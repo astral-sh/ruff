@@ -8,7 +8,7 @@ use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{
-    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -8767,7 +8767,7 @@ impl<'db> ConstructorCallError<'db> {
         let report_init_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
             CallDunderError::MethodNotAvailable => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     // If we are using vendored typeshed, it should be impossible to have missing
                     // or unbound `__init__` method on a class, as all classes have `object` in MRO.
@@ -8781,10 +8781,10 @@ impl<'db> ConstructorCallError<'db> {
             }
             CallDunderError::PossiblyUnbound(bindings) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__init__` on type `{}` is possibly unbound.",
+                        "Method `__init__` on type `{}` is possibly missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }
@@ -8799,10 +8799,10 @@ impl<'db> ConstructorCallError<'db> {
         let report_new_error = |error: &DunderNewCallError<'db>| match error {
             DunderNewCallError::PossiblyUnbound(call_error) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__new__` on type `{}` is possibly unbound.",
+                        "Method `__new__` on type `{}` is possibly missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }

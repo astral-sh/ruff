@@ -26,7 +26,7 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 | **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
 | ---------------- | -------- | ------------------------- | ------------------- |
 | bound            |          |                           |                     |
-| possibly-unbound |          | `possibly-unbound-import` | ?                   |
+| possibly-unbound |          | `possibly-missing-import` | ?                   |
 | unbound          |          | ?                         | `unresolved-import` |
 
 ## Declared
@@ -158,7 +158,7 @@ a = None
 
 If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
 inferred types. This case is interesting because the "possibly declared" definition might not be the
-same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-unbound-import`
+same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-missing-import`
 error for both `a` and `b`:
 
 `mod.py`:
@@ -177,8 +177,8 @@ else:
 ```
 
 ```py
-# error: [possibly-unbound-import]
-# error: [possibly-unbound-import]
+# error: [possibly-missing-import]
+# error: [possibly-missing-import]
 from mod import a, b
 
 reveal_type(a)  # revealed: Literal[1] | Any
@@ -332,8 +332,8 @@ if flag():
 ```
 
 ```py
-# error: [possibly-unbound-import]
-# error: [possibly-unbound-import]
+# error: [possibly-missing-import]
+# error: [possibly-missing-import]
 from mod import MyInt, C
 
 reveal_type(MyInt)  # revealed: <class 'int'>

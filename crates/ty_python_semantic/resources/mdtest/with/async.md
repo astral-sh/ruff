@@ -129,7 +129,7 @@ async def _(flag: bool):
 
         async def __exit__(self, *args): ...
 
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because the method `__aenter__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because the method `__aenter__` is possibly missing"
     async with Manager() as f:
         reveal_type(f)  # revealed: CoroutineType[Any, Any, str]
 ```

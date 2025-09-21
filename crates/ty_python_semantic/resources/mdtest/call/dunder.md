@@ -114,7 +114,7 @@ def _(flag: bool):
 
     this_fails = ThisFails()
 
-    # error: [possibly-unbound-implicit-call]
+    # error: [possibly-missing-implicit-call]
     reveal_type(this_fails[0])  # revealed: Unknown | str
 ```
 
@@ -270,6 +270,6 @@ def _(flag: bool):
                 return str(key)
 
     c = C()
-    # error: [possibly-unbound-implicit-call]
+    # error: [possibly-missing-implicit-call]
     reveal_type(c[0])  # revealed: str
 ```

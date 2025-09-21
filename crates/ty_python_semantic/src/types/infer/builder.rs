@@ -52,7 +52,7 @@ use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE, INVALID_PARAMETER_DEFAULT,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
+    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
     UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
     report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
@@ -60,7 +60,7 @@ use crate::types::diagnostic::{
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_return_type,
     report_namedtuple_field_without_default_after_field_with_default,
-    report_possibly_unbound_attribute,
+    report_possibly_missing_attribute,
 };
 use crate::types::diagnostic::{
     INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, SUBCLASS_OF_FINAL_CLASS,
@@ -3190,10 +3190,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Err(err) => match err {
                 CallDunderError::PossiblyUnbound { .. } => {
                     if let Some(builder) =
-                        context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, &**value)
+                        context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, &**value)
                     {
                         builder.into_diagnostic(format_args!(
-                            "Method `__setitem__` of type `{}` is possibly unbound",
+                            "Method `__setitem__` of type `{}` is possibly missing",
                             value_ty.display(db),
                         ));
                     }
@@ -3612,7 +3612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     };
 
                                     if boundness == Boundness::PossiblyUnbound {
-                                        report_possibly_unbound_attribute(
+                                        report_possibly_missing_attribute(
                                             &self.context,
                                             target,
                                             attribute,
@@ -3642,7 +3642,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     }
 
                                     if instance_attr_boundness == Boundness::PossiblyUnbound {
-                                        report_possibly_unbound_attribute(
+                                        report_possibly_missing_attribute(
                                             &self.context,
                                             target,
                                             attribute,
@@ -3722,7 +3722,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 };
 
                             if boundness == Boundness::PossiblyUnbound {
-                                report_possibly_unbound_attribute(
+                                report_possibly_missing_attribute(
                                     &self.context,
                                     target,
                                     attribute,
@@ -3753,7 +3753,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
 
                             if class_attr_boundness == Boundness::PossiblyUnbound {
-                                report_possibly_unbound_attribute(
+                                report_possibly_missing_attribute(
                                     &self.context,
                                     target,
                                     attribute,
@@ -4643,10 +4643,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // together if the attribute exists but is possibly-unbound.
                     if let Some(builder) = self
                         .context
-                        .report_lint(&POSSIBLY_UNBOUND_IMPORT, AnyNodeRef::Alias(alias))
+                        .report_lint(&POSSIBLY_MISSING_IMPORT, AnyNodeRef::Alias(alias))
                     {
                         builder.into_diagnostic(format_args!(
-                            "Member `{name}` of module `{module_name}` is possibly unbound",
+                            "Member `{name}` of module `{module_name}` is possibly missing",
                         ));
                     }
                 }
@@ -6643,7 +6643,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::unknown().into()
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
-                    report_possibly_unbound_attribute(
+                    report_possibly_missing_attribute(
                         &self.context,
                         attribute,
                         &attr.id,
@@ -8539,10 +8539,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__getitem__` of type `{}` is possibly unbound",
+                        "Method `__getitem__` of type `{}` is possibly missing",
                         value_ty.display(db),
                     ));
                 }
@@ -8622,11 +8622,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Place::Type(ty, boundness) => {
                     if boundness == Boundness::PossiblyUnbound {
                         if let Some(builder) =
-                            context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
+                            context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Method `__class_getitem__` of type `{}` \
-                                    is possibly unbound",
+                                    is possibly missing",
                                 value_ty.display(db),
                             ));
                         }

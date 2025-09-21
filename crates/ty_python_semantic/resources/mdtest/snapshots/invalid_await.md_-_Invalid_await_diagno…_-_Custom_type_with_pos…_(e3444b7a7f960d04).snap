@@ -3,7 +3,7 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: invalid_await.md - Invalid await diagnostics - Custom type with possibly unbound `__await__`
+mdtest name: invalid_await.md - Invalid await diagnostics - Custom type with possibly missing `__await__`
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
 ---
 
@@ -41,7 +41,7 @@ error[invalid-await]: `PossiblyUnbound` is not awaitable
   |             --------------- method defined here
 6 |             yield
   |
-info: `__await__` is possibly unbound
+info: `__await__` is possibly missing
 info: rule `invalid-await` is enabled by default
 
 ```

@@ -158,10 +158,10 @@ def _(flag: bool) -> None:
             def __new__(cls):
                 return object.__new__(cls)
 
-    # error: [possibly-unbound-implicit-call]
+    # error: [possibly-missing-implicit-call]
     reveal_type(Foo())  # revealed: Foo
 
-    # error: [possibly-unbound-implicit-call]
+    # error: [possibly-missing-implicit-call]
     # error: [too-many-positional-arguments]
     reveal_type(Foo(1))  # revealed: Foo
 ```

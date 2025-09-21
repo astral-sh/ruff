@@ -443,7 +443,7 @@ def _(flag: bool):
 This snippet tests that we infer the element type correctly in the following edge case:
 
 - `__iter__` is a method with the correct parameter spec that returns a valid iterator; BUT
-- `__iter__` is possibly unbound; AND
+- `__iter__` is possibly missing; AND
 - `__getitem__` is set to a non-callable type
 
 It's important that we emit a diagnostic here, but it's also important that we still use the return

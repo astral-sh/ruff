@@ -129,7 +129,7 @@ def _(flag: bool):
 
         def __exit__(self, *args): ...
 
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly missing"
     with Manager() as f:
         reveal_type(f)  # revealed: str
 ```

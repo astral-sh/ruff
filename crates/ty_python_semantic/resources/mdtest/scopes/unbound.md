@@ -16,7 +16,7 @@ class C:
     if flag:
         x = 2
 
-# error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C'>` is possibly unbound"
+# error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C'>` is possibly missing"
 reveal_type(C.x)  # revealed: Unknown | Literal[2]
 reveal_type(C.y)  # revealed: Unknown | Literal[1]
 ```
@@ -52,7 +52,7 @@ class C:
     elif coinflip():
         x: str = "abc"
 
-# error: [possibly-unbound-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(C.x)  # revealed: int | str
 ```
 
