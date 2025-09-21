@@ -279,6 +279,37 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+Using `auto()` with `StrEnum`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum, auto
+
+class Answer(StrEnum):
+    YES = auto()
+    NO = auto()
+
+# revealed: Literal["yes"]
+reveal_type(Answer.YES.value)
+```
+
+Using `auto()` with `IntEnum`
+
+```py
+from enum import IntEnum, auto
+
+class Answer(IntEnum):
+    YES = auto()
+    NO = auto()
+
+# revealed: Literal[1]
+reveal_type(Answer.YES.value)
+```
+
 Combining aliases with `auto()`:
 
 ```py

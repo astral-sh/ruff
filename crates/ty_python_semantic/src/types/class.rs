@@ -3664,6 +3664,7 @@ pub enum KnownClass {
     Auto,
     Member,
     Nonmember,
+    StrEnum,
     // abc
     ABCMeta,
     // Types
@@ -3803,6 +3804,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
@@ -3862,6 +3864,7 @@ impl KnownClass {
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
+            | KnownClass::StrEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -3941,6 +3944,7 @@ impl KnownClass {
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
+            | KnownClass::StrEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4020,6 +4024,7 @@ impl KnownClass {
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
+            | KnownClass::StrEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4137,6 +4142,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -4220,6 +4226,7 @@ impl KnownClass {
             Self::Auto => "auto",
             Self::Member => "member",
             Self::Nonmember => "nonmember",
+            Self::StrEnum => "StrEnum",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -4455,9 +4462,12 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum | Self::EnumType | Self::Auto | Self::Member | Self::Nonmember => {
-                KnownModule::Enum
-            }
+            Self::Enum
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -4583,6 +4593,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::NewType
@@ -4666,6 +4677,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -4752,6 +4764,9 @@ impl KnownClass {
             "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 Self::EnumType
             }
+            "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                Self::StrEnum
+            }
             "auto" => Self::Auto,
             "member" => Self::Member,
             "nonmember" => Self::Nonmember,
@@ -4824,6 +4839,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
@@ -5376,7 +5392,9 @@ mod tests {
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
                     KnownClass::KwOnly => PythonVersion::PY310,
-                    KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
+                    KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
+                        PythonVersion::PY311
+                    }
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)
