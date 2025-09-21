@@ -140,6 +140,9 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     };
 
     if !((first_arg_id == "__class__"
+            // If the first argument is __class__, check if it's a local variable.
+            // If so, don't apply UP008.
+            && !checker.semantic().current_scope().has("__class__")
         || (first_arg_id == parent_name.as_str()
             // If the first argument matches the class name, check if it's a local variable
             // that shadows the class name. If so, don't apply UP008.

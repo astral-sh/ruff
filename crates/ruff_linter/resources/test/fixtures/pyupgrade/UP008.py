@@ -287,3 +287,19 @@ class C(B):
     def f(self):
         C = B  # Local variable C shadows the class name
         return super(C, self).f()  # Should NOT trigger UP008
+
+
+# See: https://github.com/astral-sh/ruff/issues/20491
+# UP008 should not apply when __class__ is a local variable
+class A:
+    def f(self):
+        return 1
+
+class B(A):
+    def f(self):
+        return 2
+
+class C(B):
+    def f(self):
+        __class__ = B  # Local variable __class__ shadows the implicit __class__
+        return super(__class__, self).f()  # Should NOT trigger UP008
