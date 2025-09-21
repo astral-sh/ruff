@@ -95,20 +95,32 @@ pub(crate) fn is_import_required_by_isort(
     stmt: StmtRef,
     alias: &Alias,
 ) -> bool {
-    let segments: &[&str] = match stmt {
+    match stmt {
         StmtRef::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             ..
-        }) => &[module.as_str(), alias.name.as_str()],
-        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. }) | StmtRef::Import(_) => {
-            &[alias.name.as_str()]
+        }) => {
+            let segments = &[module.as_str(), alias.name.as_str()];
+            required_imports
+                .iter()
+                .any(|required_import| required_import.qualified_name().segments() == segments)
         }
-        _ => return false,
-    };
-
-    required_imports
-        .iter()
-        .any(|required_import| required_import.qualified_name().segments() == segments)
+        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. }) => {
+            let segments = &[alias.name.as_str()];
+            required_imports
+                .iter()
+                .any(|required_import| required_import.qualified_name().segments() == segments)
+        }
+        StmtRef::Import(ast::StmtImport { .. }) => {
+            // For import statements, we need to check if the full module path matches
+            // For example, "concurrent.futures" should match ["concurrent", "futures"]
+            let segments: Vec<&str> = alias.name.as_str().split('.').collect();
+            required_imports.iter().any(|required_import| {
+                required_import.qualified_name().segments() == segments.as_slice()
+            })
+        }
+        _ => false,
+    }
 }
 
 /// UP010

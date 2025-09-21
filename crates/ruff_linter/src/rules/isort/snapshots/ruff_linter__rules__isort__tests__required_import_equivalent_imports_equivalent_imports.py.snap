@@ -1,4 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-
+I002 [*] Missing required import: `import concurrent.futures as futures`
+--> equivalent_imports.py:1:1
+help: Insert required import: `import concurrent.futures as futures`
+1 + import concurrent.futures as futures
+2 | from concurrent import futures
+3 | 
+4 | 1
