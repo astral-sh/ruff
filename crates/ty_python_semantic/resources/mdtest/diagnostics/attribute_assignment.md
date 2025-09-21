@@ -69,7 +69,7 @@ instance = C()
 instance.non_existent = 1  # error: [unresolved-attribute]
 ```
 
-## Possibly-unbound attributes
+## Possibly-missing attributes
 
 When trying to set an attribute that is not defined in all branches, we emit errors:
 

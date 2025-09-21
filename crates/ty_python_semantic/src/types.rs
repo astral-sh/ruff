@@ -3774,7 +3774,7 @@ impl<'db> Type<'db> {
                         });
                     }
 
-                    // Don't trust possibly unbound `__bool__` method.
+                    // Don't trust possibly missing `__bool__` method.
                     Ok(Truthiness::Ambiguous)
                 }
 
@@ -7921,7 +7921,7 @@ impl<'db> AwaitError<'db> {
                 }
             }
             Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
-                diag.info("`__await__` is possibly unbound");
+                diag.info("`__await__` is possibly missing");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)
@@ -8028,7 +8028,7 @@ impl<'db> ContextManagerError<'db> {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
-                    format!("the method `{name}` is possibly unbound")
+                    format!("the method `{name}` is possibly missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
@@ -8045,7 +8045,7 @@ impl<'db> ContextManagerError<'db> {
                                          name_b: &str| {
             match (error_a, error_b) {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
-                    format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
+                    format!("the methods `{name_a}` and `{name_b}` are possibly missing")
                 }
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
@@ -8594,7 +8594,7 @@ pub(super) enum BoolError<'db> {
 
     /// Any other reason why the type can't be converted to a bool.
     /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
-    /// because `__bool__` points to a type that has a possibly unbound `__call__` method.
+    /// because `__bool__` points to a type that has a possibly missing `__call__` method.
     Other { not_boolable_type: Type<'db> },
 }
 
