@@ -124,20 +124,19 @@ pub(crate) fn builtin_attribute_shadowing(
             //     def repeat(value: int, times: int) -> list[int]:
             //         return [value] * times
             // ```
-            // In stable, only consider references from within the class scope.
-            // In preview, also consider references whose first non-type parent scope is the class
+            // In stable, only consider references whose first non-type parent scope is the class
             // scope (e.g., decorators, default args, and attribute initializers).
+            // In preview, also consider references from within the class scope.
             let consider_reference = |reference_scope_id: ScopeId| {
-                if reference_scope_id == scope_id {
-                    return true;
-                }
                 if is_a003_class_scope_shadowing_expansion_enabled(checker.settings()) {
-                    return checker
-                        .semantic()
-                        .first_non_type_parent_scope_id(reference_scope_id)
-                        == Some(scope_id);
+                    if reference_scope_id == scope_id {
+                        return true;
+                    }
                 }
-                false
+                checker
+                    .semantic()
+                    .first_non_type_parent_scope_id(reference_scope_id)
+                    == Some(scope_id)
             };
 
             for reference in binding
