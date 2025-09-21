@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, ceil_char_boundary,
+    github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::{Db, files::File};
 
@@ -499,10 +500,12 @@ impl Diagnostic {
     /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
         let a = (
+            self.severity().is_fatal(),
             self.expect_ruff_source_file(),
             self.range().map(|r| r.start()),
         );
         let b = (
+            other.severity().is_fatal(),
             other.expect_ruff_source_file(),
             other.range().map(|r| r.start()),
         );
@@ -1447,6 +1450,11 @@ pub enum DiagnosticFormat {
     /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     #[cfg(feature = "serde")]
     Gitlab,
+
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

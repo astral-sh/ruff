@@ -5,7 +5,7 @@ use crate::place::{ConsideredDefinitions, Place, global_symbol};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-use crate::types::{KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, UnionType, check_types};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -409,17 +409,17 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                def f(self):
-                    self.attr: int | None = None
-            "#,
+        class C:
+            def f(self):
+                self.attr: int | None = None
+        "#,
     )?;
     db.write_dedented(
         "/src/main.py",
         r#"
-            from mod import C
-            x = C().attr
-            "#,
+        from mod import C
+        x = C().attr
+        "#,
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
@@ -430,10 +430,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                def f(self):
-                    self.attr: str | None = None
-            "#,
+        class C:
+            def f(self):
+                self.attr: str | None = None
+        "#,
     )?;
 
     let events = {
@@ -442,17 +442,22 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-    assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
 
     // Add a comment; this should not trigger the type of `x` to be re-inferred
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                def f(self):
-                    # a comment!
-                    self.attr: str | None = None
-            "#,
+        class C:
+            def f(self):
+                # a comment!
+                self.attr: str | None = None
+        "#,
     )?;
 
     let events = {
@@ -462,7 +467,12 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         db.take_salsa_events()
     };
 
-    assert_function_query_was_not_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+    assert_function_query_was_not_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
 
     Ok(())
 }
@@ -487,19 +497,19 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                if random.choice([True, False]):
-                    attr: int = 42
-                else:
-                    attr: None = None
-            "#,
+        class C:
+            if random.choice([True, False]):
+                attr: int = 42
+            else:
+                attr: None = None
+        "#,
     )?;
     db.write_dedented(
         "/src/main.py",
         r#"
-            from mod import C
-            x = C().attr
-            "#,
+        from mod import C
+        x = C().attr
+        "#,
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
@@ -510,12 +520,12 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                if random.choice([True, False]):
-                    attr: str = "42"
-                else:
-                    attr: None = None
-            "#,
+        class C:
+            if random.choice([True, False]):
+                attr: str = "42"
+            else:
+                attr: None = None
+        "#,
     )?;
 
     let events = {
@@ -524,19 +534,24 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-    assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
 
     // Add a comment; this should not trigger the type of `x` to be re-inferred
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                # comment
-                if random.choice([True, False]):
-                    attr: str = "42"
-                else:
-                    attr: None = None
-            "#,
+        class C:
+            # comment
+            if random.choice([True, False]):
+                attr: str = "42"
+            else:
+                attr: None = None
+        "#,
     )?;
 
     let events = {
@@ -546,7 +561,12 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         db.take_salsa_events()
     };
 
-    assert_function_query_was_not_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+    assert_function_query_was_not_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
 
     Ok(())
 }
@@ -569,22 +589,22 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                def __init__(self):
-                    self.instance_attr: str = "24"
+        class C:
+            def __init__(self):
+                self.instance_attr: str = "24"
 
-                @classmethod
-                def method(cls):
-                    cls.class_attr: int = 42
-            "#,
+            @classmethod
+            def method(cls):
+                cls.class_attr: int = 42
+        "#,
     )?;
     db.write_dedented(
         "/src/main.py",
         r#"
-            from mod import C
-            C.method()
-            x = C().class_attr
-            "#,
+        from mod import C
+        C.method()
+        x = C().class_attr
+        "#,
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
@@ -595,14 +615,14 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                def __init__(self):
-                    self.instance_attr: str = "24"
+        class C:
+            def __init__(self):
+                self.instance_attr: str = "24"
 
-                @classmethod
-                def method(cls):
-                    cls.class_attr: str = "42"
-            "#,
+            @classmethod
+            def method(cls):
+                cls.class_attr: str = "42"
+        "#,
     )?;
 
     let events = {
@@ -611,21 +631,26 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
         db.take_salsa_events()
     };
-    assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
 
     // Add a comment; this should not trigger the type of `x` to be re-inferred
     db.write_dedented(
         "/src/mod.py",
         r#"
-            class C:
-                def __init__(self):
-                    self.instance_attr: str = "24"
+        class C:
+            def __init__(self):
+                self.instance_attr: str = "24"
 
-                @classmethod
-                def method(cls):
-                    # comment
-                    cls.class_attr: str = "42"
-            "#,
+            @classmethod
+            def method(cls):
+                # comment
+                cls.class_attr: str = "42"
+        "#,
     )?;
 
     let events = {
@@ -635,7 +660,88 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         db.take_salsa_events()
     };
 
-    assert_function_query_was_not_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+    assert_function_query_was_not_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
+
+    Ok(())
+}
+
+/// Inferring the result of a call-expression shouldn't need to re-run after
+/// a trivial change to the function's file (e.g. by adding a docstring to the function).
+#[test]
+fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    db.write_dedented(
+        "src/foo.py",
+        r#"
+        def foo() -> int:
+            return 5
+    "#,
+    )?;
+    db.write_dedented(
+        "src/bar.py",
+        r#"
+        from foo import foo
+
+        a = foo()
+        "#,
+    )?;
+
+    let bar = system_path_to_file(&db, "src/bar.py")?;
+    let a = global_symbol(&db, bar, "a").place;
+
+    assert_eq!(
+        a.expect_type(),
+        UnionType::from_elements(&db, [Type::unknown(), KnownClass::Int.to_instance(&db)])
+    );
+    let events = db.take_salsa_events();
+
+    let module = parsed_module(&db, bar).load(&db);
+    let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
+    let foo_call = semantic_index(&db, bar).expression(call);
+
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(foo_call),
+        &events,
+    );
+
+    // Add a docstring to foo to trigger a re-run.
+    // The bar-call site of foo should not be re-run because of that
+    db.write_dedented(
+        "src/foo.py",
+        r#"
+        def foo() -> int:
+            "Computes a value"
+            return 5
+        "#,
+    )?;
+    db.clear_salsa_events();
+
+    let a = global_symbol(&db, bar, "a").place;
+
+    assert_eq!(
+        a.expect_type(),
+        UnionType::from_elements(&db, [Type::unknown(), KnownClass::Int.to_instance(&db)])
+    );
+    let events = db.take_salsa_events();
+
+    let module = parsed_module(&db, bar).load(&db);
+    let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
+    let foo_call = semantic_index(&db, bar).expression(call);
+
+    assert_function_query_was_not_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(foo_call),
+        &events,
+    );
 
     Ok(())
 }

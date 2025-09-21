@@ -363,7 +363,7 @@ help: Replace with `Decimal` constructor
 21 | _ = Decimal.from_float(float("-Infinity"))
 22 | _ = Decimal.from_float(float("nan"))
    - _ = Decimal.from_float(float("-NaN "))
-23 + _ = Decimal("-nan")
+23 + _ = Decimal("nan")
 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
 25 | _ = Decimal.from_float(float("  iNf \n\t "))
 26 | _ = Decimal.from_float(float("   -inF\n \t"))
@@ -655,7 +655,7 @@ help: Replace with `Decimal` constructor
 62 | 
 63 | # Cases with non-finite floats - should produce safe fixes
    - _ = Decimal.from_float(float("-nan"))
-64 + _ = Decimal("-nan")
+64 + _ = Decimal("nan")
 65 | _ = Decimal.from_float(float("\x2dnan"))
 66 | _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
 
@@ -673,7 +673,7 @@ help: Replace with `Decimal` constructor
 63 | # Cases with non-finite floats - should produce safe fixes
 64 | _ = Decimal.from_float(float("-nan"))
    - _ = Decimal.from_float(float("\x2dnan"))
-65 + _ = Decimal("-nan")
+65 + _ = Decimal("nan")
 66 | _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
 
 FURB164 [*] Verbose method `from_float` in `Decimal` construction
@@ -689,4 +689,4 @@ help: Replace with `Decimal` constructor
 64 | _ = Decimal.from_float(float("-nan"))
 65 | _ = Decimal.from_float(float("\x2dnan"))
    - _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
-66 + _ = Decimal("-nan")
+66 + _ = Decimal("nan")

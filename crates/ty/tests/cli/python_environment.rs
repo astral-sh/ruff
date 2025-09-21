@@ -1875,3 +1875,56 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn pythonpath_is_respected() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/bar/baz.py", "it = 42"),
+        (
+            "src/foo.py",
+            r#"
+            import baz
+            print(f"{baz.it}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> src/foo.py:2:8
+      |
+    2 | import baz
+      |        ^^^
+    3 | print(f"{baz.it}")
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command()
+        .env("PYTHONPATH", case.root().join("src/bar")),
+        @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}

@@ -38,7 +38,7 @@ pub struct Definition<'db> {
     #[no_eq]
     #[returns(ref)]
     #[tracked]
-    pub(crate) kind: DefinitionKind<'db>,
+    pub kind: DefinitionKind<'db>,
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
     pub(crate) is_reexported: bool,
@@ -876,7 +876,7 @@ pub struct StarImportDefinitionKind {
 }
 
 impl StarImportDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }
 
@@ -960,7 +960,7 @@ pub struct ImportDefinitionKind {
 }
 
 impl ImportDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
         self.node.node(module)
     }
 
@@ -981,7 +981,7 @@ pub struct ImportFromDefinitionKind {
 }
 
 impl ImportFromDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }
 

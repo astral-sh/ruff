@@ -415,24 +415,37 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        // NOTE: At time of writing, 2025-08-29, auto-import isn't
-        // ready to be enabled by default yet. Once it is, we should
-        // either just enable it or provide a way to configure it.
-        let settings = ty_ide::CompletionSettings { auto_import: false };
+        let settings = ty_ide::CompletionSettings { auto_import: true };
         let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
 
         Ok(completions
             .into_iter()
-            .map(|completion| Completion {
-                kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.inner.name.into(),
-                documentation: completion
-                    .documentation
-                    .map(|documentation| documentation.render_plaintext()),
-                detail: completion
-                    .inner
-                    .ty
-                    .map(|ty| ty.display(&self.db).to_string()),
+            .map(|comp| {
+                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range = Range::from_text_range(
+                        edit.range(),
+                        &index,
+                        &source,
+                        self.position_encoding,
+                    );
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
+                Completion {
+                    name: comp.name.into(),
+                    kind,
+                    detail: type_display,
+                    module_name: comp.module_name.map(ToString::to_string),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
+                }
             })
             .collect())
     }
@@ -921,9 +934,15 @@ pub struct Completion {
     pub name: String,
     pub kind: Option<CompletionKind>,
     #[wasm_bindgen(getter_with_clone)]
+    pub insert_text: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub additional_text_edits: Option<Vec<TextEdit>>,
+    #[wasm_bindgen(getter_with_clone)]
     pub documentation: Option<String>,
     #[wasm_bindgen(getter_with_clone)]
     pub detail: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub module_name: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -956,36 +975,44 @@ pub enum CompletionKind {
     TypeParameter,
 }
 
-impl From<ty_python_semantic::CompletionKind> for CompletionKind {
-    fn from(value: ty_python_semantic::CompletionKind) -> Self {
+impl From<ty_ide::CompletionKind> for CompletionKind {
+    fn from(value: ty_ide::CompletionKind) -> Self {
         match value {
-            ty_python_semantic::CompletionKind::Text => Self::Text,
-            ty_python_semantic::CompletionKind::Method => Self::Method,
-            ty_python_semantic::CompletionKind::Function => Self::Function,
-            ty_python_semantic::CompletionKind::Constructor => Self::Constructor,
-            ty_python_semantic::CompletionKind::Field => Self::Field,
-            ty_python_semantic::CompletionKind::Variable => Self::Variable,
-            ty_python_semantic::CompletionKind::Class => Self::Class,
-            ty_python_semantic::CompletionKind::Interface => Self::Interface,
-            ty_python_semantic::CompletionKind::Module => Self::Module,
-            ty_python_semantic::CompletionKind::Property => Self::Property,
-            ty_python_semantic::CompletionKind::Unit => Self::Unit,
-            ty_python_semantic::CompletionKind::Value => Self::Value,
-            ty_python_semantic::CompletionKind::Enum => Self::Enum,
-            ty_python_semantic::CompletionKind::Keyword => Self::Keyword,
-            ty_python_semantic::CompletionKind::Snippet => Self::Snippet,
-            ty_python_semantic::CompletionKind::Color => Self::Color,
-            ty_python_semantic::CompletionKind::File => Self::File,
-            ty_python_semantic::CompletionKind::Reference => Self::Reference,
-            ty_python_semantic::CompletionKind::Folder => Self::Folder,
-            ty_python_semantic::CompletionKind::EnumMember => Self::EnumMember,
-            ty_python_semantic::CompletionKind::Constant => Self::Constant,
-            ty_python_semantic::CompletionKind::Struct => Self::Struct,
-            ty_python_semantic::CompletionKind::Event => Self::Event,
-            ty_python_semantic::CompletionKind::Operator => Self::Operator,
-            ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
+            ty_ide::CompletionKind::Text => Self::Text,
+            ty_ide::CompletionKind::Method => Self::Method,
+            ty_ide::CompletionKind::Function => Self::Function,
+            ty_ide::CompletionKind::Constructor => Self::Constructor,
+            ty_ide::CompletionKind::Field => Self::Field,
+            ty_ide::CompletionKind::Variable => Self::Variable,
+            ty_ide::CompletionKind::Class => Self::Class,
+            ty_ide::CompletionKind::Interface => Self::Interface,
+            ty_ide::CompletionKind::Module => Self::Module,
+            ty_ide::CompletionKind::Property => Self::Property,
+            ty_ide::CompletionKind::Unit => Self::Unit,
+            ty_ide::CompletionKind::Value => Self::Value,
+            ty_ide::CompletionKind::Enum => Self::Enum,
+            ty_ide::CompletionKind::Keyword => Self::Keyword,
+            ty_ide::CompletionKind::Snippet => Self::Snippet,
+            ty_ide::CompletionKind::Color => Self::Color,
+            ty_ide::CompletionKind::File => Self::File,
+            ty_ide::CompletionKind::Reference => Self::Reference,
+            ty_ide::CompletionKind::Folder => Self::Folder,
+            ty_ide::CompletionKind::EnumMember => Self::EnumMember,
+            ty_ide::CompletionKind::Constant => Self::Constant,
+            ty_ide::CompletionKind::Struct => Self::Struct,
+            ty_ide::CompletionKind::Event => Self::Event,
+            ty_ide::CompletionKind::Operator => Self::Operator,
+            ty_ide::CompletionKind::TypeParameter => Self::TypeParameter,
         }
     }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    pub range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    pub new_text: String,
 }
 
 #[wasm_bindgen]

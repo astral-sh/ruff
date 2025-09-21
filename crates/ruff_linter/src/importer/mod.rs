@@ -6,10 +6,12 @@
 use std::error::Error;
 
 use anyhow::Result;
-use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
+use libcst_native as cst;
 
+use ruff_diagnostics::Edit;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_importer::Insertion;
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
@@ -17,22 +19,17 @@ use ruff_python_semantic::{
 use ruff_python_trivia::textwrap::indent;
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::Edit;
-use crate::Locator;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
 use crate::fix::codemods::CodegenStylist;
-use crate::importer::insertion::Insertion;
-
-mod insertion;
 
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
     python_ast: &'a [Stmt],
     /// The tokens representing the Python AST.
     tokens: &'a Tokens,
-    /// The [`Locator`] for the Python AST.
-    locator: &'a Locator<'a>,
+    /// The source code text for `python_ast`.
+    source: &'a str,
     /// The [`Stylist`] for the Python AST.
     stylist: &'a Stylist<'a>,
     /// The list of visited, top-level runtime imports in the Python AST.
@@ -44,13 +41,13 @@ pub(crate) struct Importer<'a> {
 impl<'a> Importer<'a> {
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
-        locator: &'a Locator<'a>,
+        source: &'a str,
         stylist: &'a Stylist<'a>,
     ) -> Self {
         Self {
             python_ast: parsed.suite(),
             tokens: parsed.tokens(),
-            locator,
+            source,
             stylist,
             runtime_imports: Vec::default(),
             type_checking_blocks: Vec::default(),
@@ -76,11 +73,10 @@ impl<'a> Importer<'a> {
         let required_import = import.to_string();
         if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
-            Insertion::end_of_statement(stmt, self.locator, self.stylist)
-                .into_edit(&required_import)
+            Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
                 .into_edit(&required_import)
         }
     }
@@ -99,17 +95,17 @@ impl<'a> Importer<'a> {
         let content = fix::codemods::retain_imports(
             &import.names,
             import.statement,
-            self.locator,
+            self.source,
             self.stylist,
         )?;
 
         // Add the import to the top-level.
         let insertion = if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
-            Insertion::end_of_statement(stmt, self.locator, self.stylist)
+            Insertion::end_of_statement(stmt, self.source, self.stylist)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
         };
         let add_import_edit = insertion.into_edit(&content);
 
@@ -131,7 +127,7 @@ impl<'a> Importer<'a> {
         let content = fix::codemods::retain_imports(
             &import.names,
             import.statement,
-            self.locator,
+            self.source,
             self.stylist,
         )?;
 
@@ -155,7 +151,7 @@ impl<'a> Importer<'a> {
                         None
                     } else {
                         Some(Edit::range_replacement(
-                            self.locator.slice(statement.range()).to_string(),
+                            self.source[statement.range()].to_string(),
                             statement.range(),
                         ))
                     }
@@ -186,7 +182,7 @@ impl<'a> Importer<'a> {
                     None
                 } else {
                     Some(Edit::range_replacement(
-                        self.locator.slice(type_checking.range()).to_string(),
+                        self.source[type_checking.range()].to_string(),
                         type_checking.range(),
                     ))
                 };
@@ -362,7 +358,7 @@ impl<'a> Importer<'a> {
         // By adding this no-op edit, we force the `unused-imports` fix to conflict with the
         // `sys-exit-alias` fix, and thus will avoid applying both fixes in the same pass.
         let import_edit = Edit::range_replacement(
-            self.locator.slice(imported_name.range()).to_string(),
+            self.source[imported_name.range()].to_string(),
             imported_name.range(),
         );
         Ok(Some((import_edit, imported_name.into_name())))
@@ -469,11 +465,11 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut statement = match_statement(self.locator.slice(stmt))?;
+        let mut statement = match_statement(&self.source[stmt.range()])?;
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
-        aliases.push(ImportAlias {
-            name: NameOrAttribute::N(Box::new(cstName {
+        aliases.push(cst::ImportAlias {
+            name: cst::NameOrAttribute::N(Box::new(cst::Name {
                 value: member,
                 lpar: vec![],
                 rpar: vec![],
@@ -491,10 +487,10 @@ impl<'a> Importer<'a> {
     fn add_type_checking_block(&self, content: &str, at: TextSize) -> Result<Edit> {
         let insertion = if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
-            Insertion::end_of_statement(stmt, self.locator, self.stylist)
+            Insertion::end_of_statement(stmt, self.source, self.stylist)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
         };
         if insertion.is_inline() {
             Err(anyhow::anyhow!(
@@ -507,7 +503,7 @@ impl<'a> Importer<'a> {
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
     fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist, self.tokens).into_edit(content)
+        Insertion::start_of_block(at, self.source, self.stylist, self.tokens).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.

@@ -2415,8 +2415,18 @@ class Answer(enum.Enum):
     YES = 1
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
-reveal_type(Answer.NO.value)  # revealed: Any
+reveal_type(Answer.NO.value)  # revealed: Literal[0]
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
+```
+
+## Divergent inferred implicit instance attribute types
+
+```py
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x, 1)
+
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## References

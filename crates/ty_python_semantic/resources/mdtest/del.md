@@ -46,7 +46,7 @@ def delete():
     del d  # error: [unresolved-reference] "Name `d` used when not defined"
 
 delete()
-reveal_type(d)  # revealed: list[@Todo(list literal element type)]
+reveal_type(d)  # revealed: list[Unknown | int]
 
 def delete_element():
     # When the `del` target isn't a name, it doesn't force local resolution.
@@ -62,7 +62,7 @@ def delete_global():
 
 delete_global()
 # Again, the variable should have been removed, but we don't check it.
-reveal_type(d)  # revealed: list[@Todo(list literal element type)]
+reveal_type(d)  # revealed: list[Unknown | int]
 
 def delete_nonlocal():
     e = 2

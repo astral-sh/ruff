@@ -90,9 +90,7 @@ impl DisplaySettings {
 fn type_to_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => {
-            type_to_class_literal(db, Type::from(instance.class(db)))
-        }
+        Type::NominalInstance(instance) => Some(instance.class_literal(db)),
         Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
         Type::GenericAlias(alias) => Some(alias.origin(db)),
         Type::ProtocolInstance(ProtocolInstanceType {
@@ -193,10 +191,8 @@ impl ClassDisplay<'_> {
         let mut name_parts = vec![];
 
         // Skips itself
-        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
-        {
-            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
-            let node = ancestor_scope_id.node(self.db);
+        for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1) {
+            let node = ancestor_scope.node();
 
             match ancestor_scope.kind() {
                 ScopeKind::Class => {
@@ -1648,7 +1644,7 @@ mod tests {
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
                     Parameter::variadic(Name::new_static("args"))
-                        .with_annotated_type(Type::object(&db)),
+                        .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
                     Parameter::keyword_only(Name::new_static("h"))
@@ -1804,7 +1800,7 @@ mod tests {
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
                     Parameter::variadic(Name::new_static("args"))
-                        .with_annotated_type(Type::object(&db)),
+                        .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
                     Parameter::keyword_only(Name::new_static("h"))

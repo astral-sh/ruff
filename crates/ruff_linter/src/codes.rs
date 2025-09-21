@@ -394,6 +394,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
         (Flake8Bugbear, "911") => (RuleGroup::Stable, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
+        (Flake8Bugbear, "912") => (RuleGroup::Preview, rules::flake8_bugbear::rules::MapWithoutExplicitStrict),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
@@ -944,7 +945,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "120") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathDirname),
         (Flake8UsePathlib, "121") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathSamefile),
         (Flake8UsePathlib, "122") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathSplitext),
-        (Flake8UsePathlib, "123") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::BuiltinOpen),
+        (Flake8UsePathlib, "123") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::BuiltinOpen),
         (Flake8UsePathlib, "124") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::PyPath),
         (Flake8UsePathlib, "201") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory),
         (Flake8UsePathlib, "202") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathGetsize),
@@ -1051,6 +1052,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "063") => (RuleGroup::Preview, rules::ruff::rules::AccessAnnotationsFromClassDict),
         (Ruff, "064") => (RuleGroup::Preview, rules::ruff::rules::NonOctalPermissions),
+        (Ruff, "065") => (RuleGroup::Preview, rules::ruff::rules::LoggingEagerConversion),
+
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
@@ -1080,6 +1083,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
+        #[cfg(any(feature = "test-rules", test))]
+        (Ruff, "990") => (RuleGroup::Preview, rules::ruff::rules::PanicyTestRule),
 
 
         // flake8-django

@@ -481,6 +481,10 @@ class Foo:
     def returns_self(self, x: int) -> Self:
         return self
 
+    @classmethod
+    def class_method(cls, x: int) -> Self:
+        return cls(x)
+
 def _(
     c1: CallableTypeOf[f1],
     c2: CallableTypeOf[f2],
@@ -488,6 +492,7 @@ def _(
     c4: CallableTypeOf[Foo],
     c5: CallableTypeOf[Foo(42).__call__],
     c6: CallableTypeOf[Foo(42).returns_self],
+    c7: CallableTypeOf[Foo.class_method],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int
@@ -499,4 +504,5 @@ def _(
     reveal_type(c5)  #  revealed: (x: int) -> str
 
     reveal_type(c6)  # revealed: (x: int) -> Foo
+    reveal_type(c7)  # revealed: (x: int) -> Foo
 ```

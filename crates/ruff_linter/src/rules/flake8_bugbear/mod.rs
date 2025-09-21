@@ -16,6 +16,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    use crate::settings::types::PreviewMode;
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
@@ -81,10 +82,34 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY314.into(),
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(
         Rule::ClassAsDataStructure,
         Path::new("class_as_data_structure.py"),
         PythonVersion::PY39
+    )]
+    #[test_case(
+        Rule::MapWithoutExplicitStrict,
+        Path::new("B912.py"),
+        PythonVersion::PY313
     )]
     fn rules_with_target_version(
         rule_code: Rule,

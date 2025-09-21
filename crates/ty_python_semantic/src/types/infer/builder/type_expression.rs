@@ -14,14 +14,18 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
     LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeIsType, UnionBuilder, UnionType, todo_type,
+    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_type_expression_no_store(expression);
+        let mut ty = self.infer_type_expression_no_store(expression);
+        let divergent = Type::divergent(self.scope());
+        if ty.has_divergent_type(self.db(), divergent) {
+            ty = divergent;
+        }
         self.store_expression_type(expression, ty);
         ty
     }
@@ -114,7 +118,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     node_index: _,
                 } = subscript;
 
-                let value_ty = self.infer_expression(value);
+                let value_ty = self.infer_expression(value, TypeContext::default());
 
                 self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
             }
@@ -324,7 +328,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Dict(dict) => {
-                self.infer_dict_expression(dict);
+                self.infer_dict_expression(dict, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Dict literals are not allowed in type expressions"),
@@ -333,7 +337,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Set(set) => {
-                self.infer_set_expression(set);
+                self.infer_set_expression(set, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Set literals are not allowed in type expressions"),
@@ -414,7 +418,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(call_expr);
+                self.infer_call_expression(call_expr, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Function calls are not allowed in type expressions"),
@@ -544,7 +548,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let value_ty = if builder.deferred_state.in_string_annotation() {
                         // Using `.expression_type` does not work in string annotations, because
                         // we do not store types for sub-expressions. Re-infer the type here.
-                        builder.infer_expression(value)
+                        builder.infer_expression(value, TypeContext::default())
                     } else {
                         builder.expression_type(value)
                     };
@@ -559,7 +563,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match tuple_slice {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
-                    self.infer_expression(ellipsis);
+                    self.infer_expression(ellipsis, TypeContext::default());
                     let result =
                         TupleType::homogeneous(self.db(), self.infer_type_expression(element));
                     self.store_expression_type(tuple_slice, Type::tuple(Some(result)));
@@ -617,7 +621,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                let name_ty = self.infer_expression(slice);
+                let name_ty = self.infer_expression(slice, TypeContext::default());
                 match name_ty {
                     Type::ClassLiteral(class_literal) => {
                         if class_literal.is_protocol(self.db()) {
@@ -663,7 +667,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 slice: parameters,
                 ..
             }) => {
-                let parameters_ty = match self.infer_expression(value) {
+                let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
                             let ty = UnionType::from_elements_leave_aliases(
@@ -713,7 +717,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `infer_expression` (instead of `infer_type_expression`) here to avoid
                 // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
                 // expression).
-                self.infer_expression(&subscript.slice);
+                self.infer_expression(slice, TypeContext::default());
                 Type::unknown()
             }
             Type::SpecialForm(special_form) => {
@@ -721,7 +725,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedProtocol(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.Protocol` is not allowed in type expressions",
@@ -730,7 +734,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::SubscriptedGeneric(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.Generic` is not allowed in type expressions",
@@ -739,7 +743,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::Deprecated(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`warnings.deprecated` is not allowed in type expressions",
@@ -748,7 +752,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::Field(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`dataclasses.Field` is not allowed in type expressions",
@@ -757,7 +761,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::ConstraintSet(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`ty_extensions.ConstraintSet` is not allowed in type expressions",
@@ -766,7 +770,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeVar(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     todo_type!("TypeVar annotations")
                 }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
@@ -831,8 +835,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .unwrap_or(Type::unknown())
                     }
                     None => {
-                        // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
-                        // specialize a non-generic class.
+                        // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_type_expression(slice);
                         todo_type!("specialized non-generic class")
                     }
@@ -912,14 +915,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {
                     for argument in arguments {
-                        self.infer_expression(argument);
+                        self.infer_expression(argument, TypeContext::default());
                     }
                     self.store_expression_type(arguments_slice, Type::unknown());
                     return Type::unknown();
                 };
 
                 for element in metadata {
-                    self.infer_expression(element);
+                    self.infer_expression(element, TypeContext::default());
                 }
 
                 let ty = self.infer_type_expression(type_expr);
@@ -1107,7 +1110,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let num_arguments = arguments.len();
                 let type_of_type = if num_arguments == 1 {
                     // N.B. This uses `infer_expression` rather than `infer_type_expression`
-                    self.infer_expression(&arguments[0])
+                    self.infer_expression(&arguments[0], TypeContext::default())
                 } else {
                     for argument in arguments {
                         self.infer_type_expression(argument);
@@ -1137,7 +1140,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 if num_arguments != 1 {
                     for argument in arguments {
-                        self.infer_expression(argument);
+                        self.infer_expression(argument, TypeContext::default());
                     }
                     report_invalid_argument_number_to_special_form(
                         &self.context,
@@ -1152,7 +1155,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                let argument_type = self.infer_expression(&arguments[0]);
+                let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
                 let bindings = argument_type.bindings(db);
 
                 // SAFETY: This is enforced by the constructor methods on `Bindings` even in
@@ -1166,7 +1169,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(bound_method) = argument_type.into_bound_method() {
                         binding
                             .signature
-                            .bind_self(self.db(), Some(bound_method.self_instance(db)))
+                            .bind_self(self.db(), Some(bound_method.typing_self_type(db)))
                     } else {
                         binding.signature.clone()
                     }
@@ -1362,7 +1365,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::tuple(self.infer_tuple_type_expression(arguments_slice))
             }
             SpecialFormType::Generic | SpecialFormType::Protocol => {
-                self.infer_expression(arguments_slice);
+                self.infer_expression(arguments_slice, TypeContext::default());
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "`{special_form}` is not allowed in type expressions",
@@ -1380,7 +1383,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Ok(match parameters {
             // TODO handle type aliases
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let value_ty = self.infer_expression(value);
+                let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
                     let ty = self.infer_literal_parameter_type(slice)?;
 
@@ -1389,7 +1392,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(parameters, ty);
                     ty
                 } else {
-                    self.infer_expression(slice);
+                    self.infer_expression(slice, TypeContext::default());
                     self.store_expression_type(parameters, Type::unknown());
 
                     return Err(vec![parameters]);
@@ -1426,13 +1429,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             literal @ (ast::Expr::StringLiteral(_)
             | ast::Expr::BytesLiteral(_)
             | ast::Expr::BooleanLiteral(_)
-            | ast::Expr::NoneLiteral(_)) => self.infer_expression(literal),
+            | ast::Expr::NoneLiteral(_)) => self.infer_expression(literal, TypeContext::default()),
             literal @ ast::Expr::NumberLiteral(number) if number.value.is_int() => {
-                self.infer_expression(literal)
+                self.infer_expression(literal, TypeContext::default())
             }
             // For enum values
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                let value_ty = self.infer_expression(value);
+                let value_ty = self.infer_expression(value, TypeContext::default());
 
                 if is_enum_class(self.db(), value_ty) {
                     let ty = value_ty
@@ -1461,7 +1464,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty
             }
             _ => {
-                self.infer_expression(parameters);
+                self.infer_expression(parameters, TypeContext::default());
                 return Err(vec![parameters]);
             }
         })
@@ -1507,7 +1510,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 });
             }
             ast::Expr::Subscript(subscript) => {
-                let value_ty = self.infer_expression(&subscript.value);
+                let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
                 self.infer_subscript_type_expression(subscript, value_ty);
                 // TODO: Support `Concatenate[...]`
                 return Some(Parameters::todo());
@@ -1519,13 +1522,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                if any_over_type(self.db(), self.infer_name_load(name), &|ty| match ty {
-                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
-                    Type::NominalInstance(nominal) => nominal
-                        .class(self.db())
-                        .is_known(self.db(), KnownClass::ParamSpec),
-                    _ => false,
-                }) {
+                if any_over_type(
+                    self.db(),
+                    self.infer_name_load(name),
+                    &|ty| match ty {
+                        Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
+                        Type::NominalInstance(nominal) => {
+                            nominal.has_known_class(self.db(), KnownClass::ParamSpec)
+                        }
+                        _ => false,
+                    },
+                    true,
+                ) {
                     return Some(Parameters::todo());
                 }
             }

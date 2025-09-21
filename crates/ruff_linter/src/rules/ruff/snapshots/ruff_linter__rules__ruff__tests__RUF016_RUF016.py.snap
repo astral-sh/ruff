@@ -415,3 +415,31 @@ RUF016 Indexed access to type `list` uses type `str` instead of an integer or sl
 95 |
 96 | # Cannot emit on invalid access using variable in index
    |
+
+RUF016 Indexed access to type `list` uses type `Template` instead of an integer or slice
+   --> RUF016.py:124:14
+    |
+123 | # Should emit for invalid access using t-string
+124 | var = [1, 2][t"x"]
+    |              ^^^^
+125 |
+126 | # Should emit for invalid access using lambda
+    |
+
+RUF016 Indexed access to type `list` uses type `lambda` instead of an integer or slice
+   --> RUF016.py:127:17
+    |
+126 | # Should emit for invalid access using lambda
+127 | var = [1, 2, 3][lambda: 0]
+    |                 ^^^^^^^^^
+128 |
+129 | # Should emit for invalid access using generator
+    |
+
+RUF016 Indexed access to type `list` uses type `generator` instead of an integer or slice
+   --> RUF016.py:130:17
+    |
+129 | # Should emit for invalid access using generator
+130 | var = [1, 2, 3][(x for x in ())]
+    |                 ^^^^^^^^^^^^^^^
+    |
