@@ -853,15 +853,26 @@ impl<'db> Node<'db> {
         // intersection clauses in the DNF form. The path traverses zero or more interior nodes,
         // and takes either the true or false edge from each one. That gives you the positive or
         // negative individual constraints in the path's clause.
-
-        match self {
-            Node::AlwaysTrue => return String::from("always"),
-            Node::AlwaysFalse => return String::from("never"),
-            Node::Interior(_) => {}
+        struct DisplayNode<'db> {
+            node: Node<'db>,
+            db: &'db dyn Db,
         }
-        let mut clauses = self.satisfied_clauses(db);
-        clauses.simplify();
-        clauses.render(db)
+
+        impl Display for DisplayNode<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.node {
+                    Node::AlwaysTrue => f.write_str("always"),
+                    Node::AlwaysFalse => f.write_str("never"),
+                    Node::Interior(_) => {
+                        let mut clauses = self.node.satisfied_clauses(self.db);
+                        clauses.simplify();
+                        clauses.display(self.db).fmt(f)
+                    }
+                }
+            }
+        }
+
+        DisplayNode { node: self, db }
     }
 }
 
@@ -1137,26 +1148,38 @@ impl<'db> SatisfiedClause<'db> {
         }
     }
 
-    fn render(&self, db: &'db dyn Db, result: &mut String) {
-        if self.constraints.len() > 1 {
-            result.push_str("(");
+    fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplaySatisfiedClause<'a, 'db> {
+            clause: &'a SatisfiedClause<'db>,
+            db: &'db dyn Db,
         }
-        for (i, constraint) in self.constraints.iter().enumerate() {
-            if i > 0 {
-                result.push_str(" ∧ ");
+
+        impl Display for DisplaySatisfiedClause<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if self.clause.constraints.len() > 1 {
+                    f.write_str("(")?;
+                }
+                for (i, constraint) in self.clause.constraints.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ∧ ")?;
+                    }
+                    match constraint {
+                        SatisfiedConstraint::Positive(constraint) => {
+                            write!(f, "{}", constraint.display(self.db))?;
+                        }
+                        SatisfiedConstraint::Negative(constraint) => {
+                            write!(f, "{}", constraint.display_negated(self.db))?;
+                        }
+                    }
+                }
+                if self.clause.constraints.len() > 1 {
+                    f.write_str(")")?;
+                }
+                Ok(())
             }
-            let _ = match constraint {
-                SatisfiedConstraint::Positive(constraint) => {
-                    write!(result, "{}", constraint.display(db))
-                }
-                SatisfiedConstraint::Negative(constraint) => {
-                    write!(result, "{}", constraint.display_negated(db))
-                }
-            };
         }
-        if self.constraints.len() > 1 {
-            result.push_str(")");
-        }
+
+        DisplaySatisfiedClause { clause: self, db }
     }
 }
 
@@ -1186,17 +1209,27 @@ impl<'db> SatisfiedClauses<'db> {
         }
     }
 
-    fn render(&self, db: &'db dyn Db) -> String {
-        if self.clauses.is_empty() {
-            return String::from("always");
+    fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplaySatisfiedClauses<'a, 'db> {
+            clauses: &'a SatisfiedClauses<'db>,
+            db: &'db dyn Db,
         }
-        let mut result = String::new();
-        for (i, clause) in self.clauses.iter().enumerate() {
-            if i > 0 {
-                result.push_str(" ∨ ");
+
+        impl Display for DisplaySatisfiedClauses<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if self.clauses.clauses.is_empty() {
+                    return f.write_str("always");
+                }
+                for (i, clause) in self.clauses.clauses.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ∨ ")?;
+                    }
+                    clause.display(self.db).fmt(f)?;
+                }
+                Ok(())
             }
-            clause.render(db, &mut result);
         }
-        result
+
+        DisplaySatisfiedClauses { clauses: self, db }
     }
 }
