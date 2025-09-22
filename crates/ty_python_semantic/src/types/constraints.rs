@@ -1073,10 +1073,14 @@ impl<'db> InteriorNode<'db> {
                     self_atom.display(db),
                     nested_atom.display(db),
                 );
-                simplified =
-                    simplified.substitute_intersection(db, larger_atom, smaller_atom, smaller_atom);
-                simplified =
-                    simplified.substitute_union(db, larger_atom, smaller_atom, larger_atom);
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_intersection(db, larger_atom, smaller_atom, smaller_atom),
+                );
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_union(db, larger_atom, smaller_atom, larger_atom),
+                );
                 return;
             }
 
@@ -1086,8 +1090,10 @@ impl<'db> InteriorNode<'db> {
                 .intersect(db, nested_constraint)
                 .map(|constraint| ConstrainedTypeVar::new(db, typevar, constraint));
             if let Some(intersection) = intersection {
-                simplified =
-                    simplified.substitute_intersection(db, self_atom, nested_atom, intersection);
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_intersection(db, self_atom, nested_atom, intersection),
+                );
             }
         });
         simplified
