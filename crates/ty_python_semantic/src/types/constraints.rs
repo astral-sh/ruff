@@ -865,7 +865,7 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => f.write_str("never"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
-                        clauses.simplify();
+                        clauses.simplify(self.db);
                         clauses.display(self.db).fmt(f)
                     }
                 }
@@ -1109,7 +1109,7 @@ impl<'db> SatisfiedConstraint<'db> {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClause<'db> {
     constraints: Vec<SatisfiedConstraint<'db>>,
 }
@@ -1142,10 +1142,12 @@ impl<'db> SatisfiedClause<'db> {
         self.constraints[last_index].flip();
     }
 
-    fn remove_prefix(&mut self, prefix: &SatisfiedClause<'db>) {
+    fn remove_prefix(&mut self, db: &'db dyn Db, prefix: &SatisfiedClause<'db>) -> bool {
         if self.constraints.starts_with(&prefix.constraints) {
             self.constraints.drain(0..prefix.constraints.len());
+            return true;
         }
+        false
     }
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
@@ -1183,7 +1185,7 @@ impl<'db> SatisfiedClause<'db> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClauses<'db> {
     clauses: Vec<SatisfiedClause<'db>>,
 }
@@ -1193,19 +1195,61 @@ impl<'db> SatisfiedClauses<'db> {
         self.clauses.push(clause);
     }
 
-    fn simplify(&mut self) {
-        let mut existing_clauses = std::mem::take(&mut self.clauses);
-        self.clauses.reserve_exact(existing_clauses.len());
-        while let Some((i, _)) =
-            (existing_clauses.iter().enumerate()).min_by_key(|(_, clause)| clause.constraints.len())
-        {
-            let mut clause = existing_clauses.swap_remove(i);
+    fn simplify_one_round(&mut self, db: &'db dyn Db) -> bool {
+        let mut changes_made = false;
+
+        // First remove any duplicate clauses. (The clause list will start out with no duplicates
+        // in the first round of simplification, because of the guarantees provided by the BDD
+        // structure. But earlier rounds of simplification might have made some clauses redundant.)
+        // Note that we have to loop through the vector element indexes manually, since we might
+        // remove elements in each iteration.
+        let mut i = 0;
+        while i < self.clauses.len() {
+            let mut j = i + 1;
+            while j < self.clauses.len() {
+                if self.clauses[i] == self.clauses[j] {
+                    self.clauses.swap_remove(j);
+                    changes_made = true;
+                } else {
+                    j += 1;
+                }
+            }
+            i += 1;
+        }
+        if changes_made {
+            return true;
+        }
+
+        for i in 0..self.clauses.len() {
+            let (clause, rest) = self.clauses[..i + 1]
+                .split_last_mut()
+                .expect("index should be in range");
             clause.with_flipped_last_constraint(|clause| {
-                for other_clause in &mut existing_clauses {
-                    other_clause.remove_prefix(&clause);
+                for existing in rest {
+                    changes_made |= existing.remove_prefix(db, clause);
                 }
             });
-            self.clauses.push(clause);
+
+            let (clause, rest) = self.clauses[i..]
+                .split_first_mut()
+                .expect("index should be in range");
+            clause.with_flipped_last_constraint(|clause| {
+                for existing in rest {
+                    changes_made |= existing.remove_prefix(db, clause);
+                }
+            });
+
+            if changes_made {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn simplify(&mut self, db: &'db dyn Db) {
+        while self.simplify_one_round(db) {
+            // Keep going
         }
     }
 
