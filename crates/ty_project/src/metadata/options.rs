@@ -310,21 +310,34 @@ impl Options {
         // as they should be checked before site-packages just like python
         // interpreter does
         if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
-            const SEP: &str = if cfg!(windows) { ";" } else { ":" };
-
-            for path in python_path.split(SEP) {
-                let possible_path = SystemPath::absolute(path, system.current_directory());
-
-                if system.is_directory(&possible_path) {
+            for path in std::env::split_paths(python_path.as_str()) {
+                let Some(path) = SystemPath::from_std_path(path.as_path()) else {
+                    let path = path.to_string_lossy();
                     tracing::debug!(
-                        "Adding `{possible_path}` from the `PYTHONPATH` environment variable to `extra_paths`"
+                        "Skipping `{path}` listed in `PYTHONPATH` because the path is not valid UTF-8"
                     );
-                    extra_paths.push(possible_path);
-                } else {
+                    continue;
+                };
+
+                let abspath = SystemPath::absolute(path, system.current_directory());
+
+                if !system.path_exists(&abspath) {
                     tracing::debug!(
-                        "Skipping `{possible_path}` listed in `PYTHONPATH` because the path doesn't exist or isn't a directory"
+                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path does not exist"
                     );
+                    continue;
                 }
+                if !system.is_directory(&abspath) {
+                    tracing::debug!(
+                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path is not a directory"
+                    );
+                    continue;
+                }
+
+                tracing::debug!(
+                    "Adding `{abspath}` from the `PYTHONPATH` environment variable to `extra_paths`"
+                );
+                extra_paths.push(abspath);
             }
         }
 
