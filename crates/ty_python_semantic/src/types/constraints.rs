@@ -372,6 +372,22 @@ impl<'db> RangeConstraint<'db> {
         Some(Self { lower, upper })
     }
 
+    /// Returns the union of two range constraints if it can be simplified to a single constraint.
+    /// Otherwise returns `None`.
+    fn union(&self, db: &'db dyn Db, other: RangeConstraint<'db>) -> Option<Self> {
+        // When one of the bounds is entirely contained within the other, the union simplifies to
+        // the larger bounds.
+        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
+            return Some(self.clone());
+        }
+        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
+            return Some(other.clone());
+        }
+
+        // Otherwise the result cannot be simplified.
+        None
+    }
+
     fn display(self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
         self.display_inner(db, typevar, false)
     }
@@ -455,6 +471,23 @@ impl<'db> Node<'db> {
         ))
     }
 
+    fn new_satisfied_constraint(db: &'db dyn Db, constraint: SatisfiedConstraint<'db>) -> Self {
+        match constraint {
+            SatisfiedConstraint::Positive(constraint) => Self::Interior(InteriorNode::new(
+                db,
+                constraint,
+                Node::AlwaysTrue,
+                Node::AlwaysFalse,
+            )),
+            SatisfiedConstraint::Negative(constraint) => Self::Interior(InteriorNode::new(
+                db,
+                constraint,
+                Node::AlwaysFalse,
+                Node::AlwaysTrue,
+            )),
+        }
+    }
+
     fn atom(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
         match self {
             Node::Interior(interior) => Some(interior.atom(db)),
@@ -514,6 +547,7 @@ impl<'db> Node<'db> {
     }
 
     fn implies(self, db: &'db dyn Db, other: Self) -> Self {
+        /*
         match (self, other) {
             (Node::AlwaysFalse, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
             (Node::AlwaysTrue, other) | (other, Node::AlwaysFalse) => other,
@@ -522,6 +556,8 @@ impl<'db> Node<'db> {
                 a.implies(db, b)
             }
         }
+        */
+        self.or(db, other.negate(db))
     }
 
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
@@ -541,11 +577,17 @@ impl<'db> Node<'db> {
         // since it maps everything we care about to 1, and everything we don't care about to 0. So
         // we can just AND the two BDDs together.
         let mapped_to_zero = self.and(db, relative_to);
+        eprintln!("==> {}", self.display(db));
+        eprintln!("  ∧ {}", relative_to.display(db));
+        eprintln!("  = {}", mapped_to_zero.display(db));
 
         // And then we try forcing them to 1. To that, we negate `relative_to`, so that things we
         // care about map to 0, and things we don't care about map to 1. And then we OR that with
         // the original BDD.
         let mapped_to_one = self.or(db, relative_to.negate(db));
+        eprintln!("==> {}", self.display(db));
+        eprintln!("  ∨ {}", relative_to.negate(db).display(db));
+        eprintln!("  = {}", mapped_to_one.display(db));
 
         // Then we keep the result that has the fewest interior nodes, using that as a proxy for
         // the complexity of the underlying function.
@@ -569,37 +611,131 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         assignment: impl IntoIterator<Item = SatisfiedConstraint<'db>>,
-    ) -> (Node<'db>, Node<'db>) {
-        assignment.into_iter().fold(
-            (self, Node::AlwaysFalse),
-            |(restricted, not_restricted), assignment| {
-                let (this_restricted, this_not_restricted) =
-                    restricted.restrict_one(db, assignment);
-                (this_restricted, not_restricted.or(db, this_not_restricted))
-            },
-        )
+    ) -> Node<'db> {
+        //eprintln!("==> restrict {}", self.display(db));
+        assignment.into_iter().fold(self, |restricted, assignment| {
+            /*
+            eprintln!(" -> restricted {}", restricted.display(db));
+            eprintln!(
+                " -> {} == {}",
+                assignment.constraint().display(db),
+                match assignment {
+                    SatisfiedConstraint::Positive(_) => "1",
+                    SatisfiedConstraint::Negative(_) => "0",
+                },
+            );
+            */
+            restricted.restrict_one(db, assignment)
+        })
     }
 
-    fn restrict_one(
-        self,
-        db: &'db dyn Db,
-        assignment: SatisfiedConstraint<'db>,
-    ) -> (Node<'db>, Node<'db>) {
+    fn restrict_one(self, db: &'db dyn Db, assignment: SatisfiedConstraint<'db>) -> Node<'db> {
         match self {
-            Node::AlwaysTrue => (Node::AlwaysTrue, Node::AlwaysTrue),
-            Node::AlwaysFalse => (Node::AlwaysFalse, Node::AlwaysFalse),
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
             Node::Interior(interior) => interior.restrict_one(db, assignment),
         }
     }
 
-    fn substitute(
+    fn substitute_intersection(
         self,
         db: &'db dyn Db,
-        from: impl IntoIterator<Item = SatisfiedConstraint<'db>>,
-        to: Self,
+        left: ConstrainedTypeVar<'db>,
+        right: ConstrainedTypeVar<'db>,
+        replacement: ConstrainedTypeVar<'db>,
     ) -> Self {
-        let (when_from, when_not_from) = self.restrict(db, from);
-        to.ite(db, when_from, when_not_from)
+        eprintln!(
+            "==> substitute {} for ({}) ∧ ({})",
+            replacement.display(db),
+            left.display(db),
+            right.display(db)
+        );
+        eprintln!(" -> in {}", self.display(db));
+        let when_not_left = self.restrict(db, [SatisfiedConstraint::Negative(left)]);
+        eprintln!(" -> (x ∧ y)[x=0] = {}", when_not_left.display(db));
+        let when_left_but_not_right = self.restrict(
+            db,
+            [
+                SatisfiedConstraint::Positive(left),
+                SatisfiedConstraint::Negative(right),
+            ],
+        );
+        eprintln!(
+            " -> (x ∧ y)[x=1,y=0] = {}",
+            when_left_but_not_right.display(db)
+        );
+        let when_left_and_right = self.restrict(
+            db,
+            [
+                SatisfiedConstraint::Positive(left),
+                SatisfiedConstraint::Positive(right),
+            ],
+        );
+        eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_left_and_right.display(db));
+        let left_node = Node::new_constraint(db, left);
+        let right_node = Node::new_constraint(db, right);
+        let replacement_node = Node::new_constraint(db, replacement);
+
+        let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
+        eprintln!(" -> right_result = {}", right_result.display(db));
+        let left_result = left_node.ite(db, right_result, when_not_left);
+        eprintln!(" -> left_result  = {}", left_result.display(db));
+        let result = replacement_node.ite(db, when_left_and_right, left_result);
+        eprintln!(" -> result       = {}", result.display(db));
+        result
+    }
+
+    fn substitute_union(
+        self,
+        db: &'db dyn Db,
+        left: ConstrainedTypeVar<'db>,
+        right: ConstrainedTypeVar<'db>,
+        replacement: ConstrainedTypeVar<'db>,
+    ) -> Self {
+        eprintln!(
+            "==> substitute {} for ({}) ∨ ({})",
+            replacement.display(db),
+            left.display(db),
+            right.display(db)
+        );
+        eprintln!(" -> in {}", self.display(db));
+        let when_l0_r0 = self.restrict(
+            db,
+            [
+                SatisfiedConstraint::Negative(left),
+                SatisfiedConstraint::Negative(right),
+            ],
+        );
+        let when_l1_r0 = self.restrict(
+            db,
+            [
+                SatisfiedConstraint::Positive(left),
+                SatisfiedConstraint::Negative(right),
+            ],
+        );
+        let when_l0_r1 = self.restrict(
+            db,
+            [
+                SatisfiedConstraint::Negative(left),
+                SatisfiedConstraint::Positive(right),
+            ],
+        );
+        let when_l1_r1 = self.restrict(
+            db,
+            [
+                SatisfiedConstraint::Positive(left),
+                SatisfiedConstraint::Positive(right),
+            ],
+        );
+        let replacement_node = Node::new_constraint(db, replacement);
+
+        let result = replacement_node.ite(
+            db,
+            when_l1_r0.or(db, when_l0_r1.or(db, when_l1_r1)),
+            when_l0_r0,
+        );
+        eprintln!(" -> result       = {}", result.display(db));
+        result
     }
 
     fn for_each_constraint(
@@ -619,6 +755,12 @@ impl<'db> Node<'db> {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => interior.simplify(db),
+        }
+    }
+
+    fn update_if_simpler(&mut self, db: &'db dyn Db, replacement: Self) {
+        if replacement.interior_node_count(db) < self.interior_node_count(db) {
+            *self = replacement;
         }
     }
 
@@ -753,6 +895,7 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
+    /*
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn implies(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_atom = self.atom(db);
@@ -778,35 +921,30 @@ impl<'db> InteriorNode<'db> {
             ),
         }
     }
+    */
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn restrict_one(
-        self,
-        db: &'db dyn Db,
-        assignment: SatisfiedConstraint<'db>,
-    ) -> (Node<'db>, Node<'db>) {
+    fn restrict_one(self, db: &'db dyn Db, assignment: SatisfiedConstraint<'db>) -> Node<'db> {
         // If this node's variable is larger than the assignment's variable, then we have reached a
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_atom = self.atom(db);
         if assignment.constraint() < self_atom {
-            return (Node::Interior(self), Node::Interior(self));
+            return Node::Interior(self);
         }
 
         // Otherwise, check if this node's variable is in the assignment. If so, substitute the
         // variable by replacing this node with its if_false/if_true edge, accordingly.
         if assignment == SatisfiedConstraint::Positive(self_atom) {
-            (self.if_true(db), self.if_false(db))
+            self.if_true(db)
         } else if assignment == SatisfiedConstraint::Negative(self_atom) {
-            (self.if_false(db), self.if_true(db))
+            self.if_false(db)
         } else {
-            let (true_restricted, true_not_restricted) =
-                self.if_true(db).restrict_one(db, assignment);
-            let (false_restricted, false_not_restricted) =
-                self.if_false(db).restrict_one(db, assignment);
-            (
-                Node::new(db, self_atom, true_restricted, false_restricted),
-                Node::new(db, self_atom, true_not_restricted, false_not_restricted),
+            Node::new(
+                db,
+                self_atom,
+                self.if_true(db).restrict_one(db, assignment),
+                self.if_false(db).restrict_one(db, assignment),
             )
         }
     }
@@ -815,47 +953,52 @@ impl<'db> InteriorNode<'db> {
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
         let self_atom = self.atom(db);
         let mut simplified = Node::Interior(self);
-        Node::Interior(self).for_each_constraint(db, &mut |nested_constraint| {
-            if self_atom == nested_constraint {
+        Node::Interior(self).for_each_constraint(db, &mut |nested_atom| {
+            if self_atom == nested_atom {
                 return;
             }
 
             let typevar = self_atom.typevar(db);
-            if typevar != nested_constraint.typevar(db) {
+            if typevar != nested_atom.typevar(db) {
                 return;
             }
 
-            /*
-            // XXX: Can these be removed in favor of the intersection below?
-            if self_atom.contains(db, nested_constraint) {
-                let given = Node::new_constraint(db, nested_constraint)
+            if self_atom.contains(db, nested_atom) {
+                eprintln!(
+                    "==> {} contains {}",
+                    self_atom.display(db),
+                    nested_atom.display(db),
+                );
+                let given = Node::new_constraint(db, nested_atom)
                     .implies(db, Node::new_constraint(db, self_atom));
-                simplified = simplified.simplify_relative_to(db, given);
+                eprintln!(" -> {}", given.display(db));
+                simplified.update_if_simpler(db, simplified.simplify_relative_to(db, given));
                 return;
             }
-            if nested_constraint.contains(db, self_atom) {
+            if nested_atom.contains(db, self_atom) {
+                eprintln!(
+                    "==> {} contains {} (rev)",
+                    nested_atom.display(db),
+                    self_atom.display(db),
+                );
                 let given = Node::new_constraint(db, self_atom)
-                    .implies(db, Node::new_constraint(db, nested_constraint));
-                simplified = simplified.simplify_relative_to(db, given);
+                    .implies(db, Node::new_constraint(db, nested_atom));
+                eprintln!(" -> {}", given.display(db));
+                simplified.update_if_simpler(db, simplified.simplify_relative_to(db, given));
                 return;
             }
-            */
 
-            let intersection =
-                match (self_atom.constraint(db)).intersect(db, nested_constraint.constraint(db)) {
-                    Some(intersection) => {
-                        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, intersection))
-                    }
-                    None => Node::AlwaysFalse,
-                };
-            simplified = simplified.substitute(
-                db,
-                [
-                    SatisfiedConstraint::Positive(self_atom),
-                    SatisfiedConstraint::Positive(nested_constraint),
-                ],
-                intersection,
-            );
+            let self_constraint = self_atom.constraint(db);
+            let nested_constraint = nested_atom.constraint(db);
+            let intersection = self_constraint
+                .intersect(db, nested_constraint)
+                .map(|constraint| ConstrainedTypeVar::new(db, typevar, constraint));
+            if let Some(intersection) = intersection {
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_intersection(db, self_atom, nested_atom, intersection),
+                );
+            }
         });
         simplified
     }
@@ -875,15 +1018,15 @@ impl<'db> SatisfiedConstraint<'db> {
         }
     }
 
-    fn flip(&mut self) {
+    fn flipped(self) -> Self {
         match self {
-            SatisfiedConstraint::Positive(constraint) => {
-                *self = SatisfiedConstraint::Negative(*constraint);
-            }
-            SatisfiedConstraint::Negative(constraint) => {
-                *self = SatisfiedConstraint::Positive(*constraint);
-            }
+            SatisfiedConstraint::Positive(constraint) => SatisfiedConstraint::Negative(constraint),
+            SatisfiedConstraint::Negative(constraint) => SatisfiedConstraint::Positive(constraint),
         }
+    }
+
+    fn flip(&mut self) {
+        *self = self.flipped();
     }
 }
 

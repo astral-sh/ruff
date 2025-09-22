@@ -389,6 +389,25 @@ def _[T, U]() -> None:
     reveal_type(negated_range_constraint(Sub, T, Base) | negated_range_constraint(Sub, U, Base))
 ```
 
+### fwomp
+
+```py
+from typing import final
+from ty_extensions import range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+class SubSub(Sub): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(SubSub, T, Super) | range_constraint(Sub, T, Base))
+```
+
 ### Union of two ranges
 
 When one of the bounds is entirely contained within the other, the union simplifies to the larger
