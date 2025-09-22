@@ -4,6 +4,7 @@ use ruff_python_ast::{
     self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
     helpers::{pep_604_union, typing_optional},
     name::Name,
+    operator_precedence::OperatorPrecedence,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
@@ -238,7 +239,14 @@ fn create_fix(
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
-            let content = checker.generator().expr(&union_expr);
+
+            // Check if we need parentheses to preserve operator precedence
+            let content = if needs_parentheses_for_precedence(semantic, &union_expr) {
+                format!("({})", checker.generator().expr(&union_expr))
+            } else {
+                checker.generator().expr(&union_expr)
+            };
+
             let union_edit = Edit::range_replacement(content, literal_expr.range());
             Fix::applicable_edit(union_edit, applicability)
         }
@@ -255,4 +263,36 @@ enum UnionKind {
     NoUnion,
     TypingOptional,
     BitOr,
+}
+
+/// Check if the union expression needs parentheses to preserve operator precedence.
+/// This is needed when the union is part of a larger expression where the `|` operator
+/// has lower precedence than the surrounding operations (like attribute access).
+fn needs_parentheses_for_precedence(
+    semantic: &ruff_python_semantic::SemanticModel,
+    _union_expr: &Expr,
+) -> bool {
+    // Get the parent expression to check if we're in a context that needs parentheses
+    let Some(parent_expr) = semantic.current_expression_parent() else {
+        return false;
+    };
+
+    // Check if the parent expression is an attribute access, call, or subscript
+    // These operations have higher precedence than the `|` operator
+    match parent_expr {
+        Expr::Attribute(_) | Expr::Call(_) | Expr::Subscript(_) => {
+            // The union expression needs parentheses to ensure correct precedence
+            true
+        }
+        Expr::BinOp(bin_op) => {
+            // Check if we're in a binary operation where the union is not the leftmost operand
+            // and the operator has higher precedence than `|`
+            let union_precedence = OperatorPrecedence::BitOr;
+            let bin_op_precedence = OperatorPrecedence::from(bin_op.op);
+
+            // If the binary operation has higher precedence than `|`, we need parentheses
+            bin_op_precedence > union_precedence
+        }
+        _ => false,
+    }
 }
