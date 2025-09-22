@@ -1926,6 +1926,11 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
+    Ok(())
+}
+
+#[test]
+fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("baz-dir/baz.py", "it = 42"),
         ("foo-dir/foo.py", "it = 42"),
