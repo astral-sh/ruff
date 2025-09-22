@@ -1593,9 +1593,16 @@ impl<'db> Type<'db> {
                     })
             }
 
+            (Type::TypeVar(_), _) if relation.is_assignability() => {
+                // The implicit lower bound of a typevar is `Never`, which means
+                // that it is always assignable to any other type.
+
+                // TODO: record the unification constraints
+
+                ConstraintSet::from(true)
+            }
+
             // `Never` is the bottom type, the empty set.
-            // Other than one unlikely edge case (TypeVars bound to `Never`),
-            // no other type is a subtype of or assignable to `Never`.
             (_, Type::Never) => ConstraintSet::from(false),
 
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
@@ -1631,15 +1638,6 @@ impl<'db> Type<'db> {
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
             (_, Type::NonInferableTypeVar(_)) => ConstraintSet::from(false),
-
-            (Type::TypeVar(_), _) if relation.is_assignability() => {
-                // The implicit lower bound of a typevar is `Never`, which means
-                // that it is always assignable to any other type.
-
-                // TODO: record the unification constraints
-
-                ConstraintSet::from(true)
-            }
 
             (_, Type::TypeVar(typevar))
                 if relation.is_assignability()
