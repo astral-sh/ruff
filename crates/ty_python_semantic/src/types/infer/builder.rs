@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -40,7 +40,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    self, ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
@@ -51,10 +51,11 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
+    INVALID_SELF_PARAMETER_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
     report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
@@ -75,6 +76,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -2311,6 +2313,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|default| self.file_expression_type(default));
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
+            let is_self = match self.special_first_method_parameter_type(parameter) {
+                Some(func_type) => {
+                    !func_type.is_classmethod(self.db()) && !func_type.is_staticmethod(self.db())
+                }
+                None => false,
+            };
+
+            match declared_ty {
+                Type::TypeVar(type_var)
+                    if type_var.typevar(self.db()).kind(self.db()) == TypeVarKind::TypingSelf => {}
+                Type::NonInferableTypeVar(type_var)
+                    if type_var.typevar(self.db()).kind(self.db()) == TypeVarKind::TypingSelf => {}
+                _ => {
+                    if is_self {
+                        if let Some(class) = self.class_context_of_current_method() {
+                            let should_be_subtype = Type::instance(self.db(), class);
+                            if !should_be_subtype.is_subtype_of(self.db(), declared_ty) {
+                                dbg!(should_be_subtype);
+                                dbg!(declared_ty);
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&INVALID_SELF_PARAMETER_TYPE, parameter)
+                                {
+                                    builder.into_diagnostic(format_args!("invalid",));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
                     DeclaredAndInferredType::MightBeDifferent {
@@ -2357,6 +2390,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             self.add_binding(parameter.into(), definition, ty);
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_parameter_type(
+        &mut self,
+        parameter: &ast::Parameter,
+    ) -> Option<FunctionType<'db>> {
+        let current_scope = self.scope().scope(self.db());
+        let module = parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
+        let method = current_scope.node().as_function()?;
+
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.index.scope(parent_scope_id);
+        parent_scope.node().as_class()?;
+
+        let method_definition = self.index.expect_single_definition(method);
+        let DefinitionKind::Function(func_def) = method_definition.kind(self.db()) else {
+            return None;
+        };
+
+        let func_type = infer_definition_types(self.db(), method_definition)
+            .declaration_type(method_definition)
+            .inner_type()
+            .into_function_literal()?;
+
+        if func_def
+            .node(&module)
+            .parameters
+            .index(parameter.name())
+            .is_some_and(|index| index != 0)
+        {
+            return None;
+        }
+
+        Some(func_type)
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.

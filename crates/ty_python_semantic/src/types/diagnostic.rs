@@ -65,6 +65,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
+    registry.register_lint(&INVALID_SELF_PARAMETER_TYPE);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_NAMED_TUPLE);
     registry.register_lint(&INVALID_RAISE);
@@ -974,6 +975,30 @@ declare_lint! {
         summary: "detects default values that can't be assigned to the parameter's annotated type",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for explicit `self` parameter type annotations that are not
+    /// supertypes of the containing class.
+    ///
+    /// ## Why is this bad?
+    /// This violates type system invariants and breaks method call safety.
+    /// The `self` parameter must be typed as a supertype of its class to ensure
+    /// that instances of the class can be safely passed as the `self` argument.
+    /// When a subtype is used instead of a supertype, it creates unsound type
+    /// relationships that can lead to runtime errors.
+    ///
+    /// ## Examples
+    /// ```
+    /// class Parent:
+    ///     def method(self: str): pass
+    /// ```
+    pub(crate) static INVALID_SELF_PARAMETER_TYPE = {
+        summary: "detects self parameter annotations that are not supertypes of the containing class",
+        status: LintStatus::stable("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 

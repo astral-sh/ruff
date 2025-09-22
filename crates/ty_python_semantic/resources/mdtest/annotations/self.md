@@ -180,6 +180,7 @@ b: Self
 # TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
     # TODO: rejected Self because self has a different type
+    # error: [invalid-self-parameter-type]
     def has_existing_self_annotation(self: T) -> Self:
         return self  # error: [invalid-return-type]
 
@@ -267,6 +268,25 @@ class C:
         reveal_type(generic_context(b))  # revealed: None
 
 reveal_type(generic_context(C.f))  # revealed: None
+```
+
+## Valid Self Annotations
+
+The first argument in methods(that are not decorated with `classmethod` and `staticmethod`) is
+called `self` and it's type should accept any subclass of the class.
+
+```py
+import typing
+
+class A:
+    # error: [invalid-self-parameter-type]
+    def bad(self: int) -> None: ...
+    def good1(self: "A") -> None: ...
+    def good2(self: typing.Self) -> None: ...
+
+class B(A):
+    # TODO: Should warn the user if self is overriden with a type that is not supertype of the class
+    def good(self: "A") -> None: ...
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
