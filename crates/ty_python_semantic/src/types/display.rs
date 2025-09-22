@@ -1209,11 +1209,13 @@ impl Display for DisplayParameter<'_> {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
             if let Some(annotated_type) = self.param.annotated_type() {
-                write!(
-                    f,
-                    ": {}",
-                    annotated_type.display_with(self.db, self.settings.clone())
-                )?;
+                if !self.param.has_synthetic_annotation() {
+                    write!(
+                        f,
+                        ": {}",
+                        annotated_type.display_with(self.db, self.settings.clone())
+                    )?;
+                }
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_ty) = self.param.default_type() {
@@ -1234,7 +1236,9 @@ impl Display for DisplayParameter<'_> {
         } else if let Some(ty) = self.param.annotated_type() {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided.
-            ty.display_with(self.db, self.settings.clone()).fmt(f)?;
+            if !self.param.has_synthetic_annotation() {
+                ty.display_with(self.db, self.settings.clone()).fmt(f)?;
+            }
         }
         Ok(())
     }

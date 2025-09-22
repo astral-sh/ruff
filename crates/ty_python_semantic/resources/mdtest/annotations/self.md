@@ -33,11 +33,6 @@ class Shape:
             reveal_type(x)  # revealed: Self@nested_func_without_enclosing_binding
         inner(self)
 
-    def implicit_self(self) -> Self:
-        # TODO: first argument in a method should be considered as "typing.Self"
-        reveal_type(self)  # revealed: Unknown
-        return self
-
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
 reveal_type(Shape().nested_func())  # revealed: Shape
 
@@ -51,6 +46,104 @@ class Outer:
         def foo(self: Self) -> Self:
             reveal_type(self)  # revealed: Self@foo
             return self
+```
+
+## Detection of implicit Self
+
+In instance methods, the first parameter (regardless of its name) is assumed to have type
+`typing.Self` unless it has an explicit annotation. This does not apply to `@classmethod` and
+`@staticmethod`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Self
+
+class A:
+    def implicit_self(self) -> Self:
+        # TODO: first argument in a method should be considered as "typing.Self"
+        reveal_type(self)  # revealed: Unknown
+        return self
+
+    def foo(self) -> int:
+        def first_arg_is_not_self(a: int) -> int:
+            return a
+        return first_arg_is_not_self(1)
+
+    @classmethod
+    def bar(cls): ...
+    @staticmethod
+    def static(x): ...
+
+a = A()
+# TODO: Should reveal Self@implicit_self. Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
+reveal_type(a.implicit_self())  # revealed: A
+reveal_type(a.implicit_self)  # revealed: bound method A.implicit_self() -> A
+```
+
+If the method is a class or static method then first argument is not self:
+
+```py
+A.bar()
+a.static(1)
+```
+
+"self" name is not special; any first parameter name is treated as Self.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class B:
+    def implicit_this(this) -> Self:
+        # TODO: Should reveal Self@implicit_this
+        reveal_type(this)  # revealed: Unknown
+        return this
+
+    def ponly(self, /, x: int) -> None:
+        # TODO: Should reveal Self@ponly
+        reveal_type(self)  # revealed: Unknown
+
+    def kwonly(self, *, x: int) -> None:
+        # TODO: Should reveal Self@kwonly
+        reveal_type(self)  # revealed: Unknown
+
+    @property
+    def name(self) -> str:
+        # TODO: Should reveal Self@name
+        reveal_type(self)  # revealed: Unknown
+        return "b"
+
+B.ponly(B(), 1)
+B.name
+B.kwonly(B(), x=1)
+
+class G(Generic[T]):
+    def id(self) -> Self:
+        # TODO: Should reveal Self@id
+        reveal_type(self)  # revealed: Unknown
+        return self
+
+g = G[int]()
+
+# TODO: Should reveal Self@id Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
+reveal_type(G[int].id(g))  # revealed: G[int]
+```
+
+Free functions and nested functions do not use implicit `Self`:
+
+```py
+def not_a_method(self):
+    reveal_type(self)  # revealed: Unknown
+
+class C:
+    def outer(self) -> None:
+        def inner(self):
+            reveal_type(self)  # revealed: Unknown
 ```
 
 ## typing_extensions
@@ -206,6 +299,53 @@ class MyMetaclass(type):
     # TODO: rejected
     def __new__(cls) -> Self:
         return super().__new__(cls)
+```
+
+## Explicit Annotation Overrides Implicit `Self`
+
+If the first parameter is explicitly annotated, that annotation takes precedence over the implicit
+`Self` treatment.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+class Explicit:
+    # TODO: Should warn the user if self is overriden with a type that is not subtype of the class
+    def bad(self: int) -> None:
+        reveal_type(self)  # revealed: int
+
+    def forward(self: "Explicit") -> None:
+        reveal_type(self)  # revealed: Explicit
+
+e = Explicit()
+# error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `int`, found `Explicit`"
+e.bad()
+```
+
+## Type of Implicit Self
+
+The assigned type to self argument depends on the method signature. When the method is defined in a
+non-generic class and has no other mention of `typing.Self` (for example in return type) then type
+of `self` is instance of the class.
+
+```py
+from typing import Self
+
+class C:
+    def f(self) -> Self:
+        return self
+
+    def z(self) -> None: ...
+
+C.z(1)  # error: [invalid-argument-type] "Argument to function `z` is incorrect: Expected `C`, found `Literal[1]`"
+```
+
+```py
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C` of type variable `Self`"
+C.f(1)
 ```
 
 ## Binding a method fixes `Self`
