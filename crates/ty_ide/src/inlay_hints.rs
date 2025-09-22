@@ -1445,6 +1445,50 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn test_function_call_different_formatting() {
+        let test = inlay_hint_test(
+            "
+            def foo(
+                x: int,
+                y: int
+            ): ...
+
+            foo(1, 2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(
+            x: int,
+            y: int
+        ): ...
+
+        foo([x=]1, [y=]2)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:5
+          |
+        2 | def foo(
+        3 |     x: int,
+          |     ^
+        4 |     y: int
+        5 | ): ...
+          |
+        info: For inlay hint label 'x' at 45..46
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:5
+          |
+        2 | def foo(
+        3 |     x: int,
+        4 |     y: int
+          |     ^
+        5 | ): ...
+          |
+        info: For inlay hint label 'y' at 52..53
+        ");
+    }
+
     struct InlayHintLocationDiagnostic {
         source_text: String,
         source_range: TextRange,
