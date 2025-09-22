@@ -546,6 +546,23 @@ impl<'db> Node<'db> {
         }
     }
 
+    fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
+                Node::AlwaysTrue
+            }
+            (Node::AlwaysTrue, _)
+            | (Node::AlwaysFalse, _)
+            | (_, Node::AlwaysTrue)
+            | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::Interior(a), Node::Interior(b)) => {
+                // IFF is commutative, which lets us halve the cache requirements
+                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                a.iff(db, b)
+            }
+        }
+    }
+
     fn implies(self, db: &'db dyn Db, other: Self) -> Self {
         /*
         match (self, other) {
@@ -895,6 +912,32 @@ impl<'db> InteriorNode<'db> {
                 other_atom,
                 Node::Interior(self).and(db, other.if_true(db)),
                 Node::Interior(self).and(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
+        let self_atom = self.atom(db);
+        let other_atom = other.atom(db);
+        match self_atom.cmp(&other_atom) {
+            Ordering::Equal => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).iff(db, other.if_true(db)),
+                self.if_false(db).iff(db, other.if_false(db)),
+            ),
+            Ordering::Less => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).iff(db, Node::Interior(other)),
+                self.if_false(db).iff(db, Node::Interior(other)),
+            ),
+            Ordering::Greater => Node::new(
+                db,
+                other_atom,
+                Node::Interior(self).iff(db, other.if_true(db)),
+                Node::Interior(self).iff(db, other.if_false(db)),
             ),
         }
     }
