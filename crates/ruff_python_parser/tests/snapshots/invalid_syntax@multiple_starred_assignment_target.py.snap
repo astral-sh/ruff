@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/multiple_starred_assi
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..84,
+        range: 0..112,
         body: [
             Assign(
                 StmtAssign {
@@ -346,6 +346,122 @@ Module(
                     ),
                 },
             ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 84..111,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 84..102,
+                                elts: [
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 85..87,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 86..87,
+                                                    id: Name("a"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 89..91,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 90..91,
+                                                    id: Name("b"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 93..101,
+                                            elts: [
+                                                Starred(
+                                                    ExprStarred {
+                                                        node_index: NodeIndex(None),
+                                                        range: 94..96,
+                                                        value: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 95..96,
+                                                                id: Name("c"),
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Starred(
+                                                    ExprStarred {
+                                                        node_index: NodeIndex(None),
+                                                        range: 98..100,
+                                                        value: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 99..100,
+                                                                id: Name("d"),
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: true,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                                parenthesized: true,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 105..111,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 106..107,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 109..110,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -375,6 +491,7 @@ Module(
 3 | (*a, *b, c) = (1, 2, 3)
   | ^^^^^^^^^^^ Syntax Error: Two starred expressions in assignment
 4 | [*a, *b, c] = (1, 2, 3)
+5 | (*a, *b, (*c, *d)) = (1, 2)
   |
 
 
@@ -383,4 +500,21 @@ Module(
 3 | (*a, *b, c) = (1, 2, 3)
 4 | [*a, *b, c] = (1, 2, 3)
   | ^^^^^^^^^^^ Syntax Error: Two starred expressions in assignment
+5 | (*a, *b, (*c, *d)) = (1, 2)
+  |
+
+
+  |
+3 | (*a, *b, c) = (1, 2, 3)
+4 | [*a, *b, c] = (1, 2, 3)
+5 | (*a, *b, (*c, *d)) = (1, 2)
+  | ^^^^^^^^^^^^^^^^^^ Syntax Error: Two starred expressions in assignment
+  |
+
+
+  |
+3 | (*a, *b, c) = (1, 2, 3)
+4 | [*a, *b, c] = (1, 2, 3)
+5 | (*a, *b, (*c, *d)) = (1, 2)
+  |          ^^^^^^^^ Syntax Error: Two starred expressions in assignment
   |

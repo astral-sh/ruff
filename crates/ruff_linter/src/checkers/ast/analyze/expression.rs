@@ -216,7 +216,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     checker,
                     elts,
                     check_too_many_expressions,
-                    false,
                     expr.range(),
                 );
             }

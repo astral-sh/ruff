@@ -134,9 +134,6 @@ impl SemanticSyntaxChecker {
                         *range,
                     );
                 }
-                for target in targets {
-                    Self::multiple_star_expression(target, ctx);
-                }
 
                 // test_ok assign_stmt_starred_expr_value
                 // _ = 4
@@ -391,36 +388,37 @@ impl SemanticSyntaxChecker {
             );
         }
     }
-    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
-        match expr {
-            Expr::Tuple(ast::ExprTuple { elts, range, .. })
-            | Expr::List(ast::ExprList { elts, range, .. }) => {
-                let mut count = 0;
-                for elt in elts {
-                    if matches!(elt, Expr::Starred(_)) {
-                        count += 1;
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr_ctx: ExprContext,
+        elts: &[Expr],
+        range: TextRange,
+    ) {
+        if expr_ctx.is_store() {
+            let mut has_starred = false;
+            for elt in elts {
+                if elt.is_starred_expr() {
+                    if has_starred {
+                        // test_err multiple_starred_assignment_target
+                        // (*a, *b) = (1, 2)
+                        // [*a, *b] = (1, 2)
+                        // (*a, *b, c) = (1, 2, 3)
+                        // [*a, *b, c] = (1, 2, 3)
+                        // (*a, *b, (*c, *d)) = (1, 2)
+
+                        // test_ok multiple_starred_assignment_target
+                        // (*a, b) = (1, 2)
+                        // (*_, normed), *_ = [(1,), 2]
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                            range,
+                        );
+                        return;
                     }
-                    Self::multiple_star_expression(elt, ctx);
-                }
-                if count > 1 {
-                    // test_err multiple_starred_assignment_target
-                    // (*a, *b) = (1, 2)
-                    // [*a, *b] = (1, 2)
-                    // (*a, *b, c) = (1, 2, 3)
-                    // [*a, *b, c] = (1, 2, 3)
-
-                    // test_ok multiple_starred_assignment_target
-                    // (*a, b) = (1, 2)
-                    // (*_, normed), *_ = [(1,), 2]
-
-                    Self::add_error(
-                        ctx,
-                        SemanticSyntaxErrorKind::MultipleStarredExpressions,
-                        *range,
-                    );
+                    has_starred = true;
                 }
             }
-            _ => {}
         }
     }
 
@@ -788,6 +786,20 @@ impl SemanticSyntaxChecker {
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
                 Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
+            }
+            Expr::Tuple(ast::ExprTuple {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            })
+            | Expr::List(ast::ExprList {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            }) => {
+                Self::multiple_star_expression(ctx, *expr_ctx, elts, *range);
             }
             Expr::Lambda(ast::ExprLambda {
                 parameters: Some(parameters),
