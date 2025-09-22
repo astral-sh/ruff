@@ -139,6 +139,15 @@ reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
 # error: [invalid-assignment] "Object of type `list[Unknown | str]` is not assignable to `list[LiteralString]`"
 o: list[typing.LiteralString] = ["a", "b", "c"]
 reveal_type(o)  # revealed: list[LiteralString]
+
+p: dict[int, int] = {}
+reveal_type(p)  # revealed: dict[int, int]
+
+q: dict[int | str, int] = {1: 1, 2: 2, 3: 3}
+reveal_type(q)  # revealed: dict[int | str, int]
+
+r: dict[int | str, int | str] = {1: 1, 2: 2, 3: 3}
+reveal_type(r)  # revealed: dict[int | str, int | str]
 ```
 
 ## Incorrect collection literal assignments are complained aobut
