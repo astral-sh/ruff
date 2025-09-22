@@ -140,13 +140,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
 }
 
 fn is_simple_with_block(with_stmt: &ast::StmtWith) -> bool {
-    with_stmt.items.len() == 1
-        && with_stmt
-            .body
-            .iter()
-            .filter(|stmt| matches!(stmt, Stmt::Assign(_)))
-            .count()
-            == 1
+    with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)])
 }
 
 fn generate_fix(
@@ -190,30 +184,18 @@ fn generate_fix(
         return None;
     }
 
-    let target = with_stmt.body.iter().find_map(|stmt| match stmt {
-        Stmt::Assign(assign) if assign.value.range().contains_range(read_expr.range()) => {
+    let target = match with_stmt.body.first() {
+        Some(Stmt::Assign(assign)) if assign.value.range().contains_range(read_expr.range()) => {
             match assign.targets.first() {
-                Some(Expr::Name(name)) => Some(name.id.to_string()),
-                _ => None,
+                Some(Expr::Name(name)) => name.id.as_str(),
+                _ => return None,
             }
         }
-        _ => None,
-    })?;
+        _ => return None,
+    };
 
     let locator = checker.locator();
     let filename_code = locator.slice(open.filename.range());
-
-    let kwargs = if open.keywords.is_empty() {
-        String::new()
-    } else {
-        format!(
-            ", {}",
-            open.keywords
-                .iter()
-                .map(|kw| locator.slice(kw.range()))
-                .join(", ")
-        )
-    };
 
     let (import_edit, binding) = checker
         .importer()
@@ -224,14 +206,27 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = format!(
-        "{} = {}({}).{}({})",
-        target,
-        binding,
-        filename_code,
-        open.mode.pathlib_method(),
-        kwargs.trim_start_matches(", ")
-    );
+    let replacement = if open.keywords.is_empty() {
+        format!(
+            "{} = {}({}).{}()",
+            target,
+            binding,
+            filename_code,
+            open.mode.pathlib_method()
+        )
+    } else {
+        format!(
+            "{} = {}({}).{}({})",
+            target,
+            binding,
+            filename_code,
+            open.mode.pathlib_method(),
+            open.keywords
+                .iter()
+                .map(|kw| locator.slice(kw.range()))
+                .join(", ")
+        )
+    };
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
         Applicability::Unsafe
@@ -264,14 +259,22 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
 }
 
 fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnippet {
-    let name = ast::ExprName {
-        id: open.mode.pathlib_method(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+    let name = open.mode.pathlib_method();
+
+    if open.keywords.is_empty() {
+        return SourceCodeSnippet::from_str(&format!("{}()", name));
+    }
+
     let call = ast::ExprCall {
-        func: Box::new(name.into()),
+        func: Box::new(
+            ast::ExprName {
+                id: name,
+                ctx: ast::ExprContext::Load,
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            }
+            .into(),
+        ),
         arguments: ast::Arguments {
             args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
