@@ -1037,15 +1037,6 @@ impl<'db> InteriorNode<'db> {
                 );
                 simplified.update_if_simpler(
                     db,
-                    simplified.substitute_intersection(
-                        db,
-                        SatisfiedConstraint::Positive(larger_atom),
-                        SatisfiedConstraint::Positive(smaller_atom),
-                        Node::new_constraint(db, smaller_atom),
-                    ),
-                );
-                simplified.update_if_simpler(
-                    db,
                     simplified.substitute_union(
                         db,
                         SatisfiedConstraint::Positive(larger_atom),
@@ -1053,7 +1044,15 @@ impl<'db> InteriorNode<'db> {
                         Node::new_constraint(db, larger_atom),
                     ),
                 );
-                return;
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Negative(larger_atom),
+                        SatisfiedConstraint::Positive(smaller_atom),
+                        Node::AlwaysFalse,
+                    ),
+                );
             }
 
             let self_constraint = self_atom.constraint(db);
@@ -1083,9 +1082,36 @@ impl<'db> InteriorNode<'db> {
                         db,
                         simplified.substitute_intersection(
                             db,
+                            SatisfiedConstraint::Positive(self_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::AlwaysFalse,
+                        ),
+                    );
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_union(
+                            db,
                             SatisfiedConstraint::Negative(self_atom),
                             SatisfiedConstraint::Negative(nested_atom),
-                            Node::AlwaysFalse,
+                            Node::AlwaysTrue,
+                        ),
+                    );
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_intersection(
+                            db,
+                            SatisfiedConstraint::Positive(self_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            Node::new_constraint(db, self_atom),
+                        ),
+                    );
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_intersection(
+                            db,
+                            SatisfiedConstraint::Negative(self_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::new_constraint(db, nested_atom),
                         ),
                     );
                 }
