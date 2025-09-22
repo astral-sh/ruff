@@ -706,6 +706,7 @@ impl<'db> Node<'db> {
                 SatisfiedConstraint::Negative(right),
             ],
         );
+        eprintln!(" -> (x ∧ y)[x=0,y=0] = {}", when_l0_r0.display(db));
         let when_l1_r0 = self.restrict(
             db,
             [
@@ -713,6 +714,7 @@ impl<'db> Node<'db> {
                 SatisfiedConstraint::Negative(right),
             ],
         );
+        eprintln!(" -> (x ∧ y)[x=1,y=0] = {}", when_l1_r0.display(db));
         let when_l0_r1 = self.restrict(
             db,
             [
@@ -720,6 +722,7 @@ impl<'db> Node<'db> {
                 SatisfiedConstraint::Positive(right),
             ],
         );
+        eprintln!(" -> (x ∧ y)[x=0,y=1] = {}", when_l0_r1.display(db));
         let when_l1_r1 = self.restrict(
             db,
             [
@@ -727,6 +730,7 @@ impl<'db> Node<'db> {
                 SatisfiedConstraint::Positive(right),
             ],
         );
+        eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_l1_r1.display(db));
         let replacement_node = Node::new_constraint(db, replacement);
 
         let result = replacement_node.ite(
@@ -963,28 +967,27 @@ impl<'db> InteriorNode<'db> {
                 return;
             }
 
-            if self_atom.contains(db, nested_atom) {
+            let larger_smaller = if self_atom.contains(db, nested_atom) {
+                Some((self_atom, nested_atom))
+            } else if nested_atom.contains(db, self_atom) {
+                Some((nested_atom, self_atom))
+            } else {
+                None
+            };
+            if let Some((larger_atom, smaller_atom)) = larger_smaller {
                 eprintln!(
                     "==> {} contains {}",
                     self_atom.display(db),
                     nested_atom.display(db),
                 );
-                let given = Node::new_constraint(db, nested_atom)
-                    .implies(db, Node::new_constraint(db, self_atom));
-                eprintln!(" -> {}", given.display(db));
-                simplified.update_if_simpler(db, simplified.simplify_relative_to(db, given));
-                return;
-            }
-            if nested_atom.contains(db, self_atom) {
-                eprintln!(
-                    "==> {} contains {} (rev)",
-                    nested_atom.display(db),
-                    self_atom.display(db),
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_intersection(db, larger_atom, smaller_atom, smaller_atom),
                 );
-                let given = Node::new_constraint(db, self_atom)
-                    .implies(db, Node::new_constraint(db, nested_atom));
-                eprintln!(" -> {}", given.display(db));
-                simplified.update_if_simpler(db, simplified.simplify_relative_to(db, given));
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_union(db, larger_atom, smaller_atom, larger_atom),
+                );
                 return;
             }
 
