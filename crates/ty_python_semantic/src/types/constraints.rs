@@ -1089,11 +1089,30 @@ impl<'db> InteriorNode<'db> {
             let intersection = self_constraint
                 .intersect(db, nested_constraint)
                 .map(|constraint| ConstrainedTypeVar::new(db, typevar, constraint));
-            if let Some(intersection) = intersection {
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_intersection(db, self_atom, nested_atom, intersection),
-                );
+            match intersection {
+                Some(intersection) => {
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_intersection(
+                            db,
+                            self_atom,
+                            nested_atom,
+                            intersection,
+                        ),
+                    );
+                }
+                None => {
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.restrict(
+                            db,
+                            [
+                                SatisfiedConstraint::Negative(self_atom),
+                                SatisfiedConstraint::Negative(nested_atom),
+                            ],
+                        ),
+                    );
+                }
             }
         });
         simplified
