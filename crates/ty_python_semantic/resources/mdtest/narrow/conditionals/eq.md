@@ -118,17 +118,18 @@ class Foo(Enum):
     A = 1
     B = 2
 
-    def __ne__(self,other): return False
+    def __ne__(self, other):
+        return False
 
-reveal_type(Foo.A == Foo.A) # revealed: Literal[True]
+reveal_type(Foo.A == Foo.A)  # revealed: Literal[True]
 
-foo = cast(Foo, Foo.A)
+foo = cast("Foo", Foo.A)
 
 if foo == Foo.A:
-    reveal_type(foo) # revealed: Literal[Foo.A]
+    reveal_type(foo)  # revealed: Literal[Foo.A]
 
 if foo != Foo.B:
-    reveal_type(foo) #revealed: Foo
+    reveal_type(foo)  # revealed: Foo
 ```
 
 ## `x != y` where `y` is of literal type
