@@ -271,6 +271,50 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
+#[test]
+fn deduplicate_directory_and_explicit_file() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = tempdir.path();
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+exclude = ["main.py"]
+"#,
+    )?;
+
+    let main = root.join("main.py");
+    fs::write(&main, "import os\n")?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(
+            Command::new(get_cargo_bin(BIN_NAME))
+                .current_dir(root)
+                .args(STDIN_BASE_OPTIONS)
+                .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+                .arg(".")
+                // Explicitly pass main.py, should be linted regardless of it being excluded by lint.exclude
+                .arg("main.py"),
+            @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "
+        );
+    });
+
+    Ok(())
+}
+
 #[test]
 fn exclude_stdin() -> Result<()> {
     let tempdir = TempDir::new()?;

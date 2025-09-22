@@ -29,6 +29,7 @@ import {
   DocumentHighlightKind,
   InlayHintKind,
   LocationLink,
+  TextEdit,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
@@ -314,13 +315,26 @@ class PlaygroundServer
 
     return {
       suggestions: completions.map((completion, i) => ({
-        label: completion.name,
+        label: {
+          label: completion.name,
+          detail:
+            completion.module_name == null
+              ? undefined
+              : ` (import ${completion.module_name})`,
+          description: completion.detail ?? undefined,
+        },
         sortText: String(i).padStart(digitsLength, "0"),
         kind:
           completion.kind == null
             ? CompletionItemKind.Variable
             : mapCompletionKind(completion.kind),
-        insertText: completion.name,
+        insertText: completion.insert_text ?? completion.name,
+        additionalTextEdits: completion.additional_text_edits?.map(
+          (edit: TextEdit) => ({
+            range: tyRangeToMonacoRange(edit.range),
+            text: edit.new_text,
+          }),
+        ),
         documentation: completion.documentation,
         detail: completion.detail,
         // TODO(micha): It's unclear why this field is required for monaco but not VS Code.

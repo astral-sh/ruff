@@ -65,7 +65,7 @@ pub(crate) fn remove_imports<'a>(
                     if member == "*" {
                         found_star = true;
                     } else {
-                        bail!("Expected \"*\" for unused import (got: \"{}\")", member);
+                        bail!("Expected \"*\" for unused import (got: \"{member}\")");
                     }
                 }
                 if !found_star {

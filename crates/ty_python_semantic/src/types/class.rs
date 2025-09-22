@@ -9,7 +9,7 @@ use super::{
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::scope::NodeWithScopeKind;
+use crate::semantic_index::scope::{NodeWithScopeKind, Scope};
 use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
@@ -2935,8 +2935,8 @@ impl<'db> ClassLiteral<'db> {
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
 
-        let is_valid_scope = |method_scope: ScopeId<'db>| {
-            if let Some(method_def) = method_scope.node(db).as_function() {
+        let is_valid_scope = |method_scope: &Scope| {
+            if let Some(method_def) = method_scope.node().as_function() {
                 let method_name = method_def.node(&module).name.as_str();
                 if let Place::Type(Type::FunctionLiteral(method_type), _) =
                     class_symbol(db, class_body_scope, method_name).place
@@ -2954,7 +2954,7 @@ impl<'db> ClassLiteral<'db> {
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, &name)
         {
-            let method_scope = method_scope_id.to_scope_id(db, file);
+            let method_scope = index.scope(method_scope_id);
             if !is_valid_scope(method_scope) {
                 continue;
             }
@@ -3010,14 +3010,13 @@ impl<'db> ClassLiteral<'db> {
         for (attribute_assignments, method_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
-            let method_scope = method_scope_id.to_scope_id(db, file);
+            let method_scope = index.scope(method_scope_id);
             if !is_valid_scope(method_scope) {
                 continue;
             }
 
             // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable = if let Some(method_def) = method_scope.node(db).as_function()
-            {
+            let is_method_reachable = if let Some(method_def) = method_scope.node().as_function() {
                 let method = index.expect_single_definition(method_def);
                 let method_place = class_table
                     .symbol_id(&method_def.node(&module).name)
@@ -3695,6 +3694,7 @@ pub enum KnownClass {
     ParamSpec,
     ParamSpecArgs,
     ParamSpecKwargs,
+    ProtocolMeta,
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
@@ -3822,6 +3822,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ProtocolMeta
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -3904,6 +3905,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
             | KnownClass::Template => false,
         }
     }
@@ -3983,6 +3985,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
             | KnownClass::Template => false,
         }
     }
@@ -4061,6 +4064,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
             | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
             | KnownClass::Template => false,
         }
     }
@@ -4152,6 +4156,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
             | Self::Template => false,
         }
     }
@@ -4251,6 +4256,7 @@ impl KnownClass {
             Self::ConstraintSet => "ConstraintSet",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
+            Self::ProtocolMeta => "_ProtocolMeta",
         }
     }
 
@@ -4478,6 +4484,7 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
@@ -4597,6 +4604,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
             | Self::Template => Some(false),
 
             Self::Tuple => None,
@@ -4681,6 +4689,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
             | Self::Template => false,
         }
     }
@@ -4774,6 +4783,7 @@ impl KnownClass {
             "ConstraintSet" => Self::ConstraintSet,
             "TypedDictFallback" => Self::TypedDictFallback,
             "Template" => Self::Template,
+            "_ProtocolMeta" => Self::ProtocolMeta,
             _ => return None,
         };
 
@@ -4856,9 +4866,9 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
-
         }
     }
 

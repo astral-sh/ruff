@@ -717,7 +717,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::re_sub_positional_args(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnreliableCallableCheck) {
-                flake8_bugbear::rules::unreliable_callable_check(checker, expr, func, args);
+                flake8_bugbear::rules::unreliable_callable_check(
+                    checker, expr, func, args, keywords,
+                );
             }
             if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
@@ -739,6 +741,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::ZipWithoutExplicitStrict) {
                 if checker.target_version() >= PythonVersion::PY310 {
                     flake8_bugbear::rules::zip_without_explicit_strict(checker, call);
+                }
+            }
+            if checker.is_rule_enabled(Rule::MapWithoutExplicitStrict) {
+                if checker.target_version() >= PythonVersion::PY314 {
+                    flake8_bugbear::rules::map_without_explicit_strict(checker, call);
                 }
             }
             if checker.is_rule_enabled(Rule::NoExplicitStacklevel) {
@@ -1278,6 +1285,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryEmptyIterableWithinDequeCall) {
                 ruff::rules::unnecessary_literal_within_deque_call(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::LoggingEagerConversion) {
+                ruff::rules::logging_eager_conversion(checker, call);
             }
             if checker.is_rule_enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);

@@ -1522,7 +1522,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
-            report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
+            report_invalid_assignment(&self.context, node, binding, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         }
@@ -1679,9 +1679,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     report_invalid_assignment(
                         &self.context,
                         node,
+                        definition,
                         declared_ty.inner_type(),
                         inferred_ty,
                     );
+
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_ty.inner_type())
                 }
@@ -4856,7 +4858,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
-        let current_file = self.file();
+
         'names: for name in names {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us. Note that we skip the scope containing the
@@ -4864,8 +4866,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
                 // globals, so check only function-like scopes.
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-                if !enclosing_scope_id.is_function_like(db) {
+                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
+                if !enclosing_scope.kind().is_function_like() {
                     continue;
                 }
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
@@ -5336,29 +5338,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             panic!("Typeshed should always have a `{name}` class in `builtins.pyi` with a single type variable")
         });
 
-        let mut elements_are_assignable = true;
-        let mut inferred_elt_tys = Vec::with_capacity(elts.len());
-
-        // Infer the type of each element in the collection literal.
-        for elt in elts {
-            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
-            inferred_elt_tys.push(inferred_elt_ty);
-
-            if let Some(annotated_elts_ty) = annotated_elts_ty {
-                elements_are_assignable &=
-                    inferred_elt_ty.is_assignable_to(self.db(), annotated_elts_ty);
-            }
-        }
-
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db());
 
         match annotated_elts_ty {
-            // If the inferred type of any element is not assignable to the type annotation, we
-            // ignore it, as to provide a more precise error message.
-            Some(_) if !elements_are_assignable => {}
-
-            // Otherwise, the annotated type acts as a constraint for `T`.
+            // The annotated type acts as a constraint for `T`.
             //
             // Note that we infer the annotated type _before_ the elements, to closer match the order
             // of any unions written in the type annotation.
@@ -5372,7 +5356,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // The inferred type of each element acts as an additional constraint on `T`.
-        for inferred_elt_ty in inferred_elt_tys {
+        for elt in elts {
+            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
+
             // Convert any element literals to their promoted type form to avoid excessively large
             // unions for large nested list literals, which the constraint solver struggles with.
             let inferred_elt_ty =
@@ -5775,7 +5761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
-        _tcx: TypeContext<'db>,
+        tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let ast::ExprCall {
             range: _,
@@ -5955,7 +5941,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = match bindings.check_types(self.db(), &call_arguments) {
+        let mut bindings = match bindings.check_types(self.db(), &call_arguments, &tcx) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
@@ -6362,7 +6348,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
-            let current_file = self.file();
             let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol() {
                 if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
@@ -6428,7 +6413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // check only function-like scopes.
                 // There is one exception to this rule: annotation scopes can see
                 // names defined in an immediately-enclosing class scope.
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
+                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
 
                 let is_immediately_enclosing_scope = scope.is_annotation(db)
                     && scope
@@ -6495,7 +6480,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
+                if !enclosing_scope.kind().is_function_like() && !is_immediately_enclosing_scope {
                     continue;
                 }
 
@@ -6515,6 +6500,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
+
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
 
                 // If the name is declared or bound in this scope, figure out its type. This might
                 // resolve the name and end the walk. But if the name is declared `nonlocal` in
@@ -8521,7 +8508,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
             .match_parameters(self.db(), &call_argument_types)
-            .check_types(self.db(), &call_argument_types)
+            .check_types(self.db(), &call_argument_types, &TypeContext::default())
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
@@ -9030,6 +9017,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::TypeParam::TypeVarTuple(node) => self.infer_definition(node),
             }
         }
+    }
+
+    /// Infer the type of the given expression in isolation, ignoring the surrounding region.
+    pub(super) fn infer_isolated_expression(mut self, expr: &ast::Expr) -> Type<'db> {
+        let expr_ty = self.infer_expression_impl(expr, TypeContext::default());
+        let _ = self.context.finish();
+        expr_ty
     }
 
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {

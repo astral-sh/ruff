@@ -86,7 +86,7 @@ etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
-get-size2 = { version = "0.6.2", features = [
+get-size2 = { version = "0.6.3", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -95,7 +95,7 @@ get-size2 = { version = "0.6.2", features = [
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
-hashbrown = { version = "0.15.0", default-features = false, features = [
+hashbrown = { version = "0.16.0", default-features = false, features = [
     "raw-entry",
     "equivalent",
     "inline-more",
@@ -203,7 +203,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom", "ruff_options_metadata", "uuid"]
+ignored = ["getrandom", "ruff_options_metadata", "uuid", "get-size2"]
 
 
 [workspace.lints.rust]
