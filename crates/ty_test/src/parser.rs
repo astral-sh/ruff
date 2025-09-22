@@ -512,9 +512,8 @@ impl<'s> Parser<'s> {
                             self.process_mdtest_directive(MdtestDirective::PullTypesSkip)?;
                         } else if !HTML_COMMENT_ALLOWLIST.contains(&html_comment) {
                             bail!(
-                                "Unknown HTML comment `{}` -- possibly a typo? \
-                                (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
-                                html_comment
+                                "Unknown HTML comment `{html_comment}` -- possibly a typo? \
+                                (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)"
                             );
                         }
                         self.cursor.skip_bytes(position + HTML_COMMENT_END.len());
@@ -721,8 +720,7 @@ impl<'s> Parser<'s> {
                 }
                 _ => {
                     bail!(
-                        "Cannot auto-generate file name for code block with language `{}` in test `{test_name}`",
-                        lang
+                        "Cannot auto-generate file name for code block with language `{lang}` in test `{test_name}`"
                     );
                 }
             },
