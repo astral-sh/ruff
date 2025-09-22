@@ -931,6 +931,44 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     f(*t)  # error: [no-matching-overload]
 ```
 
+## Filtering based on variaidic arguments
+
+This is the step 4 of the overload call evaluation algorithm which specifies that:
+
+> If the argument list is compatible with two or more overloads, determine whether one or more of
+> the overloads has a variadic parameter (either `*args` or `**kwargs`) that maps to a corresponding
+> argument that supplies an indeterminate number of positional or keyword arguments. If so,
+> eliminate overloads that do not have a variadic parameter.
+
+This is only performed if the previous step resulted in more than one matching overload.
+
+### Simple
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x1: int) -> tuple[int]: ...
+@overload
+def f(x1: int, x2: int) -> tuple[int, int]: ...
+@overload
+def f(*x: int) -> int: ...
+```
+
+```py
+from overloaded import f
+
+def _(x1: int, x2: int, args: list[int]):
+    reveal_type(f(x1))  # revealed: tuple[int]
+    reveal_type(f(x1, x2))  # revealed: tuple[int, int]
+    reveal_type(f(*(x1, x2)))  # revealed: tuple[int, int]
+
+    # Step 4 should filter out all but the last overload.
+    reveal_type(f(*args))  # revealed: int
+```
+
 ## Filtering based on `Any` / `Unknown`
 
 This is the step 5 of the overload call evaluation algorithm which specifies that:
