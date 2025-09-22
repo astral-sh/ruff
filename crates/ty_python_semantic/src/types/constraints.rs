@@ -551,10 +551,21 @@ impl<'db> Node<'db> {
             (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
                 Node::AlwaysTrue
             }
-            (Node::AlwaysTrue, _)
-            | (Node::AlwaysFalse, _)
-            | (_, Node::AlwaysTrue)
-            | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::AlwaysTrue, Node::AlwaysFalse) | (Node::AlwaysFalse, Node::AlwaysTrue) => {
+                Node::AlwaysFalse
+            }
+            (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(interior)) => Node::new(
+                db,
+                interior.atom(db),
+                self.iff(db, interior.if_true(db)),
+                self.iff(db, interior.if_false(db)),
+            ),
+            (Node::Interior(interior), Node::AlwaysTrue | Node::AlwaysFalse) => Node::new(
+                db,
+                interior.atom(db),
+                interior.if_true(db).iff(db, other),
+                interior.if_false(db).iff(db, other),
+            ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // IFF is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
