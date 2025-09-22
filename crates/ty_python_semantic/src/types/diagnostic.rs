@@ -6,7 +6,7 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
@@ -19,7 +19,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::{
     ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
-    binding_type,
+    binding_type, infer_isolated_expression,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
@@ -1940,14 +1940,23 @@ fn report_invalid_assignment_with_message(
     }
 }
 
-pub(super) fn report_invalid_assignment(
-    context: &InferContext,
+pub(super) fn report_invalid_assignment<'db>(
+    context: &InferContext<'db, '_>,
     node: AnyNodeRef,
+    definition: Definition<'db>,
     target_ty: Type,
-    source_ty: Type,
+    mut source_ty: Type<'db>,
 ) {
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
+
+    if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
+        && let Some(value) = annotated_assignment.value(context.module())
+    {
+        // Re-infer the RHS of the annotated assignment, ignoring the type context, for more precise
+        // error messages.
+        source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
+    }
 
     report_invalid_assignment_with_message(
         context,
@@ -2626,7 +2635,7 @@ pub(crate) fn report_undeclared_protocol_member(
         let binding_type = binding_type(db, definition);
 
         let suggestion = binding_type
-            .literal_fallback_instance(db)
+            .literal_promotion_type(db)
             .unwrap_or(binding_type);
 
         if should_give_hint(db, suggestion) {

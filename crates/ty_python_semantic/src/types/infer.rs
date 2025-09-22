@@ -37,6 +37,7 @@
 //! be considered a bug.)
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use salsa;
@@ -49,14 +50,18 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
+use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
-use crate::types::{ClassLiteral, Truthiness, Type, TypeAndQualifiers};
+use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers};
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 
 mod builder;
 #[cfg(test)]
 mod tests;
+
+/// How many fixpoint iterations to allow before falling back to Divergent type.
+const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -111,12 +116,18 @@ pub(crate) fn infer_definition_types<'db>(
 }
 
 fn definition_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _value: &DefinitionInference<'db>,
-    _count: u32,
-    _definition: Definition<'db>,
+    count: u32,
+    definition: Definition<'db>,
 ) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    if count == ITERATIONS_BEFORE_FALLBACK {
+        salsa::CycleRecoveryAction::Fallback(DefinitionInference::cycle_fallback(
+            definition.scope(db),
+        ))
+    } else {
+        salsa::CycleRecoveryAction::Iterate
+    }
 }
 
 fn definition_cycle_initial<'db>(
@@ -207,8 +218,23 @@ fn infer_expression_types_impl<'db>(
     .finish_expression()
 }
 
-/// How many fixpoint iterations to allow before falling back to Divergent type.
-const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
+/// Infer the type of an expression in isolation.
+///
+/// The type returned by this function may be different than the type of the expression
+/// if it was inferred within its region, as it does not account for surrounding type context.
+/// This can be useful to re-infer the type of an expression for diagnostics.
+pub(crate) fn infer_isolated_expression<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    expr: &ast::Expr,
+) -> Type<'db> {
+    let file = scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module)
+        .infer_isolated_expression(expr)
+}
 
 fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
@@ -345,14 +371,35 @@ struct ExpressionWithContext<'db> {
 /// more precise inference results, aka "bidirectional type inference".
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct TypeContext<'db> {
-    annotation: Option<Type<'db>>,
+    pub(crate) annotation: Option<Type<'db>>,
 }
 
 impl<'db> TypeContext<'db> {
-    pub(crate) fn new(annotation: Type<'db>) -> Self {
-        Self {
-            annotation: Some(annotation),
+    pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
+        Self { annotation }
+    }
+
+    // If the type annotation is a specialized instance of the given `KnownClass`, returns the
+    // specialization.
+    fn known_specialization(
+        &self,
+        known_class: KnownClass,
+        db: &'db dyn Db,
+    ) -> Option<Specialization<'db>> {
+        let class_type = match self.annotation? {
+            Type::NominalInstance(instance) => instance,
+            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+            _ => return None,
         }
+        .class(db);
+
+        if !class_type.is_known(db, known_class) {
+            return None;
+        }
+
+        class_type
+            .into_generic_alias()
+            .map(|generic_alias| generic_alias.specialization(db))
     }
 }
 
@@ -618,6 +665,22 @@ impl<'db> DefinitionInference<'db> {
             scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
                 cycle_recovery: Some(CycleRecovery::Initial),
+                ..DefinitionInferenceExtra::default()
+            })),
+        }
+    }
+
+    fn cycle_fallback(scope: ScopeId<'db>) -> Self {
+        let _ = scope;
+
+        Self {
+            expressions: FxHashMap::default(),
+            bindings: Box::default(),
+            declarations: Box::default(),
+            #[cfg(debug_assertions)]
+            scope,
+            extra: Some(Box::new(DefinitionInferenceExtra {
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 ..DefinitionInferenceExtra::default()
             })),
         }

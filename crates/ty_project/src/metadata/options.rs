@@ -295,14 +295,41 @@ impl Options {
             roots
         };
 
-        let settings = SearchPathSettings {
-            extra_paths: environment
+        // collect the existing site packages
+        let mut extra_paths: Vec<SystemPathBuf> = Vec::new();
+
+        // read all the paths off the PYTHONPATH environment variable, check
+        // they exist as a directory, and add them to the vec of extra_paths
+        // as they should be checked before site-packages just like python
+        // interpreter does
+        if let Ok(python_path) = system.env_var("PYTHONPATH") {
+            for path in python_path.split(':') {
+                let possible_path = SystemPath::absolute(path, system.current_directory());
+
+                if system.is_directory(&possible_path) {
+                    tracing::debug!(
+                        "Adding `{possible_path}` from the `PYTHONPATH` environment variable to `extra_paths`"
+                    );
+                    extra_paths.push(possible_path);
+                } else {
+                    tracing::debug!(
+                        "Skipping `{possible_path}` listed in `PYTHONPATH` because the path doesn't exist or isn't a directory"
+                    );
+                }
+            }
+        }
+
+        extra_paths.extend(
+            environment
                 .extra_paths
                 .as_deref()
                 .unwrap_or_default()
                 .iter()
-                .map(|path| path.absolute(project_root, system))
-                .collect(),
+                .map(|path| path.absolute(project_root, system)),
+        );
+
+        let settings = SearchPathSettings {
+            extra_paths,
             src_roots,
             custom_typeshed: environment
                 .typeshed
@@ -1077,6 +1104,10 @@ pub enum OutputFormat {
     ///
     /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     Gitlab,
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 impl OutputFormat {
@@ -1096,6 +1127,7 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
         }
     }
 }

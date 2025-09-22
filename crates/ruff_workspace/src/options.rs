@@ -3860,6 +3860,13 @@ pub struct AnalyzeOptions {
     /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
     /// For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`)
     /// would be considered valid imports.
+    #[option(
+        default = "2",
+        value_type = "usize",
+        example = r#"
+            string-imports-min-dots = 2
+        "#
+    )]
     pub string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.

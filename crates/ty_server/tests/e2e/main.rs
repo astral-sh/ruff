@@ -27,6 +27,7 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod commands;
 mod initialize;
 mod inlay_hints;
 mod publish_diagnostics;
