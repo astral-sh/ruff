@@ -810,7 +810,7 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type overrides __eq__ or __ne__ methods
-    fn overrides_equality(&self, db: &'db dyn Db) -> bool {
+    fn overrides_equality(&self, db: &'db dyn Db, dunders: Option<Vec<(&str, bool)>>) -> bool {
         let check_dunder = |dunder_name, allowed_return_value| {
             // Note that we do explicitly exclude dunder methods on `object`, `int` and `str` here.
             // The reason for this is that we know that these dunder methods behave in a predictable way.
@@ -828,8 +828,14 @@ impl<'db> Type<'db> {
                 bindings.return_type(db) == Type::BooleanLiteral(allowed_return_value)
             }) || call_result.is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
         };
-
-        !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
+        match dunders {
+            Some(names) => {
+                !(names
+                    .iter()
+                    .all(|(name, result)| check_dunder(*name, *result)))
+            }
+            None => !(check_dunder("__eq__", true) && check_dunder("__ne__", false)),
+        }
     }
 
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
@@ -1059,30 +1065,38 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_union_of_single_valued(
+        &self,
+        db: &'db dyn Db,
+        dunders: Option<&Vec<(&str, bool)>>,
+    ) -> bool {
         self.into_union().is_some_and(|union| {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
-                    || (ty.is_enum(db) && !ty.overrides_equality(db))
+                    || ty.is_single_valued_enum(db, dunders.cloned())
             })
         }) || self.is_bool(db)
             || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+            || self.is_single_valued_enum(db, dunders.cloned())
     }
 
-    pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_union_with_single_valued(
+        &self,
+        db: &'db dyn Db,
+        dunders: Option<&Vec<(&str, bool)>>,
+    ) -> bool {
         self.into_union().is_some_and(|union| {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
-                    || (ty.is_enum(db) && !ty.overrides_equality(db))
+                    || ty.is_single_valued_enum(db, dunders.cloned())
             })
         }) || self.is_bool(db)
             || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+            || self.is_single_valued_enum(db, dunders.cloned())
     }
 
     pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
@@ -2673,6 +2687,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    //enum special case
+    pub(crate) fn is_single_valued_enum(
+        self,
+        db: &'db dyn Db,
+        dunders: Option<Vec<(&str, bool)>>,
+    ) -> bool {
+        (matches!(self, Type::EnumLiteral(_)) || self.is_enum(db))
+            && !self.overrides_equality(db, dunders)
+    }
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
@@ -2690,7 +2713,7 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
 
-            Type::EnumLiteral(_) => !self.overrides_equality(db),
+            Type::EnumLiteral(_) => false,
 
             Type::ProtocolInstance(..) => {
                 // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.

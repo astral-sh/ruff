@@ -477,7 +477,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         // We can only narrow on equality checks against single-valued types.
-        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
+        if rhs_ty.is_single_valued(self.db)
+            || rhs_ty.is_union_of_single_valued(self.db, Some(&vec![("__eq__", true)]))
+            || rhs_ty.is_single_valued_enum(self.db, Some(vec![("__eq__", true)]))
+        {
             // The fully-general (and more efficient) approach here would be to introduce a
             // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
             // `~NeverEqualTo(rhs_ty)` here and let union/intersection builder sort it out. This is
@@ -517,7 +520,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
                     // Other than the above cases, two single-valued disjoint types cannot compare
                     // equal.
-                    _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
+                    _ => {
+                        !(left_ty.is_single_valued(db)
+                            || left_ty.is_single_valued_enum(db, Some(vec![("__eq__", true)]))
+                                && right_ty.is_single_valued(db)
+                            || right_ty.is_single_valued_enum(db, Some(vec![("__eq__", true)])))
+                    }
                 }
             }
 
@@ -575,7 +583,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         )
                     }
                     _ => {
-                        if ty.is_single_valued(db) && !could_compare_equal(db, ty, rhs_ty) {
+                        if (ty.is_single_valued(db)
+                            || ty.is_single_valued_enum(db, Some(vec![("__eq__", true)])))
+                            && !could_compare_equal(db, ty, rhs_ty)
+                        {
                             ty
                         } else {
                             Type::Never
@@ -610,7 +621,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(i64::from(b))])
                     .negate(self.db),
             ),
-            _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
+            _ if rhs_ty.is_single_valued(self.db)
+                || rhs_ty.is_single_valued_enum(self.db, None) =>
+            {
+                Some(rhs_ty.negate(self.db))
+            }
             _ => None,
         }
     }
@@ -618,12 +633,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+        if lhs_ty.is_single_valued(self.db)
+            || lhs_ty.is_union_of_single_valued(self.db, Some(&vec![("__eq__", true)]))
+            || lhs_ty.is_single_valued_enum(self.db, Some(vec![("__eq__", true)]))
+        {
             rhs_ty
                 .try_iterate(self.db)
                 .ok()
                 .map(|iterable| iterable.homogeneous_element_type(self.db))
-        } else if lhs_ty.is_union_with_single_valued(self.db) {
+        } else if lhs_ty.is_union_with_single_valued(self.db, Some(&vec![("__eq__", true)])) {
             let rhs_values = rhs_ty
                 .try_iterate(self.db)
                 .ok()?
@@ -640,7 +658,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if !element.is_single_valued(self.db)
                         && !element.is_literal_string()
                         && !element.is_bool(self.db)
-                        && (!element.is_enum(self.db) || element.overrides_equality(self.db))
+                        && (!element.is_enum(self.db)
+                            || !element
+                                .is_single_valued_enum(self.db, Some(vec![("__eq__", true)])))
                     {
                         builder = builder.add(*element);
                     }
@@ -658,14 +678,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .ok()?
             .homogeneous_element_type(self.db);
 
-        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+        if lhs_ty.is_single_valued(self.db)
+            || lhs_ty.is_union_of_single_valued(self.db, None)
+            || lhs_ty.is_single_valued_enum(self.db, None)
+        {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
             let complement = IntersectionBuilder::new(self.db)
                 .add_positive(lhs_ty)
                 .add_negative(rhs_values)
                 .build();
             Some(complement)
-        } else if lhs_ty.is_union_with_single_valued(self.db) {
+        } else if lhs_ty.is_union_with_single_valued(self.db, None) {
             // Split LHS into single-valued portion and the rest. Exclude RHS values from the
             // single-valued portion, keep the rest intact.
             let mut single_builder = UnionBuilder::new(self.db);
@@ -676,7 +699,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if element.is_single_valued(self.db)
                         || element.is_literal_string()
                         || element.is_bool(self.db)
-                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
+                        || element.is_single_valued_enum(self.db, None)
                     {
                         single_builder = single_builder.add(*element);
                     } else {
