@@ -183,7 +183,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackResult<'db> {
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,

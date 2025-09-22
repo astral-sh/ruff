@@ -554,7 +554,7 @@ impl<'db> CycleRecovery<'db> {
 }
 
 /// The inferred types for a scope region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
@@ -563,7 +563,7 @@ pub(crate) struct ScopeInference<'db> {
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct ScopeInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
@@ -612,7 +612,7 @@ impl<'db> ScopeInference<'db> {
 }
 
 /// The inferred types for a definition region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
@@ -638,7 +638,7 @@ pub(crate) struct DefinitionInference<'db> {
     extra: Option<Box<DefinitionInferenceExtra<'db>>>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
@@ -761,7 +761,7 @@ impl<'db> DefinitionInference<'db> {
 }
 
 /// The inferred types for an expression region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
@@ -774,7 +774,7 @@ pub(crate) struct ExpressionInference<'db> {
 }
 
 /// Extra data that only exists for few inferred expression regions.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
 struct ExpressionInferenceExtra<'db> {
     /// The types of every binding in this expression region.
     ///

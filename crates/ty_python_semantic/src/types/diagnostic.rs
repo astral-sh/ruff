@@ -1790,7 +1790,7 @@ declare_lint! {
 }
 
 /// A collection of type check diagnostics.
-#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,

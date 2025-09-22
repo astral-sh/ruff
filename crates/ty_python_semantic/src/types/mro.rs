@@ -418,7 +418,7 @@ impl<'db> Iterator for MroIterator<'db> {
 
 impl std::iter::FusedIterator for MroIterator<'_> {}
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MroError<'db> {
     kind: MroErrorKind<'db>,
     fallback_mro: Mro<'db>,
@@ -447,7 +447,7 @@ impl<'db> MroError<'db> {
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) enum MroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///
@@ -488,7 +488,7 @@ impl<'db> MroErrorKind<'db> {
 }
 
 /// Error recording the fact that a class definition was found to have duplicate bases.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct DuplicateBaseError<'db> {
     /// The base that is duplicated in the class's bases list.
     pub(super) duplicate_base: ClassBase<'db>,
