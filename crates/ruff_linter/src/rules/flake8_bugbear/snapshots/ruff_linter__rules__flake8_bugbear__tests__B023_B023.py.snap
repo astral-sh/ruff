@@ -244,3 +244,34 @@ B023 Function definition does not bind loop variable `i`
 174 |             return [lambda: i for i in range(3)]  # error
     |                             ^
     |
+
+B023 Function definition does not bind loop variable `_i`
+   --> B023.py:208:34
+    |
+206 | for _i in range(0, 4):
+207 |     data[f"v{_i}"] = data["hex"].apply(
+208 |         lambda x: modifier(x[2 * _i : 2 * _i + 2]),  # Should trigger B023 - _i is not bound
+    |                                  ^^
+209 |     )
+    |
+
+B023 Function definition does not bind loop variable `_i`
+   --> B023.py:208:43
+    |
+206 | for _i in range(0, 4):
+207 |     data[f"v{_i}"] = data["hex"].apply(
+208 |         lambda x: modifier(x[2 * _i : 2 * _i + 2]),  # Should trigger B023 - _i is not bound
+    |                                           ^^
+209 |     )
+    |
+
+B023 Function definition does not bind loop variable `value`
+   --> B023.py:217:20
+    |
+215 |     def add_one():
+216 |         def _add_one_inner(value):
+217 |             return value + 1  # Should trigger B023 - value is not bound to loop variable
+    |                    ^^^^^
+218 |
+219 |         return _add_one_inner
+    |
