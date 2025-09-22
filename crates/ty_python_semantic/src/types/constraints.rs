@@ -668,41 +668,28 @@ impl<'db> Node<'db> {
     fn substitute_intersection(
         self,
         db: &'db dyn Db,
-        left: ConstrainedTypeVar<'db>,
-        right: ConstrainedTypeVar<'db>,
-        replacement: ConstrainedTypeVar<'db>,
+        left: SatisfiedConstraint<'db>,
+        right: SatisfiedConstraint<'db>,
+        replacement_node: Node<'db>,
     ) -> Self {
         eprintln!(
             "==> substitute {} for ({}) ∧ ({})",
-            replacement.display(db),
+            replacement_node.display(db),
             left.display(db),
             right.display(db)
         );
         eprintln!(" -> in {}", self.display(db));
-        let when_not_left = self.restrict(db, [SatisfiedConstraint::Negative(left)]);
+        let when_not_left = self.restrict(db, [left.flipped()]);
         eprintln!(" -> (x ∧ y)[x=0] = {}", when_not_left.display(db));
-        let when_left_but_not_right = self.restrict(
-            db,
-            [
-                SatisfiedConstraint::Positive(left),
-                SatisfiedConstraint::Negative(right),
-            ],
-        );
+        let when_left_but_not_right = self.restrict(db, [left, right.flipped()]);
         eprintln!(
             " -> (x ∧ y)[x=1,y=0] = {}",
             when_left_but_not_right.display(db)
         );
-        let when_left_and_right = self.restrict(
-            db,
-            [
-                SatisfiedConstraint::Positive(left),
-                SatisfiedConstraint::Positive(right),
-            ],
-        );
+        let when_left_and_right = self.restrict(db, [left, right]);
         eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_left_and_right.display(db));
-        let left_node = Node::new_constraint(db, left);
-        let right_node = Node::new_constraint(db, right);
-        let replacement_node = Node::new_constraint(db, replacement);
+        let left_node = Node::new_satisfied_constraint(db, left);
+        let right_node = Node::new_satisfied_constraint(db, right);
 
         let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
         eprintln!(" -> right_result = {}", right_result.display(db));
@@ -729,52 +716,27 @@ impl<'db> Node<'db> {
     fn substitute_union(
         self,
         db: &'db dyn Db,
-        left: ConstrainedTypeVar<'db>,
-        right: ConstrainedTypeVar<'db>,
-        replacement: ConstrainedTypeVar<'db>,
+        left: SatisfiedConstraint<'db>,
+        right: SatisfiedConstraint<'db>,
+        replacement_node: Node<'db>,
     ) -> Self {
         eprintln!(
             "==> substitute {} for ({}) ∨ ({})",
-            replacement.display(db),
+            replacement_node.display(db),
             left.display(db),
             right.display(db)
         );
         eprintln!(" -> in {}", self.display(db));
-        let when_l0_r0 = self.restrict(
-            db,
-            [
-                SatisfiedConstraint::Negative(left),
-                SatisfiedConstraint::Negative(right),
-            ],
-        );
+        let when_l0_r0 = self.restrict(db, [left.flipped(), right.flipped()]);
         eprintln!(" -> (x ∧ y)[x=0,y=0] = {}", when_l0_r0.display(db));
-        let when_l1_r0 = self.restrict(
-            db,
-            [
-                SatisfiedConstraint::Positive(left),
-                SatisfiedConstraint::Negative(right),
-            ],
-        );
+        let when_l1_r0 = self.restrict(db, [left, right.flipped()]);
         eprintln!(" -> (x ∧ y)[x=1,y=0] = {}", when_l1_r0.display(db));
-        let when_l0_r1 = self.restrict(
-            db,
-            [
-                SatisfiedConstraint::Negative(left),
-                SatisfiedConstraint::Positive(right),
-            ],
-        );
+        let when_l0_r1 = self.restrict(db, [left.flipped(), right]);
         eprintln!(" -> (x ∧ y)[x=0,y=1] = {}", when_l0_r1.display(db));
-        let when_l1_r1 = self.restrict(
-            db,
-            [
-                SatisfiedConstraint::Positive(left),
-                SatisfiedConstraint::Positive(right),
-            ],
-        );
+        let when_l1_r1 = self.restrict(db, [left, right]);
         eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_l1_r1.display(db));
-        let left_node = Node::new_constraint(db, left);
-        let right_node = Node::new_constraint(db, right);
-        let replacement_node = Node::new_constraint(db, replacement);
+        let left_node = Node::new_satisfied_constraint(db, left);
+        let right_node = Node::new_satisfied_constraint(db, right);
 
         let result = replacement_node.ite(
             db,
@@ -1075,41 +1037,55 @@ impl<'db> InteriorNode<'db> {
                 );
                 simplified.update_if_simpler(
                     db,
-                    simplified.substitute_intersection(db, larger_atom, smaller_atom, smaller_atom),
+                    simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Positive(larger_atom),
+                        SatisfiedConstraint::Positive(smaller_atom),
+                        Node::new_constraint(db, smaller_atom),
+                    ),
                 );
                 simplified.update_if_simpler(
                     db,
-                    simplified.substitute_union(db, larger_atom, smaller_atom, larger_atom),
+                    simplified.substitute_union(
+                        db,
+                        SatisfiedConstraint::Positive(larger_atom),
+                        SatisfiedConstraint::Positive(smaller_atom),
+                        Node::new_constraint(db, larger_atom),
+                    ),
                 );
                 return;
             }
 
             let self_constraint = self_atom.constraint(db);
             let nested_constraint = nested_atom.constraint(db);
-            let intersection = self_constraint
-                .intersect(db, nested_constraint)
-                .map(|constraint| ConstrainedTypeVar::new(db, typevar, constraint));
-            match intersection {
+            match self_constraint.intersect(db, nested_constraint) {
                 Some(intersection) => {
                     simplified.update_if_simpler(
                         db,
                         simplified.substitute_intersection(
                             db,
-                            self_atom,
-                            nested_atom,
-                            intersection,
+                            SatisfiedConstraint::Positive(self_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::new_constraint(
+                                db,
+                                ConstrainedTypeVar::new(db, typevar, intersection),
+                            ),
                         ),
                     );
                 }
                 None => {
+                    eprintln!(
+                        "==> {} ∧ {} is empty",
+                        self_atom.display(db),
+                        nested_atom.display(db)
+                    );
                     simplified.update_if_simpler(
                         db,
-                        simplified.restrict(
+                        simplified.substitute_intersection(
                             db,
-                            [
-                                SatisfiedConstraint::Negative(self_atom),
-                                SatisfiedConstraint::Negative(nested_atom),
-                            ],
+                            SatisfiedConstraint::Negative(self_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            Node::AlwaysFalse,
                         ),
                     );
                 }
@@ -1142,6 +1118,29 @@ impl<'db> SatisfiedConstraint<'db> {
 
     fn flip(&mut self) {
         *self = self.flipped();
+    }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        struct DisplaySatisfiedConstraint<'db> {
+            constraint: SatisfiedConstraint<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl Display for DisplaySatisfiedConstraint<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.constraint {
+                    SatisfiedConstraint::Positive(constraint) => constraint.display(self.db).fmt(f),
+                    SatisfiedConstraint::Negative(constraint) => {
+                        constraint.display_negated(self.db).fmt(f)
+                    }
+                }
+            }
+        }
+
+        DisplaySatisfiedConstraint {
+            constraint: self,
+            db,
+        }
     }
 }
 
