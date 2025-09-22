@@ -12,6 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
@@ -57,6 +58,20 @@ mod tests {
         let diagnostics = test_path(
             Path::new("refurb").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("FURB101.py"))]
+    fn preview_rules(path: &Path) -> Result<()> {
+        let snapshot = format!("preview_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("refurb").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![Rule::ReadWholeFile])
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

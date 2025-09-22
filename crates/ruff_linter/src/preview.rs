@@ -228,3 +228,8 @@ pub(crate) const fn is_sim910_expanded_key_support_enabled(settings: &LinterSett
 pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/
+pub(crate) const fn is_fix_read_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
