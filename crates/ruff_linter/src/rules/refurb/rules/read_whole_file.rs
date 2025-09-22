@@ -262,7 +262,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
     let name = open.mode.pathlib_method();
 
     if open.keywords.is_empty() {
-        return SourceCodeSnippet::from_str(&format!("{}()", name));
+        return SourceCodeSnippet::from_str(&format!("{name}()"));
     }
 
     let call = ast::ExprCall {
