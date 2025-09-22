@@ -8057,7 +8057,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
-    fn mark_typevars_inferable<'a>(
+    fn mark_typevars_inferable(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
