@@ -2713,7 +2713,7 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
 
-            Type::EnumLiteral(_) => false,
+            Type::EnumLiteral(_) => !self.overrides_equality(db, None),
 
             Type::ProtocolInstance(..) => {
                 // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.

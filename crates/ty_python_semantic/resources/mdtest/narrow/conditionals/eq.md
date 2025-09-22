@@ -107,6 +107,30 @@ def _(answer: AmbiguousEnum):
         reveal_type(answer)  # revealed: AmbiguousEnum
 ```
 
+If the enum only has a custom `__ne__` without a modified `__eq__`, it is safe to narrow on eq/in
+checks.
+
+```py
+from enum import Enum
+from typing import cast
+
+class Foo(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self,other): return False
+
+reveal_type(Foo.A == Foo.A) # revealed: Literal[True]
+
+foo = cast(Foo, Foo.A)
+
+if foo == Foo.A:
+    reveal_type(foo) # revealed: Literal[Foo.A]
+
+if foo != Foo.B:
+    reveal_type(foo) #revealed: Foo
+```
+
 ## `x != y` where `y` is of literal type
 
 ```py
