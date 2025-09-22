@@ -342,6 +342,7 @@ class Contravariant[T]:
 def _(x: object):
     if isinstance(x, Contravariant):
         reveal_type(x)  # revealed: Contravariant[Never]
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Argument type `Contravariant[Never]` does not satisfy upper bound `Contravariant[T@Contravariant]` of type variable `Self`"
         # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
 ```

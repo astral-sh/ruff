@@ -1632,6 +1632,31 @@ impl<'db> Type<'db> {
             // be specialized to `Never`.)
             (_, Type::NonInferableTypeVar(_)) => ConstraintSet::from(false),
 
+            (Type::TypeVar(_), _) if relation.is_assignability() => {
+                // The implicit lower bound of a typevar is `Never`, which means
+                // that it is always assignable to any other type.
+
+                // TODO: record the unification constraints
+
+                ConstraintSet::from(true)
+            }
+
+            (_, Type::TypeVar(typevar))
+                if relation.is_assignability()
+                    && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
+                        !self
+                            .has_relation_to_impl(db, bound, relation, visitor)
+                            .is_never_satisfied()
+                    }) =>
+            {
+                // TODO: record the unification constraints
+
+                typevar
+                    .typevar(db)
+                    .upper_bound(db)
+                    .when_none_or(|bound| self.has_relation_to_impl(db, bound, relation, visitor))
+            }
+
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
 
@@ -8032,7 +8057,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
-    fn mark_typevars_inferable(
+    fn mark_typevars_inferable<'a>(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
