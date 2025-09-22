@@ -699,7 +699,20 @@ impl<'db> Node<'db> {
         eprintln!(" -> left_result  = {}", left_result.display(db));
         let result = replacement_node.ite(db, when_left_and_right, left_result);
         eprintln!(" -> result       = {}", result.display(db));
-        result
+
+        let validity = replacement_node.iff(db, left_node.and(db, right_node));
+        eprintln!(" -> validity     = {}", validity.display(db));
+        let constrained_original = self.and(db, validity);
+        eprintln!(" -> **original   = {}", constrained_original.display(db));
+        let constrained_replacement = result.and(db, validity);
+        eprintln!(" -> **result     = {}", constrained_replacement.display(db));
+        if constrained_original == constrained_replacement {
+            eprintln!(" -> using replacement");
+            result
+        } else {
+            eprintln!(" -> using original");
+            self
+        }
     }
 
     fn substitute_union(
@@ -748,6 +761,8 @@ impl<'db> Node<'db> {
             ],
         );
         eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_l1_r1.display(db));
+        let left_node = Node::new_constraint(db, left);
+        let right_node = Node::new_constraint(db, right);
         let replacement_node = Node::new_constraint(db, replacement);
 
         let result = replacement_node.ite(
@@ -756,7 +771,20 @@ impl<'db> Node<'db> {
             when_l0_r0,
         );
         eprintln!(" -> result       = {}", result.display(db));
-        result
+
+        let validity = replacement_node.iff(db, left_node.or(db, right_node));
+        eprintln!(" -> validity     = {}", validity.display(db));
+        let constrained_original = self.and(db, validity);
+        eprintln!(" -> **original   = {}", constrained_original.display(db));
+        let constrained_replacement = result.and(db, validity);
+        eprintln!(" -> **result     = {}", constrained_replacement.display(db));
+        if constrained_original == constrained_replacement {
+            eprintln!(" -> using replacement");
+            result
+        } else {
+            eprintln!(" -> using original");
+            self
+        }
     }
 
     fn for_each_constraint(
@@ -1023,14 +1051,10 @@ impl<'db> InteriorNode<'db> {
                     self_atom.display(db),
                     nested_atom.display(db),
                 );
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_intersection(db, larger_atom, smaller_atom, smaller_atom),
-                );
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_union(db, larger_atom, smaller_atom, larger_atom),
-                );
+                simplified =
+                    simplified.substitute_intersection(db, larger_atom, smaller_atom, smaller_atom);
+                simplified =
+                    simplified.substitute_union(db, larger_atom, smaller_atom, larger_atom);
                 return;
             }
 
@@ -1040,10 +1064,8 @@ impl<'db> InteriorNode<'db> {
                 .intersect(db, nested_constraint)
                 .map(|constraint| ConstrainedTypeVar::new(db, typevar, constraint));
             if let Some(intersection) = intersection {
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_intersection(db, self_atom, nested_atom, intersection),
-                );
+                simplified =
+                    simplified.substitute_intersection(db, self_atom, nested_atom, intersection);
             }
         });
         simplified
