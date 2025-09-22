@@ -1185,7 +1185,7 @@ impl<'db> ClassType<'db> {
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
                     Type::Callable(
                         new_function
-                            .into_bound_method_type(db, self_ty)
+                            .into_bound_method_type(db, correct_return_type)
                             .into_callable_type(db),
                     )
                 } else {
