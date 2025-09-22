@@ -297,7 +297,13 @@ impl Options {
         };
 
         // collect the existing site packages
-        let mut extra_paths: Vec<SystemPathBuf> = Vec::new();
+        let mut extra_paths: Vec<SystemPathBuf> = environment
+            .extra_paths
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|path| path.absolute(project_root, system))
+            .collect();
 
         // read all the paths off the PYTHONPATH environment variable, check
         // they exist as a directory, and add them to the vec of extra_paths
@@ -321,15 +327,6 @@ impl Options {
                 }
             }
         }
-
-        extra_paths.extend(
-            environment
-                .extra_paths
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(|path| path.absolute(project_root, system)),
-        );
 
         let settings = SearchPathSettings {
             extra_paths,
