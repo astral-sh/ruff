@@ -125,49 +125,17 @@ class RuffCodeActionProvider implements CodeActionProvider {
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions = this.diagnostics
       // Show fixes for any diagnostic whose range intersects the requested range
-      .filter((check) => {
-        const diagStartLine = check.start_location.row;
-        const diagStartCol = check.start_location.column;
-        const diagEndLine = check.end_location.row;
-        const diagEndCol = check.end_location.column;
-
-        const rangeStartLine = range.startLineNumber;
-        const rangeStartCol = range.startColumn;
-        const rangeEndLine = range.endLineNumber;
-        const rangeEndCol = range.endColumn;
-
-        // Helper to compare positions
-        const isBeforeOrEqual = (
-          lineA: number,
-          colA: number,
-          lineB: number,
-          colB: number,
-        ) => lineA < lineB || (lineA === lineB && colA <= colB);
-
-        const isAfterOrEqual = (
-          lineA: number,
-          colA: number,
-          lineB: number,
-          colB: number,
-        ) => lineA > lineB || (lineA === lineB && colA >= colB);
-
-        // Ranges [diagStart, diagEnd] and [rangeStart, rangeEnd] intersect if:
-        // diagStart <= rangeEnd AND diagEnd >= rangeStart
-        const diagStartsBeforeOrAtRangeEnd = isBeforeOrEqual(
-          diagStartLine,
-          diagStartCol,
-          rangeEndLine,
-          rangeEndCol,
-        );
-        const diagEndsAfterOrAtRangeStart = isAfterOrEqual(
-          diagEndLine,
-          diagEndCol,
-          rangeStartLine,
-          rangeStartCol,
-        );
-
-        return diagStartsBeforeOrAtRangeEnd && diagEndsAfterOrAtRangeStart;
-      })
+      .filter((check) =>
+        Range.areIntersecting(
+          new Range(
+            check.start_location.row,
+            check.start_location.column,
+            check.end_location.row,
+            check.end_location.column,
+          ),
+          range,
+        ),
+      )
       .filter(({ fix }) => fix)
       .map((check) => ({
         title: check.fix
