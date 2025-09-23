@@ -14,6 +14,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::flake8_builtins;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_resource_path};
     use ruff_python_ast::PythonVersion;
 
@@ -52,6 +53,28 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
+                flake8_builtins: flake8_builtins::settings::Settings {
+                    strict_checking: true,
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
                 flake8_builtins: flake8_builtins::settings::Settings {
                     strict_checking: true,
                     ..Default::default()

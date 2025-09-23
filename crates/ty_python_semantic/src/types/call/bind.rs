@@ -19,8 +19,8 @@ use crate::place::{Boundness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
-    UNKNOWN_ARGUMENT,
+    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
+    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1991,6 +1991,7 @@ struct ArgumentMatcher<'a, 'db> {
 
     argument_matches: Vec<MatchedArgument<'db>>,
     parameter_matched: Vec<bool>,
+    suppress_missing_error: Vec<bool>,
     next_positional: usize,
     first_excess_positional: Option<usize>,
     num_synthetic_args: usize,
@@ -2009,6 +2010,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             errors,
             argument_matches: vec![MatchedArgument::default(); arguments.len()],
             parameter_matched: vec![false; parameters.len()],
+            suppress_missing_error: vec![false; parameters.len()],
             next_positional: 0,
             first_excess_positional: None,
             num_synthetic_args: 0,
@@ -2105,10 +2107,21 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             .keyword_by_name(name)
             .or_else(|| self.parameters.keyword_variadic())
         else {
-            self.errors.push(BindingError::UnknownArgument {
-                argument_name: ast::name::Name::new(name),
-                argument_index: self.get_argument_index(argument_index),
-            });
+            if let Some((parameter_index, parameter)) =
+                self.parameters.positional_only_by_name(name)
+            {
+                self.errors
+                    .push(BindingError::PositionalOnlyParameterAsKwarg {
+                        argument_index: self.get_argument_index(argument_index),
+                        parameter: ParameterContext::new(parameter, parameter_index, true),
+                    });
+                self.suppress_missing_error[parameter_index] = true;
+            } else {
+                self.errors.push(BindingError::UnknownArgument {
+                    argument_name: ast::name::Name::new(name),
+                    argument_index: self.get_argument_index(argument_index),
+                });
+            }
             return Err(());
         };
         self.assign_argument(
@@ -2223,6 +2236,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         let mut missing = vec![];
         for (index, matched) in self.parameter_matched.iter().copied().enumerate() {
             if !matched {
+                if self.suppress_missing_error[index] {
+                    continue;
+                }
                 let param = &self.parameters[index];
                 if param.is_variadic()
                     || param.is_keyword_variadic()
@@ -3094,6 +3110,11 @@ pub(crate) enum BindingError<'db> {
         argument_name: ast::name::Name,
         argument_index: Option<usize>,
     },
+    /// A positional-only parameter is passed as keyword argument.
+    PositionalOnlyParameterAsKwarg {
+        argument_index: Option<usize>,
+        parameter: ParameterContext,
+    },
     /// More positional arguments are provided in the call than can be handled by the signature.
     TooManyPositionalArguments {
         first_excess_argument_index: Option<usize>,
@@ -3330,6 +3351,35 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    } else if let Some(spans) = callable_ty.function_spans(context.db()) {
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!("{callable_kind} signature here"),
+                        );
+                        sub.annotate(Annotation::primary(spans.signature));
+                        diag.sub(sub);
+                    }
+                }
+            }
+
+            Self::PositionalOnlyParameterAsKwarg {
+                argument_index,
+                parameter,
+            } => {
+                let node = Self::get_node(node, *argument_index);
+                if let Some(builder) =
+                    context.report_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG, node)
+                {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Positional-only parameter {parameter} passed as keyword argument{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {

@@ -77,6 +77,7 @@ Settings: Settings {
         "non-subscriptable": Error (Default),
         "not-iterable": Error (Default),
         "parameter-already-assigned": Error (Default),
+        "positional-only-parameter-as-kwarg": Error (Default),
         "possibly-missing-attribute": Warning (Default),
         "possibly-missing-implicit-call": Warning (Default),
         "possibly-missing-import": Warning (Default),
