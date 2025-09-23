@@ -267,6 +267,11 @@ reveal_type(Color.red)
 
 ### Using `auto()`
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 from enum import Enum, auto
 from ty_extensions import enum_members
@@ -277,14 +282,27 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
-Using `auto()` with `StrEnum`
+Usages of `auto()` can be combined with manual value assignments:
 
-```toml
-[environment]
-python-version = "3.11"
+```py
+class Mixed(Enum):
+    MANUAL_1 = -1
+    AUTO_1 = auto()
+    MANUAL_2 = -2
+    AUTO_2 = auto()
+
+reveal_type(Mixed.MANUAL_1.value)  # revealed: Literal[-1]
+reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[1]
+reveal_type(Mixed.MANUAL_2.value)  # revealed: Literal[-2]
+reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[2]
 ```
+
+When using `auto()` with `StrEnum`, the value is the lowercase name of the member:
 
 ```py
 from enum import StrEnum, auto
@@ -293,11 +311,11 @@ class Answer(StrEnum):
     YES = auto()
     NO = auto()
 
-# revealed: Literal["yes"]
-reveal_type(Answer.YES.value)
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
 ```
 
-Using `auto()` with `IntEnum`
+Using `auto()` with `IntEnum` also works as expected:
 
 ```py
 from enum import IntEnum, auto
@@ -306,8 +324,8 @@ class Answer(IntEnum):
     YES = auto()
     NO = auto()
 
-# revealed: Literal[1]
-reveal_type(Answer.YES.value)
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
 Combining aliases with `auto()`:
