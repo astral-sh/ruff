@@ -363,7 +363,7 @@ for x in Bad():
     reveal_type(x)  # revealed: Unknown
 ```
 
-## `__iter__` returns an object with a possibly unbound `__next__` method
+## `__iter__` returns an object with a possibly missing `__next__` method
 
 ```py
 def _(flag: bool):
@@ -412,7 +412,7 @@ for y in Iterable2():
     reveal_type(y)  # revealed: Unknown
 ```
 
-## Possibly unbound `__iter__` and bad `__getitem__` method
+## Possibly missing `__iter__` and bad `__getitem__` method
 
 <!-- snapshot-diagnostics -->
 
@@ -438,12 +438,12 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int | bytes
 ```
 
-## Possibly unbound `__iter__` and not-callable `__getitem__`
+## Possibly missing `__iter__` and not-callable `__getitem__`
 
 This snippet tests that we infer the element type correctly in the following edge case:
 
 - `__iter__` is a method with the correct parameter spec that returns a valid iterator; BUT
-- `__iter__` is possibly unbound; AND
+- `__iter__` is possibly missing; AND
 - `__getitem__` is set to a non-callable type
 
 It's important that we emit a diagnostic here, but it's also important that we still use the return
@@ -466,7 +466,7 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int
 ```
 
-## Possibly unbound `__iter__` and possibly unbound `__getitem__`
+## Possibly missing `__iter__` and possibly missing `__getitem__`
 
 <!-- snapshot-diagnostics -->
 
@@ -560,7 +560,7 @@ for x in Iterable():
     reveal_type(x)  # revealed: int
 ```
 
-## Possibly unbound `__iter__` but definitely bound `__getitem__`
+## Possibly missing `__iter__` but definitely bound `__getitem__`
 
 Here, we should not emit a diagnostic: if `__iter__` is unbound, we should fallback to
 `__getitem__`:
@@ -694,7 +694,7 @@ def _(flag: bool):
         reveal_type(y)  # revealed: str | int
 ```
 
-## Possibly unbound `__iter__` and possibly invalid `__getitem__`
+## Possibly missing `__iter__` and possibly invalid `__getitem__`
 
 <!-- snapshot-diagnostics -->
 
