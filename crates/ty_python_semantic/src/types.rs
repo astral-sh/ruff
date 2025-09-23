@@ -6730,8 +6730,16 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(Type<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
-    /// Marks the typevars that are bound by a generic class or function as inferable. If the parameter
-    /// is `None`, *all* typevars are marked as inferable.
+    /// Marks type variables as inferable.
+    ///
+    /// When we create the signature for a generic function, we mark its type variables as inferable. Since
+    /// the generic function might reference type variables from enclosing generic scopes, we include the
+    /// function's binding context in order to only mark those type variables as inferable that are actually
+    /// bound by that function.
+    ///
+    /// When the parameter is set to `None`, *all* type variables will be marked as inferable. We use this
+    /// variant when descending into the bounds and/or constraints, and the default value of a type variable,
+    /// which may include nested type variables (`Self` has a bound of `C[T]` for a generic class `C[T]`).
     MarkTypeVarsInferable(Option<BindingContext<'db>>),
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
@@ -7678,6 +7686,9 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        // Type variables can have nested type variables in their bounds, constraints, or default value.
+        // When we mark a type variable as inferable, we also mark all of these nested type variables as
+        // inferable, so we set the parameter to `None` here.
         let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
 
         Self::new(
