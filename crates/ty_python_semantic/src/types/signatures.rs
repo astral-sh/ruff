@@ -304,6 +304,7 @@ bitflags::bitflags! {
         const IS_GENERATOR = 1 << 0;
         const HAS_IMPLICITLY_POSITIONAL_FIRST_PARAMETER = 1 << 1;
         const MARK_TYPEVARS_INFERABLE = 1 << 2;
+        const COROUTINE_RETURN_TYPE = 1 << 3;
     }
 }
 
@@ -318,6 +319,10 @@ impl SignatureFlags {
 
     pub(crate) fn mark_typevars_inferable(self) -> bool {
         self.contains(SignatureFlags::MARK_TYPEVARS_INFERABLE)
+    }
+
+    pub(crate) fn coroutine_return_type(self) -> bool {
+        self.contains(SignatureFlags::COROUTINE_RETURN_TYPE)
     }
 }
 
@@ -391,7 +396,7 @@ impl<'db> Signature<'db> {
             } else {
                 plain_return_ty
             };
-            if function_node.is_async && !flags.is_generator() {
+            if function_node.is_async && !flags.is_generator() && flags.coroutine_return_type() {
                 KnownClass::CoroutineType
                     .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
             } else {

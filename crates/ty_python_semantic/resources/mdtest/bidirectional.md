@@ -61,6 +61,8 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import overload
+
 def list1[T](x: T) -> list[T]:
     return [x]
 
@@ -75,4 +77,21 @@ def wrap_data() -> list[dict]:
     # but the return type check passes here because the inferred return type is widened
     # by bidirectional type inference.
     return list1(res)
+
+@overload
+def f(x: int) -> list[int]: ...
+@overload
+def f(x: str) -> list[str]: ...
+def f(x: int | str) -> list[int] | list[str]:
+    # `list[int] | list[str]` is a different type than `list[int | str]`.
+    if isinstance(x, int):
+        return list1(x)
+    else:
+        return list1(x)
+
+reveal_type(f(1))  # revealed: list[int]
+reveal_type(f("a"))  # revealed: list[str]
+
+async def f() -> list[int]:
+    return list1(1)
 ```

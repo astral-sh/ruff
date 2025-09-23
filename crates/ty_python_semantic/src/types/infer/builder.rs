@@ -4774,7 +4774,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let annotated_return_type = |_| {
             nearest_enclosing_function(self.db(), self.index, self.scope()).map(|func| {
                 // When inferring expressions within a function body,
-                // the expected type passed should be the "raw" type, i.e. type variables in the return type are non-inferable.
+                // the expected type passed should be the "raw" type,
+                // i.e. type variables in the return type are non-inferable, and the return types of async functions are not wrapped in `CoroutineType[...]`.
                 TypeContext::new(func.last_definition_raw_signature(self.db()).return_ty)
             })
         };

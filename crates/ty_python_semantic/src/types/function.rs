@@ -343,11 +343,12 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
-        self.signature_impl(db, inherited_generic_context, true)
+        self.signature_impl(db, inherited_generic_context, false)
     }
 
     /// Typed internally-visible "raw" signature for this function.
-    /// That is, type variables in parameter types and the return type remain non-inferable.
+    /// That is, type variables in parameter types and the return type remain non-inferable,
+    /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
     ///
     /// ## Warning
     ///
@@ -360,14 +361,14 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
-        self.signature_impl(db, inherited_generic_context, false)
+        self.signature_impl(db, inherited_generic_context, true)
     }
 
     fn signature_impl(
         self,
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
-        mark_typevars_inferable: bool,
+        raw: bool,
     ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
@@ -448,8 +449,9 @@ impl<'db> OverloadLiteral<'db> {
         ) {
             flags |= SignatureFlags::HAS_IMPLICITLY_POSITIONAL_FIRST_PARAMETER;
         }
-        if mark_typevars_inferable {
+        if !raw {
             flags |= SignatureFlags::MARK_TYPEVARS_INFERABLE;
+            flags |= SignatureFlags::COROUTINE_RETURN_TYPE;
         }
         Signature::from_function(
             db,
