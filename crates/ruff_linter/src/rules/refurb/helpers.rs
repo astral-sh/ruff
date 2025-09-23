@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, Stmt, name::Name, parenthesize::parenthesized_range};
 use ruff_python_codegen::Generator;
@@ -392,79 +391,33 @@ pub(super) fn generate_furb_101_103_fix(
         )
         .ok()?;
 
-    let replacement = match (target, content_code) {
-        (Some(var), Some(content)) => {
-            if open.keywords.is_empty() {
-                format!(
-                    "{} = {}({}).{}({})",
-                    var,
-                    binding,
-                    filename_code,
-                    open.mode.pathlib_method(),
-                    content
-                )
-            } else {
-                format!(
-                    "{} = {}({}).{}({}, {})",
-                    var,
-                    binding,
-                    filename_code,
-                    open.mode.pathlib_method(),
-                    content,
-                    open.keywords
-                        .iter()
-                        .map(|kw| locator.slice(kw.range()))
-                        .join(", ")
-                )
-            }
+    let args = itertools::join(
+        content_code
+            .into_iter()
+            .chain(open.keywords.iter().map(|kw| locator.slice(kw.range()))),
+        ", ",
+    );
+
+    let replacement = match target {
+        Some(var) => {
+            format!(
+                "{} = {}({}).{}({})",
+                var,
+                binding,
+                filename_code,
+                open.mode.pathlib_method(),
+                args
+            )
         }
-        (None, Some(content)) => {
-            if open.keywords.is_empty() {
-                format!(
-                    "{}({}).{}({})",
-                    binding,
-                    filename_code,
-                    open.mode.pathlib_method(),
-                    content
-                )
-            } else {
-                format!(
-                    "{}({}).{}({}, {})",
-                    binding,
-                    filename_code,
-                    open.mode.pathlib_method(),
-                    content,
-                    open.keywords
-                        .iter()
-                        .map(|kw| locator.slice(kw.range()))
-                        .join(", ")
-                )
-            }
+        None => {
+            format!(
+                "{}({}).{}({})",
+                binding,
+                filename_code,
+                open.mode.pathlib_method(),
+                args
+            )
         }
-        (Some(var), None) => {
-            if open.keywords.is_empty() {
-                format!(
-                    "{} = {}({}).{}()",
-                    var,
-                    binding,
-                    filename_code,
-                    open.mode.pathlib_method()
-                )
-            } else {
-                format!(
-                    "{} = {}({}).{}({})",
-                    var,
-                    binding,
-                    filename_code,
-                    open.mode.pathlib_method(),
-                    open.keywords
-                        .iter()
-                        .map(|kw| locator.slice(kw.range()))
-                        .join(", ")
-                )
-            }
-        }
-        _ => return None,
     };
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
