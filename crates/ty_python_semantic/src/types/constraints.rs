@@ -65,6 +65,7 @@ use std::cmp::Ordering;
 use std::fmt::{Display, Write};
 
 use itertools::{EitherOrBoth, Itertools};
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
@@ -1037,177 +1038,184 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
-        let self_atom = self.atom(db);
+        let mut visited_atoms = FxHashSet::default();
+        let mut new_atoms = vec![self.atom(db)];
         let mut simplified = Node::Interior(self);
-        Node::Interior(self).for_each_constraint(db, &mut |nested_atom| {
-            if self_atom == nested_atom {
-                return;
-            }
-
-            let typevar = self_atom.typevar(db);
-            if typevar != nested_atom.typevar(db) {
-                return;
-            }
-
-            let larger_smaller = if self_atom.contains(db, nested_atom) {
-                Some((self_atom, nested_atom))
-            } else if nested_atom.contains(db, self_atom) {
-                Some((nested_atom, self_atom))
-            } else {
-                None
-            };
-            if let Some((larger_atom, smaller_atom)) = larger_smaller {
-                /*
-                eprintln!(
-                    "==> {} contains {}",
-                    self_atom.display(db),
-                    nested_atom.display(db),
-                );
-                */
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_union(
-                        db,
-                        SatisfiedConstraint::Positive(larger_atom),
-                        SatisfiedConstraint::Positive(smaller_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Positive(larger_atom),
-                        ),
-                    ),
-                );
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_intersection(
-                        db,
-                        SatisfiedConstraint::Negative(larger_atom),
-                        SatisfiedConstraint::Negative(smaller_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Negative(larger_atom),
-                        ),
-                    ),
-                );
-
-                simplified.update_if_simpler(
-                    db,
-                    simplified.substitute_intersection(
-                        db,
-                        SatisfiedConstraint::Negative(larger_atom),
-                        SatisfiedConstraint::Positive(smaller_atom),
-                        Node::AlwaysFalse,
-                    ),
-                );
-            }
-
-            let self_constraint = self_atom.constraint(db);
-            let nested_constraint = nested_atom.constraint(db);
-            match self_constraint.intersect(db, nested_constraint) {
-                Some(intersection) => {
-                    let intersection_constraint =
-                        ConstrainedTypeVar::new(db, typevar, intersection);
-                    let positive_intersection_node = Node::new_satisfied_constraint(
-                        db,
-                        SatisfiedConstraint::Positive(intersection_constraint),
-                    );
-                    let negative_intersection_node = Node::new_satisfied_constraint(
-                        db,
-                        SatisfiedConstraint::Negative(intersection_constraint),
-                    );
-
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(self_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            positive_intersection_node,
-                        ),
-                    );
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_union(
-                            db,
-                            SatisfiedConstraint::Negative(self_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            negative_intersection_node,
-                        ),
-                    );
-
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(self_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            Node::new_satisfied_constraint(
-                                db,
-                                SatisfiedConstraint::Positive(self_atom),
-                            )
-                            .and(db, negative_intersection_node),
-                        ),
-                    );
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Negative(self_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            Node::new_satisfied_constraint(
-                                db,
-                                SatisfiedConstraint::Positive(nested_atom),
-                            )
-                            .and(db, negative_intersection_node),
-                        ),
-                    );
+        while let Some(new_atom) = new_atoms.pop() {
+            visited_atoms.insert(new_atom);
+            Node::Interior(self).for_each_constraint(db, &mut |nested_atom| {
+                if new_atom == nested_atom {
+                    return;
                 }
-                None => {
+
+                let typevar = new_atom.typevar(db);
+                if typevar != nested_atom.typevar(db) {
+                    return;
+                }
+
+                let larger_smaller = if new_atom.contains(db, nested_atom) {
+                    Some((new_atom, nested_atom))
+                } else if nested_atom.contains(db, new_atom) {
+                    Some((nested_atom, new_atom))
+                } else {
+                    None
+                };
+                if let Some((larger_atom, smaller_atom)) = larger_smaller {
                     /*
                     eprintln!(
-                        "==> {} ∧ {} is empty",
-                        self_atom.display(db),
-                        nested_atom.display(db)
+                        "==> {} contains {}",
+                        new_atom.display(db),
+                        nested_atom.display(db),
                     );
                     */
                     simplified.update_if_simpler(
                         db,
+                        simplified.substitute_union(
+                            db,
+                            SatisfiedConstraint::Positive(larger_atom),
+                            SatisfiedConstraint::Positive(smaller_atom),
+                            Node::new_satisfied_constraint(
+                                db,
+                                SatisfiedConstraint::Positive(larger_atom),
+                            ),
+                        ),
+                    );
+                    simplified.update_if_simpler(
+                        db,
                         simplified.substitute_intersection(
                             db,
-                            SatisfiedConstraint::Positive(self_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
+                            SatisfiedConstraint::Negative(larger_atom),
+                            SatisfiedConstraint::Negative(smaller_atom),
+                            Node::new_satisfied_constraint(
+                                db,
+                                SatisfiedConstraint::Negative(larger_atom),
+                            ),
+                        ),
+                    );
+
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_intersection(
+                            db,
+                            SatisfiedConstraint::Negative(larger_atom),
+                            SatisfiedConstraint::Positive(smaller_atom),
                             Node::AlwaysFalse,
                         ),
                     );
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_union(
-                            db,
-                            SatisfiedConstraint::Negative(self_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            Node::AlwaysTrue,
-                        ),
-                    );
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(self_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            Node::new_constraint(db, self_atom),
-                        ),
-                    );
-                    simplified.update_if_simpler(
-                        db,
-                        simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Negative(self_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            Node::new_constraint(db, nested_atom),
-                        ),
-                    );
                 }
-            }
-        });
+
+                let new_constraint = new_atom.constraint(db);
+                let nested_constraint = nested_atom.constraint(db);
+                match new_constraint.intersect(db, nested_constraint) {
+                    Some(intersection) => {
+                        let intersection_constraint =
+                            ConstrainedTypeVar::new(db, typevar, intersection);
+                        if !visited_atoms.contains(&intersection_constraint) {
+                            new_atoms.push(intersection_constraint);
+                        }
+                        let positive_intersection_node = Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Positive(intersection_constraint),
+                        );
+                        let negative_intersection_node = Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Negative(intersection_constraint),
+                        );
+
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_intersection(
+                                db,
+                                SatisfiedConstraint::Positive(new_atom),
+                                SatisfiedConstraint::Positive(nested_atom),
+                                positive_intersection_node,
+                            ),
+                        );
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_union(
+                                db,
+                                SatisfiedConstraint::Negative(new_atom),
+                                SatisfiedConstraint::Negative(nested_atom),
+                                negative_intersection_node,
+                            ),
+                        );
+
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_intersection(
+                                db,
+                                SatisfiedConstraint::Positive(new_atom),
+                                SatisfiedConstraint::Negative(nested_atom),
+                                Node::new_satisfied_constraint(
+                                    db,
+                                    SatisfiedConstraint::Positive(new_atom),
+                                )
+                                .and(db, negative_intersection_node),
+                            ),
+                        );
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_intersection(
+                                db,
+                                SatisfiedConstraint::Negative(new_atom),
+                                SatisfiedConstraint::Positive(nested_atom),
+                                Node::new_satisfied_constraint(
+                                    db,
+                                    SatisfiedConstraint::Positive(nested_atom),
+                                )
+                                .and(db, negative_intersection_node),
+                            ),
+                        );
+                    }
+                    None => {
+                        /*
+                        eprintln!(
+                            "==> {} ∧ {} is empty",
+                            new_atom.display(db),
+                            nested_atom.display(db)
+                        );
+                        */
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_intersection(
+                                db,
+                                SatisfiedConstraint::Positive(new_atom),
+                                SatisfiedConstraint::Positive(nested_atom),
+                                Node::AlwaysFalse,
+                            ),
+                        );
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_union(
+                                db,
+                                SatisfiedConstraint::Negative(new_atom),
+                                SatisfiedConstraint::Negative(nested_atom),
+                                Node::AlwaysTrue,
+                            ),
+                        );
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_intersection(
+                                db,
+                                SatisfiedConstraint::Positive(new_atom),
+                                SatisfiedConstraint::Negative(nested_atom),
+                                Node::new_constraint(db, new_atom),
+                            ),
+                        );
+                        simplified.update_if_simpler(
+                            db,
+                            simplified.substitute_intersection(
+                                db,
+                                SatisfiedConstraint::Negative(new_atom),
+                                SatisfiedConstraint::Positive(nested_atom),
+                                Node::new_constraint(db, nested_atom),
+                            ),
+                        );
+                    }
+                }
+            });
+        }
         simplified
     }
 }
