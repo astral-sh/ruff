@@ -1292,8 +1292,14 @@ impl<'db> Parameters<'db> {
                         let typevar_binding_context = Some(definition);
                         let index = semantic_index(db, scope_id.file(db));
                         let class = nearest_enclosing_class(db, index, scope_id).unwrap();
-                        Type::TypeVar(
+                        Type::NonInferableTypeVar(
                             get_self_type(db, scope_id, typevar_binding_context, class).unwrap(),
+                        )
+                        .apply_type_mapping(
+                            db,
+                            &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                                definition,
+                            ))),
                         )
                     };
                     Parameter {

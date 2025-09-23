@@ -117,7 +117,7 @@ reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
 reveal_type(C[int]().f(1))  # revealed: str
 reveal_type(bound_method(1))  # revealed: str
 
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[Unknown]` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[T@C]` of type variable `Self`"
 C[int].f(1)  # error: [missing-argument]
 reveal_type(C[int].f(C[int](), 1))  # revealed: str
 
