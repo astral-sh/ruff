@@ -19,7 +19,7 @@ use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pret
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::{LineColumn, OneIndexed, PositionEncoding};
 use ruff_text_size::Ranged;
 use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
@@ -228,27 +228,47 @@ impl Workspace {
 
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|msg| ExpandedMessage {
-                code: msg.secondary_code_or_id().to_string(),
-                message: msg.body().to_string(),
-                start_location: source_code
-                    .line_column(msg.range().unwrap_or_default().start())
-                    .into(),
-                end_location: source_code
-                    .line_column(msg.range().unwrap_or_default().end())
-                    .into(),
-                fix: msg.fix().map(|fix| ExpandedFix {
-                    message: msg.first_help_text().map(ToString::to_string),
-                    edits: fix
-                        .edits()
-                        .iter()
-                        .map(|edit| ExpandedEdit {
-                            location: source_code.line_column(edit.start()).into(),
-                            end_location: source_code.line_column(edit.end()).into(),
-                            content: edit.content().map(ToString::to_string),
-                        })
-                        .collect(),
-                }),
+            .map(|msg| {
+                let range = msg.range().unwrap_or_default();
+                let start_loc = source_code.source_location(range.start(), PositionEncoding::Utf16);
+                let end_loc = source_code.source_location(range.end(), PositionEncoding::Utf16);
+
+                ExpandedMessage {
+                    code: msg.secondary_code_or_id().to_string(),
+                    message: msg.body().to_string(),
+                    start_location: Location {
+                        row: start_loc.line,
+                        column: start_loc.character_offset,
+                    },
+                    end_location: Location {
+                        row: end_loc.line,
+                        column: end_loc.character_offset,
+                    },
+                    fix: msg.fix().map(|fix| ExpandedFix {
+                        message: msg.first_help_text().map(ToString::to_string),
+                        edits: fix
+                            .edits()
+                            .iter()
+                            .map(|edit| {
+                                let s = source_code
+                                    .source_location(edit.start(), PositionEncoding::Utf16);
+                                let e = source_code
+                                    .source_location(edit.end(), PositionEncoding::Utf16);
+                                ExpandedEdit {
+                                    location: Location {
+                                        row: s.line,
+                                        column: s.character_offset,
+                                    },
+                                    end_location: Location {
+                                        row: e.line,
+                                        column: e.character_offset,
+                                    },
+                                    content: edit.content().map(ToString::to_string),
+                                }
+                            })
+                            .collect(),
+                    }),
+                }
             })
             .collect();
 
