@@ -931,11 +931,7 @@ fn location_link_from_navigation_target(
 ) -> LocationLink {
     LocationLink {
         path: target.file().path(db).to_string(),
-        full_range: Range::from_file_range(
-            db,
-            FileRange::new(target.file(), target.full_range()),
-            position_encoding,
-        ),
+        full_range: Range::from_file_range(db, target.full_file_range(), position_encoding),
         selection_range: Some(Range::from_file_range(
             db,
             FileRange::new(target.file(), target.focus_range()),
