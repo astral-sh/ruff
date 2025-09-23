@@ -250,7 +250,7 @@ fn small(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&*COLOUR_SCIENCE, /*&*PANDAS,*/ &*STATIC_FRAME], sample_size=1, sample_count=3)]
+#[bench(args=[&*COLOUR_SCIENCE, &*PANDAS, &*STATIC_FRAME], sample_size=1, sample_count=3)]
 fn medium(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }

@@ -14,6 +14,7 @@ alerta
 altair
 antidote
 anyio
+apprise
 artigraph
 arviz
 async-utils
@@ -84,14 +85,17 @@ pandas
 pandas-stubs
 pandera
 paroxython
+parso
 pegen
 pip
 poetry
 porcupine
 ppb-vector
+prefect
 psycopg
 pwndbg
 pybind11
+pycryptodome
 pydantic
 pyinstrument
 pyjwt
@@ -105,6 +109,7 @@ pytest-robotframework
 python-chess
 python-htmlgen
 python-sop
+pywin32
 rclip
 rich
 rotki
@@ -112,6 +117,7 @@ schema_salad
 schemathesis
 scikit-build-core
 scikit-learn
+scipy
 scrapy
 setuptools
 sockeye
@@ -124,6 +130,7 @@ stone
 strawberry
 streamlit
 svcs
+sympy
 tornado
 trio
 twine
