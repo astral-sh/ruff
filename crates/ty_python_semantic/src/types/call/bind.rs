@@ -1758,7 +1758,7 @@ impl<'db> CallableBinding<'db> {
         if self.dunder_call_is_possibly_unbound {
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Object of type `{}` is not callable (possibly unbound `__call__` method)",
+                    "Object of type `{}` is not callable (possibly missing `__call__` method)",
                     self.callable_type.display(context.db()),
                 ));
                 if let Some(union_diag) = union_diag {

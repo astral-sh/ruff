@@ -1863,21 +1863,21 @@ Use instead:
 a = 20 / 0  # type: ignore
 ```
 
-## `possibly-unbound-attribute`
+## `possibly-missing-attribute`
 
 <small>
 Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-attribute) ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-attribute) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1328)
 </small>
 
 **What it does**
 
-Checks for possibly unbound attributes.
+Checks for possibly missing attributes.
 
 **Why is this bad?**
 
-Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
+Attempting to access a missing attribute will raise an `AttributeError` at runtime.
 
 **Examples**
 
@@ -1889,23 +1889,23 @@ class A:
 A.c  # AttributeError: type object 'A' has no attribute 'c'
 ```
 
-## `possibly-unbound-implicit-call`
+## `possibly-missing-implicit-call`
 
 <small>
 Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-implicit-call) ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-implicit-call) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L132)
 </small>
 
 **What it does**
 
-Checks for implicit calls to possibly unbound methods.
+Checks for implicit calls to possibly missing methods.
 
 **Why is this bad?**
 
 Expressions such as `x[y]` and `x * y` call methods
 under the hood (`__getitem__` and `__mul__` respectively).
-Calling an unbound method will raise an `AttributeError` at runtime.
+Calling a missing method will raise an `AttributeError` at runtime.
 
 **Examples**
 
@@ -1919,21 +1919,21 @@ class A:
 A()[0]  # TypeError: 'A' object is not subscriptable
 ```
 
-## `possibly-unbound-import`
+## `possibly-missing-import`
 
 <small>
 Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-import) ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-import) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1350)
 </small>
 
 **What it does**
 
-Checks for imports of symbols that may be unbound.
+Checks for imports of symbols that may be missing.
 
 **Why is this bad?**
 
-Importing an unbound module or name will raise a `ModuleNotFoundError`
+Importing a missing module or name will raise a `ModuleNotFoundError`
 or `ImportError` at runtime.
 
 **Examples**

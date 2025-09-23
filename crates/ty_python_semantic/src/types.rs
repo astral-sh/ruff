@@ -8,7 +8,7 @@ use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{
-    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -3830,7 +3830,7 @@ impl<'db> Type<'db> {
                         });
                     }
 
-                    // Don't trust possibly unbound `__bool__` method.
+                    // Don't trust possibly missing `__bool__` method.
                     Ok(Truthiness::Ambiguous)
                 }
 
@@ -8148,7 +8148,7 @@ impl<'db> AwaitError<'db> {
                 }
             }
             Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
-                diag.info("`__await__` is possibly unbound");
+                diag.info("`__await__` may be missing");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)
@@ -8255,7 +8255,7 @@ impl<'db> ContextManagerError<'db> {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
-                    format!("the method `{name}` is possibly unbound")
+                    format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
@@ -8272,7 +8272,7 @@ impl<'db> ContextManagerError<'db> {
                                          name_b: &str| {
             match (error_a, error_b) {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
-                    format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
+                    format!("the methods `{name_a}` and `{name_b}` are possibly missing")
                 }
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
@@ -8821,7 +8821,7 @@ pub(super) enum BoolError<'db> {
 
     /// Any other reason why the type can't be converted to a bool.
     /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
-    /// because `__bool__` points to a type that has a possibly unbound `__call__` method.
+    /// because `__bool__` points to a type that has a possibly missing `__call__` method.
     Other { not_boolable_type: Type<'db> },
 }
 
@@ -8994,7 +8994,7 @@ impl<'db> ConstructorCallError<'db> {
         let report_init_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
             CallDunderError::MethodNotAvailable => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     // If we are using vendored typeshed, it should be impossible to have missing
                     // or unbound `__init__` method on a class, as all classes have `object` in MRO.
@@ -9008,10 +9008,10 @@ impl<'db> ConstructorCallError<'db> {
             }
             CallDunderError::PossiblyUnbound(bindings) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__init__` on type `{}` is possibly unbound.",
+                        "Method `__init__` on type `{}` may be missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }
@@ -9026,10 +9026,10 @@ impl<'db> ConstructorCallError<'db> {
         let report_new_error = |error: &DunderNewCallError<'db>| match error {
             DunderNewCallError::PossiblyUnbound(call_error) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__new__` on type `{}` is possibly unbound.",
+                        "Method `__new__` on type `{}` may be missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }
