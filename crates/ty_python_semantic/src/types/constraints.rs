@@ -62,22 +62,12 @@
 //! supertype of it.
 
 use std::cmp::Ordering;
-use std::fmt::{Display, Write};
+use std::fmt::Display;
 
-use itertools::{EitherOrBoth, Itertools};
 use rustc_hash::FxHashSet;
-use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
-
-fn comparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-    left.is_subtype_of(db, right) || right.is_subtype_of(db, left)
-}
-
-fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-    !comparable(db, left, right)
-}
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -343,13 +333,6 @@ impl<'db> RangeConstraint<'db> {
         Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, constraint))
     }
 
-    fn always() -> Self {
-        Self {
-            lower: Type::Never,
-            upper: Type::object(),
-        }
-    }
-
     fn contains(self, db: &'db dyn Db, other: RangeConstraint<'db>) -> bool {
         self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper)
     }
@@ -371,22 +354,6 @@ impl<'db> RangeConstraint<'db> {
         }
 
         Some(Self { lower, upper })
-    }
-
-    /// Returns the union of two range constraints if it can be simplified to a single constraint.
-    /// Otherwise returns `None`.
-    fn union(&self, db: &'db dyn Db, other: RangeConstraint<'db>) -> Option<Self> {
-        // When one of the bounds is entirely contained within the other, the union simplifies to
-        // the larger bounds.
-        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
-            return Some(self.clone());
-        }
-        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
-            return Some(other.clone());
-        }
-
-        // Otherwise the result cannot be simplified.
-        None
     }
 
     fn display(self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
@@ -496,10 +463,6 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn is_terminal(self) -> bool {
-        matches!(self, Node::AlwaysFalse | Node::AlwaysTrue)
-    }
-
     fn is_always_satisfied(self) -> bool {
         matches!(self, Node::AlwaysTrue)
     }
@@ -575,69 +538,9 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn implies(self, db: &'db dyn Db, other: Self) -> Self {
-        /*
-        match (self, other) {
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
-            (Node::AlwaysTrue, other) | (other, Node::AlwaysFalse) => other,
-            (Node::Interior(a), Node::Interior(b)) => {
-                // Implies is _not_ commutative, so we can't use the same trick as above.
-                a.implies(db, b)
-            }
-        }
-        */
-        self.or(db, other.negate(db))
-    }
-
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
-    }
-
-    fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Self {
-        // relative_to should describe variable combinations that are impossible (for instance
-        // `x ∧ ¬y` if `x → y`). For those variable assignments, we don't care what value the BDD
-        // resolves to. We can try to simplify the BDD by seeing if mapping those variables to 0 or
-        // to 1 give a smaller BDD. Given `x → y`, that would simplify `x ∧ y` to `x`. (That might
-        // require mapping `x ∧ ¬y` to 0 or to 1, depending on how `x` and `y` relate to each other
-        // in the variable ordering.)
-
-        // First try forcing the don't-care assignments to 0. `relative_to` already encodes this,
-        // since it maps everything we care about to 1, and everything we don't care about to 0. So
-        // we can just AND the two BDDs together.
-        let mapped_to_zero = self.and(db, relative_to);
-        /*
-        eprintln!("==> {}", self.display(db));
-        eprintln!("  ∧ {}", relative_to.display(db));
-        eprintln!("  = {}", mapped_to_zero.display(db));
-        */
-
-        // And then we try forcing them to 1. To that, we negate `relative_to`, so that things we
-        // care about map to 0, and things we don't care about map to 1. And then we OR that with
-        // the original BDD.
-        let mapped_to_one = self.or(db, relative_to.negate(db));
-        /*
-        eprintln!("==> {}", self.display(db));
-        eprintln!("  ∨ {}", relative_to.negate(db).display(db));
-        eprintln!("  = {}", mapped_to_one.display(db));
-        */
-
-        // Then we keep the result that has the fewest interior nodes, using that as a proxy for
-        // the complexity of the underlying function.
-        let mapped_to_zero_size = mapped_to_zero.interior_node_count(db);
-        let mapped_to_one_size = mapped_to_one.interior_node_count(db);
-        let (smaller_size, smaller_updated) = if mapped_to_zero_size < mapped_to_one_size {
-            (mapped_to_zero_size, mapped_to_zero)
-        } else {
-            (mapped_to_one_size, mapped_to_one)
-        };
-
-        let original_size = self.interior_node_count(db);
-        if smaller_size < original_size {
-            smaller_updated
-        } else {
-            self
-        }
     }
 
     fn restrict(
@@ -804,12 +707,6 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn update_if_simpler(&mut self, db: &'db dyn Db, replacement: Self) {
-        // if replacement.interior_node_count(db) < self.interior_node_count(db) {
-        *self = replacement;
-        //}
-    }
-
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
         struct Searcher<'db> {
             clauses: SatisfiedClauses<'db>,
@@ -862,7 +759,7 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => f.write_str("never"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
-                        clauses.simplify(self.db);
+                        clauses.simplify();
                         clauses.display(self.db).fmt(f)
                     }
                 }
@@ -978,34 +875,6 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
-    /*
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn implies(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_atom = self.atom(db);
-        let other_atom = other.atom(db);
-        match self_atom.cmp(&other_atom) {
-            Ordering::Equal => Node::new(
-                db,
-                self_atom,
-                self.if_true(db).implies(db, other.if_true(db)),
-                self.if_false(db).implies(db, other.if_false(db)),
-            ),
-            Ordering::Less => Node::new(
-                db,
-                self_atom,
-                self.if_true(db).implies(db, Node::Interior(other)),
-                self.if_false(db).implies(db, Node::Interior(other)),
-            ),
-            Ordering::Greater => Node::new(
-                db,
-                other_atom,
-                Node::Interior(self).implies(db, other.if_true(db)),
-                Node::Interior(self).implies(db, other.if_false(db)),
-            ),
-        }
-    }
-    */
-
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
@@ -1068,39 +937,30 @@ impl<'db> InteriorNode<'db> {
                         nested_atom.display(db),
                     );
                     */
-                    simplified.update_if_simpler(
+                    simplified = simplified.substitute_union(
                         db,
-                        simplified.substitute_union(
+                        SatisfiedConstraint::Positive(larger_atom),
+                        SatisfiedConstraint::Positive(smaller_atom),
+                        Node::new_satisfied_constraint(
                             db,
                             SatisfiedConstraint::Positive(larger_atom),
-                            SatisfiedConstraint::Positive(smaller_atom),
-                            Node::new_satisfied_constraint(
-                                db,
-                                SatisfiedConstraint::Positive(larger_atom),
-                            ),
                         ),
                     );
-                    simplified.update_if_simpler(
+                    simplified = simplified.substitute_intersection(
                         db,
-                        simplified.substitute_intersection(
+                        SatisfiedConstraint::Negative(larger_atom),
+                        SatisfiedConstraint::Negative(smaller_atom),
+                        Node::new_satisfied_constraint(
                             db,
                             SatisfiedConstraint::Negative(larger_atom),
-                            SatisfiedConstraint::Negative(smaller_atom),
-                            Node::new_satisfied_constraint(
-                                db,
-                                SatisfiedConstraint::Negative(larger_atom),
-                            ),
                         ),
                     );
 
-                    simplified.update_if_simpler(
+                    simplified = simplified.substitute_intersection(
                         db,
-                        simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Negative(larger_atom),
-                            SatisfiedConstraint::Positive(smaller_atom),
-                            Node::AlwaysFalse,
-                        ),
+                        SatisfiedConstraint::Negative(larger_atom),
+                        SatisfiedConstraint::Positive(smaller_atom),
+                        Node::AlwaysFalse,
                     );
                 }
 
@@ -1122,50 +982,38 @@ impl<'db> InteriorNode<'db> {
                             SatisfiedConstraint::Negative(intersection_constraint),
                         );
 
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_intersection(
                             db,
-                            simplified.substitute_intersection(
-                                db,
-                                SatisfiedConstraint::Positive(new_atom),
-                                SatisfiedConstraint::Positive(nested_atom),
-                                positive_intersection_node,
-                            ),
+                            SatisfiedConstraint::Positive(new_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            positive_intersection_node,
                         );
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_union(
                             db,
-                            simplified.substitute_union(
-                                db,
-                                SatisfiedConstraint::Negative(new_atom),
-                                SatisfiedConstraint::Negative(nested_atom),
-                                negative_intersection_node,
-                            ),
+                            SatisfiedConstraint::Negative(new_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            negative_intersection_node,
                         );
 
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_intersection(
                             db,
-                            simplified.substitute_intersection(
+                            SatisfiedConstraint::Positive(new_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            Node::new_satisfied_constraint(
                                 db,
                                 SatisfiedConstraint::Positive(new_atom),
-                                SatisfiedConstraint::Negative(nested_atom),
-                                Node::new_satisfied_constraint(
-                                    db,
-                                    SatisfiedConstraint::Positive(new_atom),
-                                )
-                                .and(db, negative_intersection_node),
-                            ),
+                            )
+                            .and(db, negative_intersection_node),
                         );
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_intersection(
                             db,
-                            simplified.substitute_intersection(
+                            SatisfiedConstraint::Negative(new_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::new_satisfied_constraint(
                                 db,
-                                SatisfiedConstraint::Negative(new_atom),
                                 SatisfiedConstraint::Positive(nested_atom),
-                                Node::new_satisfied_constraint(
-                                    db,
-                                    SatisfiedConstraint::Positive(nested_atom),
-                                )
-                                .and(db, negative_intersection_node),
-                            ),
+                            )
+                            .and(db, negative_intersection_node),
                         );
                     }
                     None => {
@@ -1176,41 +1024,29 @@ impl<'db> InteriorNode<'db> {
                             nested_atom.display(db)
                         );
                         */
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_intersection(
                             db,
-                            simplified.substitute_intersection(
-                                db,
-                                SatisfiedConstraint::Positive(new_atom),
-                                SatisfiedConstraint::Positive(nested_atom),
-                                Node::AlwaysFalse,
-                            ),
+                            SatisfiedConstraint::Positive(new_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::AlwaysFalse,
                         );
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_union(
                             db,
-                            simplified.substitute_union(
-                                db,
-                                SatisfiedConstraint::Negative(new_atom),
-                                SatisfiedConstraint::Negative(nested_atom),
-                                Node::AlwaysTrue,
-                            ),
+                            SatisfiedConstraint::Negative(new_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            Node::AlwaysTrue,
                         );
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_intersection(
                             db,
-                            simplified.substitute_intersection(
-                                db,
-                                SatisfiedConstraint::Positive(new_atom),
-                                SatisfiedConstraint::Negative(nested_atom),
-                                Node::new_constraint(db, new_atom),
-                            ),
+                            SatisfiedConstraint::Positive(new_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            Node::new_constraint(db, new_atom),
                         );
-                        simplified.update_if_simpler(
+                        simplified = simplified.substitute_intersection(
                             db,
-                            simplified.substitute_intersection(
-                                db,
-                                SatisfiedConstraint::Negative(new_atom),
-                                SatisfiedConstraint::Positive(nested_atom),
-                                Node::new_constraint(db, nested_atom),
-                            ),
+                            SatisfiedConstraint::Negative(new_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::new_constraint(db, nested_atom),
                         );
                     }
                 }
@@ -1245,6 +1081,9 @@ impl<'db> SatisfiedConstraint<'db> {
         *self = self.flipped();
     }
 
+    // Keep this for future debugging needs, even though it's not used when rendering constraint
+    // sets.
+    #[expect(dead_code)]
     fn display(self, db: &'db dyn Db) -> impl Display {
         struct DisplaySatisfiedConstraint<'db> {
             constraint: SatisfiedConstraint<'db>,
@@ -1275,13 +1114,6 @@ struct SatisfiedClause<'db> {
 }
 
 impl<'db> SatisfiedClause<'db> {
-    fn to_singleton(&self) -> Option<SatisfiedConstraint<'db>> {
-        match self.constraints.as_slice() {
-            [constraint] => Some(*constraint),
-            _ => None,
-        }
-    }
-
     fn push(&mut self, constraint: SatisfiedConstraint<'db>) {
         self.constraints.push(constraint);
     }
@@ -1302,7 +1134,7 @@ impl<'db> SatisfiedClause<'db> {
         self.constraints[last_index].flip();
     }
 
-    fn remove_prefix(&mut self, db: &'db dyn Db, prefix: &SatisfiedClause<'db>) -> bool {
+    fn remove_prefix(&mut self, prefix: &SatisfiedClause<'db>) -> bool {
         if self.constraints.starts_with(&prefix.constraints) {
             self.constraints.drain(0..prefix.constraints.len());
             return true;
@@ -1355,7 +1187,7 @@ impl<'db> SatisfiedClauses<'db> {
         self.clauses.push(clause);
     }
 
-    fn simplify_one_round(&mut self, db: &'db dyn Db) -> bool {
+    fn simplify_one_round(&mut self) -> bool {
         let mut changes_made = false;
 
         // First remove any duplicate clauses. (The clause list will start out with no duplicates
@@ -1386,7 +1218,7 @@ impl<'db> SatisfiedClauses<'db> {
                 .expect("index should be in range");
             clause.with_flipped_last_constraint(|clause| {
                 for existing in rest {
-                    changes_made |= existing.remove_prefix(db, clause);
+                    changes_made |= existing.remove_prefix(clause);
                 }
             });
 
@@ -1395,7 +1227,7 @@ impl<'db> SatisfiedClauses<'db> {
                 .expect("index should be in range");
             clause.with_flipped_last_constraint(|clause| {
                 for existing in rest {
-                    changes_made |= existing.remove_prefix(db, clause);
+                    changes_made |= existing.remove_prefix(clause);
                 }
             });
 
@@ -1407,8 +1239,8 @@ impl<'db> SatisfiedClauses<'db> {
         false
     }
 
-    fn simplify(&mut self, db: &'db dyn Db) {
-        while self.simplify_one_round(db) {
+    fn simplify(&mut self) {
+        while self.simplify_one_round() {
             // Keep going
         }
     }
