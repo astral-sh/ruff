@@ -5,17 +5,18 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
-use ruff_python_codegen::{Generator, Stylist};
-use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_trivia::{CommentRanges, indentation_at_offset, textwrap};
+use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::preview::{
+    is_b006_check_guaranteed_mutable_expr_enabled,
+    is_b006_unsafe_fix_preserve_assignment_expr_enabled,
+};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -112,7 +113,12 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             .iter()
             .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
-        if is_guaranteed_mutable_expr(default, checker.semantic())
+        let is_mut_expr = if is_b006_check_guaranteed_mutable_expr_enabled(checker.settings()) {
+            is_guaranteed_mutable_expr(default, checker.semantic())
+        } else {
+            is_mutable_expr(default, checker.semantic())
+        };
+        if is_mut_expr
             && !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
@@ -120,18 +126,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
-            if let Some(fix) = move_initialization(
-                function_def,
-                parameter,
-                default,
-                checker.semantic(),
-                checker.locator(),
-                checker.stylist(),
-                checker.indexer(),
-                checker.generator(),
-                checker.comment_ranges(),
-                checker.source(),
-            ) {
+            if let Some(fix) = move_initialization(function_def, parameter, default, checker) {
                 diagnostic.set_fix(fix);
             }
         }
@@ -152,19 +147,16 @@ fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
-#[expect(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &ParameterWithDefault,
     default: &Expr,
-    semantic: &SemanticModel,
-    locator: &Locator,
-    stylist: &Stylist,
-    indexer: &Indexer,
-    generator: Generator,
-    comment_ranges: &CommentRanges,
-    source: &str,
+    checker: &Checker,
 ) -> Option<Fix> {
+    let indexer = checker.indexer();
+    let locator = checker.locator();
+    let stylist = checker.stylist();
+
     let mut body = function_def.body.iter().peekable();
 
     // Avoid attempting to fix single-line functions.
@@ -173,8 +165,12 @@ fn move_initialization(
         return None;
     }
 
-    let range = match parenthesized_range(default.into(), parameter.into(), comment_ranges, source)
-    {
+    let range = match parenthesized_range(
+        default.into(),
+        parameter.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    ) {
         Some(range) => range,
         None => default.range(),
     };
@@ -182,7 +178,7 @@ fn move_initialization(
     let default_edit = Edit::range_replacement("None".to_string(), range);
 
     // If the function is a stub, this is the only necessary edit.
-    if is_stub(function_def, semantic) {
+    if is_stub(function_def, checker.semantic()) {
         return Some(Fix::unsafe_edit(default_edit));
     }
 
@@ -191,12 +187,28 @@ fn move_initialization(
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    let _ = write!(
-        &mut content,
-        "{} = {}",
-        parameter.parameter.name(),
-        generator.expr_parenthesized(default)
-    );
+    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
+        let annotation = if let Some(ann) = parameter.annotation() {
+            format!(": {}", locator.slice(ann))
+        } else {
+            String::new()
+        };
+        let _ = write!(
+            &mut content,
+            "{}{} = {}",
+            parameter.parameter.name(),
+            annotation,
+            checker.generator().expr_parenthesized(default)
+        );
+    } else {
+        let _ = write!(
+            &mut content,
+            "{} = {}",
+            parameter.name(),
+            checker.generator().expr(default)
+        );
+    }
+
     content.push_str(stylist.line_ending().as_str());
 
     // Determine the indentation depth of the function body.

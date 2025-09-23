@@ -126,6 +126,7 @@ impl<'a> Generator<'a> {
         self.unparse_expr(expr, 0);
         self.generate()
     }
+
     pub fn expr_parenthesized(mut self, expr: &Expr) -> String {
         self.unparse_expr(expr, precedence::MAX);
         self.generate()
