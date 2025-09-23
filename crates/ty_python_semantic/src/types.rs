@@ -3592,6 +3592,16 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::NominalInstance(instance)
+                if matches!(name_str, "value" | "_value_")
+                    && is_single_member_enum(db, instance.class(db).class_literal(db).0) =>
+            {
+                enum_metadata(db, instance.class(db).class_literal(db).0)
+                    .and_then(|metadata| metadata.members.get_index(0).map(|(_, v)| *v))
+                    .map_or(Place::Unbound, Place::bound)
+                    .into()
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::BooleanLiteral(..)
