@@ -912,11 +912,6 @@ impl PathlibPathChecker {
 }
 
 impl TypeChecker for PathlibPathChecker {
-    // match_annotation doesn't check `Path` in union
-    // or `Optional`.
-    // TODO: Once we have updated it to handle those
-    // cases, update `blocking_path_method.rs`(ASYNC240)
-    // to use this version of `PathlibPathChecker`.
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
         Self::is_pathlib_path_constructor(semantic, annotation)
     }
