@@ -298,6 +298,29 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Default, Debug, Copy, Clone)]
+    pub(crate) struct SignatureFlags: u8 {
+        const IS_GENERATOR = 1 << 0;
+        const HAS_IMPLICITLY_POSITIONAL_FIRST_PARAMETER = 1 << 1;
+        const MARK_TYPEVARS_INFERABLE = 1 << 2;
+    }
+}
+
+impl SignatureFlags {
+    pub(crate) fn is_generator(self) -> bool {
+        self.contains(SignatureFlags::IS_GENERATOR)
+    }
+
+    pub(crate) fn has_implicitly_positional_first_parameter(self) -> bool {
+        self.contains(SignatureFlags::HAS_IMPLICITLY_POSITIONAL_FIRST_PARAMETER)
+    }
+
+    pub(crate) fn mark_typevars_inferable(self) -> bool {
+        self.contains(SignatureFlags::MARK_TYPEVARS_INFERABLE)
+    }
+}
+
 impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
         Self {
@@ -354,22 +377,21 @@ impl<'db> Signature<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
-        is_generator: bool,
-        has_implicitly_positional_first_parameter: bool,
+        flags: SignatureFlags,
     ) -> Self {
-        let parameters = Parameters::from_parameters(
-            db,
-            definition,
-            function_node.parameters.as_ref(),
-            has_implicitly_positional_first_parameter,
-        );
+        let parameters =
+            Parameters::from_parameters(db, definition, function_node.parameters.as_ref(), flags);
         let return_ty = function_node.returns.as_ref().map(|returns| {
-            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
-                .apply_type_mapping(
+            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
+            let plain_return_ty = if flags.mark_typevars_inferable() {
+                plain_return_ty.apply_type_mapping(
                     db,
                     &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
-                );
-            if function_node.is_async && !is_generator {
+                )
+            } else {
+                plain_return_ty
+            };
+            if function_node.is_async && !flags.is_generator() {
                 KnownClass::CoroutineType
                     .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
             } else {
@@ -1168,7 +1190,7 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
-        has_implicitly_positional_first_parameter: bool,
+        flags: SignatureFlags,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -1195,6 +1217,7 @@ impl<'db> Parameters<'db> {
                     name: Some(param.parameter.name.id.clone()),
                     default_type: default_type(param),
                 },
+                flags,
             )
         };
 
@@ -1207,7 +1230,7 @@ impl<'db> Parameters<'db> {
         if positional_only.is_empty() {
             let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
 
-            if has_implicitly_positional_first_parameter {
+            if flags.has_implicitly_positional_first_parameter() {
                 positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
             }
 
@@ -1227,6 +1250,7 @@ impl<'db> Parameters<'db> {
                     name: arg.parameter.name.id.clone(),
                     default_type: default_type(arg),
                 },
+                flags,
             )
         });
 
@@ -1238,6 +1262,7 @@ impl<'db> Parameters<'db> {
                 ParameterKind::Variadic {
                     name: arg.name.id.clone(),
                 },
+                flags,
             )
         });
 
@@ -1250,6 +1275,7 @@ impl<'db> Parameters<'db> {
                     name: arg.parameter.name.id.clone(),
                     default_type: default_type(arg),
                 },
+                flags,
             )
         });
 
@@ -1261,6 +1287,7 @@ impl<'db> Parameters<'db> {
                 ParameterKind::KeywordVariadic {
                     name: arg.name.id.clone(),
                 },
+                flags,
             )
         });
 
@@ -1544,13 +1571,19 @@ impl<'db> Parameter<'db> {
         definition: Definition<'db>,
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
+        flags: SignatureFlags,
     ) -> Self {
         Self {
             annotated_type: parameter.annotation().map(|annotation| {
-                definition_expression_type(db, definition, annotation).apply_type_mapping(
-                    db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
-                )
+                let annotated_ty = definition_expression_type(db, definition, annotation);
+                if flags.mark_typevars_inferable() {
+                    annotated_ty.apply_type_mapping(
+                        db,
+                        &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    )
+                } else {
+                    annotated_ty
+                }
             }),
             kind,
             form: ParameterForm::Value,

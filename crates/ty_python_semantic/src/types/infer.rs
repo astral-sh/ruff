@@ -50,6 +50,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
+use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers};
@@ -496,6 +497,29 @@ pub(crate) fn nearest_enclosing_class<'db>(
                 .declaration_type(definition)
                 .inner_type()
                 .into_class_literal()
+        })
+}
+
+/// Returns the type of the nearest enclosing function for the given scope.
+///
+/// This function walks up the ancestor scopes starting from the given scope,
+/// and finds the closest (non-lambda) function definition.
+///
+/// Returns `None` if no enclosing function is found.
+pub(crate) fn nearest_enclosing_function<'db>(
+    db: &'db dyn Db,
+    semantic: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> Option<FunctionType<'db>> {
+    semantic
+        .ancestor_scopes(scope.file_scope_id(db))
+        .find_map(|(_, ancestor_scope)| {
+            let func = ancestor_scope.node().as_function()?;
+            let definition = semantic.expect_single_definition(func);
+            infer_definition_types(db, definition)
+                .declaration_type(definition)
+                .inner_type()
+                .into_function_literal()
         })
 }
 

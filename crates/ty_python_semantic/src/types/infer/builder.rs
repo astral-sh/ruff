@@ -75,6 +75,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
+use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -4770,9 +4771,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        if let Some(ty) =
-            self.infer_optional_expression(ret.value.as_deref(), TypeContext::default())
-        {
+        let annotated_return_type = |_| {
+            nearest_enclosing_function(self.db(), self.index, self.scope()).map(|func| {
+                // When inferring expressions within a function body,
+                // the expected type passed should be the "raw" type, i.e. type variables in the return type are non-inferable.
+                TypeContext::new(func.last_definition_raw_signature(self.db()).return_ty)
+            })
+        };
+        let tcx = ret
+            .value
+            .as_ref()
+            .and_then(annotated_return_type)
+            .unwrap_or_default();
+        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
             let range = ret
                 .value
                 .as_ref()
