@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
         const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
+        const DID_CHANGE_CONFIGURATION = 1 << 17;
     }
 }
 
@@ -70,6 +71,10 @@ impl FromStr for SupportedCommand {
 }
 
 impl ResolvedClientCapabilities {
+    /// Returns `true` if the client supports change configuration notifications.
+    pub(crate) const fn supports_change_conf_notifications(self) -> bool {
+        self.contains(Self::DID_CHANGE_CONFIGURATION)
+    }
     /// Returns `true` if the client supports workspace diagnostic refresh.
     pub(crate) const fn supports_workspace_diagnostic_refresh(self) -> bool {
         self.contains(Self::WORKSPACE_DIAGNOSTIC_REFRESH)
@@ -163,6 +168,10 @@ impl ResolvedClientCapabilities {
 
         let workspace = client_capabilities.workspace.as_ref();
         let text_document = client_capabilities.text_document.as_ref();
+
+        if workspace.is_some_and(|workspace| workspace.did_change_configuration.is_some()) {
+            flags |= Self::DID_CHANGE_CONFIGURATION;
+        }
 
         if workspace
             .and_then(|workspace| workspace.diagnostics.as_ref()?.refresh_support)
