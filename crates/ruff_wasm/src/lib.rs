@@ -19,7 +19,7 @@ use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pret
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineColumn, OneIndexed, PositionEncoding};
+use ruff_source_file::{LineColumn, OneIndexed, PositionEncoding as SourcePositionEncoding};
 use ruff_text_size::Ranged;
 use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
@@ -117,6 +117,7 @@ pub fn run() {
 #[wasm_bindgen]
 pub struct Workspace {
     settings: Settings,
+    position_encoding: SourcePositionEncoding,
 }
 
 #[wasm_bindgen]
@@ -126,7 +127,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(position_encoding: PositionEncoding, options: JsValue) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -135,7 +136,10 @@ impl Workspace {
             .into_settings(Path::new("."))
             .map_err(into_error)?;
 
-        Ok(Workspace { settings })
+        Ok(Workspace {
+            settings,
+            position_encoding: position_encoding.into(),
+        })
     }
 
     #[wasm_bindgen(js_name = defaultSettings)]
@@ -230,8 +234,8 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
-                let start_loc = source_code.source_location(range.start(), PositionEncoding::Utf16);
-                let end_loc = source_code.source_location(range.end(), PositionEncoding::Utf16);
+                let start_loc = source_code.source_location(range.start(), self.position_encoding);
+                let end_loc = source_code.source_location(range.end(), self.position_encoding);
 
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
@@ -251,9 +255,9 @@ impl Workspace {
                             .iter()
                             .map(|edit| {
                                 let s = source_code
-                                    .source_location(edit.start(), PositionEncoding::Utf16);
-                                let e = source_code
-                                    .source_location(edit.end(), PositionEncoding::Utf16);
+                                    .source_location(edit.start(), self.position_encoding);
+                                let e =
+                                    source_code.source_location(edit.end(), self.position_encoding);
                                 ExpandedEdit {
                                     location: Location {
                                         row: s.line,
@@ -359,6 +363,25 @@ impl From<LineColumn> for Location {
         Self {
             row: value.line,
             column: value.column,
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+#[wasm_bindgen]
+pub enum PositionEncoding {
+    #[default]
+    Utf8,
+    Utf16,
+    Utf32,
+}
+
+impl From<PositionEncoding> for SourcePositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::Utf8 => Self::Utf8,
+            PositionEncoding::Utf16 => Self::Utf16,
+            PositionEncoding::Utf32 => Self::Utf32,
         }
     }
 }
