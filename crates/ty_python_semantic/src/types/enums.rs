@@ -68,9 +68,6 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    let is_str_enum =
-        Type::ClassLiteral(class).is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db));
-
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -141,14 +138,38 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
-                                Some(if is_str_enum {
+                                let auto_value_ty = if Type::ClassLiteral(class)
+                                    .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
+                                {
                                     Type::StringLiteral(StringLiteralType::new(
                                         db,
                                         name.to_lowercase().as_str(),
                                     ))
-                                } else {
+                                } else if Type::ClassLiteral(class)
+                                    .is_subtype_of(db, KnownClass::IntEnum.to_subclass_of(db))
+                                {
                                     Type::IntLiteral(auto_counter)
-                                })
+                                } else {
+                                    let has_custom_mixin =
+                                        class.iter_mro(db, None).skip(1).any(|base| {
+                                            base.into_class().is_some_and(|class| {
+                                                !(class.is_object(db)
+                                                    || KnownClass::Enum
+                                                        .to_subclass_of(db)
+                                                        .to_class_type(db)
+                                                        .is_some_and(|enum_class| {
+                                                            class.is_subclass_of(db, enum_class)
+                                                        })
+                                                    || class.is_known(db, KnownClass::Enum))
+                                            })
+                                        });
+                                    if has_custom_mixin {
+                                        Type::any()
+                                    } else {
+                                        Type::IntLiteral(auto_counter)
+                                    }
+                                };
+                                Some(auto_value_ty)
                             }
 
                             _ => None,

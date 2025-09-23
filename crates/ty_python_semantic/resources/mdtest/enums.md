@@ -320,6 +320,11 @@ reveal_type(enum_members(Answer))
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
+
+class SingleMember(Enum):
+    SINGLE = auto()
+
+reveal_type(SingleMember.SINGLE.value)  # revealed: Literal[1]
 ```
 
 Usages of `auto()` can be combined with manual value assignments:
@@ -348,6 +353,11 @@ class Answer(StrEnum):
 
 reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
 reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+
+class SingleMember(StrEnum):
+    SINGLE = auto()
+
+reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
 
 Using `auto()` with `IntEnum` also works as expected:
@@ -361,6 +371,36 @@ class Answer(IntEnum):
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
+Using `auto()` with non-integer mixins:
+
+```python
+from enum import Enum, auto
+
+class A(str, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(A.X.value)  # revealed: Any
+
+class B(bytes, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(B.X.value)  # revealed: Any
+
+class C(tuple, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(C.X.value)  # revealed: Any
+
+class D(float, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(D.X.value)  # revealed: Any
 ```
 
 Combining aliases with `auto()`:
