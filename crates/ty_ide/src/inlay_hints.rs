@@ -292,10 +292,8 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
                     if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
                     {
-                        let navigation_target = parameter_label_offset.and_then(|offset| {
-                            details
-                                .target_signature_file
-                                .map(|file| NavigationTarget::new(file, offset))
+                        let navigation_target = parameter_label_offset.map(|file_range| {
+                            NavigationTarget::new(file_range.file(), file_range.range())
                         });
 
                         self.add_call_argument_name(

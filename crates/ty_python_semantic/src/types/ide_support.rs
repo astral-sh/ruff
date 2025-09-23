@@ -848,7 +848,7 @@ pub struct CallSignatureDetails<'db> {
     pub parameter_label_offsets: Vec<TextRange>,
 
     /// Offsets for each parameter in the signature definition.
-    pub definition_parameter_offsets: HashMap<String, TextRange>,
+    pub definition_parameter_offsets: HashMap<String, FileRange>,
 
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
@@ -916,7 +916,14 @@ pub fn call_signature_details<'db>(
                         let file = definition.file(db);
                         let module_ref = parsed_module(db, file).load(db);
 
-                        definition_parameter_offsets(definition.kind(db), &module_ref)
+                        definition_parameter_offsets(definition.kind(db), &module_ref).map(
+                            |offsets| {
+                                offsets
+                                    .into_iter()
+                                    .map(|(name, offset)| (name, FileRange::new(file, offset)))
+                                    .collect()
+                            },
+                        )
                     })
                     .unwrap_or_default();
 
@@ -980,14 +987,8 @@ pub fn find_active_signature_from_details(
 
 #[derive(Default)]
 pub struct InlayHintCallArgumentDetails {
-    /// The file containing the signature derived from the [`ast::ExprCall`].
-    ///
-    /// This is [`None`] if the signature does not have a definition.
-    /// This should only happen if [`definition_parameter_offsets`] is incomplete.
-    pub target_signature_file: Option<File>,
-
     /// The position of the arguments mapped to their name and the range of the argument definition in the signature.
-    pub argument_names: HashMap<usize, (String, Option<TextRange>)>,
+    pub argument_names: HashMap<usize, (String, Option<FileRange>)>,
 }
 
 pub fn inlay_hint_call_argument_details<'db>(
@@ -1006,10 +1007,6 @@ pub fn inlay_hint_call_argument_details<'db>(
     let call_signature_details = signature_details.get(active_signature_index)?;
 
     let parameters = call_signature_details.signature.parameters();
-
-    let target_signature_file = call_signature_details
-        .definition
-        .map(|definition| definition.file(db));
 
     let definition_parameter_offsets = &call_signature_details.definition_parameter_offsets;
 
@@ -1049,10 +1046,7 @@ pub fn inlay_hint_call_argument_details<'db>(
         }
     }
 
-    Some(InlayHintCallArgumentDetails {
-        target_signature_file,
-        argument_names,
-    })
+    Some(InlayHintCallArgumentDetails { argument_names })
 }
 
 /// Find the text range of a specific parameter in function parameters by name.
