@@ -1,5 +1,3 @@
-use itertools::Itertools;
-use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt,
@@ -10,8 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, find_file_opens, generate_furb_101_103_fix};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -61,7 +58,8 @@ impl Violation for ReadWholeFile {
 
     fn fix_title(&self) -> Option<String> {
         Some(format!(
-            "Replace with `Path().{}`",
+            "Replace with `Path({}).{}`",
+            self.filename.truncated_display(),
             self.suggestion.truncated_display(),
         ))
     }
@@ -129,7 +127,21 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                     return;
                 }
 
-                if let Some(fix) = generate_fix(self.checker, &open, expr, self.with_stmt) {
+                let target = match self.with_stmt.body.first() {
+                    Some(Stmt::Assign(assign))
+                        if assign.value.range().contains_range(expr.range()) =>
+                    {
+                        match assign.targets.first() {
+                            Some(Expr::Name(name)) => Some(name.id.as_str()),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                if let Some(fix) =
+                    generate_furb_101_103_fix(self.checker, &open, target, None, self.with_stmt)
+                {
                     diagnostic.set_fix(fix);
                 }
             }
@@ -137,108 +149,6 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
         }
         visitor::walk_expr(self, expr);
     }
-}
-
-fn is_simple_with_block(with_stmt: &ast::StmtWith) -> bool {
-    with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)])
-}
-
-fn generate_fix(
-    checker: &Checker,
-    open: &FileOpen,
-    read_expr: &Expr,
-    with_stmt: &ast::StmtWith,
-) -> Option<Fix> {
-    // `closefd` and `opener` are not supported by pathlib, so check if they
-    // are set to non-default values.
-    // https://github.com/astral-sh/ruff/issues/7620
-    // Signature as of Python 3.13 (https://docs.python.org/3/library/functions.html#open):
-    // ```text
-    // builtins.open(
-    //   file,          0
-    //   mode='r',      1 <= not supported by read_text() / read_text()
-    //   buffering=-1,  2 <= not supported by read_text() / read_text()
-    //   encoding=None, 3
-    //   errors=None,   4
-    //   newline=None,  5 <= not supported by read_text() / read_text()
-    //   closefd=True,  6 <= not supported by pathlib
-    //   opener=None    7 <= not supported by pathlib
-    // )
-    // ```
-    // For `pathlib.Path.read_text()` (https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text):
-    // ```
-    // def read_text(self, encoding=None, errors=None):
-    //      """
-    //      Open the file in text mode, read it, and close the file.
-    //      """
-    //      encoding = io.text_encoding(encoding)
-    //      with self.open(mode='r', encoding=encoding, errors=errors) as f:
-    //          return f.read()
-    //
-    // ```
-    // For `pathlib.Path.read_bytes()` (https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes):
-    // ```text
-    // Path.read_bytes()
-    // ```
-    if !is_simple_with_block(with_stmt) {
-        return None;
-    }
-
-    let target = match with_stmt.body.first() {
-        Some(Stmt::Assign(assign)) if assign.value.range().contains_range(read_expr.range()) => {
-            match assign.targets.first() {
-                Some(Expr::Name(name)) => name.id.as_str(),
-                _ => return None,
-            }
-        }
-        _ => return None,
-    };
-
-    let locator = checker.locator();
-    let filename_code = locator.slice(open.filename.range());
-
-    let (import_edit, binding) = checker
-        .importer()
-        .get_or_import_symbol(
-            &ImportRequest::import("pathlib", "Path"),
-            with_stmt.start(),
-            checker.semantic(),
-        )
-        .ok()?;
-
-    let replacement = if open.keywords.is_empty() {
-        format!(
-            "{} = {}({}).{}()",
-            target,
-            binding,
-            filename_code,
-            open.mode.pathlib_method()
-        )
-    } else {
-        format!(
-            "{} = {}({}).{}({})",
-            target,
-            binding,
-            filename_code,
-            open.mode.pathlib_method(),
-            open.keywords
-                .iter()
-                .map(|kw| locator.slice(kw.range()))
-                .join(", ")
-        )
-    };
-
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    Some(Fix::applicable_edits(
-        Edit::range_replacement(replacement, with_stmt.range()),
-        [import_edit],
-        applicability,
-    ))
 }
 
 /// Match `x.read()` expression and return expression `x` on success.

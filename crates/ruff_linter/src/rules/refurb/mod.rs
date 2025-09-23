@@ -64,13 +64,17 @@ mod tests {
     }
 
     #[test_case(Path::new("FURB101.py"))]
+    #[test_case(Path::new("FURB103.py"))]
     fn preview_rules(path: &Path) -> Result<()> {
         let snapshot = format!("preview_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("refurb").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![Rule::ReadWholeFile])
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::ReadWholeFile,
+                    Rule::WriteWholeFile,
+                ])
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);

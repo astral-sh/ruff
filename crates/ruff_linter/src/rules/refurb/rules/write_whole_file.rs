@@ -1,15 +1,17 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{
+    self as ast, Expr, Stmt,
+    relocate::relocate_expr,
+    visitor::{self, Visitor},
+};
+
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-
-use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, find_file_opens, generate_furb_101_103_fix};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `open` and `write` that can be replaced by `pathlib`
@@ -33,6 +35,9 @@ use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
 /// Path(filename).write_text(contents)
 /// ```
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
@@ -43,11 +48,22 @@ pub(crate) struct WriteWholeFile {
 }
 
 impl Violation for WriteWholeFile {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let filename = self.filename.truncated_display();
-        let suggestion = self.suggestion.truncated_display();
-        format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+        format!(
+            "`open` and `write` should be replaced by `Path({}).{}`",
+            self.filename.truncated_display(),
+            self.suggestion.truncated_display(),
+        )
+    }
+    fn fix_title(&self) -> Option<String> {
+        Some(format!(
+            "Replace with `Path({}).{}`",
+            self.filename.truncated_display(),
+            self.suggestion.truncated_display(),
+        ))
     }
 }
 
@@ -65,7 +81,7 @@ pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // Then we need to match each `open` operation with exactly one `write` call.
-    let mut matcher = WriteMatcher::new(checker, candidates);
+    let mut matcher = WriteMatcher::new(checker, candidates, with);
     visitor::walk_body(&mut matcher, &with.body);
 }
 
@@ -74,21 +90,27 @@ struct WriteMatcher<'a, 'b> {
     checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
     loop_counter: u32,
+    with_stmt: &'a ast::StmtWith,
 }
 
 impl<'a, 'b> WriteMatcher<'a, 'b> {
-    fn new(checker: &'a Checker<'b>, candidates: Vec<FileOpen<'a>>) -> Self {
+    fn new(
+        checker: &'a Checker<'b>,
+        candidates: Vec<FileOpen<'a>>,
+        with_stmt: &'a ast::StmtWith,
+    ) -> Self {
         Self {
             checker,
             candidates,
             loop_counter: 0,
+            with_stmt,
         }
     }
 }
 
 impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if matches!(stmt, ast::Stmt::While(_) | ast::Stmt::For(_)) {
+        if matches!(stmt, Stmt::While(_) | Stmt::For(_)) {
             self.loop_counter += 1;
             visitor::walk_stmt(self, stmt);
             self.loop_counter -= 1;
@@ -104,9 +126,10 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                 .iter()
                 .position(|open| open.is_ref(write_to))
             {
+                let open = self.candidates.remove(open);
+
                 if self.loop_counter == 0 {
-                    let open = self.candidates.remove(open);
-                    self.checker.report_diagnostic(
+                    let mut diagnostic = self.checker.report_diagnostic(
                         WriteWholeFile {
                             filename: SourceCodeSnippet::from_str(
                                 &self.checker.generator().expr(open.filename),
@@ -115,8 +138,20 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                         },
                         open.item.range(),
                     );
-                } else {
-                    self.candidates.remove(open);
+
+                    if !crate::preview::is_fix_write_whole_file_enabled(self.checker.settings()) {
+                        return;
+                    }
+
+                    if let Some(fix) = generate_furb_101_103_fix(
+                        self.checker,
+                        &open,
+                        None,
+                        Some(content),
+                        self.with_stmt,
+                    ) {
+                        diagnostic.set_fix(fix);
+                    }
                 }
             }
             return;

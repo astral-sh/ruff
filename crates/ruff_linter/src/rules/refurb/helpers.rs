@@ -1,14 +1,14 @@
-use std::borrow::Cow;
-
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, parenthesize::parenthesized_range};
+use itertools::Itertools;
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{self as ast, Expr, Stmt, name::Name, parenthesize::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix};
-use ruff_python_ast::PythonVersion;
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
@@ -345,12 +345,8 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
     let iter_in_source = locator.slice(iter);
 
     match iter {
-        ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
-            Cow::Owned(format!("({iter_in_source})"))
-        }
-        ast::Expr::Lambda(_) | ast::Expr::If(_)
-            if matches!(location, IterLocation::Comprehension) =>
-        {
+        Expr::Tuple(tuple) if !tuple.parenthesized => Cow::Owned(format!("({iter_in_source})")),
+        Expr::Lambda(_) | Expr::If(_) if matches!(location, IterLocation::Comprehension) => {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),
@@ -361,4 +357,128 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
 pub(super) enum IterLocation {
     Call,
     Comprehension,
+}
+
+pub(super) fn generate_furb_101_103_fix(
+    checker: &Checker,
+    open: &FileOpen,
+    target: Option<&str>,
+    content_expr: Option<&Expr>,
+    with_stmt: &ast::StmtWith,
+) -> Option<Fix> {
+    let is_valid_block = with_stmt.items.len() == 1
+        && match (target, content_expr) {
+            // read (FURB101)
+            (Some(_), None) => matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)]),
+            // write (FURB103)
+            (None, Some(_)) => matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)]),
+            _ => false,
+        };
+
+    if !is_valid_block {
+        return None;
+    }
+
+    let locator = checker.locator();
+    let filename_code = locator.slice(open.filename.range());
+    let content_code = match content_expr {
+        Some(expr) => Some(locator.slice(expr.range())),
+        None => None,
+    };
+
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            with_stmt.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+
+    let replacement = match (target, content_code) {
+        (Some(var), Some(content)) => {
+            if open.keywords.is_empty() {
+                format!(
+                    "{} = {}({}).{}({})",
+                    var,
+                    binding,
+                    filename_code,
+                    open.mode.pathlib_method(),
+                    content
+                )
+            } else {
+                format!(
+                    "{} = {}({}).{}({}, {})",
+                    var,
+                    binding,
+                    filename_code,
+                    open.mode.pathlib_method(),
+                    content,
+                    open.keywords
+                        .iter()
+                        .map(|kw| locator.slice(kw.range()))
+                        .join(", ")
+                )
+            }
+        }
+        (None, Some(content)) => {
+            if open.keywords.is_empty() {
+                format!(
+                    "{}({}).{}({})",
+                    binding,
+                    filename_code,
+                    open.mode.pathlib_method(),
+                    content
+                )
+            } else {
+                format!(
+                    "{}({}).{}({}, {})",
+                    binding,
+                    filename_code,
+                    open.mode.pathlib_method(),
+                    content,
+                    open.keywords
+                        .iter()
+                        .map(|kw| locator.slice(kw.range()))
+                        .join(", ")
+                )
+            }
+        }
+        (Some(var), None) => {
+            if open.keywords.is_empty() {
+                format!(
+                    "{} = {}({}).{}()",
+                    var,
+                    binding,
+                    filename_code,
+                    open.mode.pathlib_method()
+                )
+            } else {
+                format!(
+                    "{} = {}({}).{}({})",
+                    var,
+                    binding,
+                    filename_code,
+                    open.mode.pathlib_method(),
+                    open.keywords
+                        .iter()
+                        .map(|kw| locator.slice(kw.range()))
+                        .join(", ")
+                )
+            }
+        }
+        _ => return None,
+    };
+
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edits(
+        Edit::range_replacement(replacement, with_stmt.range()),
+        [import_edit],
+        applicability,
+    ))
 }

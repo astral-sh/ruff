@@ -9,7 +9,7 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |      ^^^^^^^^^^^^^^^^^^^^^
 13 |     x = f.read()
    |
-help: Replace with `Path().read_text()`
+help: Replace with `Path("file.txt").read_text()`
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
   --> FURB101.py:16:6
@@ -19,7 +19,7 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 17 |     x = f.read()
    |
-help: Replace with `Path().read_bytes()`
+help: Replace with `Path("file.txt").read_bytes()`
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
   --> FURB101.py:20:6
@@ -29,7 +29,7 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 21 |     x = f.read()
    |
-help: Replace with `Path().read_bytes()`
+help: Replace with `Path("file.txt").read_bytes()`
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf8")`
   --> FURB101.py:24:6
@@ -39,7 +39,7 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(enco
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 25 |     x = f.read()
    |
-help: Replace with `Path().read_text(encoding="utf8")`
+help: Replace with `Path("file.txt").read_text(encoding="utf8")`
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(errors="ignore")`
   --> FURB101.py:28:6
@@ -49,7 +49,7 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(erro
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 29 |     x = f.read()
    |
-help: Replace with `Path().read_text(errors="ignore")`
+help: Replace with `Path("file.txt").read_text(errors="ignore")`
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
   --> FURB101.py:32:6
@@ -59,7 +59,7 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 33 |     x = f.read()
    |
-help: Replace with `Path().read_text()`
+help: Replace with `Path("file.txt").read_text()`
 
 FURB101 `open` and `read` should be replaced by `Path(foo()).read_bytes()`
   --> FURB101.py:36:6
@@ -70,7 +70,7 @@ FURB101 `open` and `read` should be replaced by `Path(foo()).read_bytes()`
 37 |     # The body of `with` is non-trivial, but the recommendation holds.
 38 |     bar("pre")
    |
-help: Replace with `Path().read_bytes()`
+help: Replace with `Path(foo()).read_bytes()`
 
 FURB101 `open` and `read` should be replaced by `Path("a.txt").read_text()`
   --> FURB101.py:44:6
@@ -81,7 +81,7 @@ FURB101 `open` and `read` should be replaced by `Path("a.txt").read_text()`
 45 |     x = a.read()
 46 |     y = b.read()
    |
-help: Replace with `Path().read_text()`
+help: Replace with `Path("a.txt").read_text()`
 
 FURB101 `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
   --> FURB101.py:44:26
@@ -92,7 +92,7 @@ FURB101 `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
 45 |     x = a.read()
 46 |     y = b.read()
    |
-help: Replace with `Path().read_bytes()`
+help: Replace with `Path("b.txt").read_bytes()`
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
   --> FURB101.py:49:18
@@ -103,4 +103,4 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
 50 |     # We have other things in here, multiple with items, but
 51 |     # the user reads the whole file and that bit they can replace.
    |
-help: Replace with `Path().read_text()`
+help: Replace with `Path("file.txt").read_text()`
