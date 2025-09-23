@@ -123,6 +123,13 @@ class RuffCodeActionProvider implements CodeActionProvider {
     model: editor.ITextModel,
     range: Range,
   ): languages.ProviderResult<languages.CodeActionList> {
+    // Convert UTF-32 (code points) columns from WASM to Monaco's UTF-16 columns
+    const utf32ToUtf16 = (lineText: string, utf32Column: number): number => {
+      // Monaco columns are 1-based. utf32Column is also 1-based (OneIndexed).
+      if (utf32Column <= 1) return 1;
+      const prefix = [...lineText].slice(0, utf32Column - 1).join("");
+      return prefix.length + 1; // length in UTF-16 code units, then make 1-based
+    };
     const actions = this.diagnostics
       // Show fixes for any diagnostic whose range intersects the requested range
       .filter((check) =>
@@ -154,9 +161,15 @@ class RuffCodeActionProvider implements CodeActionProvider {
                 textEdit: {
                   range: {
                     startLineNumber: edit.location.row,
-                    startColumn: edit.location.column,
+                    startColumn: utf32ToUtf16(
+                      model.getLineContent(edit.location.row),
+                      edit.location.column,
+                    ),
                     endLineNumber: edit.end_location.row,
-                    endColumn: edit.end_location.column,
+                    endColumn: utf32ToUtf16(
+                      model.getLineContent(edit.end_location.row),
+                      edit.end_location.column,
+                    ),
                   },
                   text: edit.content || "",
                 },
@@ -180,15 +193,28 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
     return;
   }
 
+  // Helper to convert UTF-32 (code points) columns from WASM to Monaco's UTF-16 columns
+  const utf32ToUtf16 = (lineText: string, utf32Column: number): number => {
+    if (utf32Column <= 1) return 1;
+    const prefix = [...lineText].slice(0, utf32Column - 1).join("");
+    return prefix.length + 1;
+  };
+
   editor.setModelMarkers(
     model,
     "owner",
     diagnostics.map((diagnostic) => ({
       code: diagnostic.code ?? undefined,
       startLineNumber: diagnostic.start_location.row,
-      startColumn: diagnostic.start_location.column,
+      startColumn: utf32ToUtf16(
+        model.getLineContent(diagnostic.start_location.row),
+        diagnostic.start_location.column,
+      ),
       endLineNumber: diagnostic.end_location.row,
-      endColumn: diagnostic.end_location.column,
+      endColumn: utf32ToUtf16(
+        model.getLineContent(diagnostic.end_location.row),
+        diagnostic.end_location.column,
+      ),
       message: diagnostic.code
         ? `${diagnostic.code}: ${diagnostic.message}`
         : diagnostic.message,
