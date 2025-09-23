@@ -1,8 +1,5 @@
-use ruff_python_ast::{
-    AtomicNodeIndex, Expr, ExprAwait, ExprCall, ExprName, Stmt, StmtAssign, StmtExpr,
-    StmtFunctionDef,
-};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{Expr, ExprCall, ExprName, Stmt, StmtAssign, StmtExpr, StmtFunctionDef};
+use ruff_text_size::Ranged;
 
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -38,6 +35,13 @@ use crate::checkers::ast::Checker;
 ///
 /// async def bar():
 ///     await foo()
+///
+/// ## Limitations
+///
+/// If the call is not a direct child of an statement expression or assignment statement
+/// then this rule may not reliably determine if await is missing. Functions that return
+/// coroutine objects or pass them as arguments might not be flagged correctly.
+///
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingAwaitForCoroutine;
@@ -62,28 +66,21 @@ pub(crate) fn missing_await_for_coroutine(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    // Try to detect possible scenarios where await is missing and ignore other cases
-    // For example, if the call is not a direct child of an statement expression or assignment statement
-    // then it's not reliable to determine if await is missing.
-    // User might return coroutine object from a function or pass it as an argument
     if !possibly_missing_await(call, checker.semantic()) {
         return;
     }
 
-    let is_awaitable = is_awaitable_from_asyncio(call.func.as_ref(), checker.semantic())
-        || is_awaitable_func(call.func.as_ref(), checker.semantic());
-
     // If call does not originate from asyncio or is not an async function, then it's not awaitable
-    if !is_awaitable {
-        return;
+    if is_awaitable_from_asyncio(call.func.as_ref(), checker.semantic())
+        || is_awaitable_func(call.func.as_ref(), checker.semantic())
+    {
+        checker
+            .report_diagnostic(MissingAwaitForCoroutine, call.range())
+            .set_fix(Fix::unsafe_edit(Edit::insertion(
+                "await ".to_string(),
+                call.start(),
+            )));
     }
-
-    checker
-        .report_diagnostic(MissingAwaitForCoroutine, call.range())
-        .set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&generate_fix(call)),
-            call.range(),
-        )));
 }
 
 fn is_awaitable_from_asyncio(func: &Expr, semantic: &SemanticModel) -> bool {
@@ -113,6 +110,10 @@ fn is_awaitable_func(func: &Expr, semantic: &SemanticModel) -> bool {
     false
 }
 
+/// Try to detect possible scenarios where await is missing and ignore other cases
+/// If the call is not a direct child of an statement expression or assignment statement
+/// then this rule may not reliably determine if await is missing. Functions that return
+/// coroutine objects or pass them as arguments might not be flagged correctly.
 fn possibly_missing_await(call: &ExprCall, semantic: &SemanticModel) -> bool {
     if let Stmt::Expr(StmtExpr { value, .. }) = semantic.current_statement() {
         if let Expr::Call(expr_call) = value.as_ref() {
@@ -126,16 +127,4 @@ fn possibly_missing_await(call: &ExprCall, semantic: &SemanticModel) -> bool {
         }
     }
     false
-}
-
-/// Generate a [`Fix`] to add `await` for coroutine.
-///
-/// For example:
-/// - Given `asyncio.sleep(1)`, generate `await asyncio.sleep(1)`.
-fn generate_fix(call: &ExprCall) -> Expr {
-    Expr::Await(ExprAwait {
-        node_index: AtomicNodeIndex::default(),
-        value: Box::new(Expr::Call(call.clone())),
-        range: TextRange::default(),
-    })
 }
