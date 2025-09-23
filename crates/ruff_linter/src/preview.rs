@@ -240,3 +240,17 @@ pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
 pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// github.com/astral-sh/ruff/issues/20004
+pub(crate) const fn is_b006_check_guaranteed_mutable_expr_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
+// github.com/astral-sh/ruff/issues/20004
+pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+assertion_line: 112
 ---
 B006 [*] Do not use mutable data structures for argument defaults
  --> B006_9.py:1:10
@@ -9,15 +10,14 @@ B006 [*] Do not use mutable data structures for argument defaults
 2 |     print(x)
   |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-1   |-def f1(x=([],)):
-  1 |+def f1(x=None):
-  2 |+    if x is None:
-  3 |+        x = ([],)
-2 4 |     print(x)
-3 5 | 
-4 6 | 
+  - def f1(x=([],)):
+1 + def f1(x=None):
+2 +     if x is None:
+3 +         x = ([],)
+4 |     print(x)
+5 | 
+6 | 
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
  --> B006_9.py:5:10
@@ -27,18 +27,17 @@ B006 [*] Do not use mutable data structures for argument defaults
 6 |     print(x)
   |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-2 2 |     print(x)
-3 3 | 
-4 4 | 
-5   |-def f2(x=(x for x in "x")):
-  5 |+def f2(x=None):
-  6 |+    if x is None:
-  7 |+        x = (x for x in "x")
-6 8 |     print(x)
-7 9 | 
-8 10 | 
+2  |     print(x)
+3  | 
+4  | 
+   - def f2(x=(x for x in "x")):
+5  + def f2(x=None):
+6  +     if x is None:
+7  +         x = (x for x in "x")
+8  |     print(x)
+9  | 
+10 | 
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_9.py:9:10
@@ -48,18 +47,17 @@ B006 [*] Do not use mutable data structures for argument defaults
 10 |     print(x)
    |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-6  6  |     print(x)
-7  7  | 
-8  8  | 
-9     |-def f3(x=((x for x in "x"),)):
-   9  |+def f3(x=None):
-   10 |+    if x is None:
-   11 |+        x = ((x for x in "x"),)
-10 12 |     print(x)
-11 13 | 
-12 14 | 
+6  |     print(x)
+7  | 
+8  | 
+   - def f3(x=((x for x in "x"),)):
+9  + def f3(x=None):
+10 +     if x is None:
+11 +         x = ((x for x in "x"),)
+12 |     print(x)
+13 | 
+14 | 
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_9.py:13:11
@@ -69,18 +67,17 @@ B006 [*] Do not use mutable data structures for argument defaults
 14 |     print(x)
    |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-10 10 |     print(x)
-11 11 | 
-12 12 | 
-13    |-def f4(x=(z := [1, ])):
-   13 |+def f4(x=None):
-   14 |+    if x is None:
-   15 |+        x = (z := [1])
-14 16 |     print(x)
-15 17 | 
-16 18 | 
+10 |     print(x)
+11 | 
+12 | 
+   - def f4(x=(z := [1, ])):
+13 + def f4(x=None):
+14 +     if x is None:
+15 +         x = (z := [1])
+16 |     print(x)
+17 | 
+18 | 
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_9.py:17:11
@@ -90,15 +87,14 @@ B006 [*] Do not use mutable data structures for argument defaults
 18 |     print(x)
    |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-14 14 |     print(x)
-15 15 | 
-16 16 | 
-17    |-def f5(x=([1, ])):
-   17 |+def f5(x=None):
-   18 |+    if x is None:
-   19 |+        x = [1]
-18 20 |     print(x)
-19 21 | 
-20 22 |
+14 |     print(x)
+15 | 
+16 | 
+   - def f5(x=([1, ])):
+17 + def f5(x=None):
+18 +     if x is None:
+19 +         x = [1]
+20 |     print(x)
+21 | 
+22 | 
+note: This is an unsafe fix and may change runtime behavior
