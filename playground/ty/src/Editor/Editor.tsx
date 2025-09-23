@@ -436,10 +436,7 @@ class PlaygroundServer
       hints: inlayHints.map((hint) => ({
         label: hint.label.map((part) => ({
           label: part.label,
-          location:
-            part.location !== undefined
-              ? this.mapNavigationTarget(part.location)
-              : undefined,
+          // As of 2025-09-23, location isn't supported by Monaco which is why we don't set it
         })),
         position: {
           lineNumber: hint.position.line,
