@@ -127,7 +127,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(position_encoding: PositionEncoding, options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue, position_encoding: Option<PositionEncoding>) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -138,7 +138,7 @@ impl Workspace {
 
         Ok(Workspace {
             settings,
-            position_encoding: position_encoding.into(),
+            position_encoding: position_encoding.unwrap_or_default().into(),
         })
     }
 
