@@ -593,11 +593,9 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
         let line_end = current_pos + line.len();
 
         if let Some(entry) = line.strip_prefix(indentation) {
-            if entry
-                .chars()
-                .next()
-                .is_some_and(|first_char| !first_char.is_whitespace())
-            {
+            if entry.chars().next().is_some_and(|first_char| {
+                first_char.is_ascii_alphabetic() || first_char == '_' || first_char == '*'
+            }) {
                 let Some((before_colon, _)) = entry.split_once(':') else {
                     current_pos = line_end + 1;
                     continue;
@@ -645,11 +643,9 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
         let line_end = current_pos + potential.len();
 
         if let Some(entry) = potential.strip_prefix(indentation) {
-            if entry
-                .chars()
-                .next()
-                .is_some_and(|first_char| !first_char.is_whitespace())
-            {
+            if entry.chars().next().is_some_and(|first_char| {
+                first_char.is_ascii_alphabetic() || first_char == '_' || first_char == '*'
+            }) {
                 if let Some(param) = entry.split(':').next() {
                     let param_name = param.trim_end();
                     let param_start = line_start + indentation.len();
