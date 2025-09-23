@@ -1038,7 +1038,7 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
-        actual: Type<'db>,
+        mut actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -1065,6 +1065,14 @@ impl<'db> SpecializationBuilder<'db> {
             && actual.is_subtype_of(self.db, formal)
         {
             return Ok(());
+        }
+
+        if let Type::Union(union) = actual {
+            // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
+            // So, here we remove the union elements that are not related to `formal`.
+            actual = union.filter(self.db, |actual_elem| {
+                !actual_elem.is_disjoint_from(self.db, formal)
+            });
         }
 
         match (formal, actual) {

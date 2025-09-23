@@ -35,6 +35,9 @@ l3: list[int] = intermediate
 # TODO: it would be nice if this were `list[int]`
 reveal_type(intermediate)  # revealed: list[Literal[1]]
 reveal_type(l3)  # revealed: list[int]
+
+l4: list[int] | None = list1(1)
+reveal_type(l4)  # revealed: list[int]
 ```
 
 ```py
@@ -78,6 +81,12 @@ def wrap_data() -> list[dict]:
     # by bidirectional type inference.
     return list1(res)
 
+def wrap_data2() -> list[dict] | None:
+    if not (res := get_data()):
+        return None
+    reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
+    return list1(res)
+
 @overload
 def f(x: int) -> list[int]: ...
 @overload
@@ -92,6 +101,6 @@ def f(x: int | str) -> list[int] | list[str]:
 reveal_type(f(1))  # revealed: list[int]
 reveal_type(f("a"))  # revealed: list[str]
 
-async def f() -> list[int]:
+async def g() -> list[int]:
     return list1(1)
 ```
