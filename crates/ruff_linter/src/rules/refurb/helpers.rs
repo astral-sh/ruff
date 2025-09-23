@@ -381,10 +381,7 @@ pub(super) fn generate_furb_101_103_fix(
 
     let locator = checker.locator();
     let filename_code = locator.slice(open.filename.range());
-    let content_code = match content_expr {
-        Some(expr) => Some(locator.slice(expr.range())),
-        None => None,
-    };
+    let content_code = content_expr.map(|expr| locator.slice(expr.range()));
 
     let (import_edit, binding) = checker
         .importer()
