@@ -17,7 +17,7 @@ reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
 reveal_type(__builtins__)  # revealed: Any
 # error: [possibly-unresolved-reference] "Name `__warningregistry__` used when possibly not defined"
-reveal_type(__warningregistry__)  # revealed: Any
+reveal_type(__warningregistry__)  # revealed: dict[Any, int]
 
 import sys
 
