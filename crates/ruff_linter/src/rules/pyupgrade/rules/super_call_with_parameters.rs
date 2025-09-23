@@ -139,14 +139,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    if !((first_arg_id == "__class__"
-            // If the first argument is __class__, check if it's a local variable.
-            // If so, don't apply UP008.
-            && !checker.semantic().current_scope().has("__class__")
-        || (first_arg_id == parent_name.as_str()
-            // If the first argument matches the class name, check if it's a local variable
-            // that shadows the class name. If so, don't apply UP008.
-            && !checker.semantic().current_scope().has(first_arg_id)))
+    // The `super(__class__, self)` and `super(ParentClass, self)` patterns are redundant in Python 3
+    // when the first argument refers to the implicit `__class__` cell or to the enclosing class.
+    // Avoid triggering if a local variable shadows either name.
+    if !(((first_arg_id == "__class__") || (first_arg_id == parent_name.as_str()))
+        && !checker.semantic().current_scope().has(first_arg_id)
         && second_arg_id == parent_arg.name().as_str())
     {
         return;
