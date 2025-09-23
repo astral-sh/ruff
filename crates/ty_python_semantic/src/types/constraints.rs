@@ -639,28 +639,35 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         assignment: impl IntoIterator<Item = SatisfiedConstraint<'db>>,
-    ) -> Node<'db> {
+    ) -> (Node<'db>, bool) {
         //eprintln!("==> restrict {}", self.display(db));
-        assignment.into_iter().fold(self, |restricted, assignment| {
-            /*
-            eprintln!(" -> restricted {}", restricted.display(db));
-            eprintln!(
-                " -> {} == {}",
-                assignment.constraint().display(db),
-                match assignment {
-                    SatisfiedConstraint::Positive(_) => "1",
-                    SatisfiedConstraint::Negative(_) => "0",
-                },
-            );
-            */
-            restricted.restrict_one(db, assignment)
-        })
+        assignment
+            .into_iter()
+            .fold((self, true), |(restricted, found), assignment| {
+                /*
+                eprintln!(" -> restricted {}", restricted.display(db));
+                eprintln!(
+                    " -> {} == {}",
+                    assignment.constraint().display(db),
+                    match assignment {
+                        SatisfiedConstraint::Positive(_) => "1",
+                        SatisfiedConstraint::Negative(_) => "0",
+                    },
+                );
+                */
+                let (restricted, found_this) = restricted.restrict_one(db, assignment);
+                (restricted, found && found_this)
+            })
     }
 
-    fn restrict_one(self, db: &'db dyn Db, assignment: SatisfiedConstraint<'db>) -> Node<'db> {
+    fn restrict_one(
+        self,
+        db: &'db dyn Db,
+        assignment: SatisfiedConstraint<'db>,
+    ) -> (Node<'db>, bool) {
         match self {
-            Node::AlwaysTrue => Node::AlwaysTrue,
-            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::AlwaysTrue => (Node::AlwaysTrue, false),
+            Node::AlwaysFalse => (Node::AlwaysFalse, false),
             Node::Interior(interior) => interior.restrict_one(db, assignment),
         }
     }
@@ -679,14 +686,17 @@ impl<'db> Node<'db> {
             right.display(db)
         );
         eprintln!(" -> in {}", self.display(db));
-        let when_not_left = self.restrict(db, [left.flipped()]);
+        let (when_not_left, _) = self.restrict(db, [left.flipped()]);
         eprintln!(" -> (x ∧ y)[x=0] = {}", when_not_left.display(db));
-        let when_left_but_not_right = self.restrict(db, [left, right.flipped()]);
+        let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
         eprintln!(
             " -> (x ∧ y)[x=1,y=0] = {}",
             when_left_but_not_right.display(db)
         );
-        let when_left_and_right = self.restrict(db, [left, right]);
+        let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
+        if !both_found {
+            return self;
+        }
         eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_left_and_right.display(db));
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
@@ -727,13 +737,16 @@ impl<'db> Node<'db> {
             right.display(db)
         );
         eprintln!(" -> in {}", self.display(db));
-        let when_l0_r0 = self.restrict(db, [left.flipped(), right.flipped()]);
+        let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
         eprintln!(" -> (x ∧ y)[x=0,y=0] = {}", when_l0_r0.display(db));
-        let when_l1_r0 = self.restrict(db, [left, right.flipped()]);
+        let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
         eprintln!(" -> (x ∧ y)[x=1,y=0] = {}", when_l1_r0.display(db));
-        let when_l0_r1 = self.restrict(db, [left.flipped(), right]);
+        let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
         eprintln!(" -> (x ∧ y)[x=0,y=1] = {}", when_l0_r1.display(db));
-        let when_l1_r1 = self.restrict(db, [left, right]);
+        let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
+        if !both_found {
+            return self;
+        }
         eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_l1_r1.display(db));
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
@@ -781,9 +794,9 @@ impl<'db> Node<'db> {
     }
 
     fn update_if_simpler(&mut self, db: &'db dyn Db, replacement: Self) {
-        if replacement.interior_node_count(db) < self.interior_node_count(db) {
-            *self = replacement;
-        }
+        // if replacement.interior_node_count(db) < self.interior_node_count(db) {
+        *self = replacement;
+        //}
     }
 
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
@@ -983,27 +996,31 @@ impl<'db> InteriorNode<'db> {
     */
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn restrict_one(self, db: &'db dyn Db, assignment: SatisfiedConstraint<'db>) -> Node<'db> {
+    fn restrict_one(
+        self,
+        db: &'db dyn Db,
+        assignment: SatisfiedConstraint<'db>,
+    ) -> (Node<'db>, bool) {
         // If this node's variable is larger than the assignment's variable, then we have reached a
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_atom = self.atom(db);
         if assignment.constraint() < self_atom {
-            return Node::Interior(self);
+            return (Node::Interior(self), false);
         }
 
         // Otherwise, check if this node's variable is in the assignment. If so, substitute the
         // variable by replacing this node with its if_false/if_true edge, accordingly.
         if assignment == SatisfiedConstraint::Positive(self_atom) {
-            self.if_true(db)
+            (self.if_true(db), true)
         } else if assignment == SatisfiedConstraint::Negative(self_atom) {
-            self.if_false(db)
+            (self.if_false(db), true)
         } else {
-            Node::new(
-                db,
-                self_atom,
-                self.if_true(db).restrict_one(db, assignment),
-                self.if_false(db).restrict_one(db, assignment),
+            let (if_true, found_in_true) = self.if_true(db).restrict_one(db, assignment);
+            let (if_false, found_in_false) = self.if_false(db).restrict_one(db, assignment);
+            (
+                Node::new(db, self_atom, if_true, if_false),
+                found_in_true || found_in_false,
             )
         }
     }
