@@ -90,8 +90,7 @@ still continue to use the old convention, so it is supported by ty as well.
 def f(__x: int): ...
 
 f(1)
-# error: [missing-argument]
-# error: [unknown-argument]
+# error: [positional-only-parameter-as-kwarg]
 f(__x=1)
 ```
 
@@ -131,11 +130,9 @@ class C:
     @staticmethod
     def static_method(self, __x: int): ...
 
-# error: [missing-argument]
-# error: [unknown-argument]
+# error: [positional-only-parameter-as-kwarg]
 C().method(__x=1)
-# error: [missing-argument]
-# error: [unknown-argument]
+# error: [positional-only-parameter-as-kwarg]
 C.class_method(__x="1")
 C.static_method("x", __x=42)  # fine
 ```
