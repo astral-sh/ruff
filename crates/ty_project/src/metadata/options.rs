@@ -311,25 +311,22 @@ impl Options {
         // interpreter does
         if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
             for path in std::env::split_paths(python_path.as_str()) {
-                let Some(path) = SystemPath::from_std_path(path.as_path()) else {
-                    let path = path.to_string_lossy();
-                    tracing::debug!(
-                        "Skipping `{path}` listed in `PYTHONPATH` because the path is not valid UTF-8"
-                    );
-                    continue;
+                let path = match SystemPathBuf::from_path_buf(path) {
+                    Ok(path) => path,
+                    Err(path) => {
+                        tracing::debug!(
+                            "Skipping `{path}` listed in `PYTHONPATH` because the path is not valid UTF-8",
+                            path = path.display()
+                        );
+                        continue;
+                    }
                 };
 
                 let abspath = SystemPath::absolute(path, system.current_directory());
 
-                if !system.path_exists(&abspath) {
-                    tracing::debug!(
-                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path does not exist"
-                    );
-                    continue;
-                }
                 if !system.is_directory(&abspath) {
                     tracing::debug!(
-                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path is not a directory"
+                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path doesn't exist or isn't a directory"
                     );
                     continue;
                 }
@@ -337,6 +334,7 @@ impl Options {
                 tracing::debug!(
                     "Adding `{abspath}` from the `PYTHONPATH` environment variable to `extra_paths`"
                 );
+
                 extra_paths.push(abspath);
             }
         }
