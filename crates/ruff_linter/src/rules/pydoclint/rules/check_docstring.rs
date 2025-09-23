@@ -603,14 +603,11 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
                     continue;
                 };
                 if let Some(param) = before_colon.split_whitespace().next() {
-                    let param_name = param.trim_start_matches('*');
-                    let param_start_in_line =
-                        indentation.len() + before_colon.find(param).unwrap_or(0);
-                    let param_start = line_start + param_start_in_line;
+                    let param_start = line_start + indentation.len();
                     let param_end = param_start + param.len();
 
                     entries.push(ParameterEntry {
-                        name: param_name,
+                        name: param.trim_start_matches('*'),
                         range: TextRange::new(
                             content_start + TextSize::try_from(param_start).unwrap(),
                             content_start + TextSize::try_from(param_end).unwrap(),
@@ -654,12 +651,12 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
                 if let Some(param) = entry.split(':').next() {
-                    let param_name = param.trim_end().trim_start_matches('*');
+                    let param_name = param.trim_end();
                     let param_start = line_start + indentation.len();
-                    let param_end = param_start + param.len();
+                    let param_end = param_start + param_name.len();
 
                     entries.push(ParameterEntry {
-                        name: param_name,
+                        name: param_name.trim_start_matches('*'),
                         range: TextRange::new(
                             content_start + TextSize::try_from(param_start).unwrap(),
                             content_start + TextSize::try_from(param_end).unwrap(),
