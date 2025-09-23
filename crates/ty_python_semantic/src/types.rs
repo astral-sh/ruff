@@ -8030,7 +8030,7 @@ impl<'db> AwaitError<'db> {
                 }
             }
             Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
-                diag.info("`__await__` is possibly missing");
+                diag.info("`__await__` may be missing");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)
@@ -8137,7 +8137,7 @@ impl<'db> ContextManagerError<'db> {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
-                    format!("the method `{name}` is possibly missing")
+                    format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
@@ -8893,7 +8893,7 @@ impl<'db> ConstructorCallError<'db> {
                     context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__init__` on type `{}` is possibly missing.",
+                        "Method `__init__` on type `{}` may be missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }
@@ -8911,7 +8911,7 @@ impl<'db> ConstructorCallError<'db> {
                     context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__new__` on type `{}` is possibly missing.",
+                        "Method `__new__` on type `{}` may be missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }

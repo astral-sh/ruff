@@ -756,16 +756,16 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-missing-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` may be missing"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `non_data` on type `PossiblyUnbound` may be missing"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` may be missing"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `data` on type `PossiblyUnbound` may be missing"
     reveal_type(PossiblyUnbound().data)  # revealed: int
 ```
 

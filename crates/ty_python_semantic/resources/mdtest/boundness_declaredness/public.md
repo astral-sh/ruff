@@ -177,8 +177,8 @@ else:
 ```
 
 ```py
-# error: [possibly-missing-import]
-# error: [possibly-missing-import]
+# error: [possibly-missing-import] "Member `a` of module `mod` may be missing"
+# error: [possibly-missing-import] "Member `b` of module `mod` may be missing"
 from mod import a, b
 
 reveal_type(a)  # revealed: Literal[1] | Any

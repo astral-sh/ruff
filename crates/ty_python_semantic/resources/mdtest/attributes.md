@@ -1180,13 +1180,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1212,7 +1212,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1220,7 +1220,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly missing"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]

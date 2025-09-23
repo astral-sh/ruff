@@ -114,7 +114,11 @@ def _(flag: bool):
 
     this_fails = ThisFails()
 
-    # error: [possibly-missing-implicit-call]
+    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
+    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
+    # that the cause of the error was a possibly missing `__getitem__` method
+    #
+    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `ThisFails` may be missing"
     reveal_type(this_fails[0])  # revealed: Unknown | str
 ```
 
@@ -270,6 +274,11 @@ def _(flag: bool):
                 return str(key)
 
     c = C()
-    # error: [possibly-missing-implicit-call]
+
+    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
+    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
+    # that the cause of the error was a possibly missing `__getitem__` method
+    #
+    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `C` may be missing"
     reveal_type(c[0])  # revealed: str
 ```

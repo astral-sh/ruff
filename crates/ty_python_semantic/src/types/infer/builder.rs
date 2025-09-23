@@ -3225,7 +3225,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, &**value)
                     {
                         builder.into_diagnostic(format_args!(
-                            "Method `__setitem__` of type `{}` is possibly missing",
+                            "Method `__setitem__` of type `{}` may be missing",
                             value_ty.display(db),
                         ));
                     }
@@ -3306,7 +3306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Method `__setitem__` of type `{}` is possibly not \
+                                    "Method `__setitem__` of type `{}` may not be \
                                     callable on object of type `{}`",
                                     bindings.callable_type().display(db),
                                     value_ty.display(db),
@@ -4683,7 +4683,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&POSSIBLY_MISSING_IMPORT, AnyNodeRef::Alias(alias))
                     {
                         builder.into_diagnostic(format_args!(
-                            "Member `{name}` of module `{module_name}` is possibly missing",
+                            "Member `{name}` of module `{module_name}` may be missing",
                         ));
                     }
                 }
@@ -8760,7 +8760,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__getitem__` of type `{}` is possibly missing",
+                        "Method `__getitem__` of type `{}` may be missing",
                         value_ty.display(db),
                     ));
                 }
@@ -8808,7 +8808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     CallErrorKind::PossiblyNotCallable => {
                         if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                             builder.into_diagnostic(format_args!(
-                                "Method `__getitem__` of type `{}` is possibly not callable on object of type `{}`",
+                                "Method `__getitem__` of type `{}` may not be callable on object of type `{}`",
                                 bindings.callable_type().display(db),
                                 value_ty.display(db),
                             ));
@@ -8843,8 +8843,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Method `__class_getitem__` of type `{}` \
-                                    is possibly missing",
+                                "Method `__class_getitem__` of type `{}` may be missing",
                                 value_ty.display(db),
                             ));
                         }

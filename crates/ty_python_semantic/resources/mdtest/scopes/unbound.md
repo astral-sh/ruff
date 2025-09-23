@@ -16,7 +16,7 @@ class C:
     if flag:
         x = 2
 
-# error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C'>` is possibly missing"
+# error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C'>` may be missing"
 reveal_type(C.x)  # revealed: Unknown | Literal[2]
 reveal_type(C.y)  # revealed: Unknown | Literal[1]
 ```

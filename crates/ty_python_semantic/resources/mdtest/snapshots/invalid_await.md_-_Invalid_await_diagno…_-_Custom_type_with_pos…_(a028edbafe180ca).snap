@@ -41,7 +41,7 @@ error[invalid-await]: `PossiblyUnbound` is not awaitable
   |             --------------- method defined here
 6 |             yield
   |
-info: `__await__` is possibly missing
+info: `__await__` may be missing
 info: rule `invalid-await` is enabled by default
 
 ```

@@ -2185,7 +2185,7 @@ pub(super) fn report_possibly_missing_attribute(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Attribute `{attribute}` on type `{}` is possibly missing",
+        "Attribute `{attribute}` on type `{}` may be missing",
         object_ty.display(context.db()),
     ));
 }
@@ -2771,7 +2771,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 CallDunderError::PossiblyUnbound(_) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
-                        "Type `{}` has an `__mro_entries__` attribute, but it is possibly unbound",
+                        "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
                         base_type.display(db)
                     ));
                 }
