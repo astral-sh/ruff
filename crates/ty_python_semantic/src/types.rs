@@ -2553,9 +2553,10 @@ impl<'db> Type<'db> {
                 other.is_disjoint_from_impl(db, KnownClass::ModuleType.to_instance(db), visitor)
             }
 
-            (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-                left.is_disjoint_from_impl(db, right, visitor)
-            }
+            (Type::NominalInstance(left), Type::NominalInstance(right)) => visitor
+                .visit((self, other), || {
+                    left.is_disjoint_from_impl(db, right, visitor)
+                }),
 
             (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
                 KnownClass::Property
