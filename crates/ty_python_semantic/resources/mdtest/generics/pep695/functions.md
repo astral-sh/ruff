@@ -323,7 +323,7 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
-## Passing generic functions to generics functions
+## Passing generic functions to generic functions
 
 ```py
 from typing import Callable
