@@ -124,7 +124,50 @@ class RuffCodeActionProvider implements CodeActionProvider {
     range: Range,
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions = this.diagnostics
-      .filter((check) => range.startLineNumber === check.start_location.row)
+      // Show fixes for any diagnostic whose range intersects the requested range
+      .filter((check) => {
+        const diagStartLine = check.start_location.row;
+        const diagStartCol = check.start_location.column;
+        const diagEndLine = check.end_location.row;
+        const diagEndCol = check.end_location.column;
+
+        const rangeStartLine = range.startLineNumber;
+        const rangeStartCol = range.startColumn;
+        const rangeEndLine = range.endLineNumber;
+        const rangeEndCol = range.endColumn;
+
+        // Helper to compare positions
+        const isBeforeOrEqual = (
+          lineA: number,
+          colA: number,
+          lineB: number,
+          colB: number,
+        ) => lineA < lineB || (lineA === lineB && colA <= colB);
+
+        const isAfterOrEqual = (
+          lineA: number,
+          colA: number,
+          lineB: number,
+          colB: number,
+        ) => lineA > lineB || (lineA === lineB && colA >= colB);
+
+        // Ranges [diagStart, diagEnd] and [rangeStart, rangeEnd] intersect if:
+        // diagStart <= rangeEnd AND diagEnd >= rangeStart
+        const diagStartsBeforeOrAtRangeEnd = isBeforeOrEqual(
+          diagStartLine,
+          diagStartCol,
+          rangeEndLine,
+          rangeEndCol,
+        );
+        const diagEndsAfterOrAtRangeStart = isAfterOrEqual(
+          diagEndLine,
+          diagEndCol,
+          rangeStartLine,
+          rangeStartCol,
+        );
+
+        return diagStartsBeforeOrAtRangeEnd && diagEndsAfterOrAtRangeStart;
+      })
       .filter(({ fix }) => fix)
       .map((check) => ({
         title: check.fix
@@ -173,6 +216,7 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
     model,
     "owner",
     diagnostics.map((diagnostic) => ({
+      code: diagnostic.code ?? undefined,
       startLineNumber: diagnostic.start_location.row,
       startColumn: diagnostic.start_location.column,
       endLineNumber: diagnostic.end_location.row,
