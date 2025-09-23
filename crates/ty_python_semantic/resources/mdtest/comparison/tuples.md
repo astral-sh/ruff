@@ -392,3 +392,16 @@ class A:
 # error: [unsupported-bool-conversion]
 (A(),) == (A(),)
 ```
+
+## Recursive NamedTuple
+
+```py
+from __future__ import annotations
+from typing import NamedTuple
+
+class Node(NamedTuple):
+    parent: Node | None
+
+def _(n: Node):
+    reveal_type(n.parent is n)  # revealed: bool
+```

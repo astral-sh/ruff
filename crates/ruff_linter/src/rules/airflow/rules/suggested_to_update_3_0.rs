@@ -17,9 +17,9 @@ use ruff_text_size::TextRange;
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
-/// and not worth to be maintained in Airflow.
+/// and not worth continued maintenance in Airflow.
 /// Even though these symbols still work fine on Airflow 3.0, they are expected to be removed in a future version.
-/// The user is suggested to replace the original usage with the new ones.
+/// Where available, users should replace the removed functionality with the new alternatives.
 ///
 /// ## Example
 /// ```python
@@ -156,6 +156,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
+        }
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
+            diagnostic_for_argument(checker, arguments, "datasets", Some("assets"));
         }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {

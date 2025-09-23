@@ -2,7 +2,7 @@ use crate::{
     Db, FxIndexSet,
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
-        IntersectionType, KnownInstanceType, MethodWrapperKind, NominalInstanceType,
+        IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
         TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         class::walk_generic_alias,
@@ -23,6 +23,9 @@ use std::cell::{Cell, RefCell};
 /// but it makes it easy for implementors of the trait to do so.
 /// See [`any_over_type`] for an example of how to do this.
 pub(crate) trait TypeVisitor<'db> {
+    /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
+    fn should_visit_lazy_type_attributes(&self) -> bool;
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
@@ -81,7 +84,11 @@ pub(crate) trait TypeVisitor<'db> {
         walk_protocol_instance_type(db, protocol, self);
     }
 
-    fn visit_method_wrapper_type(&self, db: &'db dyn Db, method_wrapper: MethodWrapperKind<'db>) {
+    fn visit_method_wrapper_type(
+        &self,
+        db: &'db dyn Db,
+        method_wrapper: KnownBoundMethodType<'db>,
+    ) {
         walk_method_wrapper_type(db, method_wrapper, self);
     }
 
@@ -106,7 +113,7 @@ enum NonAtomicType<'db> {
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
-    MethodWrapper(MethodWrapperKind<'db>),
+    MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
     GenericAlias(GenericAlias<'db>),
     KnownInstance(KnownInstanceType<'db>),
@@ -158,7 +165,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
             }
-            Type::MethodWrapper(method_wrapper) => {
+            Type::KnownBoundMethod(method_wrapper) => {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
@@ -240,18 +247,28 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
 ///
 /// The function guards against infinite recursion
 /// by keeping track of the non-atomic types it has already seen.
+///
+/// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
+/// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
+/// are visited or not.
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     query: &dyn Fn(Type<'db>) -> bool,
+    should_visit_lazy_type_attributes: bool,
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
         seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
         found_matching_type: Cell<bool>,
+        should_visit_lazy_type_attributes: bool,
     }
 
     impl<'db> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            self.should_visit_lazy_type_attributes
+        }
+
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             let already_found = self.found_matching_type.get();
             if already_found {
@@ -279,6 +296,7 @@ pub(super) fn any_over_type<'db>(
         query,
         seen_types: RefCell::new(FxIndexSet::default()),
         found_matching_type: Cell::new(false),
+        should_visit_lazy_type_attributes,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()

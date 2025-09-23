@@ -1,5 +1,6 @@
 ---
 source: crates/ty_server/tests/e2e/initialize.rs
+assertion_line: 32
 expression: initialization_result
 ---
 {
@@ -32,6 +33,12 @@ expression: initialization_result
     "documentSymbolProvider": true,
     "workspaceSymbolProvider": true,
     "declarationProvider": true,
+    "executeCommandProvider": {
+      "commands": [
+        "ty.printDebugInformation"
+      ],
+      "workDoneProgress": false
+    },
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [

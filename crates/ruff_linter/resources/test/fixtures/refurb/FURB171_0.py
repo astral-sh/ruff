@@ -117,3 +117,31 @@ def _():
         # After
     ] and \
         0 < 1: ...
+
+# https://github.com/astral-sh/ruff/issues/20255
+import math
+
+# NaN behavior differences
+if math.nan in [math.nan]:
+    print("This is True")
+
+if math.nan in (math.nan,):
+    print("This is True")
+
+if math.nan in {math.nan}:
+    print("This is True")
+
+# Potential type differences with custom __eq__ methods
+class CustomEq:
+    def __eq__(self, other):
+        return "custom"
+
+obj = CustomEq()
+if obj in [CustomEq()]:
+    pass
+
+if obj in (CustomEq(),):
+    pass
+
+if obj in {CustomEq()}:
+    pass

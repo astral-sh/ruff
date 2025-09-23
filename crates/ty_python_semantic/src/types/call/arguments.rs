@@ -43,14 +43,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn from_arguments(
         db: &'db dyn Db,
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(arg, value);
+                        let ty = infer_argument_type(Some(arg), value);
                         let length = ty
                             .try_iterate(db)
                             .map(|tuple| tuple.len())
@@ -59,11 +59,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                     _ => (Argument::Positional, None),
                 },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), None)
                     } else {
-                        (Argument::Keywords, None)
+                        let ty = infer_argument_type(None, value);
+                        (Argument::Keywords, Some(ty))
                     }
                 }
             })
@@ -202,10 +203,25 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     for subtype in &expanded_types {
                         let mut new_expanded_types = pre_expanded_types.to_vec();
                         new_expanded_types[index] = Some(*subtype);
-                        expanded_arguments.push(CallArguments::new(
-                            self.arguments.clone(),
-                            new_expanded_types,
-                        ));
+
+                        // Update the arguments list to handle variadic argument expansion
+                        let mut new_arguments = self.arguments.clone();
+                        if let Argument::Variadic(_) = self.arguments[index] {
+                            // If the argument corresponding to this type is variadic, we need to
+                            // update the tuple length because expanding could change the length.
+                            // For example, in `tuple[int] | tuple[int, int]`, the length of the
+                            // first type is 1, while the length of the second type is 2.
+                            if let Some(expanded_type) = new_expanded_types[index] {
+                                let length = expanded_type
+                                    .try_iterate(db)
+                                    .map(|tuple| tuple.len())
+                                    .unwrap_or(TupleLength::unknown());
+                                new_arguments[index] = Argument::Variadic(length);
+                            }
+                        }
+
+                        expanded_arguments
+                            .push(CallArguments::new(new_arguments, new_expanded_types));
                     }
                 }
 

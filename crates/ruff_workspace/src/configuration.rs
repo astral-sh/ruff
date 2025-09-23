@@ -158,9 +158,7 @@ impl Configuration {
                 .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
             if !required_version.contains(&ruff_pkg_version) {
                 return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    required_version,
-                    RUFF_PKG_VERSION
+                    "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
                 ));
             }
         }
@@ -257,12 +255,6 @@ impl Configuration {
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
-        if lint_preview.is_disabled() && future_annotations {
-            warn_user_once!(
-                "The `lint.future-annotations` setting will have no effect \
-                    because `preview` is disabled"
-            );
-        }
 
         Ok(Settings {
             cache_dir: self

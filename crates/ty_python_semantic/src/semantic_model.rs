@@ -3,6 +3,7 @@ use ruff_db::source::line_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_source_file::LineIndex;
+use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::module_name::ModuleName;
@@ -37,6 +38,37 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file)
     }
 
+    /// Returns a map from symbol name to that symbol's
+    /// type and definition site (if available).
+    ///
+    /// The symbols are the symbols in scope at the given
+    /// AST node.
+    pub fn members_in_scope_at(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+    ) -> FxHashMap<Name, MemberDefinition<'db>> {
+        let index = semantic_index(self.db, self.file);
+        let mut members = FxHashMap::default();
+        let Some(file_scope) = self.scope(node) else {
+            return members;
+        };
+
+        for (file_scope, _) in index.ancestor_scopes(file_scope) {
+            for memberdef in
+                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
+            {
+                members.insert(
+                    memberdef.member.name,
+                    MemberDefinition {
+                        ty: memberdef.member.ty,
+                        definition: memberdef.definition,
+                    },
+                );
+            }
+        }
+        members
+    }
+
     pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module<'_>> {
         resolve_module(self.db, module_name)
     }
@@ -50,7 +82,7 @@ impl<'db> SemanticModel<'db> {
                 let ty = Type::module_literal(self.db, self.file, module);
                 Completion {
                     name: Name::new(module.name(self.db).as_str()),
-                    ty,
+                    ty: Some(ty),
                     builtin,
                 }
             })
@@ -162,7 +194,11 @@ impl<'db> SemanticModel<'db> {
 
         let mut completions = vec![];
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
-            completions.push(Completion { name, ty, builtin });
+            completions.push(Completion {
+                name,
+                ty: Some(ty),
+                builtin,
+            });
         }
         completions.extend(self.submodule_completions(&module));
         completions
@@ -173,20 +209,14 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
-        for submodule_basename in module.all_submodules(self.db) {
-            let Some(basename) = ModuleName::new(submodule_basename.as_str()) else {
+        for submodule in module.all_submodules(self.db) {
+            let ty = Type::module_literal(self.db, self.file, *submodule);
+            let Some(base) = submodule.name(self.db).components().next_back() else {
                 continue;
             };
-            let mut submodule_name = module.name(self.db).clone();
-            submodule_name.extend(&basename);
-
-            let Some(submodule) = resolve_module(self.db, &submodule_name) else {
-                continue;
-            };
-            let ty = Type::module_literal(self.db, self.file, submodule);
             completions.push(Completion {
-                name: submodule_basename.clone(),
-                ty,
+                name: Name::new(base),
+                ty: Some(ty),
                 builtin,
             });
         }
@@ -200,7 +230,7 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
-                ty: member.ty,
+                ty: Some(member.ty),
                 builtin: false,
             })
             .collect()
@@ -214,29 +244,16 @@ impl<'db> SemanticModel<'db> {
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
         let index = semantic_index(self.db, self.file);
 
-        // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
-        // Revert this to use `expression_scope_id` once a proper fix is in place.
-        //
-        // [1] https://github.com/astral-sh/ty/issues/572
-        let Some(file_scope) = (match node {
-            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
-            node => match node.as_expr_ref() {
-                // If we couldn't identify a specific
-                // expression that we're in, then just
-                // fall back to the global scope.
-                None => Some(FileScopeId::global()),
-                Some(expr) => index.try_expression_scope_id(&expr),
-            },
-        }) else {
+        let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
                 all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
-                    .map(|member| Completion {
-                        name: member.name,
-                        ty: member.ty,
+                    .map(|memberdef| Completion {
+                        name: memberdef.member.name,
+                        ty: Some(memberdef.member.ty),
                         builtin: false,
                     }),
             );
@@ -246,6 +263,28 @@ impl<'db> SemanticModel<'db> {
         completions.extend(self.module_completions(&builtins));
         completions
     }
+
+    fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
+        let index = semantic_index(self.db, self.file);
+
+        match node {
+            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
+            node => match node.as_expr_ref() {
+                // If we couldn't identify a specific
+                // expression that we're in, then just
+                // fall back to the global scope.
+                None => Some(FileScopeId::global()),
+                Some(expr) => index.try_expression_scope_id(&expr),
+            },
+        }
+    }
+}
+
+/// The type and definition (if available) of a symbol.
+#[derive(Clone, Debug)]
+pub struct MemberDefinition<'db> {
+    pub ty: Type<'db>,
+    pub definition: Option<Definition<'db>>,
 }
 
 /// A classification of symbol names.
@@ -286,8 +325,13 @@ impl NameKind {
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
-    /// The type of this completion.
-    pub ty: Type<'db>,
+    /// The type of this completion, if available.
+    ///
+    /// Generally speaking, this is always available
+    /// *unless* this was a completion corresponding to
+    /// an unimported symbol. In that case, computing the
+    /// type of all such symbols could be quite expensive.
+    pub ty: Option<Type<'db>>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information
@@ -295,96 +339,6 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
-}
-
-impl<'db> Completion<'db> {
-    /// Returns the "kind" of this completion.
-    ///
-    /// This is meant to be a very general classification of this completion.
-    /// Typically, this is communicated from the LSP server to a client, and
-    /// the client uses this information to help improve the UX (perhaps by
-    /// assigning an icon of some kind to the completion).
-    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
-        fn imp<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
-            Some(match ty {
-                Type::FunctionLiteral(_)
-                | Type::DataclassDecorator(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassTransformer(_)
-                | Type::Callable(_) => CompletionKind::Function,
-                Type::BoundMethod(_) | Type::MethodWrapper(_) => CompletionKind::Method,
-                Type::ModuleLiteral(_) => CompletionKind::Module,
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    CompletionKind::Class
-                }
-                // This is a little weird for "struct." I'm mostly interpreting
-                // "struct" here as a more general "object." ---AG
-                Type::NominalInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::BoundSuper(_)
-                | Type::TypedDict(_) => CompletionKind::Struct,
-                Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::TypeIs(_)
-                | Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_) => CompletionKind::Value,
-                Type::EnumLiteral(_) => CompletionKind::Enum,
-                Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
-                Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
-                Type::Intersection(intersection) => {
-                    intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
-                }
-                Type::Dynamic(_)
-                | Type::Never
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy => return None,
-                Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
-            })
-        }
-        imp(db, self.ty)
-    }
-}
-
-/// The "kind" of a completion.
-///
-/// This is taken directly from the LSP completion specification:
-/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind>
-///
-/// The idea here is that `Completion::kind` defines the mapping to this from
-/// `Type` (and possibly other information), which might be interesting and
-/// contentious. Then the outer edges map this to the LSP types, which is
-/// expected to be mundane and boring.
-#[derive(Clone, Copy, Debug)]
-pub enum CompletionKind {
-    Text,
-    Method,
-    Function,
-    Constructor,
-    Field,
-    Variable,
-    Class,
-    Interface,
-    Module,
-    Property,
-    Unit,
-    Value,
-    Enum,
-    Keyword,
-    Snippet,
-    Color,
-    File,
-    Reference,
-    Folder,
-    EnumMember,
-    Constant,
-    Struct,
-    Event,
-    Operator,
-    TypeParameter,
 }
 
 pub trait HasType {

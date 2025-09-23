@@ -74,8 +74,13 @@ def _(
 def bar() -> None:
     return None
 
+def outer_sync():  # `yield` from is only valid syntax inside a synchronous function
+    def _(
+        a: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
+    ): ...
+
 async def baz(): ...
-async def outer():  # avoid unrelated syntax errors on yield, yield from, and await
+async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
     def _(
         a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
         b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
@@ -90,11 +95,10 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         k: 1 if True else 2,  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
         l: await baz(),  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
-        n: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
-        o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
-        p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-        r: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        n: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
+        o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
+        p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+        q: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
     ):
         reveal_type(a)  # revealed: Unknown
         reveal_type(b)  # revealed: Unknown
@@ -107,9 +111,12 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         reveal_type(i)  # revealed: Unknown
         reveal_type(j)  # revealed: Unknown
         reveal_type(k)  # revealed: Unknown
-        reveal_type(p)  # revealed: Unknown
-        reveal_type(q)  # revealed: int | Unknown
-        reveal_type(r)  # revealed: @Todo(unknown type subscript)
+        reveal_type(l)  # revealed: Unknown
+        reveal_type(m)  # revealed: Unknown
+        reveal_type(n)  # revealed: Unknown
+        reveal_type(o)  # revealed: Unknown
+        reveal_type(p)  # revealed: int | Unknown
+        reveal_type(q)  # revealed: @Todo(unknown type subscript)
 
 class Mat:
     def __init__(self, value: int):

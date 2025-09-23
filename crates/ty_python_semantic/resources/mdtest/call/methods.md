@@ -586,5 +586,131 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+## Builtin functions and methods
+
+Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
+properties are understood correctly for these functions and methods.
+
+```py
+import types
+from typing import Callable
+from ty_extensions import static_assert, CallableTypeOf, is_assignable_to, TypeOf
+
+def f(obj: type) -> None: ...
+
+class MyClass:
+    @property
+    def my_property(self) -> int:
+        return 42
+
+    @my_property.setter
+    def my_property(self, value: int | str) -> None: ...
+
+static_assert(is_assignable_to(types.FunctionType, Callable))
+
+# revealed: <wrapper-descriptor `__get__` of `function` objects>
+reveal_type(types.FunctionType.__get__)
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
+
+# revealed: def f(obj: type) -> None
+reveal_type(f)
+static_assert(is_assignable_to(TypeOf[f], Callable))
+
+# revealed: <method-wrapper `__get__` of `f`>
+reveal_type(f.__get__)
+static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
+
+# revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
+reveal_type(types.FunctionType.__call__)
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
+
+# revealed: <method-wrapper `__call__` of `f`>
+reveal_type(f.__call__)
+static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
+
+# revealed: <wrapper-descriptor `__get__` of `property` objects>
+reveal_type(property.__get__)
+static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
+
+# revealed: property
+reveal_type(MyClass.my_property)
+static_assert(is_assignable_to(TypeOf[property], Callable))
+static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
+
+# revealed: <method-wrapper `__get__` of `property` object>
+reveal_type(MyClass.my_property.__get__)
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
+
+# revealed: <wrapper-descriptor `__set__` of `property` objects>
+reveal_type(property.__set__)
+static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
+
+# revealed: <method-wrapper `__set__` of `property` object>
+reveal_type(MyClass.my_property.__set__)
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
+
+# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+reveal_type(str.startswith)
+static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
+
+# revealed: <method-wrapper `startswith` of `str` object>
+reveal_type("foo".startswith)
+static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
+
+def _(
+    a: CallableTypeOf[types.FunctionType.__get__],
+    b: CallableTypeOf[f],
+    c: CallableTypeOf[f.__get__],
+    d: CallableTypeOf[types.FunctionType.__call__],
+    e: CallableTypeOf[f.__call__],
+    f: CallableTypeOf[property],
+    g: CallableTypeOf[property.__get__],
+    h: CallableTypeOf[MyClass.my_property.__get__],
+    i: CallableTypeOf[property.__set__],
+    j: CallableTypeOf[MyClass.my_property.__set__],
+    k: CallableTypeOf[str.startswith],
+    l: CallableTypeOf["foo".startswith],
+):
+    # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(a)
+
+    # revealed: (obj: type) -> None
+    reveal_type(b)
+
+    # TODO: ideally this would have precise return types rather than `Unknown`
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(c)
+
+    # revealed: (self, *args: Any, **kwargs: Any) -> Any
+    reveal_type(d)
+
+    # revealed: (obj: type) -> None
+    reveal_type(e)
+
+    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> Any) | None = None, doc: str | None = None) -> Unknown
+    reveal_type(f)
+
+    # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(g)
+
+    # TODO: ideally this would have precise return types rather than `Unknown`
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(h)
+
+    # TODO: ideally this would have `-> None` rather than `-> Unknown`
+    # revealed: (self: property, instance: object, value: object, /) -> Unknown
+    reveal_type(i)
+
+    # TODO: ideally this would have a more precise input type and `-> None` rather than `-> Unknown`
+    # revealed: (instance: object, value: object, /) -> Unknown
+    reveal_type(j)
+
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+    reveal_type(k)
+
+    # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    reveal_type(l)
+```
+
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
 [`__init_subclass__`]: https://docs.python.org/3/reference/datamodel.html#object.__init_subclass__

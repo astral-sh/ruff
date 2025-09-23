@@ -146,28 +146,27 @@ static FREQTRADE: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock:
     )
 });
 
-// Temporarily disabled, see https://github.com/astral-sh/ty/issues/1111
-// static PANDAS: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-//     Benchmark::new(
-//         RealWorldProject {
-//             name: "pandas",
-//             repository: "https://github.com/pandas-dev/pandas",
-//             commit: "5909621e2267eb67943a95ef5e895e8484c53432",
-//             paths: vec![SystemPath::new("pandas")],
-//             dependencies: vec![
-//                 "numpy",
-//                 "types-python-dateutil",
-//                 "types-pytz",
-//                 "types-PyMySQL",
-//                 "types-setuptools",
-//                 "pytest",
-//             ],
-//             max_dep_date: "2025-06-17",
-//             python_version: PythonVersion::PY312,
-//         },
-//         3000,
-//     )
-// });
+static PANDAS: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+    Benchmark::new(
+        RealWorldProject {
+            name: "pandas",
+            repository: "https://github.com/pandas-dev/pandas",
+            commit: "5909621e2267eb67943a95ef5e895e8484c53432",
+            paths: vec![SystemPath::new("pandas")],
+            dependencies: vec![
+                "numpy",
+                "types-python-dateutil",
+                "types-pytz",
+                "types-PyMySQL",
+                "types-setuptools",
+                "pytest",
+            ],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        },
+        3000,
+    )
+});
 
 static PYDANTIC: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
     Benchmark::new(
@@ -189,21 +188,20 @@ static PYDANTIC: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::
     )
 });
 
-// Temporarily disabled, see https://github.com/astral-sh/ty/issues/1111
-// static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-//     Benchmark::new(
-//         RealWorldProject {
-//             name: "sympy",
-//             repository: "https://github.com/sympy/sympy",
-//             commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
-//             paths: vec![SystemPath::new("sympy")],
-//             dependencies: vec!["mpmath"],
-//             max_dep_date: "2025-06-17",
-//             python_version: PythonVersion::PY312,
-//         },
-//         13000,
-//     )
-// });
+static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+    Benchmark::new(
+        RealWorldProject {
+            name: "sympy",
+            repository: "https://github.com/sympy/sympy",
+            commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
+            paths: vec![SystemPath::new("sympy")],
+            dependencies: vec!["mpmath"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        },
+        13000,
+    )
+});
 
 static TANJUN: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
     Benchmark::new(
@@ -257,10 +255,10 @@ fn medium(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-// #[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
-// fn large(bencher: Bencher, benchmark: &Benchmark) {
-//     run_single_threaded(bencher, benchmark);
-// }
+#[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
+fn large(bencher: Bencher, benchmark: &Benchmark) {
+    run_single_threaded(bencher, benchmark);
+}
 
 #[bench(args=[&*PYDANTIC], sample_size=3, sample_count=8)]
 fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {

@@ -69,9 +69,12 @@ use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
+    LateFutureImport, ReturnOutsideFunction, UndefinedLocalWithNestedImportStarUsage,
+    YieldOutsideFunction,
 };
-use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
+use crate::rules::pylint::rules::{
+    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
@@ -274,7 +277,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer: Importer::new(parsed, locator, stylist),
+            importer: Importer::new(parsed, locator.contents(), stylist),
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -657,6 +660,14 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
+            SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
+                if self.is_rule_enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
+                    self.report_diagnostic(
+                        UndefinedLocalWithNestedImportStarUsage { name },
+                        error.range,
+                    );
+                }
+            }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 // F706
                 if self.is_rule_enabled(Rule::ReturnOutsideFunction) {
@@ -666,6 +677,12 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.is_rule_enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
+                // PLE1700
+                if self.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
+                    self.report_diagnostic(YieldFromInAsyncFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -3257,6 +3274,11 @@ impl<'a> LintContext<'a> {
     /// The [`LinterSettings`] for the current analysis, including the enabled rules.
     pub(crate) const fn settings(&self) -> &LinterSettings {
         self.settings
+    }
+
+    #[cfg(any(feature = "test-rules", test))]
+    pub(crate) const fn source_file(&self) -> &SourceFile {
+        &self.source_file
     }
 }
 

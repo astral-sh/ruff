@@ -20,11 +20,3 @@ help: Install `apache-airflow-providers-postgres>=1.0.0` and use `PostgresHook` 
 6 | PostgresHook()
 7 | Mapping()
 note: This is an unsafe fix and may change runtime behavior
-
-AIR302 `airflow.operators.postgres_operator.Mapping` is removed in Airflow 3.0
- --> AIR302_postgres.py:7:1
-  |
-6 | PostgresHook()
-7 | Mapping()
-  | ^^^^^^^
-  |
