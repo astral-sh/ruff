@@ -14,7 +14,11 @@ a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscri
 class NotSubscriptable:
     __getitem__ = None
 
-# error: "Method `__getitem__` of type `Unknown | None` is possibly not callable on object of type `NotSubscriptable`"
+# TODO: this would be more user-friendly if the `call-non-callable` diagnostic was
+# transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
+# that this was because `__getitem__` was possibly not callable
+#
+# error: [call-non-callable] "Method `__getitem__` of type `Unknown | None` may not be callable on object of type `NotSubscriptable`"
 a = NotSubscriptable()[0]
 ```
 
@@ -82,7 +86,7 @@ class NoSetitem:
     __setitem__ = None
 
 a = NoSetitem()
-a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` is possibly not callable on object of type `NoSetitem`"
+a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` may not be callable on object of type `NoSetitem`"
 ```
 
 ## Valid `__setitem__` method

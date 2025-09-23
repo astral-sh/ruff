@@ -116,7 +116,7 @@ def _(n: int):
     # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [no-matching-overload] "No overload of function `f6` matches arguments"
     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
     x = f(3)
 ```
 

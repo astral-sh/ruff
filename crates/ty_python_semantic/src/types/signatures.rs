@@ -391,7 +391,9 @@ impl<'db> Signature<'db> {
             let plain_return_ty = if flags.mark_typevars_inferable() {
                 plain_return_ty.apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 )
             } else {
                 plain_return_ty
@@ -1366,6 +1368,17 @@ impl<'db> Parameters<'db> {
             .and_then(|parameter| parameter.is_positional().then_some(parameter))
     }
 
+    /// Return a positional-only parameter (with index) with the given name.
+    pub(crate) fn positional_only_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
+        self.iter().enumerate().find(|(_, parameter)| {
+            parameter.is_positional_only()
+                && parameter
+                    .name()
+                    .map(|p_name| p_name == name)
+                    .unwrap_or(false)
+        })
+    }
+
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
     pub(crate) fn variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
@@ -1584,7 +1597,9 @@ impl<'db> Parameter<'db> {
                 if flags.mark_typevars_inferable() {
                     annotated_ty.apply_type_mapping(
                         db,
-                        &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                        &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                            definition,
+                        ))),
                     )
                 } else {
                     annotated_ty
