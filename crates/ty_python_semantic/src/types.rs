@@ -367,26 +367,6 @@ fn member_lookup_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-fn has_relation_to_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &ConstraintSet<'db>,
-    _count: u32,
-    _self: Type<'db>,
-    _target: Type<'db>,
-    _relation: TypeRelation,
-) -> salsa::CycleRecoveryAction<ConstraintSet<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn has_relation_to_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: Type<'db>,
-    _target: Type<'db>,
-    _relation: TypeRelation,
-) -> ConstraintSet<'db> {
-    ConstraintSet::from(true)
-}
-
 fn class_lookup_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &PlaceAndQualifiers<'db>,
@@ -1484,11 +1464,6 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
 
-    #[salsa::tracked(
-        cycle_fn=has_relation_to_cycle_recover,
-        cycle_initial=has_relation_to_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
     fn has_relation_to(
         self,
         db: &'db dyn Db,
