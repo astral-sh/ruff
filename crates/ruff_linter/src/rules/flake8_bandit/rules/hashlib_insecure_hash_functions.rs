@@ -23,9 +23,11 @@ use crate::rules::flake8_bandit::helpers::string_literal;
 /// Avoid using weak or broken cryptographic hash functions in security
 /// contexts. Instead, use a known secure hash function such as SHA256.
 ///
-/// Note: This rule intentionally only considers Python-guaranteed weak
-/// algorithm names: `md4`, `md5`, `sha`, and `sha1` (see
-/// [`hashlib.algorithms_guaranteed`](https://docs.python.org/3/library/hashlib.html#hashlib.algorithms_guaranteed)).
+/// Note: This rule targets the following weak algorithm names in `hashlib`:
+/// `md4`, `md5`, `sha`, and `sha1`. It also flags uses of `crypt.crypt` and
+/// `crypt.mksalt` when configured with `METHOD_CRYPT`, `METHOD_MD5`, or
+/// `METHOD_BLOWFISH`.
+///
 /// It does not attempt to lint OpenSSL- or platform-specific aliases and OIDs
 /// (for example: `"sha-1"`, `"ssl3-sha1"`, `"ssl3-md5"`, or
 /// `"1.3.14.3.2.26"`), nor variations with trailing spaces, as the set of
@@ -67,7 +69,6 @@ use crate::rules::flake8_bandit::helpers::string_literal;
 /// ## References
 /// - [Python documentation: `hashlib` — Secure hashes and message digests](https://docs.python.org/3/library/hashlib.html)
 /// - [Python documentation: `crypt` — Function to check Unix passwords](https://docs.python.org/3/library/crypt.html)
-/// - [Python documentation: `hashlib.algorithms_guaranteed`](https://docs.python.org/3/library/hashlib.html#hashlib.algorithms_guaranteed)
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
