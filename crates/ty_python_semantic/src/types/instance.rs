@@ -390,7 +390,7 @@ impl<'db> NominalInstanceType<'db> {
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
-                if result.union(db, compatible).is_always_satisfied() {
+                if result.union(db, &compatible).is_always_satisfied() {
                     return result;
                 }
             }

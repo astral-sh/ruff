@@ -132,7 +132,7 @@ where
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         for child in self {
-            if result.union(db, f(child)).is_always_satisfied() {
+            if result.union(db, &f(child)).is_always_satisfied() {
                 return result;
             }
         }
@@ -197,7 +197,7 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
-    pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
+    pub(crate) fn union(&mut self, db: &'db dyn Db, other: &Self) -> &Self {
         self.node = self.node.or(db, other.node).simplify(db);
         self
     }
@@ -230,7 +230,7 @@ impl<'db> ConstraintSet<'db> {
     /// already saturated.
     pub(crate) fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         if !self.is_always_satisfied() {
-            self.union(db, other());
+            self.union(db, &other());
         }
         self
     }
@@ -687,11 +687,7 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn for_each_constraint(
-        self,
-        db: &'db dyn Db,
-        f: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> (),
-    ) {
+    fn for_each_constraint(self, db: &'db dyn Db, f: &mut dyn FnMut(ConstrainedTypeVar<'db>)) {
         let Node::Interior(interior) = self else {
             return;
         };
@@ -1213,7 +1209,7 @@ impl<'db> SatisfiedClauses<'db> {
         }
 
         for i in 0..self.clauses.len() {
-            let (clause, rest) = self.clauses[..i + 1]
+            let (clause, rest) = self.clauses[..=i]
                 .split_last_mut()
                 .expect("index should be in range");
             clause.with_flipped_last_constraint(|clause| {
