@@ -18,6 +18,8 @@ use crate::checkers::ast::Checker;
 /// Python's asyncio runtime will emit a warning when a coroutine is not awaited.
 ///
 /// ## Examples
+///
+///
 /// ```python
 /// async def foo():
 ///     pass
@@ -28,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// async def foo():
 ///     pass
@@ -35,6 +38,7 @@ use crate::checkers::ast::Checker;
 ///
 /// async def bar():
 ///     await foo()
+/// ```
 ///
 /// ## Limitations
 ///
