@@ -958,6 +958,12 @@ impl<'db> InteriorNode<'db> {
                         SatisfiedConstraint::Positive(smaller_atom),
                         Node::AlwaysFalse,
                     );
+                    simplified = simplified.substitute_union(
+                        db,
+                        SatisfiedConstraint::Positive(larger_atom),
+                        SatisfiedConstraint::Negative(smaller_atom),
+                        Node::AlwaysTrue,
+                    );
                 }
 
                 let new_constraint = new_atom.constraint(db);
