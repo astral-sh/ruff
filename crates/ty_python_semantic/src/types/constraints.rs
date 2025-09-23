@@ -1070,9 +1070,25 @@ impl<'db> InteriorNode<'db> {
                         db,
                         SatisfiedConstraint::Positive(larger_atom),
                         SatisfiedConstraint::Positive(smaller_atom),
-                        Node::new_constraint(db, larger_atom),
+                        Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Positive(larger_atom),
+                        ),
                     ),
                 );
+                simplified.update_if_simpler(
+                    db,
+                    simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Negative(larger_atom),
+                        SatisfiedConstraint::Negative(smaller_atom),
+                        Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Negative(larger_atom),
+                        ),
+                    ),
+                );
+
                 simplified.update_if_simpler(
                     db,
                     simplified.substitute_intersection(
@@ -1088,16 +1104,60 @@ impl<'db> InteriorNode<'db> {
             let nested_constraint = nested_atom.constraint(db);
             match self_constraint.intersect(db, nested_constraint) {
                 Some(intersection) => {
+                    let intersection_constraint =
+                        ConstrainedTypeVar::new(db, typevar, intersection);
+                    let positive_intersection_node = Node::new_satisfied_constraint(
+                        db,
+                        SatisfiedConstraint::Positive(intersection_constraint),
+                    );
+                    let negative_intersection_node = Node::new_satisfied_constraint(
+                        db,
+                        SatisfiedConstraint::Negative(intersection_constraint),
+                    );
+
                     simplified.update_if_simpler(
                         db,
                         simplified.substitute_intersection(
                             db,
                             SatisfiedConstraint::Positive(self_atom),
                             SatisfiedConstraint::Positive(nested_atom),
-                            Node::new_constraint(
+                            positive_intersection_node,
+                        ),
+                    );
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_union(
+                            db,
+                            SatisfiedConstraint::Negative(self_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            negative_intersection_node,
+                        ),
+                    );
+
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_intersection(
+                            db,
+                            SatisfiedConstraint::Positive(self_atom),
+                            SatisfiedConstraint::Negative(nested_atom),
+                            Node::new_satisfied_constraint(
                                 db,
-                                ConstrainedTypeVar::new(db, typevar, intersection),
-                            ),
+                                SatisfiedConstraint::Positive(self_atom),
+                            )
+                            .and(db, negative_intersection_node),
+                        ),
+                    );
+                    simplified.update_if_simpler(
+                        db,
+                        simplified.substitute_intersection(
+                            db,
+                            SatisfiedConstraint::Negative(self_atom),
+                            SatisfiedConstraint::Positive(nested_atom),
+                            Node::new_satisfied_constraint(
+                                db,
+                                SatisfiedConstraint::Positive(nested_atom),
+                            )
+                            .and(db, negative_intersection_node),
                         ),
                     );
                 }
