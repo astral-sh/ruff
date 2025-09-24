@@ -8133,9 +8133,13 @@ impl<'db> BoundTypeVarInstance<'db> {
         match self.typevar(db).explicit_variance(db) {
             Some(explicit_variance) => explicit_variance.compose(polarity),
             None => match self.binding_context(db) {
-                BindingContext::Definition(definition) => binding_type(db, definition)
-                    .with_polarity(polarity)
-                    .variance_of(db, self),
+                BindingContext::Definition(definition) => {
+                    let type_inference = infer_definition_types(db, definition);
+                    type_inference
+                        .binding_type(definition)
+                        .with_polarity(polarity)
+                        .variance_of(db, self)
+                }
                 BindingContext::Synthetic => TypeVarVariance::Invariant,
             },
         }
