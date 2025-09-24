@@ -52,7 +52,7 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, bind_typevar, get_self_type,
+    GenericContext, PartialSpecialization, Specialization, bind_typevar, typing_self,
     walk_generic_context,
 };
 pub use crate::types::ide_support::{
@@ -5715,7 +5715,7 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let self_type = get_self_type(db, scope_id, typevar_binding_context, class);
+                    let self_type = typing_self(db, scope_id, typevar_binding_context, class);
                     Ok(self_type.map(Type::NonInferableTypeVar).unwrap_or(*self))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),

@@ -22,7 +22,7 @@ use super::{
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
-use crate::types::generics::{GenericContext, get_self_type, walk_generic_context};
+use crate::types::generics::{GenericContext, typing_self, walk_generic_context};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
@@ -1293,7 +1293,7 @@ impl<'db> Parameters<'db> {
                     let index = semantic_index(db, scope_id.file(db));
                     let class = nearest_enclosing_class(db, index, scope_id).unwrap();
                     Type::NonInferableTypeVar(
-                        get_self_type(db, scope_id, typevar_binding_context, class).unwrap(),
+                        typing_self(db, scope_id, typevar_binding_context, class).unwrap(),
                     )
                     .apply_type_mapping(
                         db,

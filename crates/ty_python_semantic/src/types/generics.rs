@@ -98,7 +98,8 @@ pub(crate) fn bind_typevar<'db>(
         })
 }
 
-pub(crate) fn get_self_type<'db>(
+/// Create a `typing.Self` type variable for a given class.
+pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
@@ -106,11 +107,10 @@ pub(crate) fn get_self_type<'db>(
 ) -> Option<BoundTypeVarInstance<'db>> {
     let index = semantic_index(db, scope_id.file(db));
 
-    let class_definition = class.definition(db);
     let typevar = TypeVarInstance::new(
         db,
         ast::name::Name::new_static("Self"),
-        Some(class_definition),
+        Some(class.definition(db)),
         Some(
             TypeVarBoundOrConstraints::UpperBound(Type::instance(
                 db,
@@ -125,6 +125,7 @@ pub(crate) fn get_self_type<'db>(
         None,
         TypeVarKind::TypingSelf,
     );
+
     bind_typevar(
         db,
         index,
