@@ -112,3 +112,7 @@ has_access_dataset
 # airflow.www.utils
 get_sensitive_variables_fields
 should_hide_value_for_key
+
+from airflow.datasets import DatasetEvent
+
+DatasetEvent
