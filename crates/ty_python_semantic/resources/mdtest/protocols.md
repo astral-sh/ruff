@@ -1769,6 +1769,9 @@ class P(Protocol):
 class NominalSubtype:
     def m(self, y: int) -> None: ...
 
+class NominalSubtype2:
+    def m(self, *args: object) -> None: ...
+
 class NotSubtype:
     def m(self, x: int) -> int:
         return 42
@@ -1785,18 +1788,24 @@ class DefinitelyNotSubtype:
     m = None
 
 static_assert(is_subtype_of(NominalSubtype, P))
+static_assert(is_subtype_of(NominalSubtype2, P))
+static_assert(is_subtype_of(NominalSubtype | NominalSubtype2, P))
 static_assert(not is_assignable_to(DefinitelyNotSubtype, P))
 static_assert(not is_assignable_to(NotSubtype, P))
+static_assert(not is_assignable_to(NominalSubtype | NotSubtype, P))
+static_assert(not is_assignable_to(NominalSubtype2 | DefinitelyNotSubtype, P))
 
 # `m` has the correct signature when accessed on instances of `NominalWithClassMethod`,
 # but not when accessed on the class object `NominalWithClassMethod` itself
 #
-# TODO: this should pass
+# TODO: these should pass
 static_assert(not is_assignable_to(NominalWithClassMethod, P))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalSubtype | NominalWithClassMethod, P))  # error: [static-assert-error]
 
 # Conversely, `m` has the correct signature when accessed on the class object
 # `NominalWithStaticMethod`, but not when accessed on instances of `NominalWithStaticMethod`
 static_assert(not is_assignable_to(NominalWithStaticMethod, P))
+static_assert(not is_assignable_to(NominalSubtype | NominalWithStaticMethod, P))
 ```
 
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
@@ -2112,6 +2121,7 @@ static_assert(is_subtype_of(NClassMethodGood, PClassMethod))  # error: [static-a
 static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))  # error: [static-assert-error]
 
 static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
 static_assert(is_assignable_to(NStaticMethodGood, PStaticMethod))
@@ -2120,6 +2130,7 @@ static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))  # error: [static-
 static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
 ```
 
 ## Equivalence of protocols with method or property members
