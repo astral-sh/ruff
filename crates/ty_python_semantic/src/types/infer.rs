@@ -86,10 +86,14 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Sc
 fn scope_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &ScopeInference<'db>,
-    _count: u32,
-    _scope: ScopeId<'db>,
+    count: u32,
+    scope: ScopeId<'db>,
 ) -> salsa::CycleRecoveryAction<ScopeInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    if count == ITERATIONS_BEFORE_FALLBACK {
+        salsa::CycleRecoveryAction::Fallback(ScopeInference::cycle_fallback(scope))
+    } else {
+        salsa::CycleRecoveryAction::Iterate
+    }
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
@@ -589,6 +593,17 @@ impl<'db> ScopeInference<'db> {
             scope,
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_recovery: Some(CycleRecovery::Initial),
+                ..ScopeInferenceExtra::default()
+            })),
+            expressions: FxHashMap::default(),
+        }
+    }
+
+    fn cycle_fallback(scope: ScopeId<'db>) -> Self {
+        Self {
+            scope,
+            extra: Some(Box::new(ScopeInferenceExtra {
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
