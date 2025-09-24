@@ -20,7 +20,7 @@ use crate::types::{
     HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
     KnownInstanceType, MaterializationKind, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
     Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, binding_type, declaration_type, undecorated_type,
+    TypeVarVariance, UnionType, binding_type, declaration_type, infer_definition_types,
 };
 use crate::{Db, FxOrderSet};
 
@@ -43,7 +43,8 @@ fn enclosing_generic_contexts<'db>(
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function.node(module));
-                undecorated_type(db, definition)
+                infer_definition_types(db, definition)
+                    .undecorated_type()
                     .expect("function should have undecorated type")
                     .into_function_literal()?
                     .last_definition_signature(db)

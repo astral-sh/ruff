@@ -253,7 +253,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
-fn dynamic_elements_ordering<'db>(left: DynamicType<'db>, right: DynamicType<'db>) -> Ordering {
+fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering {
     match (left, right) {
         (DynamicType::Any, _) => Ordering::Less,
         (_, DynamicType::Any) => Ordering::Greater,
@@ -276,7 +276,9 @@ fn dynamic_elements_ordering<'db>(left: DynamicType<'db>, right: DynamicType<'db
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
 
-        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => left.cmp(&right),
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
+            left.scope.cmp(&right.scope)
+        }
         (DynamicType::Divergent(_), _) => Ordering::Less,
         (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }

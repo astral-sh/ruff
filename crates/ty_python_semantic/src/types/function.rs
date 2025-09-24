@@ -79,8 +79,8 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DivergenceKind, DivergentType, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
+    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
     RecursiveTypeNormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type,
     TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, todo_type,
     walk_generic_context, walk_type_mapping,
@@ -97,10 +97,7 @@ fn return_type_cycle_recover<'db>(
 }
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent(DivergentType::new(
-        db,
-        DivergenceKind::InferReturnType(function.literal(db).last_definition(db).body_scope(db)),
-    )))
+    Type::divergent(function.literal(db).last_definition(db).body_scope(db))
 }
 
 /// A collection of useful spans for annotating functions.

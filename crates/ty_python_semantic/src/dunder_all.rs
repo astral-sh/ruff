@@ -6,8 +6,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 
-use crate::semantic_index::global_scope;
-use crate::types::{Truthiness, Type, infer_scope_expression_type};
+use crate::semantic_index::{SemanticIndex, semantic_index};
+use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
 use crate::{Db, ModuleName, resolve_module};
 
 #[allow(clippy::ref_option)]
@@ -31,7 +31,8 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
     let module = parsed_module(db, file).load(db);
-    let mut collector = DunderAllNamesCollector::new(db, file);
+    let index = semantic_index(db, file);
+    let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
     collector.into_names()
 }
@@ -40,6 +41,9 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name
 struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
     file: File,
+
+    /// The semantic index for the module.
+    index: &'db SemanticIndex<'db>,
 
     /// The origin of the `__all__` variable in the current module, [`None`] if it is not defined.
     origin: Option<DunderAllOrigin>,
@@ -53,10 +57,11 @@ struct DunderAllNamesCollector<'db> {
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: File, index: &'db SemanticIndex<'db>) -> Self {
         Self {
             db,
             file,
+            index,
             origin: None,
             invalid: false,
             names: FxHashSet::default(),
@@ -177,7 +182,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        infer_scope_expression_type(self.db, global_scope(self.db, self.file), expr)
+        infer_expression_types(self.db, self.index.expression(expr), TypeContext::default())
+            .expression_type(expr)
     }
 
     /// Evaluate the given expression and return its truthiness.

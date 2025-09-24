@@ -2281,24 +2281,6 @@ class B:
 
 reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
-
-class Base:
-    def flip(self) -> "Sub":
-        return Sub()
-
-class Sub(Base):
-    # TODO invalid override error
-    def flip(self) -> "Base":
-        return Base()
-
-class C2:
-    def __init__(self, x: Sub):
-        self.x = x
-
-    def replace_with(self, other: "C2"):
-        self.x = other.x.flip()
-
-reveal_type(C2(Sub()).x)  # revealed: Unknown | Base
 ```
 
 This case additionally tests our union/intersection simplification logic:

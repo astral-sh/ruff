@@ -12,7 +12,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
-use crate::types::{Type, binding_type, infer_scope_expression_type};
+use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
@@ -363,7 +363,7 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.expression_scope_id(self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        infer_scope_expression_type(model.db, scope, *self)
+        infer_scope_types(model.db, scope).expression_type(*self)
     }
 }
 
