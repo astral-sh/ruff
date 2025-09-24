@@ -24,6 +24,7 @@ import SourceEditor from "./SourceEditor";
 import Diagnostics from "./Diagnostics";
 import { editor } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
+import { PositionEncoding } from "ty_wasm";
 
 type Tab = "Source" | "Settings";
 
@@ -173,7 +174,7 @@ export default function Editor({
 
     try {
       const config = JSON.parse(settingsSource);
-      const workspace = new Workspace(config);
+      const workspace = new Workspace(config, PositionEncoding.Utf16);
       const diagnostics = workspace.check(pythonSource);
 
       let secondary: SecondaryPanelResult = null;

@@ -9,7 +9,7 @@ use ruff_wasm::{ExpandedMessage, Location, PositionEncoding, Workspace};
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
         let config = js_sys::JSON::parse($config).unwrap();
-        match Workspace::new(config, Some(PositionEncoding::Utf8))
+        match Workspace::new(config, PositionEncoding::Utf8)
             .unwrap()
             .check($source)
         {

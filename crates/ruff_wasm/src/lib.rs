@@ -19,7 +19,7 @@ use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pret
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineColumn, OneIndexed, PositionEncoding as SourcePositionEncoding};
+use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
@@ -127,10 +127,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        options: JsValue,
-        position_encoding: Option<PositionEncoding>,
-    ) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -141,7 +138,7 @@ impl Workspace {
 
         Ok(Workspace {
             settings,
-            position_encoding: position_encoding.unwrap_or_default().into(),
+            position_encoding: position_encoding.into(),
         })
     }
 
@@ -237,41 +234,28 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
-                let start_loc = source_code.source_location(range.start(), self.position_encoding);
-                let end_loc = source_code.source_location(range.end(), self.position_encoding);
-
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
                     message: msg.body().to_string(),
-                    start_location: Location {
-                        row: start_loc.line,
-                        column: start_loc.character_offset,
-                    },
-                    end_location: Location {
-                        row: end_loc.line,
-                        column: end_loc.character_offset,
-                    },
+                    start_location: source_code
+                        .source_location(range.start(), self.position_encoding)
+                        .into(),
+                    end_location: source_code
+                        .source_location(range.end(), self.position_encoding)
+                        .into(),
                     fix: msg.fix().map(|fix| ExpandedFix {
                         message: msg.first_help_text().map(ToString::to_string),
                         edits: fix
                             .edits()
                             .iter()
-                            .map(|edit| {
-                                let s = source_code
-                                    .source_location(edit.start(), self.position_encoding);
-                                let e =
-                                    source_code.source_location(edit.end(), self.position_encoding);
-                                ExpandedEdit {
-                                    location: Location {
-                                        row: s.line,
-                                        column: s.character_offset,
-                                    },
-                                    end_location: Location {
-                                        row: e.line,
-                                        column: e.character_offset,
-                                    },
-                                    content: edit.content().map(ToString::to_string),
-                                }
+                            .map(|edit| ExpandedEdit {
+                                location: source_code
+                                    .source_location(edit.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(edit.end(), self.position_encoding)
+                                    .into(),
+                                content: edit.content().map(ToString::to_string),
                             })
                             .collect(),
                     }),
@@ -358,14 +342,18 @@ impl<'a> ParsedModule<'a> {
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Location {
     pub row: OneIndexed,
+    /// The character offset from the start of the line.
+    ///
+    /// The semantic of the offset depends on the [`PositionEncoding`] used when creating
+    /// the [`Workspace`].
     pub column: OneIndexed,
 }
 
-impl From<LineColumn> for Location {
-    fn from(value: LineColumn) -> Self {
+impl From<SourceLocation> for Location {
+    fn from(value: SourceLocation) -> Self {
         Self {
             row: value.line,
-            column: value.column,
+            column: value.character_offset,
         }
     }
 }
