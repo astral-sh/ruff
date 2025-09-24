@@ -14,9 +14,8 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasDivergentTypeVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    NormalizedVisitor, RecursiveTypeNormalizedVisitor, TypeMapping, TypeRelation,
-    VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -749,18 +748,6 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
-    }
-
-    pub(super) fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.inner
-            .interface(db)
-            .members(db)
-            .any(|member| member.ty().has_divergent_type_impl(db, div, visitor))
     }
 }
 

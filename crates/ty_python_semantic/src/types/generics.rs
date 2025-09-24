@@ -16,11 +16,11 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-    HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    KnownInstanceType, MaterializationKind, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, binding_type, declaration_type, infer_definition_types,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    infer_definition_types,
 };
 use crate::{Db, FxOrderSet};
 
@@ -987,20 +987,6 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
-    }
-
-    pub(crate) fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.types(db)
-            .iter()
-            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
-            || self
-                .tuple_inner(db)
-                .is_some_and(|tuple| tuple.has_divergent_type_impl(db, div, visitor))
     }
 }
 
