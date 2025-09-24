@@ -1265,63 +1265,51 @@ impl<'db> Parameters<'db> {
                 method_type: method,
                 class_type: class,
             }) = method_info
+                && !is_staticmethod
+                && !is_classmethod
+                && arg.parameter.annotation().is_none()
+                && parameters.index(arg.name().id()) == Some(0)
             {
-                if !is_staticmethod
-                    && !is_classmethod
-                    && arg.parameter.annotation().is_none()
-                    && parameters.index(arg.name().id()) == Some(0)
+                let method_has_self_in_generic_context =
+                    method.signature(db).overloads.iter().any(|s| {
+                        if let Some(context) = s.generic_context {
+                            context
+                                .variables(db)
+                                .iter()
+                                .any(|v| v.typevar(db).kind(db) == TypeVarKind::TypingSelf);
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                let implicit_annotation = if !method_has_self_in_generic_context
+                    && class.is_not_generic()
+                    && !class.known(db).is_some_and(KnownClass::is_fallback_class)
                 {
-                    let method_has_self_in_generic_context =
-                        method.signature(db).overloads.iter().any(|s| {
-                            if let Some(context) = s.generic_context {
-                                context
-                                    .variables(db)
-                                    .iter()
-                                    .any(|v| v.typevar(db).kind(db) == TypeVarKind::TypingSelf);
-                                true
-                            } else {
-                                false
-                            }
-                        });
-                    let implicit_annotation = if !method_has_self_in_generic_context
-                        && class.is_not_generic()
-                        && !class.known(db).is_some_and(KnownClass::is_fallback_class)
-                    {
-                        Type::instance(db, class)
-                    } else {
-                        let scope_id = definition.scope(db);
-                        let typevar_binding_context = Some(definition);
-                        let index = semantic_index(db, scope_id.file(db));
-                        let class = nearest_enclosing_class(db, index, scope_id).unwrap();
-                        Type::NonInferableTypeVar(
-                            get_self_type(db, scope_id, typevar_binding_context, class).unwrap(),
-                        )
-                        .apply_type_mapping(
-                            db,
-                            &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
-                                definition,
-                            ))),
-                        )
-                    };
-                    Parameter {
-                        annotated_type: Some(implicit_annotation),
-                        inferred_annotation: true,
-                        kind: ParameterKind::PositionalOrKeyword {
-                            name: arg.parameter.name.id.clone(),
-                            default_type: default_type(arg),
-                        },
-                        form: ParameterForm::Value,
-                    }
+                    Type::instance(db, class)
                 } else {
-                    Parameter::from_node_and_kind(
-                        db,
-                        definition,
-                        &arg.parameter,
-                        ParameterKind::PositionalOrKeyword {
-                            name: arg.parameter.name.id.clone(),
-                            default_type: default_type(arg),
-                        },
+                    let scope_id = definition.scope(db);
+                    let typevar_binding_context = Some(definition);
+                    let index = semantic_index(db, scope_id.file(db));
+                    let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+                    Type::NonInferableTypeVar(
+                        get_self_type(db, scope_id, typevar_binding_context, class).unwrap(),
                     )
+                    .apply_type_mapping(
+                        db,
+                        &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                            definition,
+                        ))),
+                    )
+                };
+                Parameter {
+                    annotated_type: Some(implicit_annotation),
+                    inferred_annotation: true,
+                    kind: ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                    form: ParameterForm::Value,
                 }
             } else {
                 Parameter::from_node_and_kind(
