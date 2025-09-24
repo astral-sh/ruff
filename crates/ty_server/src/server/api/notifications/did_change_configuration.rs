@@ -23,11 +23,15 @@ impl SyncNotificationHandler for DidChangeConfiguration {
         //see https://github.com/microsoft/language-server-protocol/issues/676
         assert!(params.settings.is_null());
 
-        let urls = session.workspaces().urls().cloned().collect::<Vec<_>>();
+        let _urls = session.workspaces().urls().cloned().collect::<Vec<_>>();
 
+        let w_settings = session.workspaces().into_iter().map(|item| {
+            let (_, workspaces) = item;
+            workspaces.settings()
+        });
         tracing::info!("GLOBAL: {:?}", session.global_settings());
         tracing::info!("INIT: {:?}", session.initialization_options());
-        tracing::info!("WORKSPACES: {:?}", urls);
+        tracing::info!("WORKSPACES: {:?}", w_settings);
         Ok(())
-    } 
+    }
 }
