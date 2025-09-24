@@ -27,16 +27,16 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, TypeVarKind,
-    VarianceInferable, todo_type,
+    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
 #[derive(Clone, Copy, Debug)]
 struct MethodInformation<'db> {
-    method_type: FunctionType<'db>,
-    class_type: ClassType<'db>,
+    method: FunctionType<'db>,
+    class: ClassType<'db>,
 }
 
 fn infer_method_information<'db>(
@@ -50,7 +50,7 @@ fn infer_method_information<'db>(
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
     let class_node = class_scope.node().as_class()?;
 
-    let method_type = infer_definition_types(db, definition)
+    let method = infer_definition_types(db, definition)
         .declaration_type(definition)
         .inner_type()
         .into_function_literal()?;
@@ -59,12 +59,9 @@ fn infer_method_information<'db>(
     let class_literal = infer_definition_types(db, class_def)
         .declaration_type(class_def)
         .inner_type();
-    let class_type = class_literal.to_class_type(db)?;
+    let class = class_literal.to_class_type(db)?;
 
-    Some(MethodInformation {
-        method_type,
-        class_type,
-    })
+    Some(MethodInformation { method, class })
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -1257,16 +1254,12 @@ impl<'db> Parameters<'db> {
             );
         }
         let method_info = infer_method_information(db, definition);
-        let is_classmethod = method_info.is_some_and(|f| f.method_type.is_classmethod(db));
-        let is_staticmethod = method_info.is_some_and(|f| f.method_type.is_staticmethod(db));
+        let is_static_or_classmethod = method_info
+            .is_some_and(|f| f.method.is_staticmethod(db) || f.method.is_classmethod(db));
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
-            if let Some(MethodInformation {
-                method_type: method,
-                class_type: class,
-            }) = method_info
-                && !is_staticmethod
-                && !is_classmethod
+            if let Some(MethodInformation { method, class }) = method_info
+                && !is_static_or_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
@@ -1276,18 +1269,16 @@ impl<'db> Parameters<'db> {
                             context
                                 .variables(db)
                                 .iter()
-                                .any(|v| v.typevar(db).kind(db) == TypeVarKind::TypingSelf);
-                            true
+                                .any(|v| v.typevar(db).is_self(db))
                         } else {
                             false
                         }
                     });
-                let implicit_annotation = if !method_has_self_in_generic_context
-                    && class.is_not_generic()
-                    && !class.known(db).is_some_and(KnownClass::is_fallback_class)
+
+                let inferred_annotation = if method_has_self_in_generic_context
+                    || class.is_generic()
+                    || class.known(db).is_some_and(KnownClass::is_fallback_class)
                 {
-                    Type::instance(db, class)
-                } else {
                     let scope_id = definition.scope(db);
                     let typevar_binding_context = Some(definition);
                     let index = semantic_index(db, scope_id.file(db));
@@ -1301,9 +1292,15 @@ impl<'db> Parameters<'db> {
                             definition,
                         ))),
                     )
+                } else {
+                    // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
+                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
+                    // be the only type variable, so we can just use the class directly.
+                    Type::instance(db, class)
                 };
+
                 Parameter {
-                    annotated_type: Some(implicit_annotation),
+                    annotated_type: Some(inferred_annotation),
                     inferred_annotation: true,
                     kind: ParameterKind::PositionalOrKeyword {
                         name: arg.parameter.name.id.clone(),
