@@ -156,4 +156,6 @@ help: Replace with `callable()`
    - assert hasattr(A(), "__call__")
 53 + assert callable(A())
 54 | assert callable(A()) is False
+55 | 
+56 | # https://github.com/astral-sh/ruff/issues/20440
 note: This is an unsafe fix and may change runtime behavior

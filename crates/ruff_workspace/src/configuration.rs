@@ -158,9 +158,7 @@ impl Configuration {
                 .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
             if !required_version.contains(&ruff_pkg_version) {
                 return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    required_version,
-                    RUFF_PKG_VERSION
+                    "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
                 ));
             }
         }

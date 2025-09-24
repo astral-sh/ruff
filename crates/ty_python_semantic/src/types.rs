@@ -7,7 +7,7 @@ use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{
-    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -19,12 +19,13 @@ use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::cyclic::{CycleDetector, PairVisitor, TypeTransformer};
+pub use self::cyclic::CycleDetector;
+pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
-    TypeContext, infer_deferred_types, infer_expression_type, infer_scope_expression_type,
-    static_expression_truthiness,
+    TypeContext, infer_deferred_types, infer_expression_type, infer_isolated_expression,
+    infer_scope_expression_type, static_expression_truthiness,
 };
 use self::infer::{infer_definition_types, infer_expression_types, infer_scope_types};
 pub(crate) use self::signatures::{CallableSignature, Signature};
@@ -56,14 +57,16 @@ use crate::types::generics::{
     walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
-    CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
-    definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
-    definitions_for_name, find_active_signature_from_details, inlay_hint_function_argument_details,
+    CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
+    definition_kind_for_name, definitions_for_attribute, definitions_for_imported_symbol,
+    definitions_for_keyword_argument, definitions_for_name, find_active_signature_from_details,
+    inlay_hint_function_argument_details,
 };
 use crate::types::infer::InferExpression;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
-use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
+pub(crate) use crate::types::signatures::{Parameter, Parameters};
+use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::TupleSpec;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
@@ -1261,7 +1264,26 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
             Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
+            Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
             Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
+            _ => None,
+        }
+    }
+
+    /// If this type is a literal, promote it to a type that this literal is an instance of.
+    ///
+    /// Note that this function tries to promote literals to a more user-friendly form than their
+    /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
+    /// as opposed to `FunctionType`.
+    pub(crate) fn literal_promotion_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
+            Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
+            Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
+            Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
+            Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
+            Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
+            Type::FunctionLiteral(literal) => Some(Type::Callable(literal.into_callable_type(db))),
             _ => None,
         }
     }
@@ -1797,9 +1819,16 @@ impl<'db> Type<'db> {
                     })
             }
 
+            (Type::TypeVar(_), _) if relation.is_assignability() => {
+                // The implicit lower bound of a typevar is `Never`, which means
+                // that it is always assignable to any other type.
+
+                // TODO: record the unification constraints
+
+                ConstraintSet::from(true)
+            }
+
             // `Never` is the bottom type, the empty set.
-            // Other than one unlikely edge case (TypeVars bound to `Never`),
-            // no other type is a subtype of or assignable to `Never`.
             (_, Type::Never) => ConstraintSet::from(false),
 
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
@@ -1835,6 +1864,22 @@ impl<'db> Type<'db> {
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
             (_, Type::NonInferableTypeVar(_)) => ConstraintSet::from(false),
+
+            (_, Type::TypeVar(typevar))
+                if relation.is_assignability()
+                    && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
+                        !self
+                            .has_relation_to_impl(db, bound, relation, visitor)
+                            .is_never_satisfied()
+                    }) =>
+            {
+                // TODO: record the unification constraints
+
+                typevar
+                    .typevar(db)
+                    .upper_bound(db)
+                    .when_none_or(|bound| self.has_relation_to_impl(db, bound, relation, visitor))
+            }
 
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
@@ -1928,17 +1973,12 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
                 | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_),
+                | Type::EnumLiteral(_)
+                | Type::FunctionLiteral(_),
                 _,
             ) => (self.literal_fallback_instance(db)).when_some_and(|instance| {
                 instance.has_relation_to_impl(db, target, relation, visitor)
             }),
-
-            // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
-            // so it also, for now, just delegates to its instance fallback.
-            (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
-                .to_instance(db)
-                .has_relation_to_impl(db, target, relation, visitor),
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => KnownClass::MethodType
@@ -2739,9 +2779,10 @@ impl<'db> Type<'db> {
                 other.is_disjoint_from_impl(db, KnownClass::ModuleType.to_instance(db), visitor)
             }
 
-            (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-                left.is_disjoint_from_impl(db, right, visitor)
-            }
+            (Type::NominalInstance(left), Type::NominalInstance(right)) => visitor
+                .visit((self, other), || {
+                    left.is_disjoint_from_impl(db, right, visitor)
+                }),
 
             (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
                 KnownClass::Property
@@ -4064,7 +4105,7 @@ impl<'db> Type<'db> {
                         });
                     }
 
-                    // Don't trust possibly unbound `__bool__` method.
+                    // Don't trust possibly missing `__bool__` method.
                     Ok(Truthiness::Ambiguous)
                 }
 
@@ -5076,7 +5117,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
             .match_parameters(db, argument_types)
-            .check_types(db, argument_types)
+            .check_types(db, argument_types, &TypeContext::default())
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -5125,7 +5166,7 @@ impl<'db> Type<'db> {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, argument_types)?;
+                    .check_types(db, argument_types, &TypeContext::default())?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -5930,13 +5971,25 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let instance = Type::instance(db, class.unknown_specialization(db));
+
+                    let upper_bound = Type::instance(
+                        db,
+                        class.apply_specialization(db, |generic_context| {
+                            let types = generic_context
+                                .variables(db)
+                                .iter()
+                                .map(|typevar| Type::NonInferableTypeVar(*typevar));
+
+                            generic_context.specialize(db, types.collect())
+                        }),
+                    );
+
                     let class_definition = class.definition(db);
                     let typevar = TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(instance).into()),
+                        Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
                         // According to the [spec], we can consider `Self`
                         // equivalent to an invariant type variable
                         // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
@@ -6261,8 +6314,9 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::MarkTypeVarsInferable(_) => self,
+                TypeMapping::PromoteLiterals
+                    | TypeMapping::BindLegacyTypevars(_)
+                    | TypeMapping::MarkTypeVarsInferable(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
                 Type::TypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
             }
@@ -6276,16 +6330,16 @@ impl<'db> Type<'db> {
                     partial.get(db, bound_typevar).unwrap_or(self)
                 }
                 TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                    if bound_typevar.binding_context(db) == *binding_context {
-                        Type::TypeVar(bound_typevar)
+                    if binding_context.is_none_or(|context| context == bound_typevar.binding_context(db)) {
+                        Type::TypeVar(bound_typevar.mark_typevars_inferable(db, visitor))
                     } else {
                         self
                     }
                 }
-                TypeMapping::PromoteLiterals |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { .. }
+                TypeMapping::PromoteLiterals
+                    | TypeMapping::BindLegacyTypevars(_)
+                    | TypeMapping::BindSelf(_)
+                    | TypeMapping::ReplaceSelf { .. }
                     => self,
                 TypeMapping::Materialize(materialization_kind)  => Type::NonInferableTypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
 
@@ -6305,7 +6359,13 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                Type::FunctionLiteral(function.with_type_mapping(db, type_mapping))
+                let function = Type::FunctionLiteral(function.with_type_mapping(db, type_mapping));
+
+                match type_mapping {
+                    TypeMapping::PromoteLiterals => function.literal_promotion_type(db)
+                        .expect("function literal should have a promotion type"),
+                    _ => function
+                }
             }
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
@@ -6411,8 +6471,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
-                TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
-                    .expect("literal type should have fallback instance type"),
+                TypeMapping::PromoteLiterals => self.literal_promotion_type(db)
+                    .expect("literal type should have a promotion type"),
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6953,6 +7013,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
+            Type::TypeIs(type_is_type) => type_is_type.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -6973,7 +7034,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
             | Type::NonInferableTypeVar(_)
-            | Type::TypeIs(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_) => TypeVarVariance::Bivariant,
         };
@@ -7017,8 +7077,8 @@ pub enum TypeMapping<'a, 'db> {
     Specialization(Specialization<'db>),
     /// Applies a partial specialization to the type
     PartialSpecialization(PartialSpecialization<'a, 'db>),
-    /// Promotes any literal types to their corresponding instance types (e.g. `Literal["string"]`
-    /// to `str`)
+    /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
+    /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     PromoteLiterals,
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
@@ -7027,8 +7087,17 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(Type<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
-    /// Marks the typevars that are bound by a generic class or function as inferable.
-    MarkTypeVarsInferable(BindingContext<'db>),
+    /// Marks type variables as inferable.
+    ///
+    /// When we create the signature for a generic function, we mark its type variables as inferable. Since
+    /// the generic function might reference type variables from enclosing generic scopes, we include the
+    /// function's binding context in order to only mark those type variables as inferable that are actually
+    /// bound by that function.
+    ///
+    /// When the parameter is set to `None`, *all* type variables will be marked as inferable. We use this
+    /// variant when descending into the bounds and/or constraints, and the default value of a type variable,
+    /// which may include nested type variables (`Self` has a bound of `C[T]` for a generic class `C[T]`).
+    MarkTypeVarsInferable(Option<BindingContext<'db>>),
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
 }
@@ -8095,6 +8164,43 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
+    fn mark_typevars_inferable(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        // Type variables can have nested type variables in their bounds, constraints, or default value.
+        // When we mark a type variable as inferable, we also mark all of these nested type variables as
+        // inferable, so we set the parameter to `None` here.
+        let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
+
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self._bound_or_constraints(db)
+                .map(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
+                        bound_or_constraints
+                            .mark_typevars_inferable(db, visitor)
+                            .into()
+                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
+                    | TypeVarBoundOrConstraintsEvaluation::LazyConstraints => bound_or_constraints,
+                }),
+            self.explicit_variance(db),
+            self._default(db).and_then(|default| match default {
+                TypeVarDefaultEvaluation::Eager(ty) => {
+                    Some(ty.apply_type_mapping_impl(db, type_mapping, visitor).into())
+                }
+                TypeVarDefaultEvaluation::Lazy => self
+                    .lazy_default(db)
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor).into()),
+            }),
+            self.kind(db),
+        )
+    }
+
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
         let bound_or_constraints = match self.bound_or_constraints(db)? {
             TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
@@ -8367,6 +8473,18 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    fn mark_typevars_inferable(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.typevar(db).mark_typevars_inferable(db, visitor),
+            self.binding_context(db),
+        )
+    }
+
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
         Some(Self::new(
             db,
@@ -8472,6 +8590,31 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
             }
         }
     }
+
+    fn mark_typevars_inferable(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
+
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.apply_type_mapping_impl(db, type_mapping, visitor),
+            ),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                    db,
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                ))
+            }
+        }
+    }
 }
 
 /// Error returned if a type is not awaitable.
@@ -8530,7 +8673,7 @@ impl<'db> AwaitError<'db> {
                 }
             }
             Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
-                diag.info("`__await__` is possibly unbound");
+                diag.info("`__await__` may be missing");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)
@@ -8637,7 +8780,7 @@ impl<'db> ContextManagerError<'db> {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
-                    format!("the method `{name}` is possibly unbound")
+                    format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
@@ -8654,7 +8797,7 @@ impl<'db> ContextManagerError<'db> {
                                          name_b: &str| {
             match (error_a, error_b) {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
-                    format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
+                    format!("the methods `{name_a}` and `{name_b}` are possibly missing")
                 }
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
@@ -9203,7 +9346,7 @@ pub(super) enum BoolError<'db> {
 
     /// Any other reason why the type can't be converted to a bool.
     /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
-    /// because `__bool__` points to a type that has a possibly unbound `__call__` method.
+    /// because `__bool__` points to a type that has a possibly missing `__call__` method.
     Other { not_boolable_type: Type<'db> },
 }
 
@@ -9376,7 +9519,7 @@ impl<'db> ConstructorCallError<'db> {
         let report_init_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
             CallDunderError::MethodNotAvailable => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     // If we are using vendored typeshed, it should be impossible to have missing
                     // or unbound `__init__` method on a class, as all classes have `object` in MRO.
@@ -9390,10 +9533,10 @@ impl<'db> ConstructorCallError<'db> {
             }
             CallDunderError::PossiblyUnbound(bindings) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__init__` on type `{}` is possibly unbound.",
+                        "Method `__init__` on type `{}` may be missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }
@@ -9408,10 +9551,10 @@ impl<'db> ConstructorCallError<'db> {
         let report_new_error = |error: &DunderNewCallError<'db>| match error {
             DunderNewCallError::PossiblyUnbound(call_error) => {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Method `__new__` on type `{}` is possibly unbound.",
+                        "Method `__new__` on type `{}` may be missing.",
                         context_expression_type.display(context.db()),
                     ));
                 }
@@ -10649,7 +10792,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
@@ -11722,6 +11865,16 @@ impl<'db> TypeIsType<'db> {
 
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_some()
+    }
+}
+
+impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
+    // See the [typing spec] on why `TypeIs` is invariant in its type.
+    // [typing spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.return_type(db)
+            .with_polarity(TypeVarVariance::Invariant)
+            .variance_of(db, typevar)
     }
 }
 

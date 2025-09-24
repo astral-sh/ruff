@@ -1530,7 +1530,7 @@ if flag():
 ```
 
 ```py
-# error: [possibly-unbound-import]
+# error: [possibly-missing-import]
 from module import symbol
 ```
 

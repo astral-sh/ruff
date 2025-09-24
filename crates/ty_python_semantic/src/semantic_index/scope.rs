@@ -29,10 +29,6 @@ pub struct ScopeId<'db> {
 impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
-    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_function_like()
-    }
-
     pub(crate) fn is_non_lambda_function(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_non_lambda_function()
     }

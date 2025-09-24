@@ -20,8 +20,14 @@ pub const MAGIC_GLOBALS: &[&str] = &[
     "__annotations__",
     "__builtins__",
     "__cached__",
+    "__warningregistry__",
     "__file__",
 ];
+
+/// Magic globals that are only available starting in specific Python versions.
+///
+/// `__annotate__` was introduced in Python 3.14.
+static PY314_PLUS_MAGIC_GLOBALS: &[&str] = &["__annotate__"];
 
 static ALWAYS_AVAILABLE_BUILTINS: &[&str] = &[
     "ArithmeticError",
@@ -213,6 +219,21 @@ pub fn python_builtins(minor_version: u8, is_notebook: bool) -> impl Iterator<It
         .chain(ipython_builtins)
         .flatten()
         .chain(ALWAYS_AVAILABLE_BUILTINS)
+        .copied()
+}
+
+/// Return the list of magic globals for the given Python minor version.
+pub fn python_magic_globals(minor_version: u8) -> impl Iterator<Item = &'static str> {
+    let py314_magic_globals = if minor_version >= 14 {
+        Some(PY314_PLUS_MAGIC_GLOBALS)
+    } else {
+        None
+    };
+
+    py314_magic_globals
+        .into_iter()
+        .flatten()
+        .chain(MAGIC_GLOBALS)
         .copied()
 }
 

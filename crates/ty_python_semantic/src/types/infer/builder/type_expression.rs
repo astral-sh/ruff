@@ -7,14 +7,14 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
 };
 use crate::types::enums::is_enum_class;
-use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
+    LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeIsType, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions

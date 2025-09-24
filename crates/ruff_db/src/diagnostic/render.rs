@@ -31,7 +31,7 @@ use pylint::PylintRenderer;
 mod azure;
 mod concise;
 mod full;
-mod github;
+pub mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
 #[cfg(feature = "serde")]
@@ -145,7 +145,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
             }
         }
 

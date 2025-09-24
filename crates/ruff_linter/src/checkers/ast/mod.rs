@@ -56,7 +56,7 @@ use ruff_python_semantic::{
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
     SemanticModelFlags, StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
+use ruff_python_stdlib::builtins::{python_builtins, python_magic_globals};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -277,7 +277,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer: Importer::new(parsed, locator, stylist),
+            importer: Importer::new(parsed, locator.contents(), stylist),
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -2550,7 +2550,7 @@ impl<'a> Checker<'a> {
         for builtin in standard_builtins {
             bind_builtin(builtin);
         }
-        for builtin in MAGIC_GLOBALS {
+        for builtin in python_magic_globals(target_version.minor) {
             bind_builtin(builtin);
         }
         for builtin in &settings.builtins {

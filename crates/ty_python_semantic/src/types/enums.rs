@@ -6,8 +6,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy, Type,
-        TypeQualifiers,
+        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
+        StringLiteralType, Type, TypeQualifiers,
     },
 };
 
@@ -77,12 +77,14 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
+    let is_str_enum =
+        Type::ClassLiteral(class).is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db));
+
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
-    // TODO: handle `StrEnum` which uses lowercase names as values when using `auto()`.
     let mut auto_counter = 0;
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
@@ -148,7 +150,14 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
-                                Some(Type::IntLiteral(auto_counter))
+                                Some(if is_str_enum {
+                                    Type::StringLiteral(StringLiteralType::new(
+                                        db,
+                                        name.to_lowercase().as_str(),
+                                    ))
+                                } else {
+                                    Type::IntLiteral(auto_counter)
+                                })
                             }
 
                             _ => None,

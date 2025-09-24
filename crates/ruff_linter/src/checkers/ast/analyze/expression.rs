@@ -669,6 +669,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::BlockingPathMethodInAsyncFunction) {
+                flake8_async::rules::blocking_os_path(checker, call);
+            }
             if checker.any_rule_enabled(&[
                 Rule::CreateSubprocessInAsyncFunction,
                 Rule::RunProcessInAsyncFunction,
@@ -717,7 +720,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::re_sub_positional_args(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnreliableCallableCheck) {
-                flake8_bugbear::rules::unreliable_callable_check(checker, expr, func, args);
+                flake8_bugbear::rules::unreliable_callable_check(
+                    checker, expr, func, args, keywords,
+                );
             }
             if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
@@ -739,6 +744,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::ZipWithoutExplicitStrict) {
                 if checker.target_version() >= PythonVersion::PY310 {
                     flake8_bugbear::rules::zip_without_explicit_strict(checker, call);
+                }
+            }
+            if checker.is_rule_enabled(Rule::MapWithoutExplicitStrict) {
+                if checker.target_version() >= PythonVersion::PY314 {
+                    flake8_bugbear::rules::map_without_explicit_strict(checker, call);
                 }
             }
             if checker.is_rule_enabled(Rule::NoExplicitStacklevel) {
@@ -1051,7 +1061,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsStat,
                 Rule::OsPathJoin,
                 Rule::OsPathSplitext,
-                Rule::BuiltinOpen,
                 Rule::PyPath,
                 Rule::Glob,
                 Rule::OsListdir,
@@ -1134,6 +1143,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsSymlink) {
                     flake8_use_pathlib::rules::os_symlink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::BuiltinOpen) {
+                    flake8_use_pathlib::rules::builtin_open(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                     flake8_use_pathlib::rules::path_constructor_current_directory(
@@ -1276,6 +1288,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryEmptyIterableWithinDequeCall) {
                 ruff::rules::unnecessary_literal_within_deque_call(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::LoggingEagerConversion) {
+                ruff::rules::logging_eager_conversion(checker, call);
             }
             if checker.is_rule_enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
