@@ -665,6 +665,57 @@ if __name__ == "__main__":
 }
 
 #[test]
+fn output_format_notebook() {
+    let args = ["format", "--no-cache", "--isolated", "--preview", "--check"];
+    let fixtures = Path::new("resources").join("test").join("fixtures");
+    let path = fixtures.join("unformatted.ipynb");
+    insta::with_settings!({filters => vec![
+        // Replace windows paths
+        (r"\\", "/"),
+    ]}, {
+        assert_cmd_snapshot!(
+            Command::new(get_cargo_bin(BIN_NAME)).args(args).arg(path),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        unformatted: File would be reformatted
+        --> resources/test/fixtures/unformatted.ipynb:cell 1:1:1
+         ::: cell 1
+        1 | import numpy
+          - maths = (numpy.arange(100)**2).sum()
+          - stats= numpy.asarray([1,2,3,4]).median()
+        2 + 
+        3 + maths = (numpy.arange(100) ** 2).sum()
+        4 + stats = numpy.asarray([1, 2, 3, 4]).median()
+         ::: cell 3
+        1 | # A cell with IPython escape command
+        2 | def some_function(foo, bar):
+        3 |     pass
+        4 + 
+        5 + 
+        6 | %matplotlib inline
+          ::: cell 4
+        1  | foo = %pwd
+           - def some_function(foo,bar,):
+        2  + 
+        3  + 
+        4  + def some_function(
+        5  +     foo,
+        6  +     bar,
+        7  + ):
+        8  |     # Another cell with IPython escape command
+        9  |     foo = %pwd
+        10 |     print(foo)
+
+        1 file would be reformatted
+
+        ----- stderr -----
+        ");
+    });
+}
+
+#[test]
 fn exit_non_zero_on_format() -> Result<()> {
     let tempdir = TempDir::new()?;
 

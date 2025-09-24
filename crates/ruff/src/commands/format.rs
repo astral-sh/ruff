@@ -17,6 +17,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
 use ruff_linter::settings::types::OutputFormat;
+use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
@@ -610,8 +611,8 @@ impl<'a> FormatResults<'a> {
         f: &mut impl Write,
         output_format: OutputFormat,
     ) -> io::Result<()> {
-        let notebook_index = FxHashMap::default();
-        let diagnostics: Vec<_> = self.to_diagnostics().collect();
+        let mut notebook_index = FxHashMap::default();
+        let diagnostics: Vec<_> = self.to_diagnostics(&mut notebook_index).collect();
 
         let context = EmitterContext::new(&notebook_index);
         let config = DisplayDiagnosticConfig::default();
@@ -752,7 +753,10 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Convert formatted files into [`Diagnostic`]s.
-    fn to_diagnostics(&self) -> impl Iterator<Item = Diagnostic> {
+    fn to_diagnostics(
+        &self,
+        notebook_index: &mut FxHashMap<String, NotebookIndex>,
+    ) -> impl Iterator<Item = Diagnostic> {
         self.results
             .iter()
             .filter_map(|result| {
@@ -771,11 +775,35 @@ impl<'a> FormatResults<'a> {
                 );
 
                 let path = result.path.to_string_lossy();
-                // For now, report the edit as a replacement of the whole file's contents.
-                let fix = Fix::safe_edit(Edit::range_replacement(
-                    formatted.source_code().to_string(),
-                    TextRange::up_to(unformatted.source_code().text_len()),
-                ));
+                // For now, report the edit as a replacement of the whole file's contents. For
+                // scripts, this is a single `Edit`, but notebook edits must be split by cell in
+                // order to render them as diffs.
+                let fix = if let SourceKind::IpyNotebook(formatted) = formatted
+                    && let SourceKind::IpyNotebook(unformatted) = unformatted
+                {
+                    notebook_index.insert(path.to_string(), unformatted.index().clone());
+
+                    let mut edits = formatted
+                        .cell_offsets()
+                        .ranges()
+                        .zip(unformatted.cell_offsets().ranges())
+                        .map(|(formatted_range, unformatted_range)| {
+                            let formatted = &formatted.source_code()[formatted_range];
+                            Edit::range_replacement(formatted.to_string(), unformatted_range)
+                        });
+
+                    Fix::safe_edits(
+                        edits
+                            .next()
+                            .expect("Formatted files must have at least one edit"),
+                        edits,
+                    )
+                } else {
+                    Fix::safe_edit(Edit::range_replacement(
+                        formatted.source_code().to_string(),
+                        TextRange::up_to(unformatted.source_code().text_len()),
+                    ))
+                };
 
                 let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
                 let span = Span::from(source_file);
