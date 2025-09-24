@@ -4271,6 +4271,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleLike
             | KnownClass::Template
+            | KnownClass::Path
             | KnownClass::ConstraintSet
             | KnownClass::InitVar => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
