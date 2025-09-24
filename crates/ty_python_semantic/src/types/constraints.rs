@@ -1014,6 +1014,27 @@ impl<'db> InteriorNode<'db> {
                         )
                         .and(db, negative_intersection_node),
                     );
+
+                    simplified = simplified.substitute_union(
+                        db,
+                        SatisfiedConstraint::Positive(left_atom),
+                        SatisfiedConstraint::Negative(right_atom),
+                        Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Negative(right_atom),
+                        )
+                        .or(db, positive_intersection_node),
+                    );
+                    simplified = simplified.substitute_union(
+                        db,
+                        SatisfiedConstraint::Negative(left_atom),
+                        SatisfiedConstraint::Positive(right_atom),
+                        Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Negative(left_atom),
+                        )
+                        .or(db, positive_intersection_node),
+                    );
                 }
                 None => {
                     /*
