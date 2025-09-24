@@ -1,4 +1,4 @@
-# Bidirectional Type Inference
+# Bidirectional type inference
 
 ty partially supports bidirectional type inference. This is a mechanism for inferring the type of an
 expression "from the outside in". Normally, type inference proceeds "from the inside out". That is,
@@ -46,6 +46,13 @@ def _(l: list[int] | None = None):
     l2: list[int] = l or list()
     # TODO: should be `list[int]`
     reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+
+def f[T](x: T, cond: bool) -> T | list[T]:
+    return x if cond else [x]
+
+# TODO: no error
+# error: [invalid-assignment] "Object of type `Literal[1] | list[Literal[1]]` is not assignable to `int | list[int]`"
+l5: int | list[int] = f(1, True)
 ```
 
 ```py
@@ -123,4 +130,10 @@ reveal_type(f("a"))  # revealed: list[str]
 
 async def g() -> list[int]:
     return list1(1)
+
+def h[T](x: T, cond: bool) -> T | list[T]:
+    return i(x, cond)
+
+def i[T](x: T, cond: bool) -> T | list[T]:
+    return x if cond else [x]
 ```

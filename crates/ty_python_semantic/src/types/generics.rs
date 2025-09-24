@@ -1088,6 +1088,11 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
+            (Type::Union(_), Type::Union(_)) => {
+                // TODO: We need to infer specializations appropriately.
+                // e.g.
+                // `formal: list[T] | T | U, actual: V | int | list[V]` => `T = V, U = int`
+            }
             (Type::Union(formal), _) => {
                 // TODO: We haven't implemented a full unification solver yet. If typevars appear
                 // in multiple union elements, we ideally want to express that _only one_ of them
