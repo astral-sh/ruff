@@ -13,6 +13,7 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::{EitherOrBoth, Itertools};
+use ruff_python_ast::ParameterWithDefault;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{
@@ -1222,16 +1223,83 @@ impl<'db> Parameters<'db> {
                 .map(|default| definition_expression_type(db, definition, default))
         };
 
+        let method_info = infer_method_information(db, definition);
+        let is_static_or_classmethod = method_info
+            .is_some_and(|f| f.method.is_staticmethod(db) || f.method.is_classmethod(db));
+
+        let inferred_annotation = |arg: &ParameterWithDefault| {
+            if let Some(MethodInformation { method, class }) = method_info
+                && !is_static_or_classmethod
+                && arg.parameter.annotation().is_none()
+                && parameters.index(arg.name().id()) == Some(0)
+                // TODO: find out why we break protocol type property tests when we include them here:
+                && !class.is_protocol(db)
+            {
+                let method_has_self_in_generic_context =
+                    method.signature(db).overloads.iter().any(|s| {
+                        if let Some(context) = s.generic_context {
+                            context
+                                .variables(db)
+                                .iter()
+                                .any(|v| v.typevar(db).is_self(db))
+                        } else {
+                            false
+                        }
+                    });
+
+                if method_has_self_in_generic_context
+                    || class.is_generic()
+                    || class.known(db).is_some_and(KnownClass::is_fallback_class)
+                {
+                    let scope_id = definition.scope(db);
+                    let typevar_binding_context = Some(definition);
+                    let index = semantic_index(db, scope_id.file(db));
+                    let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+
+                    Some(
+                        Type::NonInferableTypeVar(
+                            typing_self(db, scope_id, typevar_binding_context, class).unwrap(),
+                        )
+                        .apply_type_mapping(
+                            db,
+                            &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                                definition,
+                            ))),
+                        ),
+                    )
+                } else {
+                    // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
+                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
+                    // be the only type variable, so we can just use the class directly.
+                    Some(Type::instance(db, class))
+                }
+            } else {
+                None
+            }
+        };
+
         let pos_only_param = |param: &ast::ParameterWithDefault| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &param.parameter,
-                ParameterKind::PositionalOnly {
-                    name: Some(param.parameter.name.id.clone()),
-                    default_type: default_type(param),
-                },
-            )
+            if let Some(inferred_annotation_type) = inferred_annotation(param) {
+                return Parameter {
+                    annotated_type: Some(inferred_annotation_type),
+                    inferred_annotation: true,
+                    kind: ParameterKind::PositionalOnly {
+                        name: Some(param.parameter.name.id.clone()),
+                        default_type: default_type(param),
+                    },
+                    form: ParameterForm::Value,
+                };
+            } else {
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &param.parameter,
+                    ParameterKind::PositionalOnly {
+                        name: Some(param.parameter.name.id.clone()),
+                        default_type: default_type(param),
+                    },
+                )
+            }
         };
 
         let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
@@ -1253,54 +1321,11 @@ impl<'db> Parameters<'db> {
                     .map(pos_only_param),
             );
         }
-        let method_info = infer_method_information(db, definition);
-        let is_static_or_classmethod = method_info
-            .is_some_and(|f| f.method.is_staticmethod(db) || f.method.is_classmethod(db));
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
-            if let Some(MethodInformation { method, class }) = method_info
-                && !is_static_or_classmethod
-                && arg.parameter.annotation().is_none()
-                && parameters.index(arg.name().id()) == Some(0)
-            {
-                let method_has_self_in_generic_context =
-                    method.signature(db).overloads.iter().any(|s| {
-                        if let Some(context) = s.generic_context {
-                            context
-                                .variables(db)
-                                .iter()
-                                .any(|v| v.typevar(db).is_self(db))
-                        } else {
-                            false
-                        }
-                    });
-
-                let inferred_annotation = if method_has_self_in_generic_context
-                    || class.is_generic()
-                    || class.known(db).is_some_and(KnownClass::is_fallback_class)
-                {
-                    let scope_id = definition.scope(db);
-                    let typevar_binding_context = Some(definition);
-                    let index = semantic_index(db, scope_id.file(db));
-                    let class = nearest_enclosing_class(db, index, scope_id).unwrap();
-                    Type::NonInferableTypeVar(
-                        typing_self(db, scope_id, typevar_binding_context, class).unwrap(),
-                    )
-                    .apply_type_mapping(
-                        db,
-                        &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
-                            definition,
-                        ))),
-                    )
-                } else {
-                    // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
-                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
-                    // be the only type variable, so we can just use the class directly.
-                    Type::instance(db, class)
-                };
-
+            if let Some(inferred_annotation_type) = inferred_annotation(arg) {
                 Parameter {
-                    annotated_type: Some(inferred_annotation),
+                    annotated_type: Some(inferred_annotation_type),
                     inferred_annotation: true,
                     kind: ParameterKind::PositionalOrKeyword {
                         name: arg.parameter.name.id.clone(),

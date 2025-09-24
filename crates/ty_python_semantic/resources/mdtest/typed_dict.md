@@ -664,7 +664,7 @@ def combine(p: Person, e: Employee):
     reveal_type(e | e)  # revealed: Employee
 
     # TODO: Should be `Person` once we support subtyping for TypedDicts
-    reveal_type(p | e)  # revealed: Employee
+    reveal_type(p | e)  # revealed: Person | Employee
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
