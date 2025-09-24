@@ -1149,7 +1149,7 @@ impl Display for DisplayParameter<'_> {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
             if let Some(annotated_type) = self.param.annotated_type() {
-                if !self.param.has_synthetic_annotation() {
+                if self.param.should_annotation_be_displayed() {
                     write!(
                         f,
                         ": {}",
@@ -1168,7 +1168,7 @@ impl Display for DisplayParameter<'_> {
         } else if let Some(ty) = self.param.annotated_type() {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided.
-            if !self.param.has_synthetic_annotation() {
+            if self.param.should_annotation_be_displayed() {
                 ty.display_with(self.db, self.settings).fmt(f)?;
             }
         }

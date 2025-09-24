@@ -1308,7 +1308,7 @@ impl<'db> Parameters<'db> {
                     };
                     Parameter {
                         annotated_type: Some(implicit_annotation),
-                        synthetic_annotation: true,
+                        inferred_annotation: true,
                         kind: ParameterKind::PositionalOrKeyword {
                             name: arg.parameter.name.id.clone(),
                             default_type: default_type(arg),
@@ -1509,9 +1509,9 @@ pub(crate) struct Parameter<'db> {
     /// Annotated type of the parameter.
     annotated_type: Option<Type<'db>>,
 
-    /// If the type of parameter was inferred e.g. the first argument of a method has type
-    /// `typing.Self`.
-    synthetic_annotation: bool,
+    /// Does the type of this parameter come from an explicit annotation, or was it inferred from
+    /// the context, like `Self` for the `self` parameter of instance methods.
+    inferred_annotation: bool,
 
     kind: ParameterKind<'db>,
     pub(crate) form: ParameterForm,
@@ -1521,7 +1521,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
             annotated_type: None,
-            synthetic_annotation: false,
+            inferred_annotation: false,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -1533,7 +1533,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_or_keyword(name: Name) -> Self {
         Self {
             annotated_type: None,
-            synthetic_annotation: false,
+            inferred_annotation: false,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -1545,7 +1545,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn variadic(name: Name) -> Self {
         Self {
             annotated_type: None,
-            synthetic_annotation: false,
+            inferred_annotation: false,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -1554,7 +1554,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_only(name: Name) -> Self {
         Self {
             annotated_type: None,
-            synthetic_annotation: false,
+            inferred_annotation: false,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -1566,7 +1566,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_variadic(name: Name) -> Self {
         Self {
             annotated_type: None,
-            synthetic_annotation: false,
+            inferred_annotation: false,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -1605,7 +1605,7 @@ impl<'db> Parameter<'db> {
                 .annotated_type
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
             kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
-            synthetic_annotation: self.synthetic_annotation,
+            inferred_annotation: self.inferred_annotation,
             form: self.form,
         }
     }
@@ -1621,7 +1621,7 @@ impl<'db> Parameter<'db> {
     ) -> Self {
         let Parameter {
             annotated_type,
-            synthetic_annotation,
+            inferred_annotation,
             kind,
             form,
         } = self;
@@ -1665,7 +1665,7 @@ impl<'db> Parameter<'db> {
 
         Self {
             annotated_type: Some(annotated_type),
-            synthetic_annotation: *synthetic_annotation,
+            inferred_annotation: *inferred_annotation,
             kind,
             form: *form,
         }
@@ -1688,7 +1688,7 @@ impl<'db> Parameter<'db> {
             }),
             kind,
             form: ParameterForm::Value,
-            synthetic_annotation: false,
+            inferred_annotation: false,
         }
     }
 
@@ -1743,9 +1743,9 @@ impl<'db> Parameter<'db> {
         &self.kind
     }
 
-    /// Whether the type of the parameter was inferred.
-    pub(crate) fn has_synthetic_annotation(&self) -> bool {
-        self.synthetic_annotation
+    /// Whether or not the type of this parameter should be displayed.
+    pub(crate) fn should_annotation_be_displayed(&self) -> bool {
+        !self.inferred_annotation
     }
 
     /// Name of the parameter (if it has one).
