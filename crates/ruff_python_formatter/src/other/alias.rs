@@ -1,6 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::Alias;
 
+use crate::comments::trailing_comments;
 use crate::other::identifier::DotDelimitedIdentifier;
 use crate::prelude::*;
 
@@ -17,7 +18,18 @@ impl FormatNodeRule<Alias> for FormatAlias {
         } = item;
         DotDelimitedIdentifier::new(name).fmt(f)?;
         if let Some(asname) = asname {
-            write!(f, [space(), token("as"), space(), asname.format()])?;
+            let comments = f.context().comments().clone();
+            let dangling = comments.dangling(item);
+            write!(
+                f,
+                [
+                    space(),
+                    token("as"),
+                    space(),
+                    asname.format(),
+                    trailing_comments(dangling),
+                ]
+            )?;
         }
         Ok(())
     }
