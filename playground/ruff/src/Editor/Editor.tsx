@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Diagnostic, Workspace } from "ruff_wasm";
+import { Diagnostic, Workspace, PositionEncoding } from "ruff_wasm";
 import {
   ErrorMessage,
   Theme,
@@ -24,7 +24,6 @@ import SourceEditor from "./SourceEditor";
 import Diagnostics from "./Diagnostics";
 import { editor } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
-import { PositionEncoding } from "ty_wasm";
 
 type Tab = "Source" | "Settings";
 
