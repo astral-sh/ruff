@@ -1280,7 +1280,7 @@ impl<'db> Parameters<'db> {
 
         let pos_only_param = |param: &ast::ParameterWithDefault| {
             if let Some(inferred_annotation_type) = inferred_annotation(param) {
-                return Parameter {
+                Parameter {
                     annotated_type: Some(inferred_annotation_type),
                     inferred_annotation: true,
                     kind: ParameterKind::PositionalOnly {
@@ -1288,7 +1288,7 @@ impl<'db> Parameters<'db> {
                         default_type: default_type(param),
                     },
                     form: ParameterForm::Value,
-                };
+                }
             } else {
                 Parameter::from_node_and_kind(
                     db,
