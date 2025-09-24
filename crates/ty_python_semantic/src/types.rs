@@ -10075,7 +10075,7 @@ impl<'db> KnownBoundMethodType<'db> {
                     property.recursive_type_normalized(db, visitor),
                 )
             }
-            KnownBoundMethodType::StrStartswith(_) => self,
+            KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen => self,
         }
     }
 
