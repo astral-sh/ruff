@@ -86,7 +86,7 @@ mod deferred;
 
 /// State representing whether a docstring is expected or not for the next statement.
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum DocstringState {
+pub(crate) enum DocstringState {
     /// The next statement is expected to be a docstring, but not necessarily so.
     ///
     /// For example, in the following code:
@@ -127,7 +127,7 @@ impl DocstringState {
 
 /// The kind of an expected docstring.
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum ExpectedDocstringKind {
+pub(crate) enum ExpectedDocstringKind {
     /// A module-level docstring.
     ///
     /// For example,
@@ -601,6 +601,10 @@ impl<'a> Checker<'a> {
     /// `LintContext` in different analysis phases.
     pub(crate) const fn context(&self) -> &'a LintContext<'a> {
         self.context
+    }
+
+    pub(crate) fn current_docstring_state(&self) -> DocstringState {
+        self.docstring_state
     }
 }
 

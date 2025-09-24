@@ -3,13 +3,12 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::{from_relative_import, map_subscript};
+use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
-use crate::analyze::visibility;
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
@@ -1407,17 +1406,6 @@ impl<'a> SemanticModel<'a> {
             .expect("No statement found")
     }
 
-    /// Return the [`NodeId`] for the given [`Stmt`].
-    pub fn statement_id(&self, stmt: &ast::Stmt) -> Option<NodeId> {
-        match self.node_id {
-            Some(node_id) => self
-                .nodes
-                .ancestor_ids(node_id)
-                .find(|node| self.statement(*node) == stmt),
-            None => None,
-        }
-    }
-
     /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
     /// through to any parents.
     pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
@@ -1664,21 +1652,6 @@ impl<'a> SemanticModel<'a> {
             // Not a nested literal otherwise
             _ => false,
         }
-    }
-
-    /// Return `true` if the model is in a `typing.Protocol` subclass or an abstract
-    /// method.
-    pub fn in_protocol_or_abstract_method(&self) -> bool {
-        self.current_scopes().any(|scope| match scope.kind {
-            ScopeKind::Class(class_def) => class_def
-                .bases()
-                .iter()
-                .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
-            ScopeKind::Function(function_def) => {
-                visibility::is_abstract(&function_def.decorator_list, self)
-            }
-            _ => false,
-        })
     }
 
     /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
