@@ -376,8 +376,8 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
-    pub(super) const fn is_not_generic(self) -> bool {
-        matches!(self, Self::NonGeneric(_))
+    pub(super) const fn is_generic(self) -> bool {
+        matches!(self, Self::Generic(_))
     }
 
     pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
