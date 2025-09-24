@@ -194,10 +194,15 @@ pub(crate) fn format(
     caches.persist()?;
 
     // Report on any errors.
-    errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
+    //
+    // We only convert errors to `Diagnostic`s in `Check` mode with preview enabled, otherwise we
+    // fall back on printing simple messages.
+    if !(preview.is_enabled() && mode.is_check()) {
+        errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
 
-    for error in &errors {
-        error!("{error}");
+        for error in &errors {
+            error!("{error}");
+        }
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
@@ -205,7 +210,7 @@ pub(crate) fn format(
         FormatMode::Write => {}
         FormatMode::Check => {
             if preview.is_enabled() {
-                results.write_changed_preview(&mut stdout().lock(), output_format)?;
+                results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
             } else {
                 results.write_changed(&mut stdout().lock())?;
             }
@@ -605,14 +610,22 @@ impl<'a> FormatResults<'a> {
         Ok(())
     }
 
-    /// Write a list of the files that would be changed to the given writer.
+    /// Write a list of the files that would be changed and any errors to the given writer.
+    ///
+    /// Errors are reported first in the order they are provided, followed by the remaining
+    /// diagnostics sorted by file name.
     fn write_changed_preview(
         &self,
         f: &mut impl Write,
         output_format: OutputFormat,
+        errors: &[FormatCommandError],
     ) -> io::Result<()> {
         let mut notebook_index = FxHashMap::default();
-        let diagnostics: Vec<_> = self.to_diagnostics(&mut notebook_index).collect();
+        let diagnostics: Vec<_> = errors
+            .iter()
+            .map(Diagnostic::from)
+            .chain(self.to_diagnostics(&mut notebook_index))
+            .collect();
 
         let context = EmitterContext::new(&notebook_index);
         let config = DisplayDiagnosticConfig::default();
@@ -849,6 +862,73 @@ impl FormatCommandError {
             | Self::Diff(path, _)
             | Self::RangeFormatNotebook(path) => path.as_deref(),
         }
+    }
+}
+
+impl From<&FormatCommandError> for Diagnostic {
+    fn from(error: &FormatCommandError) -> Self {
+        let annotation = error.path().map(|path| {
+            let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
+            let span = Span::from(file);
+            Annotation::primary(span)
+        });
+
+        let mut diagnostic = match error {
+            // TODO(brent) also not sure about this one. Most of the ignore::Error variants
+            // do fit pretty well under Io errors, but we could match and be even more
+            // specific if we wanted. We already have a `DiagnosticId::InvalidGlob`, which
+            // could map to Error::Glob, for example.
+            FormatCommandError::Ignore(error) => {
+                Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
+            }
+            // TODO(brent) not sure if this is correct, DisplayParseError includes some
+            // color and other formatting. I think we'd rather have access to the `path` and
+            // underlying ParseError directly, like in other variants here.
+            FormatCommandError::Parse(display_parse_error) => Diagnostic::new(
+                DiagnosticId::InvalidSyntax,
+                Severity::Error,
+                display_parse_error,
+            ),
+            FormatCommandError::Panic(_, panic_error) => {
+                Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, panic_error)
+            }
+
+            // I/O errors
+            FormatCommandError::Read(_, source_error)
+            | FormatCommandError::Write(_, source_error) => {
+                Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
+            }
+            FormatCommandError::Diff(_, error) => {
+                Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
+            }
+
+            FormatCommandError::Format(_, format_module_error) => match format_module_error {
+                FormatModuleError::ParseError(parse_error) => Diagnostic::new(
+                    DiagnosticId::InvalidSyntax,
+                    Severity::Error,
+                    &parse_error.error,
+                ),
+                FormatModuleError::FormatError(format_error) => {
+                    Diagnostic::new(DiagnosticId::FormatError, Severity::Error, format_error)
+                }
+                // TODO(brent) this might need a new DiagnosticId, or we could reuse
+                // `FormatError`, which also has an InvalidDocument variant, like PrintError
+                FormatModuleError::PrintError(print_error) => {
+                    Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, print_error)
+                }
+            },
+            FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
+                DiagnosticId::RangeFormatNotebook,
+                Severity::Error,
+                "Range formatting isn't supported for notebooks.",
+            ),
+        };
+
+        if let Some(annotation) = annotation {
+            diagnostic.annotate(annotation);
+        }
+
+        diagnostic
     }
 }
 
