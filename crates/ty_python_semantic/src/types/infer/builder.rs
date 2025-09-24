@@ -4112,7 +4112,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
-            let mut inferred_ty = if target
+            let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
             {
@@ -4122,24 +4122,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
-
-            // Validate `TypedDict` dictionary literal assignments
-            if let Some(typed_dict) = declared.inner_type().into_typed_dict() {
-                if let Some(dict_expr) = value.as_dict_expr() {
-                    validate_typed_dict_dict_literal(
-                        &self.context,
-                        typed_dict,
-                        dict_expr,
-                        target.into(),
-                        |expr| self.expression_type(expr),
-                    );
-
-                    // Override the inferred type of the dict literal to be the `TypedDict` type
-                    // This ensures that the dict literal gets the correct type for key access
-                    let typed_dict_type = Type::TypedDict(typed_dict);
-                    inferred_ty = typed_dict_type;
-                }
-            }
 
             self.add_declaration_with_binding(
                 target.into(),
@@ -5319,6 +5301,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             items,
         } = dict;
+
+        // Validate `TypedDict` dictionary literal assignments.
+        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict) {
+            let typed_dict_items = typed_dict.items(self.db());
+
+            for item in items {
+                self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+
+                if let Some(ast::Expr::StringLiteral(ref key)) = item.key
+                    && let Some(key) = key.as_single_part_string()
+                    && let Some(field) = typed_dict_items.get(key.as_str())
+                {
+                    self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
+                } else {
+                    self.infer_expression(&item.value, TypeContext::default());
+                }
+            }
+
+            validate_typed_dict_dict_literal(
+                &self.context,
+                typed_dict,
+                dict,
+                dict.into(),
+                |expr| self.expression_type(expr),
+            );
+
+            return Type::TypedDict(typed_dict);
+        }
+
+        // Avoid false positives for the functional `TypedDict` form, which is currently
+        // unsupported.
+        if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation {
+            return KnownClass::Dict
+                .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()]);
+        }
 
         let items = items
             .iter()
