@@ -662,7 +662,6 @@ Considering a few different shapes of tuple for the splatted argument:
 
 ```py
 def f1(*args: str): ...
-
 def _(
     args1: tuple[str, ...],
     args2: tuple[str, *tuple[str, ...]],
