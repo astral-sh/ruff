@@ -64,7 +64,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import overload
+from typing import overload, Callable
 
 def list1[T](x: T) -> list[T]:
     return [x]
@@ -86,6 +86,18 @@ def wrap_data2() -> list[dict] | None:
         return None
     reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
     return list1(res)
+
+def deco[T](func: Callable[[], T]) -> Callable[[], T]:
+    return func
+
+def outer() -> Callable[[], list[dict]]:
+    @deco
+    def inner() -> list[dict]:
+        if not (res := get_data()):
+            return list1({})
+        reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
+        return list1(res)
+    return inner
 
 @overload
 def f(x: int) -> list[int]: ...

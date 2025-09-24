@@ -516,9 +516,10 @@ pub(crate) fn nearest_enclosing_function<'db>(
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            infer_definition_types(db, definition)
-                .declaration_type(definition)
-                .inner_type()
+            let inference = infer_definition_types(db, definition);
+            inference
+                .undecorated_type()
+                .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
                 .into_function_literal()
         })
 }
