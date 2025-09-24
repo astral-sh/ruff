@@ -590,7 +590,6 @@ impl<'db> UseDefMap<'db> {
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
     }
 
-    /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
         !self
             .reachability_constraints

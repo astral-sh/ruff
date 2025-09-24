@@ -2720,10 +2720,15 @@ impl<'db> Binding<'db> {
                 }
             }
         }
+
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+        self.return_ty = self.signature.return_ty.unwrap_or_else(|| {
+            self.callable_type
+                .infer_return_type(db)
+                .unwrap_or(Type::unknown())
+        });
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.argument_matches = matcher.finish();
     }

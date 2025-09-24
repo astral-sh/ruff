@@ -7,25 +7,21 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
 };
 use crate::types::enums::is_enum_class;
-use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
+    LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeIsType, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let mut ty = self.infer_type_expression_no_store(expression);
-        let divergent = Type::divergent(self.scope());
-        if ty.has_divergent_type(self.db(), divergent) {
-            ty = divergent;
-        }
+        let ty = self.infer_type_expression_no_store(expression);
         self.store_expression_type(expression, ty);
         ty
     }
@@ -550,7 +546,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // we do not store types for sub-expressions. Re-infer the type here.
                         builder.infer_expression(value, TypeContext::default())
                     } else {
-                        builder.expression_type(value)
+                        builder.expression_type(value.as_ref())
                     };
 
                     value_ty == Type::SpecialForm(SpecialFormType::Unpack)

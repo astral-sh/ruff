@@ -8,9 +8,13 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
+use crate::types::infer::{InferExpression, infer_expression_types_impl, infer_unpack_types};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
-use crate::unpack::{UnpackKind, UnpackValue};
+use crate::types::{
+    DivergenceKind, DivergentType, RecursiveTypeNormalizedVisitor, Type, TypeCheckDiagnostics,
+    TypeContext, UnionType,
+};
+use crate::unpack::{Unpack, UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
@@ -48,9 +52,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type =
-            infer_expression_types(self.db(), value.expression(), TypeContext::default())
-                .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let input = InferExpression::new(self.db(), value.expression(), TypeContext::default());
+        let inference = infer_expression_types_impl(self.db(), input);
+        let value_type = if let Some(cycle_recovery) = inference.cycle_recovery() {
+            let visitor = RecursiveTypeNormalizedVisitor::new(cycle_recovery);
+            inference
+                .expression_type(value.expression().node_ref(self.db(), self.module()))
+                .recursive_type_normalized(self.db(), &visitor)
+        } else {
+            inference.expression_type(value.expression().node_ref(self.db(), self.module()))
+        };
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -173,12 +184,25 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
     }
 
-    pub(crate) fn finish(mut self) -> UnpackResult<'db> {
+    pub(crate) fn finish(mut self, unpack: Unpack<'db>) -> UnpackResult<'db> {
+        let db = self.db();
         self.targets.shrink_to_fit();
+        let div = Type::divergent(DivergentType::new(
+            db,
+            DivergenceKind::InferUnpackTypes(unpack),
+        ));
+        let previous_cycle_value = infer_unpack_types(db, unpack);
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
+        for (expr, ty) in &mut self.targets {
+            let previous_ty = previous_cycle_value.expression_type(*expr);
+            *ty = UnionType::from_elements(db, [*ty, previous_ty])
+                .recursive_type_normalized(db, &visitor);
+        }
+
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: self.targets,
-            cycle_fallback_type: None,
+            cycle_recovery: None,
         }
     }
 }
@@ -191,7 +215,7 @@ pub(crate) struct UnpackResult<'db> {
     /// The fallback type for missing expressions.
     ///
     /// This is used only when constructing a cycle-recovery `UnpackResult`.
-    cycle_fallback_type: Option<Type<'db>>,
+    cycle_recovery: Option<Type<'db>>,
 }
 
 impl<'db> UnpackResult<'db> {
@@ -217,7 +241,7 @@ impl<'db> UnpackResult<'db> {
         self.targets
             .get(&expr.into())
             .copied()
-            .or(self.cycle_fallback_type)
+            .or(self.cycle_recovery)
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -225,11 +249,11 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_initial(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
-            cycle_fallback_type: Some(cycle_fallback_type),
+            cycle_recovery: Some(cycle_recovery),
         }
     }
 }

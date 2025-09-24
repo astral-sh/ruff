@@ -164,7 +164,7 @@ static PANDAS: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::ne
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY312,
         },
-        3000,
+        3300,
     )
 });
 
@@ -199,7 +199,8 @@ static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY312,
         },
-        13000,
+        // TODO: With better decorator support, `__slots__` support, etc., it should be possible to reduce the number of errors considerably.
+        70000,
     )
 });
 

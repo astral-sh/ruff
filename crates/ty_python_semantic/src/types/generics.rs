@@ -12,15 +12,15 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, binding_type, declaration_type,
+    RecursiveTypeNormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    undecorated_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -43,8 +43,7 @@ fn enclosing_generic_contexts<'db>(
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function.node(module));
-                infer_definition_types(db, definition)
-                    .undecorated_type()
+                undecorated_type(db, definition)
                     .expect("function should have undecorated type")
                     .into_function_literal()?
                     .last_definition_signature(db)
@@ -411,6 +410,19 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances(db, variables)
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let variables = self
+            .variables(db)
+            .iter()
+            .map(|bound_typevar| bound_typevar.recursive_type_normalized(db, visitor));
+
+        Self::from_typevar_instances(db, variables)
+    }
+
     fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {
         ruff_memory_usage::order_set_heap_size(variables)
     }
@@ -753,6 +765,31 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .collect();
+        let tuple_inner = self
+            .tuple_inner(db)
+            .map(|tuple| tuple.recursive_type_normalized(db, visitor));
+        let context = self
+            .generic_context(db)
+            .recursive_type_normalized(db, visitor);
+        Self::new(
+            db,
+            context,
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        )
+    }
+
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,
@@ -1005,6 +1042,24 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .types
             .iter()
             .map(|ty| ty.normalized_impl(db, visitor))
+            .collect();
+
+        PartialSpecialization {
+            generic_context,
+            types,
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.recursive_type_normalized(db, visitor);
+        let types: Cow<_> = self
+            .types
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
             .collect();
 
         PartialSpecialization {
