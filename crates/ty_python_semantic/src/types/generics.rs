@@ -104,27 +104,20 @@ pub(crate) fn get_self_type<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    // TODO: remove duplication with Type::in_type_expression
     let index = semantic_index(db, scope_id.file(db));
-
-    let upper_bound = Type::instance(
-        db,
-        class.apply_specialization(db, |generic_context| {
-            let types = generic_context
-                .variables(db)
-                .iter()
-                .map(|typevar| Type::NonInferableTypeVar(*typevar));
-
-            generic_context.specialize(db, types.collect())
-        }),
-    );
 
     let class_definition = class.definition(db);
     let typevar = TypeVarInstance::new(
         db,
         ast::name::Name::new_static("Self"),
         Some(class_definition),
-        Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
+        Some(
+            TypeVarBoundOrConstraints::UpperBound(Type::instance(
+                db,
+                class.identity_specialization(db, Type::NonInferableTypeVar),
+            ))
+            .into(),
+        ),
         // According to the [spec], we can consider `Self`
         // equivalent to an invariant type variable
         // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
@@ -329,14 +322,17 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
-    /// (And in particular, to an _inferable_ version of itself, since this will be used in our
-    /// class constructor invocation machinery to infer a specialization for the class from the
-    /// arguments passed to its constructor.)
-    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+    /// The second parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on
+    /// the use case.
+    pub(crate) fn identity_specialization(
+        self,
+        db: &'db dyn Db,
+        typevar_to_type: impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+    ) -> Specialization<'db> {
         let types = self
             .variables(db)
             .iter()
-            .map(|typevar| Type::TypeVar(*typevar))
+            .map(|typevar| typevar_to_type(*typevar))
             .collect();
         self.specialize(db, types)
     }

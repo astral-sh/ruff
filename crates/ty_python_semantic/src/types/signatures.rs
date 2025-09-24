@@ -1285,6 +1285,7 @@ impl<'db> Parameters<'db> {
                         });
                     let implicit_annotation = if !method_has_self_in_generic_context
                         && class.is_not_generic()
+                        && !class.known(db).is_some_and(KnownClass::is_fallback_class)
                     {
                         Type::instance(db, class)
                     } else {

@@ -5356,12 +5356,10 @@ impl<'db> Type<'db> {
                 Some(generic_context) => (
                     Some(class),
                     Some(generic_context),
-                    Type::from(class.apply_specialization(db, |_| {
-                        // It is important that identity_specialization specializes the class with
-                        // _inferable_ typevars, so that our specialization inference logic will
-                        // try to find a specialization for them.
-                        generic_context.identity_specialization(db)
-                    })),
+                    // It is important that identity_specialization specializes the class with
+                    // _inferable_ typevars, so that our specialization inference logic will
+                    // try to find a specialization for them.
+                    Type::from(class.identity_specialization(db, Type::TypeVar)),
                 ),
                 _ => (None, None, self),
             },
