@@ -169,6 +169,7 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypedDictType(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_) => None,

@@ -46,7 +46,9 @@ use crate::semantic_index::{
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
+use crate::types::class::{
+    CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, MethodDecorator,
+};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -101,7 +103,7 @@ use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderMap, FxOrderSet, Program};
 
 mod annotation_expression;
 mod type_expression;
@@ -5472,9 +5474,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dict;
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict)
-            && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict)
-        {
+        if let Some(ty) = self.infer_typed_dict_expression(dict, tcx) {
             return ty;
         }
 
@@ -5494,39 +5494,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()])
             })
-    }
-
-    fn infer_typed_dict_expression(
-        &mut self,
-        dict: &ast::ExprDict,
-        typed_dict: TypedDictType<'db>,
-    ) -> Option<Type<'db>> {
-        let ast::ExprDict {
-            range: _,
-            node_index: _,
-            items,
-        } = dict;
-
-        let typed_dict_items = typed_dict.items(self.db());
-
-        for item in items {
-            self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
-
-            if let Some(ast::Expr::StringLiteral(ref key)) = item.key
-                && let Some(key) = key.as_single_part_string()
-                && let Some(field) = typed_dict_items.get(key.as_str())
-            {
-                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
-            } else {
-                self.infer_expression(&item.value, TypeContext::default());
-            }
-        }
-
-        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
-            self.expression_type(expr)
-        })
-        .ok()
-        .map(|_| Type::TypedDict(typed_dict))
     }
 
     // Infer the type of a collection literal expression.
@@ -5623,6 +5590,165 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .apply_specialization(self.db(), |generic_context| builder.build(generic_context));
 
         Type::from(class_type).to_instance(self.db())
+    }
+
+    fn infer_typed_dict_expression(
+        &mut self,
+        dict: &ast::ExprDict,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let ast::ExprDict {
+            range: _,
+            node_index: _,
+            items,
+        } = dict;
+
+        // Evaluate the dictionary literal passed to the `TypedDict` constructor.
+        if let Some(Type::SpecialForm(SpecialFormType::TypedDict)) = tcx.annotation {
+            let mut typed_dict_items = FxOrderMap::default();
+
+            for item in items {
+                let Some(Type::StringLiteral(key)) =
+                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default())
+                else {
+                    // Emit a diagnostic here? We seem to support non-string literals.
+                    unimplemented!()
+                };
+
+                let field_ty = self.infer_typed_dict_field_type_expression(&item.value);
+
+                let is_required = if field_ty.qualifiers.contains(TypeQualifiers::REQUIRED) {
+                    // Explicit Required[T] annotation - always required
+                    Truthiness::AlwaysTrue
+                } else if field_ty.qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+                    // Explicit NotRequired[T] annotation - never required
+                    Truthiness::AlwaysFalse
+                } else {
+                    // No explicit qualifier - we don't have access to the `total` qualifier here,
+                    // so we leave this to be filled in by the `TypedDict` constructor.
+                    Truthiness::Ambiguous
+                };
+
+                let field = Field {
+                    single_declaration: None,
+                    declared_ty: field_ty.inner_type(),
+                    kind: FieldKind::TypedDict {
+                        is_required,
+                        is_read_only: field_ty.qualifiers.contains(TypeQualifiers::READ_ONLY),
+                    },
+                };
+
+                typed_dict_items.insert(ast::name::Name::new(key.value(self.db())), field);
+            }
+
+            // Create an incomplete synthesized `TypedDictType`, to be completed by the `TypedDict`
+            // constructor binding.
+            return Some(Type::TypedDict(TypedDictType::from_items(
+                self.db(),
+                typed_dict_items,
+            )));
+        }
+
+        let typed_dict = tcx.annotation.and_then(Type::into_typed_dict)?;
+        let typed_dict_items = typed_dict.items(self.db());
+
+        for item in items {
+            self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+
+            if let Some(ast::Expr::StringLiteral(ref key)) = item.key
+                && let Some(key) = key.as_single_part_string()
+                && let Some(field) = typed_dict_items.get(key.as_str())
+            {
+                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
+            } else {
+                self.infer_expression(&item.value, TypeContext::default());
+            }
+        }
+
+        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
+            self.expression_type(expr)
+        })
+        .ok()
+        .map(|_| Type::TypedDict(typed_dict))
+    }
+
+    fn infer_typed_dict_field_type_expression(
+        &mut self,
+        expr: &ast::Expr,
+    ) -> TypeAndQualifiers<'db> {
+        let ty = match expr {
+            ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
+                let value_ty = self.infer_expression(value, TypeContext::default());
+                let slice = &**slice;
+
+                // Unlike other type-form expressions, `TypedDict` constructor literals support
+                // the `Required`, `NotRequired`, and `ReadOnly` qualifiers.
+                match value_ty {
+                    Type::SpecialForm(
+                        type_qualifier @ (SpecialFormType::Required
+                        | SpecialFormType::NotRequired
+                        | SpecialFormType::ReadOnly),
+                    ) => {
+                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                            &*tuple.elts
+                        } else {
+                            std::slice::from_ref(slice)
+                        };
+
+                        let num_arguments = arguments.len();
+                        let type_and_qualifiers = if num_arguments == 1 {
+                            let mut type_and_qualifiers =
+                                self.infer_typed_dict_field_type_expression(slice);
+
+                            match type_qualifier {
+                                SpecialFormType::Required => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::REQUIRED);
+                                }
+                                SpecialFormType::NotRequired => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::NOT_REQUIRED);
+                                }
+                                SpecialFormType::ReadOnly => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::READ_ONLY);
+                                }
+                                _ => unreachable!(),
+                            }
+
+                            type_and_qualifiers
+                        } else {
+                            for element in arguments {
+                                self.infer_typed_dict_field_type_expression(element);
+                            }
+
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
+                                    got {num_arguments}",
+                                ));
+                            }
+
+                            Type::unknown().into()
+                        };
+
+                        if slice.is_tuple_expr() {
+                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
+                        }
+
+                        type_and_qualifiers
+                    }
+
+                    _ => self
+                        .infer_subscript_type_expression_no_store(subscript, slice, value_ty)
+                        .into(),
+                }
+            }
+
+            type_expr => self.infer_type_expression_no_store(type_expr).into(),
+        };
+
+        self.store_expression_type(expr, ty.inner_type());
+        ty
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -6013,7 +6139,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             });
 
-        // TODO: Use the type context for more precise inference.
         let callable_type = self.infer_maybe_standalone_expression(func, TypeContext::default());
 
         // Special handling for `TypedDict` method calls
@@ -6157,19 +6282,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_all_argument_types(arguments, &mut call_arguments, &bindings);
 
         // Validate `TypedDict` constructor calls after argument type inference
-        if let Some(class_literal) = callable_type.into_class_literal() {
-            if class_literal.is_typed_dict(self.db()) {
-                let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
-                if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
-                    validate_typed_dict_constructor(
-                        &self.context,
-                        typed_dict,
-                        arguments,
-                        func.as_ref().into(),
-                        |expr| self.expression_type(expr),
-                    );
-                }
-            }
+        if let Some(typed_dict) = callable_type.to_typed_dict_type(self.db()) {
+            validate_typed_dict_constructor(
+                &self.context,
+                typed_dict,
+                arguments,
+                func.as_ref().into(),
+                |expr| self.expression_type(expr),
+            );
         }
 
         let mut bindings = match bindings.check_types(self.db(), &call_arguments, &tcx) {

@@ -130,7 +130,7 @@ pub enum SpecialFormType {
 }
 
 impl SpecialFormType {
-    /// Return the [`KnownClass`] which this symbol is an instance of
+    /// Return the [`KnownClass`] which this symbol is an instance of.
     pub(crate) const fn class(self) -> KnownClass {
         match self {
             Self::Annotated

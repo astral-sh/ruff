@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
@@ -12,6 +14,12 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use crate::types::generics::GenericContext;
+use crate::types::variance::TypeVarVariance;
+use crate::types::{
+    BoundTypeVarInstance, CallableSignature, CallableType, KnownClass, NormalizedVisitor,
+    Parameter, Parameters, Signature, StringLiteralType, SubclassOfType, UnionType,
+};
 use crate::{Db, FxOrderMap};
 
 use ordermap::OrderSet;
@@ -20,7 +28,7 @@ bitflags! {
     /// Used for `TypedDict` class parameters.
     /// Keeps track of the keyword arguments that were passed-in during class definition.
     /// (see https://typing.python.org/en/latest/spec/typeddict.html)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub struct TypedDictParams: u8 {
         /// Whether keys are required by default (`total=True`)
         const TOTAL = 1 << 0;
@@ -37,25 +45,54 @@ impl Default for TypedDictParams {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
-pub struct TypedDictType<'db> {
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+)]
+pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
-    defining_class: ClassType<'db>,
+    FromClass(ClassType<'db>),
+
+    /// A `TypedDict` created using the functional syntax.
+    Synthesized(SynthesizedTypedDictType<'db>),
 }
 
 impl<'db> TypedDictType<'db> {
-    pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
-        Self { defining_class }
+    pub(crate) fn from_class(class: ClassType<'db>) -> Self {
+        TypedDictType::FromClass(class)
     }
 
-    pub(crate) fn defining_class(self) -> ClassType<'db> {
-        self.defining_class
+    /// Returns an incomplete `TypedDictType` from its items.
+    ///
+    /// This is used to instantiate a `TypedDictType` from the dictionary literal passed to a
+    /// `TypedDict` constructor.
+    pub(crate) fn from_items(db: &'db dyn Db, items: FxOrderMap<Name, Field<'db>>) -> Self {
+        TypedDictType::Synthesized(SynthesizedTypedDictType::new(
+            db,
+            None,
+            TypedDictParams::default(),
+            items,
+        ))
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+    pub(crate) fn items(&self, db: &'db dyn Db) -> Cow<'db, FxOrderMap<Name, Field<'db>>> {
+        match self {
+            TypedDictType::Synthesized(synthesized) => Cow::Borrowed(synthesized.items(db)),
+            TypedDictType::FromClass(class) => {
+                let (class_literal, specialization) = class.class_literal(db);
+                Cow::Owned(class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict))
+            }
+        }
+    }
+
+    /// Return the meta-type of this `TypedDict` type.
+    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        // `TypedDict` instances are instances of `dict` at runtime, but its important that we
+        // understand a more specific meta type in order to correctly handle `__getitem__`.
+        match self {
+            TypedDictType::FromClass(class) => SubclassOfType::from(db, class),
+            TypedDictType::Synthesized(_) => KnownClass::TypedDictFallback.to_class_literal(db),
+        }
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -65,11 +102,341 @@ impl<'db> TypedDictType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
-        Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+        match self {
+            TypedDictType::FromClass(class) => {
+                TypedDictType::FromClass(class.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
+            TypedDictType::Synthesized(synthesized) => TypedDictType::Synthesized(
+                synthesized.apply_type_mapping_impl(db, type_mapping, visitor),
+            ),
         }
+    }
+
+    pub(crate) fn normalized_impl(
+        self,
+        _db: &'db dyn Db,
+        _visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        // TODO: Normalize typed dicts.
+        self
+    }
+
+    /// Returns the type of a synthesized member like `__setitem__` or `__getitem__` for a `TypedDict`.
+    pub(crate) fn synthesized_member(
+        db: &'db dyn Db,
+        instance_ty: Type<'db>,
+        fields: &FxOrderMap<Name, Field<'db>>,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        match name {
+            "__setitem__" => {
+                // Add (key type, value type) overloads for all TypedDict items ("fields") that are not read-only:
+                let mut writeable_fields = fields
+                    .iter()
+                    .filter(|(_, field)| !field.is_read_only())
+                    .peekable();
+
+                if writeable_fields.peek().is_none() {
+                    // If there are no writeable fields, synthesize a `__setitem__` that takes
+                    // a `key` of type `Never` to signal that no keys are accepted. This leads
+                    // to slightly more user-friendly error messages compared to returning an
+                    // empty overload set.
+                    return Some(Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(Type::Never),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::none(db)),
+                        )),
+                        true,
+                    )));
+                }
+
+                let overloads = writeable_fields.map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("value")))
+                                .with_annotated_type(field.declared_ty),
+                        ]),
+                        Some(Type::none(db)),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
+            }
+            "__getitem__" => {
+                // Add (key -> value type) overloads for all TypedDict items ("fields"):
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                        ]),
+                        Some(field.declared_ty),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
+            }
+            "get" => {
+                let overloads = fields
+                    .into_iter()
+                    .flat_map(|(name, field)| {
+                        let key_type =
+                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                        // For a required key, `.get()` always returns the value type. For a non-required key,
+                        // `.get()` returns the union of the value type and the type of the default argument
+                        // (which defaults to `None`).
+
+                        // TODO: For now, we use two overloads here. They can be merged into a single function
+                        // once the generics solver takes default arguments into account.
+
+                        let get_sig = Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ]),
+                            Some(if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                            }),
+                        );
+
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        let get_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(
+                                    db,
+                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                )
+                            }),
+                        );
+
+                        [get_sig, get_with_default_sig]
+                    })
+                    // Fallback overloads for unknown keys
+                    .chain(std::iter::once({
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::none(db)],
+                            )),
+                        )
+                    }))
+                    .chain(std::iter::once({
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::TypeVar(t_default)],
+                            )),
+                        )
+                    }));
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
+            }
+            "pop" => {
+                let overloads = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        // Only synthesize `pop` for fields that are not required.
+                        !field.is_required()
+                    })
+                    .flat_map(|(name, field)| {
+                        let key_type =
+                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                        // TODO: Similar to above: consider merging these two overloads into one
+
+                        // `.pop()` without default
+                        let pop_sig = Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ]),
+                            Some(field.declared_ty),
+                        );
+
+                        // `.pop()` with a default value
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        let pop_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [field.declared_ty, Type::TypeVar(t_default)],
+                            )),
+                        );
+
+                        [pop_sig, pop_with_default_sig]
+                    });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
+            }
+            "setdefault" => {
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    // `setdefault` always returns the field type
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("default")))
+                                .with_annotated_type(field.declared_ty),
+                        ]),
+                        Some(field.declared_ty),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
+            }
+            "update" => {
+                // TODO: synthesize a set of overloads with precise types
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::variadic(Name::new_static("args")),
+                        Parameter::keyword_variadic(Name::new_static("kwargs")),
+                    ]),
+                    Some(Type::none(db)),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[salsa::interned(debug, heap_size=SynthesizedTypedDictType::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct SynthesizedTypedDictType<'db> {
+    // The dictionary literal passed to the `TypedDict` constructor is inferred as
+    // a nameless `SynthesizedTypedDictType`.
+    pub(crate) name: Option<Name>,
+
+    pub(crate) params: TypedDictParams,
+
+    #[returns(ref)]
+    pub(crate) items: FxOrderMap<Name, Field<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
+
+impl<'db> SynthesizedTypedDictType<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let items = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let field = field
+                    .clone()
+                    .apply_type_mapping_impl(db, type_mapping, visitor);
+
+                (name.clone(), field)
+            })
+            .collect::<FxOrderMap<_, _>>();
+
+        SynthesizedTypedDictType::new(db, self.name(db), self.params(db), items)
+    }
+
+    fn heap_size(
+        (name, params, items): &(Option<Name>, TypedDictParams, FxOrderMap<Name, Field<'db>>),
+    ) -> usize {
+        ruff_memory_usage::heap_size(name)
+            + ruff_memory_usage::heap_size(params)
+            + ruff_memory_usage::order_map_heap_size(items)
     }
 }
 
@@ -78,7 +445,14 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
+    match typed_dict {
+        TypedDictType::FromClass(class) => visitor.visit_type(db, class.into()),
+        TypedDictType::Synthesized(synthesized) => {
+            for (_, item) in synthesized.items(db) {
+                visitor.visit_type(db, item.declared_ty);
+            }
+        }
+    }
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {

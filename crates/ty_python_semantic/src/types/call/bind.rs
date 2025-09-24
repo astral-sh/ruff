@@ -12,11 +12,11 @@ use ruff_python_ast::name::Name;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
-use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::class::{Field, FieldKind};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
@@ -29,12 +29,14 @@ use crate::types::function::{
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
+use crate::types::typed_dict::SynthesizedTypedDictType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypedDictParams, TypedDictType, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
 };
+use crate::{FxOrderMap, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -1096,7 +1098,57 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("Support for `TypedDict`"));
+                        let [Some(name), Some(Type::TypedDict(typed_dict)), total, ..] =
+                            overload.parameter_types()
+                        else {
+                            continue;
+                        };
+
+                        let Some(name) = name.into_string_literal() else {
+                            continue;
+                        };
+
+                        let mut params = TypedDictParams::empty();
+
+                        let is_total = to_bool(total, true);
+                        params.set(TypedDictParams::TOTAL, is_total);
+
+                        let items = typed_dict.items(db);
+                        let items = items
+                            .iter()
+                            .map(|(name, field)| {
+                                let FieldKind::TypedDict {
+                                    is_required,
+                                    is_read_only,
+                                } = field.kind
+                                else {
+                                    unreachable!()
+                                };
+
+                                let field = Field {
+                                    kind: FieldKind::TypedDict {
+                                        is_read_only,
+                                        // If there is no explicit `Required`/`NotRequired` qualifier, use
+                                        // the `total` parameter.
+                                        is_required: is_required.unwrap_or(is_total).into(),
+                                    },
+                                    ..field.clone()
+                                };
+
+                                (name.clone(), field)
+                            })
+                            .collect::<FxOrderMap<_, _>>();
+
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::TypedDictType(TypedDictType::Synthesized(
+                                SynthesizedTypedDictType::new(
+                                    db,
+                                    Some(Name::new(name.value(db))),
+                                    params,
+                                    items,
+                                ),
+                            )),
+                        ));
                     }
 
                     // Not a special case
@@ -2346,7 +2398,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     ) {
         if let Some(Type::TypedDict(typed_dict)) = argument_type {
             // Special case TypedDict because we know which keys are present.
-            for (name, field) in typed_dict.items(db) {
+            for (name, field) in typed_dict.items(db).as_ref() {
                 let _ = self.match_keyword(
                     argument_index,
                     Argument::Keywords,

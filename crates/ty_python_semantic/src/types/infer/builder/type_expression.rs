@@ -807,6 +807,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     }
                 }
+                KnownInstanceType::TypedDictType(_) => {
+                    self.infer_type_expression(slice);
+
+                    if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
+                        builder.into_diagnostic(format_args!("Cannot subscript typed dict"));
+                    }
+
+                    Type::unknown()
+                }
                 KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
                     self.infer_type_expression(slice);
                     todo_type!("Generic manual PEP-695 type alias")
