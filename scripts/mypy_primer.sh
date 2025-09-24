@@ -5,7 +5,9 @@ echo "Enabling mypy primer specific configuration overloads (see .github/mypy-pr
 mkdir -p ~/.config/ty
 cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
 
-PRIMER_SELECTOR="$(paste -s -d'|' "${PRIMER_SELECTOR}")"
+# Join the lines (project names) of the file into a large regex
+# using `|` and escape parentheses.
+PRIMER_SELECTOR="$(paste -s -d'|' "${PRIMER_SELECTOR}" | sed -e 's@(@\\(@g' -e 's@)@\\)@g')"
 
 echo "new commit"
 git rev-list --format=%s --max-count=1 "${GITHUB_SHA}"
