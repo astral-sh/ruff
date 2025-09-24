@@ -19,7 +19,7 @@ There are multiple versions for the different wasm-pack targets. See [here](http
 This example uses the wasm-pack web target and is known to work with Vite.
 
 ```ts
-import init, { Workspace, type Diagnostic } from '@astral-sh/ruff-api';
+import init, { Workspace, type Diagnostic } from '@astral-sh/ruff-wasm-web';
 
 const exampleDocument = `print('hello'); print("world")`
 
