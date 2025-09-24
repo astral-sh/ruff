@@ -10,7 +10,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 10,
       "row": 1
     },
-    "filename": "fib.py",
+    "filename": "/fib.py",
     "fix": {
       "applicability": "unsafe",
       "edits": [
@@ -43,7 +43,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 6,
       "row": 6
     },
-    "filename": "fib.py",
+    "filename": "/fib.py",
     "fix": {
       "applicability": "unsafe",
       "edits": [
@@ -76,7 +76,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 5,
       "row": 1
     },
-    "filename": "undef.py",
+    "filename": "/undef.py",
     "fix": null,
     "location": {
       "column": 4,
