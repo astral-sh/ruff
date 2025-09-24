@@ -141,8 +141,7 @@ class B:
 
 reveal_type(B().name_does_not_matter())  # revealed: B
 
-# TODO: this should be B
-reveal_type(B().positional_only(1))  # revealed: Unknown
+reveal_type(B().positional_only(1))  # revealed: B
 
 reveal_type(B().keyword_only(x=1))  # revealed: B
 
