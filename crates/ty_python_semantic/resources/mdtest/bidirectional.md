@@ -38,6 +38,14 @@ reveal_type(l3)  # revealed: list[int]
 
 l4: list[int] | None = list1(1)
 reveal_type(l4)  # revealed: list[int]
+
+def _(l: list[int] | None = None):
+    l1 = l or list()
+    reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+
+    l2: list[int] = l or list()
+    # TODO: should be `list[int]`
+    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 ```
 
 ```py
