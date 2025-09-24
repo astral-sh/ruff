@@ -942,7 +942,7 @@ This is the step 4 of the overload call evaluation algorithm which specifies tha
 
 This is only performed if the previous step resulted in more than one matching overload.
 
-### Simple
+### Simple `*args`
 
 `overloaded.pyi`:
 
@@ -954,7 +954,7 @@ def f(x1: int) -> tuple[int]: ...
 @overload
 def f(x1: int, x2: int) -> tuple[int, int]: ...
 @overload
-def f(*x: int) -> int: ...
+def f(*args: int) -> int: ...
 ```
 
 ```py
@@ -967,6 +967,96 @@ def _(x1: int, x2: int, args: list[int]):
 
     # Step 4 should filter out all but the last overload.
     reveal_type(f(*args))  # revealed: int
+```
+
+### Variable `*args`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x1: int) -> tuple[int]: ...
+@overload
+def f(x1: int, x2: int) -> tuple[int, int]: ...
+@overload
+def f(x1: int, *args: int) -> tuple[int, ...]: ...
+```
+
+```py
+from overloaded import f
+
+def _(x1: int, x2: int, args1: list[int], args2: tuple[int, *tuple[int, ...]]):
+    reveal_type(f(x1, x2))  # revealed: tuple[int, int]
+    reveal_type(f(*(x1, x2)))  # revealed: tuple[int, int]
+
+    # Step 4 should filter out all but the last overload.
+    reveal_type(f(x1, *args1))  # revealed: tuple[int, ...]
+    reveal_type(f(*args2))  # revealed: tuple[int, ...]
+```
+
+### Simple `**kwargs`
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(*, x1: int) -> int: ...
+@overload
+def f(*, x1: int, x2: int) -> tuple[int, int]: ...
+@overload
+def f(**kwargs: int) -> int: ...
+```
+
+```py
+from overloaded import f
+
+def _(x1: int, x2: int, kwargs: dict[str, int]):
+    reveal_type(f(x1=x1))  # revealed: int
+    reveal_type(f(x1=x1, x2=x2))  # revealed: tuple[int, int]
+
+    # Step 4 should filter out all but the last overload.
+    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: int
+    reveal_type(f(**kwargs))  # revealed: int
+```
+
+### `TypedDict`
+
+The keys in a `TypedDict` are static so there's no variable part to it, so step 4 shouldn't filter
+out any overloads.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypedDict, overload
+
+@overload
+def f(*, x: int) -> int: ...
+@overload
+def f(*, x: int, y: int) -> tuple[int, int]: ...
+@overload
+def f(**kwargs: int) -> tuple[int, ...]: ...
+```
+
+```py
+from typing import TypedDict
+from overloaded import f
+
+class Foo(TypedDict):
+    x: int
+    y: int
+
+def _(foo: Foo, kwargs: dict[str, int]):
+    reveal_type(f(**foo))  # revealed: tuple[int, int]
+    reveal_type(f(**kwargs))  # revealed: tuple[int, ...]
 ```
 
 ## Filtering based on `Any` / `Unknown`

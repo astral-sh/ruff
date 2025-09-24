@@ -1337,8 +1337,8 @@ impl<'db> CallableBinding<'db> {
 
                 match self.matching_overload_index() {
                     MatchingOverloadIndex::None => {
-                        // This isn't possible because step 4 can only filter out overloads when
-                        // there is a matching variadic argument.
+                        // This shouldn't be possible because step 4 can only filter out overloads
+                        // when there _is_ a matching variadic argument.
                         tracing::debug!("All overloads have been filtered out in step 4");
                         return None;
                     }
@@ -1544,20 +1544,27 @@ impl<'db> CallableBinding<'db> {
         None
     }
 
+    /// Filter overloads based on variadic argument to variadic parameter match.
+    ///
+    /// This is the step 4 of the [overload call evaluation algorithm][1].
+    ///
+    /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
     fn filter_overloads_containing_variadic(&mut self, matching_overload_indexes: &[usize]) {
-        let remaining_overloads = matching_overload_indexes
+        let variadic_matching_overloads = matching_overload_indexes
             .iter()
             .filter(|&&overload_index| {
                 self.overloads[overload_index].variadic_argument_matched_to_variadic_parameter
             })
             .collect::<HashSet<_>>();
 
-        if remaining_overloads.is_empty() {
+        if variadic_matching_overloads.is_empty()
+            || variadic_matching_overloads.len() == matching_overload_indexes.len()
+        {
             return;
         }
 
         for overload_index in matching_overload_indexes {
-            if !remaining_overloads.contains(overload_index) {
+            if !variadic_matching_overloads.contains(overload_index) {
                 self.overloads[*overload_index].mark_as_unmatched_overload();
             }
         }
@@ -2091,7 +2098,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         parameter_index: usize,
         parameter: &Parameter<'db>,
         positional: bool,
-        is_variable: bool,
+        variable_argument_length: bool,
     ) {
         if !matches!(argument, Argument::Synthetic) {
             let adjusted_argument_index = argument_index - self.num_synthetic_args;
@@ -2112,7 +2119,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 });
             }
         }
-        if is_variable
+        if variable_argument_length
             && matches!(
                 (argument, parameter.kind()),
                 (Argument::Variadic, ParameterKind::Variadic { .. })
@@ -2133,7 +2140,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
-        is_variable: bool,
+        variable_argument_length: bool,
     ) -> Result<(), ()> {
         if matches!(argument, Argument::Synthetic) {
             self.num_synthetic_args += 1;
@@ -2156,7 +2163,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             parameter_index,
             parameter,
             !parameter.is_variadic(),
-            is_variable,
+            variable_argument_length,
         );
         Ok(())
     }
@@ -2747,7 +2754,8 @@ pub(crate) struct Binding<'db> {
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
 
-    /// Whether a variadic argument was matched to a variadic parameter.
+    /// Whether an argument that supplies an indeterminate number of positional or keyword
+    /// arguments is mapped to a variadic parameter (`*args` or `**kwargs`).
     variadic_argument_matched_to_variadic_parameter: bool,
 
     /// Bound types for parameters, in parameter source order, or `None` if no argument was matched
