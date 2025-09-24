@@ -603,7 +603,8 @@ impl<'a> Checker<'a> {
         self.context
     }
 
-    pub(crate) fn current_docstring_state(&self) -> DocstringState {
+    /// Return the current [`DocstringState`].
+    pub(crate) fn docstring_state(&self) -> DocstringState {
         self.docstring_state
     }
 }
