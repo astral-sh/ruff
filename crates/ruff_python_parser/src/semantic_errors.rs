@@ -35,11 +35,30 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
+    loop_stack: Vec<LoopContext>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LoopContext {
+    inside_orelse: bool,
 }
 
 impl SemanticSyntaxChecker {
     pub fn new() -> Self {
         Self::default()
+    }
+    fn in_loop_context(&self) -> bool {
+        self.loop_stack.iter().any(|ctx| !ctx.inside_orelse)
+    }
+    fn enter_loop_orelse(&mut self) {
+        if let Some(ctx) = self.loop_stack.last_mut() {
+            ctx.inside_orelse = true;
+        }
+    }
+    fn exit_loop_orelse(&mut self) {
+        if let Some(ctx) = self.loop_stack.last_mut() {
+            ctx.inside_orelse = false;
+        }
     }
 }
 
@@ -222,6 +241,20 @@ impl SemanticSyntaxChecker {
                         SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel,
                         *range,
                     );
+                }
+            }
+            Stmt::Break(ast::StmtBreak { range, .. }) => {
+                // test_ok break_outside_loop_in_function
+                // def f():
+                //     if True:
+                //         break
+
+                // test_err break_outside_loop
+                // break
+                // if True:
+                //     break
+                if !self.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
                 }
             }
             _ => {}
@@ -667,6 +700,23 @@ impl SemanticSyntaxChecker {
                 if !matches!(module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }
+            }
+            Stmt::For(ast::StmtFor { body, orelse, .. })
+            | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+                self.loop_stack.push(LoopContext {
+                    inside_orelse: false,
+                });
+                for stmt in body {
+                    self.visit_stmt(stmt, ctx);
+                }
+                if !orelse.is_empty() {
+                    self.enter_loop_orelse();
+                    for stmt in orelse {
+                        self.visit_stmt(stmt, ctx);
+                    }
+                    self.exit_loop_orelse();
+                }
+                self.loop_stack.pop();
             }
             Stmt::FunctionDef(_) => {
                 self.seen_futures_boundary = true;
@@ -1125,6 +1175,7 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
         }
     }
 }
@@ -1353,7 +1404,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1371,7 +1425,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1498,6 +1555,8 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
+
+    BreakOutsideLoop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
