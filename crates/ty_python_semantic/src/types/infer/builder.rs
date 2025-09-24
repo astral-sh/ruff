@@ -45,7 +45,9 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
+use crate::types::class::{
+    CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, MethodDecorator,
+};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -83,8 +85,8 @@ use crate::types::signatures::Signature;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
-    validate_typed_dict_key_assignment,
+    SynthesizedTypedDictType, TypedDictAssignmentKind, validate_typed_dict_constructor,
+    validate_typed_dict_dict_literal, validate_typed_dict_key_assignment,
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -94,13 +96,13 @@ use crate::types::{
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    TypedDictParams, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderMap, FxOrderSet, Program};
 
 mod annotation_expression;
 mod type_expression;
@@ -5307,11 +5309,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let typed_dict_items = typed_dict.items(self.db());
 
             for item in items {
-                self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+                let key_ty =
+                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
 
-                if let Some(ast::Expr::StringLiteral(ref key)) = item.key
-                    && let Some(key) = key.as_single_part_string()
-                    && let Some(field) = typed_dict_items.get(key.as_str())
+                if let Some(Type::StringLiteral(ref key)) = key_ty
+                    && let Some(field) = typed_dict_items.get(key.value(self.db()))
                 {
                     self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
                 } else {
@@ -5328,6 +5330,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             return Type::TypedDict(typed_dict);
+        }
+
+        // Evaluate the dictionary literal passed to the `TypedDict` constructor.
+        //
+        // TODO: This requires type-context from function argument annotations.
+        if let Some(Type::SpecialForm(SpecialFormType::TypedDict)) = tcx.annotation {
+            let mut typed_dict_items = FxOrderMap::default();
+
+            for item in items {
+                let Some(Type::StringLiteral(key)) =
+                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default())
+                else {
+                    // Emit a diagnostic here? We seem to support non-string literals.
+                    unimplemented!()
+                };
+
+                let declared_ty = self.infer_type_expression_no_store(&item.value);
+
+                let field = Field {
+                    declared_ty,
+                    single_declaration: None,
+                    kind: FieldKind::TypedDict {
+                        is_required: false,
+                        is_read_only: false,
+                    },
+                };
+
+                typed_dict_items.insert(ast::name::Name::new(key.value(self.db())), field);
+            }
+
+            return Type::TypedDict(TypedDictType::Synthesized(SynthesizedTypedDictType::new(
+                self.db(),
+                None,
+                TypedDictParams::default(),
+                typed_dict_items,
+            )));
         }
 
         // Avoid false positives for the functional `TypedDict` form, which is currently

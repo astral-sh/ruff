@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
@@ -12,6 +14,7 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use crate::types::{KnownClass, SubclassOfType};
 use crate::{Db, FxOrderMap};
 
 use ordermap::OrderSet;
@@ -20,7 +23,7 @@ bitflags! {
     /// Used for `TypedDict` class parameters.
     /// Keeps track of the keyword arguments that were passed-in during class definition.
     /// (see https://typing.python.org/en/latest/spec/typeddict.html)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub struct TypedDictParams: u8 {
         /// Whether keys are required by default (`total=True`)
         const TOTAL = 1 << 0;
@@ -37,25 +40,51 @@ impl Default for TypedDictParams {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
-pub struct TypedDictType<'db> {
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+)]
+pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
-    defining_class: ClassType<'db>,
+    FromClass(ClassType<'db>),
+    /// A `TypedDict` created using the functional syntax.
+    Synthesized(SynthesizedTypedDictType<'db>),
 }
 
 impl<'db> TypedDictType<'db> {
-    pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
-        Self { defining_class }
+    pub(crate) fn from_class(class: ClassType<'db>) -> Self {
+        TypedDictType::FromClass(class)
     }
 
-    pub(crate) fn defining_class(self) -> ClassType<'db> {
-        self.defining_class
+    /// Returns a temporary `TypedDictType` used to instantiate a `TypedDictType` from a dictionary
+    /// literal using the `TypedDict` constructor.
+    pub(crate) fn from_items(db: &'db dyn Db, items: FxOrderMap<Name, Field<'db>>) -> Self {
+        TypedDictType::Synthesized(SynthesizedTypedDictType::new(
+            db,
+            None,
+            TypedDictParams::default(),
+            items,
+        ))
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+    pub(crate) fn items(&self, db: &'db dyn Db) -> Cow<'db, FxOrderMap<Name, Field<'db>>> {
+        match self {
+            TypedDictType::Synthesized(synthesized) => Cow::Borrowed(synthesized.items(db)),
+            TypedDictType::FromClass(class) => {
+                let (class_literal, specialization) = class.class_literal(db);
+                Cow::Owned(class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict))
+            }
+        }
+    }
+
+    /// Return the meta-type of this `TypedDict` type.
+    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypedDictType::Synthesized(_) => KnownClass::Dict.to_instance(db),
+            // `TypedDict` instances are instances of `dict` at runtime, but its important that we
+            // understand a more specific meta type in order to correctly handle `__getitem__`.
+            TypedDictType::FromClass(class) => SubclassOfType::from(db, class),
+        }
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -65,11 +94,61 @@ impl<'db> TypedDictType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
-        Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+        match self {
+            TypedDictType::FromClass(class) => {
+                TypedDictType::FromClass(class.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
+            TypedDictType::Synthesized(synthesized) => TypedDictType::Synthesized(
+                synthesized.apply_type_mapping_impl(db, type_mapping, visitor),
+            ),
         }
+    }
+}
+
+#[salsa::interned(debug, heap_size=SynthesizedTypedDictType::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct SynthesizedTypedDictType<'db> {
+    // TODO: Should the temporary `None` case insted create a new variant
+    // `TypedDictType::Items`?
+    pub(crate) name: Option<Name>,
+
+    params: TypedDictParams,
+
+    #[returns(ref)]
+    pub(crate) items: FxOrderMap<Name, Field<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
+
+impl<'db> SynthesizedTypedDictType<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let items = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let field = field
+                    .clone()
+                    .apply_type_mapping_impl(db, type_mapping, visitor);
+
+                (name.clone(), field)
+            })
+            .collect::<FxOrderMap<_, _>>();
+
+        SynthesizedTypedDictType::new(db, self.name(db), self.params(db), items)
+    }
+
+    fn heap_size(
+        (name, params, items): &(Option<Name>, TypedDictParams, FxOrderMap<Name, Field<'db>>),
+    ) -> usize {
+        ruff_memory_usage::heap_size(name)
+            + ruff_memory_usage::heap_size(params)
+            + ruff_memory_usage::order_map_heap_size(items)
     }
 }
 
@@ -78,7 +157,14 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
+    match typed_dict {
+        TypedDictType::FromClass(class) => visitor.visit_type(db, class.into()),
+        TypedDictType::Synthesized(synthesized) => {
+            for (_, item) in synthesized.items(db) {
+                visitor.visit_type(db, item.declared_ty)
+            }
+        }
+    }
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {

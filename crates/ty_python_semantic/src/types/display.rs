@@ -22,6 +22,8 @@ use crate::types::{
 };
 use ruff_db::parsed::parsed_module;
 
+use super::TypedDictType;
+
 /// Settings for displaying types and signatures
 #[derive(Debug, Copy, Clone, Default)]
 pub struct DisplaySettings {
@@ -97,8 +99,8 @@ fn type_to_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
             inner: Protocol::FromClass(class),
             ..
         }) => type_to_class_literal(db, Type::from(class)),
-        Type::TypedDict(typed_dict) => {
-            type_to_class_literal(db, Type::from(typed_dict.defining_class()))
+        Type::TypedDict(TypedDictType::FromClass(class)) => {
+            type_to_class_literal(db, Type::from(class))
         }
         Type::SubclassOf(subclass_of) => {
             type_to_class_literal(db, Type::from(subclass_of.subclass_of().into_class()?))
@@ -451,12 +453,16 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => typed_dict
-                .defining_class()
-                .class_literal(self.db)
-                .0
-                .display_with(self.db, self.settings)
-                .fmt(f),
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::FromClass(class) => class
+                    .class_literal(self.db)
+                    .0
+                    .display_with(self.db, self.settings)
+                    .fmt(f),
+                TypedDictType::Synthesized(synthesized) => {
+                    write!(f, "type[{}]", synthesized.name(self.db))
+                }
+            },
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
     }

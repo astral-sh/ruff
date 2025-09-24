@@ -1127,7 +1127,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn typed_dict(defining_class: impl Into<ClassType<'db>>) -> Self {
-        Self::TypedDict(TypedDictType::new(defining_class.into()))
+        Self::TypedDict(TypedDictType::from_class(defining_class.into()))
     }
 
     #[must_use]
@@ -4726,7 +4726,7 @@ impl<'db> Type<'db> {
                             Parameter::positional_only(Some(Name::new_static("typename")))
                                 .with_annotated_type(KnownClass::Str.to_instance(db)),
                             Parameter::positional_only(Some(Name::new_static("fields")))
-                                .with_annotated_type(KnownClass::Dict.to_instance(db))
+                                .with_annotated_type(Type::SpecialForm(SpecialFormType::TypedDict))
                                 .with_default_type(Type::any()),
                             Parameter::keyword_only(Name::new_static("total"))
                                 .with_annotated_type(KnownClass::Bool.to_instance(db))
@@ -5950,7 +5950,7 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             // `TypedDict` instances are instances of `dict` at runtime, but its important that we
             // understand a more specific meta type in order to correctly handle `__getitem__`.
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => typed_dict.to_meta_type(db),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
         }
     }
@@ -6507,8 +6507,9 @@ impl<'db> Type<'db> {
                 Protocol::Synthesized(_) => None,
             },
 
-            Type::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
+                TypedDictType::Synthesized(_) => None,
             }
 
             Self::Union(_) | Self::Intersection(_) => None,

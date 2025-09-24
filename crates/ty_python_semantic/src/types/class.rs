@@ -1267,7 +1267,7 @@ impl MethodDecorator {
 }
 
 /// Kind-specific metadata for different types of fields
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
@@ -1293,8 +1293,8 @@ pub(crate) enum FieldKind<'db> {
 }
 
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Field<'db> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
@@ -1304,7 +1304,7 @@ pub(crate) struct Field<'db> {
     pub(crate) single_declaration: Option<Definition<'db>>,
 }
 
-impl Field<'_> {
+impl<'db> Field<'db> {
     pub(crate) const fn is_required(&self) -> bool {
         match &self.kind {
             FieldKind::NamedTuple { default_ty } => default_ty.is_none(),
@@ -1321,6 +1321,21 @@ impl Field<'_> {
         match &self.kind {
             FieldKind::TypedDict { is_read_only, .. } => *is_read_only,
             _ => false,
+        }
+    }
+
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Field {
+            kind: self.kind,
+            single_declaration: self.single_declaration,
+            declared_ty: self
+                .declared_ty
+                .apply_type_mapping_impl(db, type_mapping, visitor),
         }
     }
 }

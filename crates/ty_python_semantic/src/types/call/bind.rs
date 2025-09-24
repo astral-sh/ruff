@@ -29,11 +29,12 @@ use crate::types::function::{
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
+use crate::types::typed_dict::SynthesizedTypedDictType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeMapping, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeMapping, TypedDictParams, TypedDictType,
+    UnionType, WrapperDescriptorKind, enums, ide_support,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -145,7 +146,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db);
+        self.evaluate_known_cases(db, argument_types);
 
         // In order of precedence:
         //
@@ -267,7 +268,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db, argument_types: &CallArguments<'_, 'db>) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -1096,7 +1097,32 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("Support for `TypedDict`"));
+                        let [Some(name), Some(items), total, ..] = overload.parameter_types()
+                        else {
+                            continue;
+                        };
+
+                        let Some(name) = name.into_string_literal() else {
+                            continue;
+                        };
+
+                        let Type::TypedDict(TypedDictType::Synthesized(synthesized)) = items else {
+                            continue;
+                        };
+
+                        let total = to_bool(total, true);
+
+                        let mut params = TypedDictParams::empty();
+                        params.set(TypedDictParams::TOTAL, total);
+
+                        overload.set_return_type(Type::TypedDict(TypedDictType::Synthesized(
+                            SynthesizedTypedDictType::new(
+                                db,
+                                Some(Name::new(name.value(db))),
+                                params,
+                                synthesized.items(db).clone(),
+                            ),
+                        )));
                     }
 
                     // Not a special case
@@ -2178,7 +2204,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     ) {
         if let Some(Type::TypedDict(typed_dict)) = argument_type {
             // Special case TypedDict because we know which keys are present.
-            for (name, field) in typed_dict.items(db) {
+            for (name, field) in typed_dict.items(db).as_ref() {
                 let _ = self.match_keyword(
                     argument_index,
                     Argument::Keywords,
