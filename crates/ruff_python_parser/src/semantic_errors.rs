@@ -388,6 +388,7 @@ impl SemanticSyntaxChecker {
             );
         }
     }
+
     fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
         ctx: &Ctx,
         expr_ctx: ExprContext,
