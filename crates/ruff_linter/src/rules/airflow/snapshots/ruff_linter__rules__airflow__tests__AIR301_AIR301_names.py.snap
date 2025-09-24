@@ -360,4 +360,16 @@ AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
 113 | get_sensitive_variables_fields
 114 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+115 |
+116 | from airflow.datasets import DatasetEvent
     |
+
+AIR301 `airflow.datasets.DatasetEvent` is removed in Airflow 3.0
+   --> AIR301_names.py:118:1
+    |
+116 | from airflow.datasets import DatasetEvent
+117 |
+118 | DatasetEvent
+    | ^^^^^^^^^^^^
+    |
+help: It has been made private in Airflow 3. An AssetEvent type will be added to the apache-airflow-task-sdk in a future version.
