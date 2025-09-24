@@ -313,7 +313,7 @@ python-version = "3.11"
 
 ```py
 class Explicit:
-    # TODO: Should warn the user if self is overriden with a type that is not subtype of the class
+    # TODO: We could emit a warning if the annotated type of `self` is disjoint from `Explicit`
     def bad(self: int) -> None:
         reveal_type(self)  # revealed: int
 
