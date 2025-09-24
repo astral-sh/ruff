@@ -1527,6 +1527,18 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
+    /// Returns a specialization of this class where each typevar is mapped to itself. The second
+    /// parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on the use case.
+    pub(crate) fn identity_specialization(
+        self,
+        db: &'db dyn Db,
+        typevar_to_type: impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+    ) -> ClassType<'db> {
+        self.apply_specialization(db, |generic_context| {
+            generic_context.identity_specialization(db, typevar_to_type)
+        })
+    }
+
     /// Return an iterator over the inferred types of this class's *explicit* bases.
     ///
     /// Note that any class (except for `object`) that has no explicit
@@ -2625,7 +2637,14 @@ impl<'db> ClassLiteral<'db> {
                 .map_type(|ty|
                     ty.apply_type_mapping(
                         db,
-                        &TypeMapping::ReplaceSelf {new_upper_bound: determine_upper_bound(db, self, specialization, ClassBase::is_typed_dict) }
+                        &TypeMapping::ReplaceSelf {
+                            new_upper_bound: determine_upper_bound(
+                                db,
+                                self,
+                                specialization,
+                                ClassBase::is_typed_dict
+                            )
+                        }
                     )
                 )
         }
@@ -4171,6 +4190,90 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | KnownClass::Path => false,
+        }
+    }
+
+    /// Return `true` if this class is a typeshed fallback class which is used to provide attributes and
+    /// methods for another type (e.g. `NamedTupleFallback` for actual `NamedTuple`s). These fallback
+    /// classes need special treatment in some places. For example, implicit usages of `Self` should not
+    /// be eagerly replaced with the fallback class itself. Instead, `Self` should eventually be treated
+    /// as referring to the destination type (e.g. the actual `NamedTuple`).
+    pub(crate) const fn is_fallback_class(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NotImplementedType
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::EllipsisType
+            | KnownClass::NoneType
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::Deprecated
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::ProtocolMeta
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleLike
+            | KnownClass::Template
+            | KnownClass::ConstraintSet
+            | KnownClass::InitVar => false,
+            KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
 

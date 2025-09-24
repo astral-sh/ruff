@@ -277,7 +277,6 @@ reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 
 person = Person("Alice", 42)
 
-# error: [invalid-argument-type] "Argument to bound method `_asdict` is incorrect: Expected `NamedTupleFallback`, found `Person`"
 reveal_type(person._asdict())  # revealed: dict[str, Any]
 reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
