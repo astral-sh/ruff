@@ -305,7 +305,7 @@ range.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[((SubSub ≤ T@_ ≤ Base) ∧ ¬(Sub ≤ T@_ ≤ Base))]
+    # revealed: ty_extensions.ConstraintSet[(¬(Sub ≤ T@_ ≤ Base) ∧ (SubSub ≤ T@_ ≤ Base))]
     reveal_type(range_constraint(SubSub, T, Base) & negated_range_constraint(Sub, T, Super))
     # revealed: ty_extensions.ConstraintSet[(¬(Sub ≤ T@_ ≤ Base) ∧ (SubSub ≤ T@_ ≤ Super))]
     reveal_type(range_constraint(SubSub, T, Super) & negated_range_constraint(Sub, T, Base))
@@ -339,7 +339,7 @@ Otherwise, the union cannot be simplified.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(¬(Sub ≤ T@_ ≤ Base) ∧ ¬(Base ≤ T@_ ≤ Super))]
+    # revealed: ty_extensions.ConstraintSet[(¬(Base ≤ T@_ ≤ Super) ∧ ¬(Sub ≤ T@_ ≤ Base))]
     reveal_type(negated_range_constraint(Sub, T, Base) & negated_range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(¬(Base ≤ T@_ ≤ Super) ∧ ¬(SubSub ≤ T@_ ≤ Sub))]
     reveal_type(negated_range_constraint(SubSub, T, Sub) & negated_range_constraint(Base, T, Super))
@@ -438,9 +438,9 @@ Otherwise, the union cannot be simplified.
 def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (Sub ≤ T@_ ≤ Base)]
     reveal_type(range_constraint(Sub, T, Base) | range_constraint(Base, T, Super))
-    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Base ≤ T@_ ≤ Super)]
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (SubSub ≤ T@_ ≤ Sub)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Base, T, Super))
-    # revealed: ty_extensions.ConstraintSet[(Unrelated ≤ T@_) ∨ (SubSub ≤ T@_ ≤ Sub)]
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Unrelated ≤ T@_)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Unrelated, T, object))
 ```
 
