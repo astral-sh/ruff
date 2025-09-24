@@ -3447,6 +3447,11 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)),
             )
             .into(),
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::Path) && name == "open" =>
+            {
+                Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::PathOpen)).into()
+            }
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -6209,7 +6214,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_))
+            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
@@ -6354,7 +6359,9 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_))
+            | Type::KnownBoundMethod(
+                KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen,
+            )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
@@ -9435,6 +9442,8 @@ pub enum KnownBoundMethodType<'db> {
     /// this allows us to understand statically known branches for common tests such as
     /// `if sys.platform.startswith("freebsd")`.
     StrStartswith(StringLiteralType<'db>),
+    /// Method wrapper for `Path.open`,
+    PathOpen,
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9458,6 +9467,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(db, Type::StringLiteral(string_literal));
         }
+        KnownBoundMethodType::PathOpen => {}
     }
 }
 
@@ -9493,17 +9503,23 @@ impl<'db> KnownBoundMethodType<'db> {
                 ConstraintSet::from(self == other)
             }
 
+            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen) => {
+                ConstraintSet::from(true)
+            }
+
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::StrStartswith(_),
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::PathOpen,
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::StrStartswith(_),
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::PathOpen,
             ) => ConstraintSet::from(false),
         }
     }
@@ -9538,17 +9554,23 @@ impl<'db> KnownBoundMethodType<'db> {
                 ConstraintSet::from(self == other)
             }
 
+            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen) => {
+                ConstraintSet::from(true)
+            }
+
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::StrStartswith(_),
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::PathOpen,
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::StrStartswith(_),
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::PathOpen,
             ) => ConstraintSet::from(false),
         }
     }
@@ -9567,7 +9589,7 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(db, visitor))
             }
-            KnownBoundMethodType::StrStartswith(_) => self,
+            KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen => self,
         }
     }
 
@@ -9579,6 +9601,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderGet(_)
             | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
+            KnownBoundMethodType::PathOpen => KnownClass::MethodType,
         }
     }
 
@@ -9674,6 +9697,9 @@ impl<'db> KnownBoundMethodType<'db> {
                     ]),
                     Some(KnownClass::Bool.to_instance(db)),
                 )))
+            }
+            KnownBoundMethodType::PathOpen => {
+                Either::Right(std::iter::once(Signature::todo("`Path.open` return type")))
             }
         }
     }
