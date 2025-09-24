@@ -696,6 +696,14 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(MultipleStarredExpressions, error.range);
                 }
             }
+            SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                if self.is_rule_enabled(Rule::FutureFeatureNotDefined) {
+                    self.report_diagnostic(
+                        pyflakes::rules::FutureFeatureNotDefined { name },
+                        error.range,
+                    );
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
