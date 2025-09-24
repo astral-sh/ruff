@@ -64,6 +64,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use crate::Db;
@@ -903,156 +904,151 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
-        let mut visited_atoms = FxHashSet::default();
-        let mut new_atoms = vec![self.atom(db)];
+        let mut seen_atoms = FxHashSet::default();
+        Node::Interior(self).for_each_constraint(db, &mut |atom| {
+            seen_atoms.insert(atom);
+        });
+
+        let mut to_visit: Vec<(_, _)> = seen_atoms.iter().copied().tuple_combinations().collect();
         let mut simplified = Node::Interior(self);
-        while let Some(new_atom) = new_atoms.pop() {
-            visited_atoms.insert(new_atom);
-            Node::Interior(self).for_each_constraint(db, &mut |nested_atom| {
-                if new_atom == nested_atom {
-                    return;
-                }
+        while let Some((left_atom, right_atom)) = to_visit.pop() {
+            let typevar = left_atom.typevar(db);
+            if typevar != right_atom.typevar(db) {
+                continue;
+            }
 
-                let typevar = new_atom.typevar(db);
-                if typevar != nested_atom.typevar(db) {
-                    return;
-                }
+            let larger_smaller = if left_atom.contains(db, right_atom) {
+                Some((left_atom, right_atom))
+            } else if right_atom.contains(db, left_atom) {
+                Some((right_atom, left_atom))
+            } else {
+                None
+            };
+            if let Some((larger_atom, smaller_atom)) = larger_smaller {
+                /*
+                eprintln!(
+                    "==> {} contains {}",
+                    left_atom.display(db),
+                    right_atom.display(db),
+                );
+                */
+                simplified = simplified.substitute_union(
+                    db,
+                    SatisfiedConstraint::Positive(larger_atom),
+                    SatisfiedConstraint::Positive(smaller_atom),
+                    Node::new_satisfied_constraint(db, SatisfiedConstraint::Positive(larger_atom)),
+                );
+                simplified = simplified.substitute_intersection(
+                    db,
+                    SatisfiedConstraint::Negative(larger_atom),
+                    SatisfiedConstraint::Negative(smaller_atom),
+                    Node::new_satisfied_constraint(db, SatisfiedConstraint::Negative(larger_atom)),
+                );
 
-                let larger_smaller = if new_atom.contains(db, nested_atom) {
-                    Some((new_atom, nested_atom))
-                } else if nested_atom.contains(db, new_atom) {
-                    Some((nested_atom, new_atom))
-                } else {
-                    None
-                };
-                if let Some((larger_atom, smaller_atom)) = larger_smaller {
-                    /*
-                    eprintln!(
-                        "==> {} contains {}",
-                        new_atom.display(db),
-                        nested_atom.display(db),
+                simplified = simplified.substitute_intersection(
+                    db,
+                    SatisfiedConstraint::Negative(larger_atom),
+                    SatisfiedConstraint::Positive(smaller_atom),
+                    Node::AlwaysFalse,
+                );
+                simplified = simplified.substitute_union(
+                    db,
+                    SatisfiedConstraint::Positive(larger_atom),
+                    SatisfiedConstraint::Negative(smaller_atom),
+                    Node::AlwaysTrue,
+                );
+            }
+
+            let left_constraint = left_atom.constraint(db);
+            let right_constraint = right_atom.constraint(db);
+            match left_constraint.intersect(db, right_constraint) {
+                Some(intersection) => {
+                    let intersection_constraint =
+                        ConstrainedTypeVar::new(db, typevar, intersection);
+                    if seen_atoms.insert(intersection_constraint) {
+                        to_visit.extend(
+                            (seen_atoms.iter().copied())
+                                .filter(|seen| *seen != intersection_constraint)
+                                .map(|seen| (seen, intersection_constraint)),
+                        );
+                    }
+                    let positive_intersection_node = Node::new_satisfied_constraint(
+                        db,
+                        SatisfiedConstraint::Positive(intersection_constraint),
                     );
-                    */
+                    let negative_intersection_node = Node::new_satisfied_constraint(
+                        db,
+                        SatisfiedConstraint::Negative(intersection_constraint),
+                    );
+
+                    simplified = simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Positive(left_atom),
+                        SatisfiedConstraint::Positive(right_atom),
+                        positive_intersection_node,
+                    );
                     simplified = simplified.substitute_union(
                         db,
-                        SatisfiedConstraint::Positive(larger_atom),
-                        SatisfiedConstraint::Positive(smaller_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Positive(larger_atom),
-                        ),
-                    );
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        SatisfiedConstraint::Negative(larger_atom),
-                        SatisfiedConstraint::Negative(smaller_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Negative(larger_atom),
-                        ),
+                        SatisfiedConstraint::Negative(left_atom),
+                        SatisfiedConstraint::Negative(right_atom),
+                        negative_intersection_node,
                     );
 
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Negative(larger_atom),
-                        SatisfiedConstraint::Positive(smaller_atom),
+                        SatisfiedConstraint::Positive(left_atom),
+                        SatisfiedConstraint::Negative(right_atom),
+                        Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Positive(left_atom),
+                        )
+                        .and(db, negative_intersection_node),
+                    );
+                    simplified = simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Negative(left_atom),
+                        SatisfiedConstraint::Positive(right_atom),
+                        Node::new_satisfied_constraint(
+                            db,
+                            SatisfiedConstraint::Positive(right_atom),
+                        )
+                        .and(db, negative_intersection_node),
+                    );
+                }
+                None => {
+                    /*
+                    eprintln!(
+                        "==> {} ∧ {} is empty",
+                        left_atom.display(db),
+                        right_atom.display(db)
+                    );
+                    */
+                    simplified = simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Positive(left_atom),
+                        SatisfiedConstraint::Positive(right_atom),
                         Node::AlwaysFalse,
                     );
                     simplified = simplified.substitute_union(
                         db,
-                        SatisfiedConstraint::Positive(larger_atom),
-                        SatisfiedConstraint::Negative(smaller_atom),
+                        SatisfiedConstraint::Negative(left_atom),
+                        SatisfiedConstraint::Negative(right_atom),
                         Node::AlwaysTrue,
                     );
+                    simplified = simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Positive(left_atom),
+                        SatisfiedConstraint::Negative(right_atom),
+                        Node::new_constraint(db, left_atom),
+                    );
+                    simplified = simplified.substitute_intersection(
+                        db,
+                        SatisfiedConstraint::Negative(left_atom),
+                        SatisfiedConstraint::Positive(right_atom),
+                        Node::new_constraint(db, right_atom),
+                    );
                 }
-
-                let new_constraint = new_atom.constraint(db);
-                let nested_constraint = nested_atom.constraint(db);
-                match new_constraint.intersect(db, nested_constraint) {
-                    Some(intersection) => {
-                        let intersection_constraint =
-                            ConstrainedTypeVar::new(db, typevar, intersection);
-                        if !visited_atoms.contains(&intersection_constraint) {
-                            new_atoms.push(intersection_constraint);
-                        }
-                        let positive_intersection_node = Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Positive(intersection_constraint),
-                        );
-                        let negative_intersection_node = Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Negative(intersection_constraint),
-                        );
-
-                        simplified = simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(new_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            positive_intersection_node,
-                        );
-                        simplified = simplified.substitute_union(
-                            db,
-                            SatisfiedConstraint::Negative(new_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            negative_intersection_node,
-                        );
-
-                        simplified = simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(new_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            Node::new_satisfied_constraint(
-                                db,
-                                SatisfiedConstraint::Positive(new_atom),
-                            )
-                            .and(db, negative_intersection_node),
-                        );
-                        simplified = simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Negative(new_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            Node::new_satisfied_constraint(
-                                db,
-                                SatisfiedConstraint::Positive(nested_atom),
-                            )
-                            .and(db, negative_intersection_node),
-                        );
-                    }
-                    None => {
-                        /*
-                        eprintln!(
-                            "==> {} ∧ {} is empty",
-                            new_atom.display(db),
-                            nested_atom.display(db)
-                        );
-                        */
-                        simplified = simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(new_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            Node::AlwaysFalse,
-                        );
-                        simplified = simplified.substitute_union(
-                            db,
-                            SatisfiedConstraint::Negative(new_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            Node::AlwaysTrue,
-                        );
-                        simplified = simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Positive(new_atom),
-                            SatisfiedConstraint::Negative(nested_atom),
-                            Node::new_constraint(db, new_atom),
-                        );
-                        simplified = simplified.substitute_intersection(
-                            db,
-                            SatisfiedConstraint::Negative(new_atom),
-                            SatisfiedConstraint::Positive(nested_atom),
-                            Node::new_constraint(db, nested_atom),
-                        );
-                    }
-                }
-            });
+            }
         }
         simplified
     }
