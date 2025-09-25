@@ -31,7 +31,7 @@ Released on 2025-09-25.
 ### Other changes
 
 - \[`playground`\] Allow hover quick fixes to appear for overlapping diagnostics ([#20527](https://github.com/astral-sh/ruff/pull/20527))
-- \[`playground`\] Fix non‑BMP code point handling in quick‑fixes and markers ([#20526](https://github.com/astral-sh/ruff/pull/20526))
+- \[`playground`\] Fix non‑BMP code point handling in quick fixes and markers ([#20526](https://github.com/astral-sh/ruff/pull/20526))
 
 ### Contributors
 
