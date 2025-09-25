@@ -1733,7 +1733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
-                CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
+                CallArguments::from_arguments(arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
                     if let Some(argument) = argument {
                         self.store_expression_type(argument, ty);
@@ -5831,7 +5831,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments =
-            CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
+            CallArguments::from_arguments(arguments, |argument, splatted_value| {
                 let ty = self.infer_expression(splatted_value, TypeContext::default());
                 if let Some(argument) = argument {
                     self.store_expression_type(argument, ty);

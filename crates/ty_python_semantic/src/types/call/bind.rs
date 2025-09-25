@@ -2135,24 +2135,36 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         Ok(())
     }
 
+    /// Match a variadic argument to the remaining positional, standard or variadic parameters.
     fn match_variadic(
         &mut self,
         db: &'db dyn Db,
         argument_index: usize,
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
-        length: TupleLength,
     ) -> Result<(), ()> {
         let tuple = argument_type.map(|ty| ty.iterate(db));
-        let mut argument_types = match tuple.as_ref() {
-            Some(tuple) => Either::Left(tuple.all_elements().copied()),
-            None => Either::Right(std::iter::empty()),
+        let (mut argument_types, length, variable_element) = match tuple.as_ref() {
+            Some(tuple) => (
+                Either::Left(tuple.all_elements().copied()),
+                tuple.len(),
+                tuple.variable_element().copied(),
+            ),
+            None => (
+                Either::Right(std::iter::empty()),
+                TupleLength::unknown(),
+                None,
+            ),
         };
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
         for _ in 0..length.minimum() {
-            self.match_positional(argument_index, argument, argument_types.next())?;
+            self.match_positional(
+                argument_index,
+                argument,
+                argument_types.next().or(variable_element),
+            )?;
         }
 
         // If the tuple is variable-length, we assume that it will soak up all remaining positional
@@ -2163,7 +2175,24 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 .get_positional(self.next_positional)
                 .is_some()
             {
-                self.match_positional(argument_index, argument, argument_types.next())?;
+                self.match_positional(
+                    argument_index,
+                    argument,
+                    argument_types.next().or(variable_element),
+                )?;
+            }
+        }
+
+        // Finally, if there is a variadic parameter we can match any of the remaining unpacked
+        // argument types to it, but only if there is at least one remaining argument type. This is
+        // because a variadic parameter is optional, so if this was done unconditionally, ty could
+        // raise a false positive as "too many arguments".
+        if self.parameters.variadic().is_some() {
+            if let Some(argument_type) = argument_types.next().or(variable_element) {
+                self.match_positional(argument_index, argument, Some(argument_type))?;
+                for argument_type in argument_types {
+                    self.match_positional(argument_index, argument, Some(argument_type))?;
+                }
             }
         }
 
@@ -2433,11 +2462,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.enumerate_argument_types()
         {
             match argument {
-                Argument::Variadic(_) => self.check_variadic_argument_type(
+                Argument::Variadic => self.check_variadic_argument_type(
                     argument_index,
                     adjusted_argument_index,
                     argument,
-                    argument_type,
                 ),
                 Argument::Keywords => self.check_keyword_variadic_argument_type(
                     argument_index,
@@ -2465,37 +2493,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
-        argument_type: Type<'db>,
     ) {
-        // If the argument is splatted, convert its type into a tuple describing the splatted
-        // elements. For tuples, we don't have to do anything! For other types, we treat it as
-        // an iterator, and create a homogeneous tuple of its output type, since we don't know
-        // how many elements the iterator will produce.
-        let argument_types = argument_type.iterate(self.db);
-
-        // Resize the tuple of argument types to line up with the number of parameters this
-        // argument was matched against. If parameter matching succeeded, then we can (TODO:
-        // should be able to, see above) guarantee that all of the required elements of the
-        // splatted tuple will have been matched with a parameter. But if parameter matching
-        // failed, there might be more required elements. That means we can't use
-        // TupleLength::Fixed below, because we would otherwise get a "too many values" error
-        // when parameter matching failed.
-        let desired_size =
-            TupleLength::Variable(self.argument_matches[argument_index].parameters.len(), 0);
-        let argument_types = argument_types
-            .resize(self.db, desired_size)
-            .expect("argument type should be consistent with its arity");
-
-        // Check the types by zipping through the splatted argument types and their matched
-        // parameters.
-        for (argument_type, parameter_index) in
-            (argument_types.all_elements()).zip(&self.argument_matches[argument_index].parameters)
+        for (parameter_index, variadic_argument_type) in
+            self.argument_matches[argument_index].iter()
         {
             self.check_argument_type(
                 adjusted_argument_index,
                 argument,
-                *argument_type,
-                *parameter_index,
+                variadic_argument_type.unwrap_or_else(Type::unknown),
+                parameter_index,
             );
         }
     }
@@ -2711,9 +2717,8 @@ impl<'db> Binding<'db> {
                 Argument::Keyword(name) => {
                     let _ = matcher.match_keyword(argument_index, argument, None, name);
                 }
-                Argument::Variadic(length) => {
-                    let _ =
-                        matcher.match_variadic(db, argument_index, argument, argument_type, length);
+                Argument::Variadic => {
+                    let _ = matcher.match_variadic(db, argument_index, argument, argument_type);
                 }
                 Argument::Keywords => {
                     keywords_arguments.push((argument_index, argument_type));
