@@ -69,8 +69,8 @@ use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, ReturnOutsideFunction, UndefinedLocalWithNestedImportStarUsage,
-    YieldOutsideFunction,
+    LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
+    UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
@@ -87,7 +87,7 @@ mod deferred;
 
 /// State representing whether a docstring is expected or not for the next statement.
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum DocstringState {
+pub(crate) enum DocstringState {
     /// The next statement is expected to be a docstring, but not necessarily so.
     ///
     /// For example, in the following code:
@@ -128,7 +128,7 @@ impl DocstringState {
 
 /// The kind of an expected docstring.
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum ExpectedDocstringKind {
+pub(crate) enum ExpectedDocstringKind {
     /// A module-level docstring.
     ///
     /// For example,
@@ -603,6 +603,11 @@ impl<'a> Checker<'a> {
     pub(crate) const fn context(&self) -> &'a LintContext<'a> {
         self.context
     }
+
+    /// Return the current [`DocstringState`].
+    pub(crate) fn docstring_state(&self) -> DocstringState {
+        self.docstring_state
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -683,6 +688,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                 // PLE1700
                 if self.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
                     self.report_diagnostic(YieldFromInAsyncFunction, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                // F622
+                if self.is_rule_enabled(Rule::MultipleStarredExpressions) {
+                    self.report_diagnostic(MultipleStarredExpressions, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable

@@ -212,13 +212,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if ctx.is_store() {
                 let check_too_many_expressions =
                     checker.is_rule_enabled(Rule::ExpressionsInStarAssignment);
-                let check_two_starred_expressions =
-                    checker.is_rule_enabled(Rule::MultipleStarredExpressions);
                 pyflakes::rules::starred_expressions(
                     checker,
                     elts,
                     check_too_many_expressions,
-                    check_two_starred_expressions,
                     expr.range(),
                 );
             }

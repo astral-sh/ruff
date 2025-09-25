@@ -389,6 +389,40 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr_ctx: ExprContext,
+        elts: &[Expr],
+        range: TextRange,
+    ) {
+        if expr_ctx.is_store() {
+            let mut has_starred = false;
+            for elt in elts {
+                if elt.is_starred_expr() {
+                    if has_starred {
+                        // test_err multiple_starred_assignment_target
+                        // (*a, *b) = (1, 2)
+                        // [*a, *b] = (1, 2)
+                        // (*a, *b, c) = (1, 2, 3)
+                        // [*a, *b, c] = (1, 2, 3)
+                        // (*a, *b, (*c, *d)) = (1, 2)
+
+                        // test_ok multiple_starred_assignment_target
+                        // (*a, b) = (1, 2)
+                        // (*_, normed), *_ = [(1,), 2]
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                            range,
+                        );
+                        return;
+                    }
+                    has_starred = true;
+                }
+            }
+        }
+    }
+
     /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
     fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
@@ -754,6 +788,20 @@ impl SemanticSyntaxChecker {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
                 Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
             }
+            Expr::Tuple(ast::ExprTuple {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            })
+            | Expr::List(ast::ExprList {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            }) => {
+                Self::multiple_star_expression(ctx, *expr_ctx, elts, *range);
+            }
             Expr::Lambda(ast::ExprLambda {
                 parameters: Some(parameters),
                 ..
@@ -1034,6 +1082,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
                 write!(f, "`from {name} import *` only allowed at module level")
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                write!(f, "Two starred expressions in assignment")
             }
         }
     }
@@ -1398,6 +1449,13 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `from <module> import *` outside module scope.
     NonModuleImportStar(String),
+
+    /// Represents the use of more than one starred expression in an assignment.
+    ///
+    /// Python only allows a single starred target when unpacking values on the
+    /// left-hand side of an assignment. Using multiple starred expressions makes
+    /// the statement invalid and results in a `SyntaxError`.
+    MultipleStarredExpressions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

@@ -85,6 +85,34 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
+## Nested `TypedDict`
+
+Nested `TypedDict` fields are also supported.
+
+```py
+from typing import TypedDict
+
+class Inner(TypedDict):
+    name: str
+    age: int | None
+
+class Person(TypedDict):
+    inner: Inner
+```
+
+```py
+alice: Person = {"inner": {"name": "Alice", "age": 30}}
+
+reveal_type(alice["inner"]["name"])  # revealed: str
+reveal_type(alice["inner"]["age"])  # revealed: int | None
+
+# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "non_existing""
+reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
+
+# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "extra""
+alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
+```
+
 ## Validation of `TypedDict` construction
 
 ```py

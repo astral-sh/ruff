@@ -916,6 +916,28 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
+    // If the type is a specialized instance of the given `KnownClass`, returns the specialization.
+    pub(crate) fn known_specialization(
+        self,
+        known_class: KnownClass,
+        db: &'db dyn Db,
+    ) -> Option<Specialization<'db>> {
+        let class_type = match self {
+            Type::NominalInstance(instance) => instance,
+            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+            _ => return None,
+        }
+        .class(db);
+
+        if !class_type.is_known(db, known_class) {
+            return None;
+        }
+
+        class_type
+            .into_generic_alias()
+            .map(|generic_alias| generic_alias.specialization(db))
+    }
+
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
