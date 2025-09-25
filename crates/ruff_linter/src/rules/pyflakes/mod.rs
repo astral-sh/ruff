@@ -507,6 +507,20 @@ mod tests {
             a.foo()",
         "f401_import_submodules_in_function_scope"
     )]
+    #[test_case(
+        r"
+        import a
+        a.b
+        import a.b",
+        "f401_use_in_between_imports"
+    )]
+    #[test_case(
+        r"
+        import a.b
+        a
+        import a",
+        "f401_use_in_between_imports"
+    )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
             &SourceKind::Python(dedent(contents).to_string()),
