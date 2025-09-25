@@ -23,7 +23,6 @@ use crate::{
         diagnostic::report_undeclared_protocol_member,
         signatures::{Parameter, Parameters},
         todo_type,
-        visitor::any_over_type,
     },
 };
 
@@ -572,16 +571,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 };
 
                 let proto_member_as_bound_method = method.bind_self(db);
-
-                if any_over_type(
-                    db,
-                    proto_member_as_bound_method,
-                    &|t| matches!(t, Type::TypeVar(_)),
-                    true,
-                ) {
-                    // TODO: proper validation for generic methods on protocols
-                    return ConstraintSet::from(true);
-                }
 
                 attribute_type.has_relation_to_impl(
                     db,

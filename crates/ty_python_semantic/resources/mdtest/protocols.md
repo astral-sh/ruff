@@ -1901,21 +1901,23 @@ from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
 class NewStyleClassScoped[T](Protocol):
-    def method(self, input: T) -> None: ...
+    def method(self: Self, input: T) -> None: ...
 
 S = TypeVar("S")
 
 class LegacyClassScoped(Protocol[S]):
-    def method(self, input: S) -> None: ...
+    def method(self: Self, input: S) -> None: ...
 
-static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
-static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
+# TODO: these should pass
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [static-assert-error]
+static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))  # error: [static-assert-error]
 
 class NominalGeneric[T]:
     def method(self, input: T) -> None: ...
 
 def _[T](x: T) -> T:
-    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))
+    # TODO: should pass
+    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))  # error: [static-assert-error]
     static_assert(is_subtype_of(NominalGeneric[T], NewStyleClassScoped[T]))
     static_assert(is_subtype_of(NominalGeneric[T], LegacyClassScoped[T]))
     return x
@@ -1989,17 +1991,22 @@ class NominalReturningSelfNotGeneric:
 # TODO: should pass
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
 
-static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
-static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
+# TODO: should pass
+static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))  # error: [static-assert-error]
+# TODO: should pass
+static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
 
-static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
-static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
+# TODO: should pass
+static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))  # error: [static-assert-error]
+# TODO: should pass
+static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
-static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+# TODO: should pass
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))  # error: [static-assert-error]
 
 # TODO: these should pass
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
