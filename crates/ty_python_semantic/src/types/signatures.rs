@@ -1232,8 +1232,6 @@ impl<'db> Parameters<'db> {
                 && !is_static_or_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
-                // TODO: find out why we break protocol type property tests when we include them here:
-                && !class.is_protocol(db)
             {
                 let method_has_self_in_generic_context =
                     method.signature(db).overloads.iter().any(|s| {
