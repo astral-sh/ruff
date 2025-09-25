@@ -14,26 +14,16 @@
 //! This module provides the machinery for representing the "under what constraints" part of that
 //! question.
 //!
-//! An individual constraint restricts the specialization of a single typevar. You can then build
-//! up more complex constraint sets using union, intersection, and negation operations. We use a
-//! disjunctive normal form (DNF) representation, just like we do for types: a [constraint
-//! set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each of which is
-//! the intersection of zero or more [individual constraints][ConstrainedTypeVar]. Note that the
-//! constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the constraint
-//! set that contains a single clause, where that clause contains no constraints, is always
-//! satisfiable (`⋃ {⋂ {}} = 1`).
-//!
-//! An individual constraint consists of a _positive range_ and zero or more _negative holes_. The
-//! positive range and each negative hole consists of a lower and upper bound. A type is within a
-//! lower and upper bound if it is a supertype of the lower bound and a subtype of the upper bound.
-//! The typevar can specialize to any type that is within the positive range, and is not within any
-//! of the negative holes. (You can think of the constraint as the set of types that are within the
-//! positive range, with the negative holes "removed" from that set.)
+//! An individual constraint restricts the specialization of a single typevar to be within a
+//! particular lower and upper bound. (A type is within a lower and upper bound if it is a
+//! supertype of the lower bound and a subtype of the upper bound.) You can then build up more
+//! complex constraint sets using union, intersection, and negation operations. We use a [binary
+//! decision diagram][bdd] (BDD) to represent a constraint set.
 //!
 //! Note that all lower and upper bounds in a constraint must be fully static. We take the bottom
 //! and top materializations of the types to remove any gradual forms if needed.
 //!
-//! NOTE: This module is currently in a transitional state. We've added the DNF [`ConstraintSet`]
+//! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
 //! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
 //! specializations from those constraints.
@@ -60,6 +50,8 @@
 //! constraint `(int ≤ T ≤ int) ∪ (str ≤ T ≤ str)`. When the lower and upper bounds are the same,
 //! the constraint says that the typevar must specialize to that _exact_ type, not to a subtype or
 //! supertype of it.
+//!
+//! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use std::cmp::Ordering;
 use std::fmt::Display;
@@ -157,20 +149,12 @@ where
 
 /// A set of constraints under which a type property holds.
 ///
-/// We use a DNF representation, so a set contains a list of zero or more
-/// [clauses][ConstraintClause], each of which is an intersection of zero or more
-/// [constraints][ConstrainedTypeVar].
-///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
-///
-/// ### Invariants
-///
-/// - The clauses are simplified as much as possible — there are no two clauses in the set that can
-///   be simplified into a single clause.
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct ConstraintSet<'db> {
+    /// The BDD representing this constraint set
     node: Node<'db>,
 }
 
@@ -269,6 +253,8 @@ impl From<bool> for ConstraintSet<'_> {
     }
 }
 
+/// An individual constraint in a constraint set. This restricts a single typevar to be within a
+/// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
@@ -299,6 +285,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 }
 
+/// Defines the lower and upper bounds of an individual constraint.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct RangeConstraint<'db> {
     lower: Type<'db>,
@@ -409,6 +396,21 @@ impl<'db> RangeConstraint<'db> {
     }
 }
 
+/// A BDD node.
+///
+/// The "variables" of a constraint set BDD are individual constraints, represented by an interned
+/// [`ConstrainedTypeVar`].
+///
+/// Terminal nodes (`false` and `true`) have their own dedicated enum variants. The
+/// [`Interior`][InteriorNode] variant represents interior nodes.
+///
+/// BDD nodes are _reduced_, which means that there are no duplicate nodes (which we handle via
+/// Salsa interning), and that there are no redundant nodes, with `if_true` and `if_false` edges
+/// that point at the same node.
+///
+/// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
+/// visits variables in the same order. [`ConstrainedTypeVar`]s are interned, so we can use the IDs
+/// that salsa assigns to define this order.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 enum Node<'db> {
     AlwaysFalse,
@@ -417,6 +419,7 @@ enum Node<'db> {
 }
 
 impl<'db> Node<'db> {
+    /// Creates a new BDD node, ensuring that it is fully reduced.
     fn new(
         db: &'db dyn Db,
         constraint: ConstrainedTypeVar<'db>,
@@ -431,6 +434,8 @@ impl<'db> Node<'db> {
         Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
     }
 
+    /// Creates a new BDD node for an individual constraint. (The BDD will evaluate to `true` when
+    /// the constraint holds, and to `false` when it does not.)
     fn new_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
         Self::Interior(InteriorNode::new(
             db,
@@ -440,6 +445,9 @@ impl<'db> Node<'db> {
         ))
     }
 
+    /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
+    /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
+    /// a negative constraint, it returns the negation of that BDD node.)
     fn new_satisfied_constraint(db: &'db dyn Db, constraint: SatisfiedConstraint<'db>) -> Self {
         match constraint {
             SatisfiedConstraint::Positive(constraint) => Self::Interior(InteriorNode::new(
@@ -457,6 +465,8 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
+    /// node.
     fn atom(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
         match self {
             Node::Interior(interior) => Some(interior.atom(db)),
@@ -464,14 +474,17 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied(self) -> bool {
         matches!(self, Node::AlwaysTrue)
     }
 
+    /// Returns whether this BDD represent the constant function `false`.
     fn is_never_satisfied(self) -> bool {
         matches!(self, Node::AlwaysFalse)
     }
 
+    /// Returns the negation of this BDD.
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysFalse,
@@ -480,6 +493,7 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the `or` or union of two BDDs.
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
@@ -492,6 +506,7 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the `and` or intersection of two BDDs.
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
@@ -504,6 +519,8 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
+    /// result.
     fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
@@ -532,11 +549,16 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns when
+    /// `then_node` evaluates to; otherwise it returns when `else_node` evaluates to.
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
     }
 
+    /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
+    /// particular values. (Those variables will not be checked when evaluating the result, and
+    /// will not be present in the result.)
     fn restrict(
         self,
         db: &'db dyn Db,
@@ -562,6 +584,9 @@ impl<'db> Node<'db> {
             })
     }
 
+    /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
+    /// particular value. (That variable will be not be checked when evaluating the result, and
+    /// will not be present in the result.)
     fn restrict_one(
         self,
         db: &'db dyn Db,
@@ -574,6 +599,7 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns a new BDD with any occurence of `left ∧ right` replaced with `replacement_node`.
     fn substitute_intersection(
         self,
         db: &'db dyn Db,
@@ -629,6 +655,7 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns a new BDD with any occurence of `left ∨ right` replaced with `replacement_node`.
     fn substitute_union(
         self,
         db: &'db dyn Db,
@@ -681,6 +708,10 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Invokes a closure for each constraint variable that appears anywhere in a BDD. (Any given
+    /// constraint can appear multiple times in different paths from the root; we do not
+    /// deduplicate those constraints, and will instead invoke the callback each time we encounter
+    /// the constraint.)
     fn for_each_constraint(self, db: &'db dyn Db, f: &mut dyn FnMut(ConstrainedTypeVar<'db>)) {
         let Node::Interior(interior) = self else {
             return;
@@ -690,6 +721,7 @@ impl<'db> Node<'db> {
         interior.if_false(db).for_each_constraint(db, f);
     }
 
+    /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
     fn simplify(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
@@ -697,6 +729,8 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
+    /// to `true`. (This translates the boolean function that this BDD represents into DNF form.)
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
         struct Searcher<'db> {
             clauses: SatisfiedClauses<'db>,
@@ -760,6 +794,7 @@ impl<'db> Node<'db> {
     }
 }
 
+/// An interior node of a BDD
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct InteriorNode<'db> {
     atom: ConstrainedTypeVar<'db>,
@@ -1063,6 +1098,8 @@ impl<'db> InteriorNode<'db> {
     }
 }
 
+/// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
+/// must provide an assignment for each variable present in the BDD.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum SatisfiedConstraint<'db> {
     Positive(ConstrainedTypeVar<'db>),
@@ -1088,8 +1125,8 @@ impl<'db> SatisfiedConstraint<'db> {
         *self = self.flipped();
     }
 
-    // Keep this for future debugging needs, even though it's not used when rendering constraint
-    // sets.
+    // Keep this for future debugging needs, even though it's not currently used when rendering
+    // constraint sets.
     #[expect(dead_code)]
     fn display(self, db: &'db dyn Db) -> impl Display {
         struct DisplaySatisfiedConstraint<'db> {
@@ -1115,6 +1152,7 @@ impl<'db> SatisfiedConstraint<'db> {
     }
 }
 
+/// A single clause in the DNF representation of a BDD
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClause<'db> {
     constraints: Vec<SatisfiedConstraint<'db>>,
@@ -1131,6 +1169,8 @@ impl<'db> SatisfiedClause<'db> {
             .expect("clause vector should not be empty");
     }
 
+    /// Invokes a closure with the last constraint in this clause negated. Returns the clause back
+    /// to its original state after invoking the closure.
     fn with_flipped_last_constraint(&mut self, f: impl for<'a> FnOnce(&'a Self)) {
         if self.constraints.is_empty() {
             return;
@@ -1141,6 +1181,8 @@ impl<'db> SatisfiedClause<'db> {
         self.constraints[last_index].flip();
     }
 
+    /// Removes another clause from this clause, if it appears as a prefix of this clause. Returns
+    /// whether the prefix was removed.
     fn remove_prefix(&mut self, prefix: &SatisfiedClause<'db>) -> bool {
         if self.constraints.starts_with(&prefix.constraints) {
             self.constraints.drain(0..prefix.constraints.len());
@@ -1184,6 +1226,8 @@ impl<'db> SatisfiedClause<'db> {
     }
 }
 
+/// A list of the clauses that satisfy a BDD. This is a DNF representation of the boolean function
+/// that the BDD represents.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClauses<'db> {
     clauses: Vec<SatisfiedClause<'db>>,
@@ -1192,6 +1236,15 @@ struct SatisfiedClauses<'db> {
 impl<'db> SatisfiedClauses<'db> {
     fn push(&mut self, clause: SatisfiedClause<'db>) {
         self.clauses.push(clause);
+    }
+
+    /// Simplifies the DNF representation, removing redundancies that do not change the underlying
+    /// function. (This is used when displaying a BDD, to make sure that the representation that we
+    /// show is as simple as possible while still producing the same results.)
+    fn simplify(&mut self) {
+        while self.simplify_one_round() {
+            // Keep going
+        }
     }
 
     fn simplify_one_round(&mut self) -> bool {
@@ -1219,6 +1272,13 @@ impl<'db> SatisfiedClauses<'db> {
             return true;
         }
 
+        // Then look for "prefix simplifications". That is, looks for patterns
+        //
+        //   (A ∧ B) ∨ (A ∧ ¬B ∧ ...)
+        //
+        // and replaces them with
+        //
+        //   (A ∧ B) ∨ (...)
         for i in 0..self.clauses.len() {
             let (clause, rest) = self.clauses[..=i]
                 .split_last_mut()
@@ -1244,12 +1304,6 @@ impl<'db> SatisfiedClauses<'db> {
         }
 
         false
-    }
-
-    fn simplify(&mut self) {
-        while self.simplify_one_round() {
-            // Keep going
-        }
     }
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
