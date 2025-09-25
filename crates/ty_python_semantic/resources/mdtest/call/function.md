@@ -159,6 +159,8 @@ def _(args: list[int]) -> None:
     takes_zero(*args)
     takes_one(*args)
     takes_two(*args)
+    takes_two(*b"ab")
+    takes_two(*b"abc")  # error: [too-many-positional-arguments]
     takes_two_positional_only(*args)
     takes_two_different(*args)  # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)  # error: [invalid-argument-type]

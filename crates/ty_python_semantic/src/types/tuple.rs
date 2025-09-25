@@ -44,7 +44,7 @@ impl TupleLength {
         TupleLength::Variable(0, 0)
     }
 
-    pub(crate) fn is_variable(self) -> bool {
+    pub(crate) const fn is_variable(self) -> bool {
         matches!(self, TupleLength::Variable(_, _))
     }
 
