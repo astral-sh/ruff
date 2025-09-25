@@ -2016,16 +2016,21 @@ class NominalReturningSelfNotGeneric:
 # TODO: should pass
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
 
+static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
 
+static_assert(is_assignable_to(NominalLegacy, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
+static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
 # TODO: these should pass
@@ -2035,8 +2040,23 @@ static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
+
 # TODO: should pass
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
+
+# These test cases are taken from the typing conformance suite:
+class ShapeProtocolImplicitSelf(Protocol):
+    def set_scale(self, scale: float) -> Self: ...
+
+class ShapeProtocolExplicitSelf(Protocol):
+    def set_scale(self: Self, scale: float) -> Self: ...
+
+class BadReturnType:
+    def set_scale(self, scale: float) -> int:
+        return 42
+
+static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
+static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
