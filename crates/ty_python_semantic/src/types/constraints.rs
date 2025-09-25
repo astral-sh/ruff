@@ -565,38 +565,33 @@ impl<'db> Node<'db> {
             .or(db, self.negate(db).and(db, else_node))
     }
 
-    /// Returns whether this BDD references the given constraints.
-    fn constraint_in_domain(self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> bool {
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => false,
-            Node::Interior(interior) => {
-                interior.constraint(db) == constraint
-                    || interior.if_true(db).constraint_in_domain(db, constraint)
-                    || interior.if_false(db).constraint_in_domain(db, constraint)
-            }
-        }
-    }
-
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
     /// particular values. (Those variables will not be checked when evaluating the result, and
     /// will not be present in the result.)
+    ///
+    /// Also returns whether _all_ of the restricted variables appeared in the BDD.
     fn restrict(
         self,
         db: &'db dyn Db,
         assignment: impl IntoIterator<Item = ConstraintAssignment<'db>>,
-    ) -> Self {
-        assignment.into_iter().fold(self, |restricted, assignment| {
-            restricted.restrict_one(db, assignment)
-        })
+    ) -> (Self, bool) {
+        assignment
+            .into_iter()
+            .fold((self, true), |(restricted, found), assignment| {
+                let (restricted, found_this) = restricted.restrict_one(db, assignment);
+                (restricted, found && found_this)
+            })
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
     /// particular value. (That variable will be not be checked when evaluating the result, and
     /// will not be present in the result.)
-    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> Self {
+    ///
+    /// Also returns whether the restricted variable appeared in the BDD.
+    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> (Self, bool) {
         match self {
-            Node::AlwaysTrue => Node::AlwaysTrue,
-            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::AlwaysTrue => (Node::AlwaysTrue, false),
+            Node::AlwaysFalse => (Node::AlwaysFalse, false),
             Node::Interior(interior) => interior.restrict_one(db, assignment),
         }
     }
@@ -609,24 +604,21 @@ impl<'db> Node<'db> {
         right: ConstraintAssignment<'db>,
         replacement: Node<'db>,
     ) -> Self {
-        // If left and right are not both present in the input BDD, we should not even attempt the
-        // substitution, since the Shannon expansion might introduce the missing variables! That
-        // confuses us below when we try to detect whether the substitution is consistent with the
-        // input.
-        if !self.constraint_in_domain(db, left.constraint())
-            || !self.constraint_in_domain(db, right.constraint())
-        {
-            return self;
-        }
-
         // We perform a Shannon expansion to find out what the input BDD evaluates to when:
         //   - left and right are both true
         //   - left is false
         //   - left is true and right is false
         // This covers the entire truth table of `left ∧ right`.
-        let when_left_and_right = self.restrict(db, [left, right]);
-        let when_not_left = self.restrict(db, [left.flipped()]);
-        let when_left_but_not_right = self.restrict(db, [left, right.flipped()]);
+        let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
+        if !both_found {
+            // If left and right are not both present in the input BDD, we should not even attempt
+            // the substitution, since the Shannon expansion might introduce the missing variables!
+            // That confuses us below when we try to detect whether the substitution is consistent
+            // with the input.
+            return self;
+        }
+        let (when_not_left, _) = self.restrict(db, [left.flipped()]);
+        let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
 
         // The result should test `replacement`, and when it's true, it should produce the same
         // output that input would when `left ∧ right` is true. When replacement is false, it
@@ -670,26 +662,23 @@ impl<'db> Node<'db> {
         right: ConstraintAssignment<'db>,
         replacement: Node<'db>,
     ) -> Self {
-        // If left and right are not both present in the input BDD, we should not even attempt the
-        // substitution, since the Shannon expansion might introduce the missing variables! That
-        // confuses us below when we try to detect whether the substitution is consistent with the
-        // input.
-        if !self.constraint_in_domain(db, left.constraint())
-            || !self.constraint_in_domain(db, right.constraint())
-        {
-            return self;
-        }
-
         // We perform a Shannon expansion to find out what the input BDD evaluates to when:
         //   - left and right are both true
         //   - left is true and right is false
         //   - left is false and right is true
         //   - left and right are both false
         // This covers the entire truth table of `left ∨ right`.
-        let when_l1_r1 = self.restrict(db, [left, right]);
-        let when_l0_r0 = self.restrict(db, [left.flipped(), right.flipped()]);
-        let when_l1_r0 = self.restrict(db, [left, right.flipped()]);
-        let when_l0_r1 = self.restrict(db, [left.flipped(), right]);
+        let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
+        if !both_found {
+            // If left and right are not both present in the input BDD, we should not even attempt
+            // the substitution, since the Shannon expansion might introduce the missing variables!
+            // That confuses us below when we try to detect whether the substitution is consistent
+            // with the input.
+            return self;
+        }
+        let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
+        let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
+        let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
 
         // The result should test `replacement`, and when it's true, it should produce the same
         // output that input would when `left ∨ right` is true. For OR, this is the union of what
@@ -908,27 +897,31 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> Node<'db> {
+    fn restrict_one(
+        self,
+        db: &'db dyn Db,
+        assignment: ConstraintAssignment<'db>,
+    ) -> (Node<'db>, bool) {
         // If this node's variable is larger than the assignment's variable, then we have reached a
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_constraint = self.constraint(db);
         if assignment.constraint() < self_constraint {
-            return Node::Interior(self);
+            return (Node::Interior(self), false);
         }
 
         // Otherwise, check if this node's variable is in the assignment. If so, substitute the
         // variable by replacing this node with its if_false/if_true edge, accordingly.
         if assignment == self_constraint.when_true() {
-            self.if_true(db)
+            (self.if_true(db), true)
         } else if assignment == self_constraint.when_false() {
-            self.if_false(db)
+            (self.if_false(db), true)
         } else {
-            Node::new(
-                db,
-                self_constraint,
-                self.if_true(db).restrict_one(db, assignment),
-                self.if_false(db).restrict_one(db, assignment),
+            let (if_true, found_in_true) = self.if_true(db).restrict_one(db, assignment);
+            let (if_false, found_in_false) = self.if_false(db).restrict_one(db, assignment);
+            (
+                Node::new(db, self_constraint, if_true, if_false),
+                found_in_true || found_in_false,
             )
         }
     }
