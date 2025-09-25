@@ -33,7 +33,7 @@ best candidates for contribution. In contrast, issues labeled with `needs-decisi
 issues with these labels.
 
 Please do not open pull requests for new features without prior discussion. While we appreciate
-exploration of new features, we will almost always close these pull requests immediately. Adding a
+exploration of new features, we will often close these pull requests immediately. Adding a
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
 team before it is appropriate to begin work on an implementation.
 
