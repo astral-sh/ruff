@@ -472,13 +472,6 @@ impl<'db> Node<'db> {
         matches!(self, Node::AlwaysFalse)
     }
 
-    fn interior_node_count(self, db: &'db dyn Db) -> usize {
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => 0,
-            Node::Interior(interior) => interior.interior_node_count(db),
-        }
-    }
-
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysFalse,
@@ -779,11 +772,6 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
-    #[salsa::tracked]
-    fn interior_node_count(self, db: &'db dyn Db) -> usize {
-        self.if_true(db).interior_node_count(db) + self.if_false(db).interior_node_count(db) + 1
-    }
-
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn negate(self, db: &'db dyn Db) -> Node<'db> {
         Node::new(
