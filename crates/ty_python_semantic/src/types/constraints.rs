@@ -575,21 +575,9 @@ impl<'db> Node<'db> {
         db: &'db dyn Db,
         assignment: impl IntoIterator<Item = SatisfiedConstraint<'db>>,
     ) -> (Node<'db>, bool) {
-        //eprintln!("==> restrict {}", self.display(db));
         assignment
             .into_iter()
             .fold((self, true), |(restricted, found), assignment| {
-                /*
-                eprintln!(" -> restricted {}", restricted.display(db));
-                eprintln!(
-                    " -> {} == {}",
-                    assignment.constraint().display(db),
-                    match assignment {
-                        SatisfiedConstraint::Positive(_) => "1",
-                        SatisfiedConstraint::Negative(_) => "0",
-                    },
-                );
-                */
                 let (restricted, found_this) = restricted.restrict_one(db, assignment);
                 (restricted, found && found_this)
             })
@@ -620,50 +608,25 @@ impl<'db> Node<'db> {
         right: SatisfiedConstraint<'db>,
         replacement_node: Node<'db>,
     ) -> Self {
-        /*
-        eprintln!(
-            "==> substitute {} for ({}) ∧ ({})",
-            replacement_node.display(db),
-            left.display(db),
-            right.display(db)
-        );
-        eprintln!(" -> in {}", self.display(db));
-        */
         let (when_not_left, _) = self.restrict(db, [left.flipped()]);
-        //eprintln!(" -> (x ∧ y)[x=0] = {}", when_not_left.display(db));
         let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
-        /*
-        eprintln!(
-            " -> (x ∧ y)[x=1,y=0] = {}",
-            when_left_but_not_right.display(db)
-        );
-        */
         let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
         if !both_found {
             return self;
         }
-        //eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_left_and_right.display(db));
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
 
         let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
-        //eprintln!(" -> right_result = {}", right_result.display(db));
         let left_result = left_node.ite(db, right_result, when_not_left);
-        //eprintln!(" -> left_result  = {}", left_result.display(db));
         let result = replacement_node.ite(db, when_left_and_right, left_result);
-        //eprintln!(" -> result       = {}", result.display(db));
 
         let validity = replacement_node.iff(db, left_node.and(db, right_node));
-        //eprintln!(" -> validity     = {}", validity.display(db));
         let constrained_original = self.and(db, validity);
-        //eprintln!(" -> **original   = {}", constrained_original.display(db));
         let constrained_replacement = result.and(db, validity);
-        //eprintln!(" -> **result     = {}", constrained_replacement.display(db));
         if constrained_original == constrained_replacement {
-            //eprintln!(" -> using replacement");
             result
         } else {
-            //eprintln!(" -> using original");
             self
         }
     }
@@ -676,26 +639,13 @@ impl<'db> Node<'db> {
         right: SatisfiedConstraint<'db>,
         replacement_node: Node<'db>,
     ) -> Self {
-        /*
-        eprintln!(
-            "==> substitute {} for ({}) ∨ ({})",
-            replacement_node.display(db),
-            left.display(db),
-            right.display(db)
-        );
-        eprintln!(" -> in {}", self.display(db));
-        */
         let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
-        //eprintln!(" -> (x ∧ y)[x=0,y=0] = {}", when_l0_r0.display(db));
         let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
-        //eprintln!(" -> (x ∧ y)[x=1,y=0] = {}", when_l1_r0.display(db));
         let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
-        //eprintln!(" -> (x ∧ y)[x=0,y=1] = {}", when_l0_r1.display(db));
         let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
         if !both_found {
             return self;
         }
-        //eprintln!(" -> (x ∧ y)[x=1,y=1] = {}", when_l1_r1.display(db));
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
 
@@ -704,19 +654,13 @@ impl<'db> Node<'db> {
             when_l1_r0.or(db, when_l0_r1.or(db, when_l1_r1)),
             when_l0_r0,
         );
-        //eprintln!(" -> result       = {}", result.display(db));
 
         let validity = replacement_node.iff(db, left_node.or(db, right_node));
-        //eprintln!(" -> validity     = {}", validity.display(db));
         let constrained_original = self.and(db, validity);
-        //eprintln!(" -> **original   = {}", constrained_original.display(db));
         let constrained_replacement = result.and(db, validity);
-        //eprintln!(" -> **result     = {}", constrained_replacement.display(db));
         if constrained_original == constrained_replacement {
-            //eprintln!(" -> using replacement");
             result
         } else {
-            //eprintln!(" -> using original");
             self
         }
     }
@@ -961,13 +905,6 @@ impl<'db> InteriorNode<'db> {
                 None
             };
             if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
-                /*
-                eprintln!(
-                    "==> {} contains {}",
-                    left_constraint.display(db),
-                    right_constraint.display(db),
-                );
-                */
                 simplified = simplified.substitute_union(
                     db,
                     larger_constraint.when_true(),
@@ -1057,13 +994,6 @@ impl<'db> InteriorNode<'db> {
                     );
                 }
                 None => {
-                    /*
-                    eprintln!(
-                        "==> {} ∧ {} is empty",
-                        left_constraint.display(db),
-                        right_constraint.display(db)
-                    );
-                    */
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_true(),
