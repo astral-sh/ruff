@@ -69,6 +69,7 @@ impl Diagnostic {
             parent: None,
             noqa_offset: None,
             secondary_code: None,
+            header_offset: 0,
         });
         Diagnostic { inner }
     }
@@ -521,6 +522,11 @@ impl Diagnostic {
 
         a.cmp(&b)
     }
+
+    /// Add an offset for aligning the header sigil with the line number separators in a diff.
+    pub fn set_header_offset(&mut self, offset: usize) {
+        Arc::make_mut(&mut self.inner).header_offset = offset;
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -534,6 +540,7 @@ struct DiagnosticInner {
     parent: Option<TextSize>,
     noqa_offset: Option<TextSize>,
     secondary_code: Option<SecondaryCode>,
+    header_offset: usize,
 }
 
 struct RenderingSortKey<'a> {

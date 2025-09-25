@@ -208,6 +208,7 @@ struct ResolvedDiagnostic<'a> {
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
+    header_offset: usize,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
@@ -259,6 +260,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            header_offset: diag.inner.header_offset,
         }
     }
 
@@ -288,6 +290,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: false,
+            header_offset: 0,
         }
     }
 
@@ -385,6 +388,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
+            header_offset: self.header_offset,
         }
     }
 }
@@ -492,6 +496,11 @@ struct RenderableDiagnostic<'r> {
     ///
     /// This is rendered as a `[*]` indicator after the diagnostic ID.
     is_fixable: bool,
+    /// Offset to align the header sigil (`-->`) with the subsequent line number separators.
+    ///
+    /// This is only needed for formatter diagnostics where we don't render a snippet via
+    /// `annotate-snippets` and thus the alignment isn't computed automatically.
+    header_offset: usize,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -504,7 +513,11 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
+        let mut message = self
+            .level
+            .title(self.message)
+            .is_fixable(self.is_fixable)
+            .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
             message = message.id(id);
         }

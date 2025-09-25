@@ -34,7 +34,7 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source, format_range};
-use ruff_source_file::{LineIndex, SourceFileBuilder};
+use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{ResolvedFile, Resolver, match_exclusion, python_files_in_path};
@@ -791,7 +791,15 @@ impl<'a> FormatResults<'a> {
                 // For now, report the edit as a replacement of the whole file's contents. For
                 // scripts, this is a single `Edit`, but notebook edits must be split by cell in
                 // order to render them as diffs.
-                let fix = if let SourceKind::IpyNotebook(formatted) = formatted
+                //
+                // We also attempt to estimate the line number width for aligning the
+                // annotate-snippets header. This is only an estimate because we don't actually know
+                // if the maximum line number present in the document will be rendered as part of
+                // the diff, either as a changed line or as an unchanged context line. For
+                // notebooks, we refine our estimate by checking the number of lines in each cell
+                // individually, otherwise we could use `formatted.source_code().count_lines(...)`
+                // in both cases.
+                let (fix, line_count) = if let SourceKind::IpyNotebook(formatted) = formatted
                     && let SourceKind::IpyNotebook(unformatted) = unformatted
                 {
                     notebook_index.insert(path.to_string(), unformatted.index().clone());
@@ -805,17 +813,29 @@ impl<'a> FormatResults<'a> {
                             Edit::range_replacement(formatted.to_string(), unformatted_range)
                         });
 
-                    Fix::safe_edits(
+                    let fix = Fix::safe_edits(
                         edits
                             .next()
                             .expect("Formatted files must have at least one edit"),
                         edits,
-                    )
+                    );
+                    let source = formatted.source_code();
+                    let line_count = formatted
+                        .cell_offsets()
+                        .ranges()
+                        .map(|range| source.count_lines(range))
+                        .max()
+                        .unwrap_or_default();
+                    (fix, line_count)
                 } else {
-                    Fix::safe_edit(Edit::range_replacement(
+                    let fix = Fix::safe_edit(Edit::range_replacement(
                         formatted.source_code().to_string(),
                         TextRange::up_to(unformatted.source_code().text_len()),
-                    ))
+                    ));
+                    let line_count = formatted
+                        .source_code()
+                        .count_lines(TextRange::up_to(formatted.source_code().text_len()));
+                    (fix, line_count)
                 };
 
                 let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
@@ -824,6 +844,9 @@ impl<'a> FormatResults<'a> {
                 annotation.set_file_level(true);
                 diagnostic.annotate(annotation);
                 diagnostic.set_fix(fix);
+
+                let lines = OneIndexed::new(line_count as usize).unwrap_or_default();
+                diagnostic.set_header_offset(lines.digits().get());
 
                 Some(diagnostic)
             })

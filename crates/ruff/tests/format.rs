@@ -680,7 +680,7 @@ fn output_format_notebook() {
         exit_code: 1
         ----- stdout -----
         unformatted: File would be reformatted
-        --> resources/test/fixtures/unformatted.ipynb:cell 1:1:1
+          --> resources/test/fixtures/unformatted.ipynb:cell 1:1:1
          ::: cell 1
         1 | import numpy
           - maths = (numpy.arange(100)**2).sum()

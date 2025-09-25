@@ -56,6 +56,7 @@ pub(crate) struct DisplayList<'a> {
     pub(crate) stylesheet: &'a Stylesheet,
     pub(crate) anonymized_line_numbers: bool,
     pub(crate) cut_indicator: &'static str,
+    pub(crate) lineno_offset: usize,
 }
 
 impl PartialEq for DisplayList<'_> {
@@ -81,13 +82,14 @@ impl Display for DisplayList<'_> {
                 _ => max,
             })
         });
-        let lineno_width = if lineno_width == 0 {
-            lineno_width
-        } else if self.anonymized_line_numbers {
-            ANONYMIZED_LINE_NUM.len()
-        } else {
-            ((lineno_width as f64).log10().floor() as usize) + 1
-        };
+        let lineno_width = self.lineno_offset
+            + if lineno_width == 0 {
+                lineno_width
+            } else if self.anonymized_line_numbers {
+                ANONYMIZED_LINE_NUM.len()
+            } else {
+                ((lineno_width as f64).log10().floor() as usize) + 1
+            };
 
         let multiline_depth = self.body.iter().fold(0, |max, set| {
             set.display_lines.iter().fold(max, |max2, line| match line {
@@ -124,6 +126,7 @@ impl<'a> DisplayList<'a> {
         term_width: usize,
         cut_indicator: &'static str,
     ) -> DisplayList<'a> {
+        let lineno_offset = message.lineno_offset;
         let body = format_message(
             message,
             term_width,
@@ -137,6 +140,7 @@ impl<'a> DisplayList<'a> {
             stylesheet,
             anonymized_line_numbers,
             cut_indicator,
+            lineno_offset,
         }
     }
 
@@ -1088,6 +1092,7 @@ fn format_message<'m>(
         footer,
         snippets,
         is_fixable,
+        lineno_offset: _,
     } = message;
 
     let mut sets = vec![];
