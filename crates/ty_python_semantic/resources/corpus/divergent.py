@@ -57,9 +57,6 @@ def unwrap(value):
     else:
         raise TypeError()
 
-# TODO: If this is commented out, that is, if `infer_scope_types` is called before `infer_return_type`, it will panic.
-reveal_type(unwrap(Foo()))
-
 def descent(x: int, y: int):
     if x > y:
         y, x = descent(y, x)
@@ -71,5 +68,5 @@ def descent(x: int, y: int):
     else:
         return descent(x-1, y-1)
 
-# TODO: If this is commented out, that is, if `infer_scope_types` is called before `infer_return_type`, it will panic.
-reveal_type(descent(5, 3))
+def count_set_bits(n):
+    return 1 + count_set_bits(n & n - 1) if n else 0
