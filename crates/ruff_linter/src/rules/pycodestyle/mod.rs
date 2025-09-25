@@ -75,7 +75,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::FloatComparison, Path::new("E723.py"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
@@ -416,9 +415,9 @@ mod tests {
             Path::new("pycodestyle/E501_2.py"),
             &settings::LinterSettings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
-                pycodestyle: pycodestyle::settings::Settings {
+                pycodestyle: Settings {
                     max_line_length: LineLength::try_from(6).unwrap(),
-                    ..pycodestyle::settings::Settings::default()
+                    ..Settings::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },

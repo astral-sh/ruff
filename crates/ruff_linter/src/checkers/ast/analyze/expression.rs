@@ -1583,9 +1583,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::TypeComparison) {
                 pycodestyle::rules::type_comparison(checker, compare);
             }
-            if checker.is_rule_enabled(Rule::FloatComparison) {
-                pycodestyle::rules::float_comparison(checker, compare);
-            }
             if checker.any_rule_enabled(&[
                 Rule::SysVersionCmpStr3,
                 Rule::SysVersionInfo0Eq3,
@@ -1628,6 +1625,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::YodaConditions) {
                 flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);
+            }
+            if checker.is_rule_enabled(Rule::FloatComparison) {
+                ruff::rules::float_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::PandasNuniqueConstantSeriesCheck) {
                 pandas_vet::rules::nunique_constant_series_check(
