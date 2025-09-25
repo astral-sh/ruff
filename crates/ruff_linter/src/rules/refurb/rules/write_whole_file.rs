@@ -1,3 +1,4 @@
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt,
@@ -10,7 +11,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::rules::refurb::helpers::{FileOpen, find_file_opens, generate_furb_101_103_fix};
+use crate::importer::ImportRequest;
+use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -52,11 +54,9 @@ impl Violation for WriteWholeFile {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`open` and `write` should be replaced by `Path({}).{}`",
-            self.filename.truncated_display(),
-            self.suggestion.truncated_display(),
-        )
+        let filename = self.filename.truncated_display();
+        let suggestion = self.suggestion.truncated_display();
+        format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
     }
     fn fix_title(&self) -> Option<String> {
         Some(format!(
@@ -129,12 +129,14 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                 let open = self.candidates.remove(open);
 
                 if self.loop_counter == 0 {
+                    let suggestion = make_suggestion(&open, content, self.checker.generator());
+
                     let mut diagnostic = self.checker.report_diagnostic(
                         WriteWholeFile {
                             filename: SourceCodeSnippet::from_str(
                                 &self.checker.generator().expr(open.filename),
                             ),
-                            suggestion: make_suggestion(&open, content, self.checker.generator()),
+                            suggestion: suggestion.clone(),
                         },
                         open.item.range(),
                     );
@@ -143,13 +145,9 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                         return;
                     }
 
-                    if let Some(fix) = generate_furb_101_103_fix(
-                        self.checker,
-                        &open,
-                        None,
-                        Some(content),
-                        self.with_stmt,
-                    ) {
+                    if let Some(fix) =
+                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                    {
                         diagnostic.set_fix(fix);
                     }
                 }
@@ -199,4 +197,47 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> Sou
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     SourceCodeSnippet::from_str(&generator.expr(&call.into()))
+}
+
+fn generate_fix(
+    checker: &Checker,
+    open: &FileOpen,
+    with_stmt: &ast::StmtWith,
+    suggestion: &SourceCodeSnippet,
+) -> Option<Fix> {
+    let is_valid_block =
+        with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)]);
+
+    if !is_valid_block {
+        return None;
+    }
+
+    let locator = checker.locator();
+    let filename_code = locator.slice(open.filename.range());
+    let call = suggestion
+        .full_display()
+        .unwrap_or(suggestion.truncated_display());
+
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            with_stmt.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+
+    let replacement = format!("{}({}).{}", binding, filename_code, call);
+
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edits(
+        Edit::range_replacement(replacement, with_stmt.range()),
+        [import_edit],
+        applicability,
+    ))
 }

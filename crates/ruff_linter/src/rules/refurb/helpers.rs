@@ -1,12 +1,12 @@
+use std::borrow::Cow;
+
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{self as ast, Expr, Stmt, name::Name, parenthesize::parenthesized_range};
+use ruff_python_ast::{self as ast, Expr, name::Name, parenthesize::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
-use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
@@ -356,79 +356,4 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
 pub(super) enum IterLocation {
     Call,
     Comprehension,
-}
-
-pub(super) fn generate_furb_101_103_fix(
-    checker: &Checker,
-    open: &FileOpen,
-    target: Option<&str>,
-    content_expr: Option<&Expr>,
-    with_stmt: &ast::StmtWith,
-) -> Option<Fix> {
-    let is_valid_block = with_stmt.items.len() == 1
-        && match (target, content_expr) {
-            // read (FURB101)
-            (Some(_), None) => matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)]),
-            // write (FURB103)
-            (None, Some(_)) => matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)]),
-            _ => false,
-        };
-
-    if !is_valid_block {
-        return None;
-    }
-
-    let locator = checker.locator();
-    let filename_code = locator.slice(open.filename.range());
-    let content_code = content_expr.map(|expr| locator.slice(expr.range()));
-
-    let (import_edit, binding) = checker
-        .importer()
-        .get_or_import_symbol(
-            &ImportRequest::import("pathlib", "Path"),
-            with_stmt.start(),
-            checker.semantic(),
-        )
-        .ok()?;
-
-    let args = itertools::join(
-        content_code
-            .into_iter()
-            .chain(open.keywords.iter().map(|kw| locator.slice(kw.range()))),
-        ", ",
-    );
-
-    let replacement = match target {
-        Some(var) => {
-            format!(
-                "{} = {}({}).{}({})",
-                var,
-                binding,
-                filename_code,
-                open.mode.pathlib_method(),
-                args
-            )
-        }
-        None => {
-            format!(
-                "{}({}).{}({})",
-                binding,
-                filename_code,
-                open.mode.pathlib_method(),
-                args
-            )
-        }
-    };
-
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    Some(Fix::applicable_edits(
-        Edit::range_replacement(replacement, with_stmt.range()),
-        [import_edit],
-        applicability,
-    ))
 }

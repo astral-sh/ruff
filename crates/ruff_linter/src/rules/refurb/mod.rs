@@ -63,18 +63,15 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Path::new("FURB101.py"))]
-    #[test_case(Path::new("FURB103.py"))]
-    fn preview_rules(path: &Path) -> Result<()> {
-        let snapshot = format!("preview_{}", path.to_string_lossy());
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("refurb").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![
-                    Rule::ReadWholeFile,
-                    Rule::WriteWholeFile,
-                ])
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
