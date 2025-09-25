@@ -56,22 +56,6 @@ impl SemanticSyntaxChecker {
         });
     }
 
-    pub fn is_feature_name(name: &str) -> bool {
-        matches!(
-            name,
-            "nested_scopes"
-                | "generators"
-                | "division"
-                | "absolute_import"
-                | "with_statement"
-                | "print_function"
-                | "unicode_literals"
-                | "barry_as_FLUFL"
-                | "generator_stop"
-                | "annotations"
-        )
-    }
-
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::ImportFrom(StmtImportFrom {
@@ -83,12 +67,14 @@ impl SemanticSyntaxChecker {
             }) => {
                 if matches!(module.as_deref(), Some("__future__")) {
                     for name in names {
-                        if !Self::is_feature_name(&name.name) {
+                        if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
                             // from __future__ import annotations
 
                             // test_err invalid_future_feature
                             // from __future__ import invalid_feature
+                            // from __future__ import annotations, invalid_feature
+                            // from __future__ import invalid_feature_1, invalid_feature_2
                             Self::add_error(
                                 ctx,
                                 SemanticSyntaxErrorKind::FutureFeatureNotDefined(
@@ -1010,6 +996,22 @@ impl SemanticSyntaxChecker {
             );
         }
     }
+}
+
+fn is_known_future_feature(name: &str) -> bool {
+    matches!(
+        name,
+        "nested_scopes"
+            | "generators"
+            | "division"
+            | "absolute_import"
+            | "with_statement"
+            | "print_function"
+            | "unicode_literals"
+            | "barry_as_FLUFL"
+            | "generator_stop"
+            | "annotations"
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]

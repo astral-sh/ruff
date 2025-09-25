@@ -2967,10 +2967,7 @@ lambda: fu
             r"
         from __future__ import *
         ",
-            &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::FutureFeatureNotDefined,
-            ],
+            &[Rule::FutureFeatureNotDefined],
         );
     }
 
