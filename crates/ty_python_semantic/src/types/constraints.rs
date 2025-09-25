@@ -568,6 +568,8 @@ impl<'db> Node<'db> {
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
     /// particular values. (Those variables will not be checked when evaluating the result, and
     /// will not be present in the result.)
+    ///
+    /// Also returns whether _all_ of the restricted variables appeared in the BDD.
     fn restrict(
         self,
         db: &'db dyn Db,
@@ -596,6 +598,8 @@ impl<'db> Node<'db> {
     /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
     /// particular value. (That variable will be not be checked when evaluating the result, and
     /// will not be present in the result.)
+    ///
+    /// Also returns whether the restricted variable appeared in the BDD.
     fn restrict_one(
         self,
         db: &'db dyn Db,
