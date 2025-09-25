@@ -932,21 +932,43 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
+        // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
+        // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
+        // substitution to replace the pair with the simplification.
+        //
+        // Some of the simplifications create _new_ constraints that weren't originally present in
+        // the BDD. If we encounter one of those cases, we need to check if we can simplify things
+        // further relative to that new constraint.
+        //
+        // To handle this, we keep track of the individual constraints that we have already
+        // discovered (`seen_constraints`), and a queue of constraint pairs that we still need to
+        // check (`to_visit`).
+
+        // Seed the seen set with all of the constraints that are present in the input BDD, and the
+        // visit queue with all pairs of those constraints. (We use "combinations" because we don't
+        // need to compare a constraint against itself, and because ordering doesn't matter.)
         let mut seen_constraints = FxHashSet::default();
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
             seen_constraints.insert(constraint);
         });
-
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
             .tuple_combinations()
             .collect();
+
+        // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
+        // be simplified.
         let mut simplified = Node::Interior(self);
         while let Some((left_constraint, right_constraint)) = to_visit.pop() {
+            // If the constraints refer to different typevars, they trivially cannot be compared.
+            // TODO: We might need to consider when one constraint's upper or lower bound refers to
+            // the other constraint's typevar.
             let typevar = left_constraint.typevar(db);
             if typevar != right_constraint.typevar(db) {
                 continue;
             }
 
+            // Containment: The range of one constraint might completely contain the range of the
+            // other. If so, there are several potential simplifications.
             let larger_smaller = if left_constraint.contains(db, right_constraint) {
                 Some((left_constraint, right_constraint))
             } else if right_constraint.contains(db, left_constraint) {
@@ -955,12 +977,15 @@ impl<'db> InteriorNode<'db> {
                 None
             };
             if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
+                // larger ∨ smaller = larger
                 simplified = simplified.substitute_union(
                     db,
                     larger_constraint.when_true(),
                     smaller_constraint.when_true(),
                     Node::new_satisfied_constraint(db, larger_constraint.when_true()),
                 );
+
+                // larger ∧ smaller = smaller
                 simplified = simplified.substitute_intersection(
                     db,
                     larger_constraint.when_false(),
@@ -968,12 +993,17 @@ impl<'db> InteriorNode<'db> {
                     Node::new_satisfied_constraint(db, larger_constraint.when_false()),
                 );
 
+                // smaller ∧ ¬larger = false
+                // (¬larger removes everything that's present in smaller)
                 simplified = simplified.substitute_intersection(
                     db,
                     larger_constraint.when_false(),
                     smaller_constraint.when_true(),
                     Node::AlwaysFalse,
                 );
+
+                // larger ∨ ¬smaller = true
+                // (larger fills in everything that's missing in ¬smaller)
                 simplified = simplified.substitute_union(
                     db,
                     larger_constraint.when_true(),
@@ -982,10 +1012,16 @@ impl<'db> InteriorNode<'db> {
                 );
             }
 
+            // There are some simplifications we can make when the intersection of the two
+            // constraints is empty, and others that we can make when the intersection is
+            // non-empty.
             let left_range = left_constraint.range(db);
             let right_range = right_constraint.range(db);
             match left_range.intersect(db, right_range) {
                 Some(intersection_range) => {
+                    // If the intersection is non-empty, we need to create a new constraint to
+                    // represent that intersection. We also need to add the new constraint to our
+                    // seen set and (if we haven't already seen it) to the to-visit queue.
                     let intersection_constraint =
                         ConstrainedTypeVar::new(db, typevar, intersection_range);
                     if seen_constraints.insert(intersection_constraint) {
@@ -1000,12 +1036,15 @@ impl<'db> InteriorNode<'db> {
                     let negative_intersection_node =
                         Node::new_satisfied_constraint(db, intersection_constraint.when_false());
 
+                    // left ∧ right = intersection
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_true(),
                         positive_intersection_node,
                     );
+
+                    // ¬left ∨ ¬right = ¬intersection
                     simplified = simplified.substitute_union(
                         db,
                         left_constraint.when_false(),
@@ -1013,6 +1052,9 @@ impl<'db> InteriorNode<'db> {
                         negative_intersection_node,
                     );
 
+                    // left ∧ ¬right = left ∧ ¬intersection
+                    // (clip the negative constraint to the smallest range that actually removes
+                    // something from positive constraint)
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_true(),
@@ -1020,6 +1062,9 @@ impl<'db> InteriorNode<'db> {
                         Node::new_satisfied_constraint(db, left_constraint.when_true())
                             .and(db, negative_intersection_node),
                     );
+
+                    // ¬left ∧ right = ¬intersection ∧ right
+                    // (save as above but reversed)
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_false(),
@@ -1028,6 +1073,9 @@ impl<'db> InteriorNode<'db> {
                             .and(db, negative_intersection_node),
                     );
 
+                    // left ∨ ¬right = intersection ∨ ¬right
+                    // (clip the positive constraint to the smallest range that actually adds
+                    // something to the negative constraint)
                     simplified = simplified.substitute_union(
                         db,
                         left_constraint.when_true(),
@@ -1035,6 +1083,9 @@ impl<'db> InteriorNode<'db> {
                         Node::new_satisfied_constraint(db, right_constraint.when_false())
                             .or(db, positive_intersection_node),
                     );
+
+                    // ¬left ∨ right = ¬left ∨ intersection
+                    // (save as above but reversed)
                     simplified = simplified.substitute_union(
                         db,
                         left_constraint.when_false(),
@@ -1043,25 +1094,38 @@ impl<'db> InteriorNode<'db> {
                             .or(db, positive_intersection_node),
                     );
                 }
+
                 None => {
+                    // All of the below hold because we just proved that the intersection of left
+                    // and right is empty.
+
+                    // left ∧ right = false
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_true(),
                         Node::AlwaysFalse,
                     );
+
+                    // ¬left ∨ ¬right = true
                     simplified = simplified.substitute_union(
                         db,
                         left_constraint.when_false(),
                         right_constraint.when_false(),
                         Node::AlwaysTrue,
                     );
+
+                    // left ∧ ¬right = left
+                    // (there is nothing in the hole of ¬right that overlaps with left)
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_false(),
                         Node::new_constraint(db, left_constraint),
                     );
+
+                    // ¬left ∧ right = right
+                    // (save as above but reversed)
                     simplified = simplified.substitute_intersection(
                         db,
                         left_constraint.when_false(),
@@ -1071,6 +1135,7 @@ impl<'db> InteriorNode<'db> {
                 }
             }
         }
+
         simplified
     }
 }
