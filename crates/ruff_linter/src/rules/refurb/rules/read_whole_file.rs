@@ -221,10 +221,10 @@ fn generate_fix(
 
     let replacement = match target {
         Some(var) => {
-            format!("{} = {}({}).{}", var, binding, filename_code, call)
+            format!("{var} = {binding}({filename_code}).{call}")
         }
         None => {
-            format!("{}({}).{}", binding, filename_code, call)
+            format!("{binding}({filename_code}).{call}")
         }
     };
 

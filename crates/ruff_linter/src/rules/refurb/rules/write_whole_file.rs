@@ -227,7 +227,7 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = format!("{}({}).{}", binding, filename_code, call);
+    let replacement = format!("{binding}({filename_code}).{call}");
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
         Applicability::Unsafe
