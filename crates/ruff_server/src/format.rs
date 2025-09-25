@@ -287,7 +287,7 @@ impl UvFormatCommand {
                     "The installed version of uv does not support `uv format`; upgrade to a newer version"
                 );
             }
-            anyhow::bail!("Failed to format document: {}", stderr);
+            anyhow::bail!("Failed to format document: {stderr}");
         }
 
         let formatted = String::from_utf8(result.stdout)

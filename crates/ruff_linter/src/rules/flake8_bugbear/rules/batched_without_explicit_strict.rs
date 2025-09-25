@@ -3,7 +3,7 @@ use ruff_python_ast::ExprCall;
 use ruff_python_ast::PythonVersion;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_bugbear::rules::is_infinite_iterable;
+use crate::rules::flake8_bugbear::helpers::is_infinite_iterable;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does

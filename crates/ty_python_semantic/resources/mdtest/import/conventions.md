@@ -306,7 +306,7 @@ The following scenarios are when a re-export happens conditionally in a stub fil
 ### Global import
 
 ```py
-# error: "Member `Foo` of module `a` is possibly unbound"
+# error: "Member `Foo` of module `a` may be missing"
 from a import Foo
 
 reveal_type(Foo)  # revealed: str
@@ -337,7 +337,7 @@ Here, both the branches of the condition are import statements where one of them
 the other does not.
 
 ```py
-# error: "Member `Foo` of module `a` is possibly unbound"
+# error: "Member `Foo` of module `a` may be missing"
 from a import Foo
 
 reveal_type(Foo)  # revealed: <class 'Foo'>
@@ -365,7 +365,7 @@ class Foo: ...
 ### Re-export in one branch
 
 ```py
-# error: "Member `Foo` of module `a` is possibly unbound"
+# error: "Member `Foo` of module `a` may be missing"
 from a import Foo
 
 reveal_type(Foo)  # revealed: <class 'Foo'>

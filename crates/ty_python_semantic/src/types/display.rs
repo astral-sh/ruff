@@ -191,10 +191,8 @@ impl ClassDisplay<'_> {
         let mut name_parts = vec![];
 
         // Skips itself
-        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
-        {
-            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
-            let node = ancestor_scope_id.node(self.db);
+        for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1) {
+            let node = ancestor_scope.node();
 
             match ancestor_scope.kind() {
                 ScopeKind::Class => {
@@ -388,6 +386,9 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
                 f.write_str("<method-wrapper `startswith` of `str` object>")
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::PathOpen) => {
+                f.write_str("bound method `Path.open`")
             }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {

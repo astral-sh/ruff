@@ -19,7 +19,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{PySourceType, PythonVersion};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -155,17 +155,27 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let module_file = module.file(db)?;
 
     if file.path(db) == module_file.path(db) {
-        Some(module)
-    } else {
-        // This path is for a module with the same name but with a different precedence. For example:
-        // ```
-        // src/foo.py
-        // src/foo/__init__.py
-        // ```
-        // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
-        // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
-        None
+        return Some(module);
+    } else if file.source_type(db) == PySourceType::Python
+        && module_file.source_type(db) == PySourceType::Stub
+    {
+        // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
+        // which would make us erroneously believe the `.py` is *not* also this module (breaking things
+        // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
+        let module = resolve_real_module(db, &module_name)?;
+        let module_file = module.file(db)?;
+        if file.path(db) == module_file.path(db) {
+            return Some(module);
+        }
     }
+    // This path is for a module with the same name but with a different precedence. For example:
+    // ```
+    // src/foo.py
+    // src/foo/__init__.py
+    // ```
+    // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
+    // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
+    None
 }
 
 pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
@@ -1576,6 +1586,7 @@ mod tests {
         let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let foo = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_real = resolve_real_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_stub = src.join("foo.pyi");
 
         assert_eq!(&src, foo.search_path(&db).unwrap());
@@ -1583,9 +1594,10 @@ mod tests {
 
         assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
         assert_eq!(
-            None,
+            Some(foo_real),
             path_to_module(&db, &FilePath::System(src.join("foo.py")))
         );
+        assert!(foo_real != foo);
     }
 
     #[test]

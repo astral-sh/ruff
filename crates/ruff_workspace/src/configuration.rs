@@ -55,7 +55,8 @@ use crate::options::{
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
-    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, LineEnding, Settings,
+    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
+    Settings,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -158,9 +159,7 @@ impl Configuration {
                 .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
             if !required_version.contains(&ruff_pkg_version) {
                 return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    required_version,
-                    RUFF_PKG_VERSION
+                    "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
                 ));
             }
         }
@@ -276,9 +275,14 @@ impl Configuration {
                 extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: FilePatternSet::try_from_iter(
-                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
-                )?,
+                include: match global_preview {
+                    PreviewMode::Disabled => FilePatternSet::try_from_iter(
+                        self.include.unwrap_or_else(|| INCLUDE.to_vec()),
+                    )?,
+                    PreviewMode::Enabled => FilePatternSet::try_from_iter(
+                        self.include.unwrap_or_else(|| INCLUDE_PREVIEW.to_vec()),
+                    )?,
+                },
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },

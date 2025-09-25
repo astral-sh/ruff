@@ -144,6 +144,13 @@ pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
 ];
+pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
+    FilePattern::Builtin("*.py"),
+    FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("*.pyw"),
+    FilePattern::Builtin("*.ipynb"),
+    FilePattern::Builtin("**/pyproject.toml"),
+];
 
 impl FileResolverSettings {
     fn new(project_root: &Path) -> Self {

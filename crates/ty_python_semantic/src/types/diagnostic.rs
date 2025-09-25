@@ -6,7 +6,7 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
@@ -19,7 +19,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::{
     ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
-    binding_type,
+    binding_type, infer_isolated_expression,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
@@ -38,7 +38,7 @@ use std::fmt::Formatter;
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
-    registry.register_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL);
+    registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -80,8 +80,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
-    registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
-    registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
+    registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
+    registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
@@ -89,6 +89,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
+    registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
@@ -130,12 +131,12 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for implicit calls to possibly unbound methods.
+    /// Checks for implicit calls to possibly missing methods.
     ///
     /// ## Why is this bad?
     /// Expressions such as `x[y]` and `x * y` call methods
     /// under the hood (`__getitem__` and `__mul__` respectively).
-    /// Calling an unbound method will raise an `AttributeError` at runtime.
+    /// Calling a missing method will raise an `AttributeError` at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -147,8 +148,8 @@ declare_lint! {
     ///
     /// A()[0]  # TypeError: 'A' object is not subscriptable
     /// ```
-    pub(crate) static POSSIBLY_UNBOUND_IMPLICIT_CALL = {
-        summary: "detects implicit calls to possibly unbound methods",
+    pub(crate) static POSSIBLY_MISSING_IMPLICIT_CALL = {
+        summary: "detects implicit calls to possibly missing methods",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -1326,10 +1327,10 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for possibly unbound attributes.
+    /// Checks for possibly missing attributes.
     ///
     /// ## Why is this bad?
-    /// Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
+    /// Attempting to access a missing attribute will raise an `AttributeError` at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -1339,8 +1340,8 @@ declare_lint! {
     ///
     /// A.c  # AttributeError: type object 'A' has no attribute 'c'
     /// ```
-    pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
-        summary: "detects references to possibly unbound attributes",
+    pub(crate) static POSSIBLY_MISSING_ATTRIBUTE = {
+        summary: "detects references to possibly missing attributes",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -1348,10 +1349,10 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for imports of symbols that may be unbound.
+    /// Checks for imports of symbols that may be missing.
     ///
     /// ## Why is this bad?
-    /// Importing an unbound module or name will raise a `ModuleNotFoundError`
+    /// Importing a missing module or name will raise a `ModuleNotFoundError`
     /// or `ImportError` at runtime.
     ///
     /// ## Examples
@@ -1365,8 +1366,8 @@ declare_lint! {
     /// # main.py
     /// from module import a  # ImportError: cannot import name 'a' from 'module'
     /// ```
-    pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
-        summary: "detects possibly unbound imports",
+    pub(crate) static POSSIBLY_MISSING_IMPORT = {
+        summary: "detects possibly missing imports",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -1533,6 +1534,27 @@ declare_lint! {
     /// ```
     pub(crate) static UNKNOWN_ARGUMENT = {
         summary: "detects unknown keyword arguments in calls",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for keyword arguments in calls that match positional-only parameters of the callable.
+    ///
+    /// ## Why is this bad?
+    /// Providing a positional-only parameter as a keyword argument will raise `TypeError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(x: int, /) -> int: ...
+    ///
+    /// f(x=1)  # Error raised here
+    /// ```
+    pub(crate) static POSITIONAL_ONLY_PARAMETER_AS_KWARG = {
+        summary: "detects positional-only parameters passed as keyword arguments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1940,14 +1962,23 @@ fn report_invalid_assignment_with_message(
     }
 }
 
-pub(super) fn report_invalid_assignment(
-    context: &InferContext,
+pub(super) fn report_invalid_assignment<'db>(
+    context: &InferContext<'db, '_>,
     node: AnyNodeRef,
+    definition: Definition<'db>,
     target_ty: Type,
-    source_ty: Type,
+    mut source_ty: Type<'db>,
 ) {
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
+
+    if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
+        && let Some(value) = annotated_assignment.value(context.module())
+    {
+        // Re-infer the RHS of the annotated assignment, ignoring the type context, for more precise
+        // error messages.
+        source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
+    }
 
     report_invalid_assignment_with_message(
         context,
@@ -2166,17 +2197,17 @@ pub(super) fn report_possibly_unresolved_reference(
     builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
-pub(super) fn report_possibly_unbound_attribute(
+pub(super) fn report_possibly_missing_attribute(
     context: &InferContext,
     target: &ast::ExprAttribute,
     attribute: &str,
     object_ty: Type,
 ) {
-    let Some(builder) = context.report_lint(&POSSIBLY_UNBOUND_ATTRIBUTE, target) else {
+    let Some(builder) = context.report_lint(&POSSIBLY_MISSING_ATTRIBUTE, target) else {
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Attribute `{attribute}` on type `{}` is possibly unbound",
+        "Attribute `{attribute}` on type `{}` may be missing",
         object_ty.display(context.db()),
     ));
 }
@@ -2762,7 +2793,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 CallDunderError::PossiblyUnbound(_) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
-                        "Type `{}` has an `__mro_entries__` attribute, but it is possibly unbound",
+                        "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
                         base_type.display(db)
                     ));
                 }

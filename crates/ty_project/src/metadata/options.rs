@@ -34,6 +34,7 @@ use ty_python_semantic::{
     PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
     SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
 };
+use ty_static::EnvVars;
 
 #[derive(
     Debug,
@@ -295,14 +296,51 @@ impl Options {
             roots
         };
 
+        // collect the existing site packages
+        let mut extra_paths: Vec<SystemPathBuf> = environment
+            .extra_paths
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|path| path.absolute(project_root, system))
+            .collect();
+
+        // read all the paths off the PYTHONPATH environment variable, check
+        // they exist as a directory, and add them to the vec of extra_paths
+        // as they should be checked before site-packages just like python
+        // interpreter does
+        if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
+            for path in std::env::split_paths(python_path.as_str()) {
+                let path = match SystemPathBuf::from_path_buf(path) {
+                    Ok(path) => path,
+                    Err(path) => {
+                        tracing::debug!(
+                            "Skipping `{path}` listed in `PYTHONPATH` because the path is not valid UTF-8",
+                            path = path.display()
+                        );
+                        continue;
+                    }
+                };
+
+                let abspath = SystemPath::absolute(path, system.current_directory());
+
+                if !system.is_directory(&abspath) {
+                    tracing::debug!(
+                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path doesn't exist or isn't a directory"
+                    );
+                    continue;
+                }
+
+                tracing::debug!(
+                    "Adding `{abspath}` from the `PYTHONPATH` environment variable to `extra_paths`"
+                );
+
+                extra_paths.push(abspath);
+            }
+        }
+
         let settings = SearchPathSettings {
-            extra_paths: environment
-                .extra_paths
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(|path| path.absolute(project_root, system))
-                .collect(),
+            extra_paths,
             src_roots,
             custom_typeshed: environment
                 .typeshed

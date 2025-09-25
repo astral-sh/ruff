@@ -415,10 +415,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        // NOTE: At time of writing, 2025-08-29, auto-import isn't
-        // ready to be enabled by default yet. Once it is, we should
-        // either just enable it or provide a way to configure it.
-        let settings = ty_ide::CompletionSettings { auto_import: false };
+        let settings = ty_ide::CompletionSettings { auto_import: true };
         let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
 
         Ok(completions
@@ -442,7 +439,7 @@ impl Workspace {
                     name: comp.name.into(),
                     kind,
                     detail: type_display,
-                    description: comp.module_name.map(ToString::to_string),
+                    module_name: comp.module_name.map(ToString::to_string),
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
@@ -945,7 +942,7 @@ pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub detail: Option<String>,
     #[wasm_bindgen(getter_with_clone)]
-    pub description: Option<String>,
+    pub module_name: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -1013,9 +1010,9 @@ impl From<ty_ide::CompletionKind> for CompletionKind {
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextEdit {
-    range: Range,
+    pub range: Range,
     #[wasm_bindgen(getter_with_clone)]
-    new_text: String,
+    pub new_text: String,
 }
 
 #[wasm_bindgen]

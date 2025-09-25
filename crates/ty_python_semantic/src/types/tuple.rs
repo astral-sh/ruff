@@ -970,6 +970,14 @@ impl<T> Tuple<T> {
         FixedLengthTuple::from_elements(elements).into()
     }
 
+    /// Returns the variable-length element of this tuple, if it has one.
+    pub(crate) fn variable_element(&self) -> Option<&T> {
+        match self {
+            Tuple::Fixed(_) => None,
+            Tuple::Variable(tuple) => Some(&tuple.variable),
+        }
+    }
+
     /// Returns an iterator of all of the fixed-length element types of this tuple.
     pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
         match self {

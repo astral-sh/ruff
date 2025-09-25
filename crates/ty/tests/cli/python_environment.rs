@@ -1875,3 +1875,131 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn pythonpath_is_respected() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("baz-dir/baz.py", "it = 42"),
+        (
+            "src/foo.py",
+            r#"
+            import baz
+            print(f"{baz.it}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> src/foo.py:2:8
+      |
+    2 | import baz
+      |        ^^^
+    3 | print(f"{baz.it}")
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command()
+        .env("PYTHONPATH", case.root().join("baz-dir")),
+        @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("baz-dir/baz.py", "it = 42"),
+        ("foo-dir/foo.py", "it = 42"),
+        (
+            "src/main.py",
+            r#"
+            import baz
+            import foo
+
+            print(f"{baz.it}")
+            print(f"{foo.it}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> src/main.py:2:8
+      |
+    2 | import baz
+      |        ^^^
+    3 | import foo
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `foo`
+     --> src/main.py:3:8
+      |
+    2 | import baz
+    3 | import foo
+      |        ^^^
+    4 |
+    5 | print(f"{baz.it}")
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    let pythonpath =
+        std::env::join_paths([case.root().join("baz-dir"), case.root().join("foo-dir")])?;
+    assert_cmd_snapshot!(case.command()
+        .env("PYTHONPATH", pythonpath),
+        @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}

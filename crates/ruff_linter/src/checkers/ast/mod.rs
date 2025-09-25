@@ -56,7 +56,7 @@ use ruff_python_semantic::{
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
     SemanticModelFlags, StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
+use ruff_python_stdlib::builtins::{python_builtins, python_magic_globals};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -69,8 +69,8 @@ use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, ReturnOutsideFunction, UndefinedLocalWithNestedImportStarUsage,
-    YieldOutsideFunction,
+    LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
+    UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
@@ -87,7 +87,7 @@ mod deferred;
 
 /// State representing whether a docstring is expected or not for the next statement.
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum DocstringState {
+pub(crate) enum DocstringState {
     /// The next statement is expected to be a docstring, but not necessarily so.
     ///
     /// For example, in the following code:
@@ -128,7 +128,7 @@ impl DocstringState {
 
 /// The kind of an expected docstring.
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum ExpectedDocstringKind {
+pub(crate) enum ExpectedDocstringKind {
     /// A module-level docstring.
     ///
     /// For example,
@@ -603,6 +603,11 @@ impl<'a> Checker<'a> {
     pub(crate) const fn context(&self) -> &'a LintContext<'a> {
         self.context
     }
+
+    /// Return the current [`DocstringState`].
+    pub(crate) fn docstring_state(&self) -> DocstringState {
+        self.docstring_state
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -683,6 +688,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                 // PLE1700
                 if self.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
                     self.report_diagnostic(YieldFromInAsyncFunction, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                // F622
+                if self.is_rule_enabled(Rule::MultipleStarredExpressions) {
+                    self.report_diagnostic(MultipleStarredExpressions, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -2550,7 +2561,7 @@ impl<'a> Checker<'a> {
         for builtin in standard_builtins {
             bind_builtin(builtin);
         }
-        for builtin in MAGIC_GLOBALS {
+        for builtin in python_magic_globals(target_version.minor) {
             bind_builtin(builtin);
         }
         for builtin in &settings.builtins {

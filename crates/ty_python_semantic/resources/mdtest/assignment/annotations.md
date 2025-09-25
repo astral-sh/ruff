@@ -131,23 +131,32 @@ m: IntList = [1, 2, 3]
 reveal_type(m)  # revealed: list[int]
 
 # TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
+# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[Literal[1, 2, 3]]`"
 n: list[typing.Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
 
 # TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[LiteralString]`"
+# error: [invalid-assignment] "Object of type `list[Unknown | str]` is not assignable to `list[LiteralString]`"
 o: list[typing.LiteralString] = ["a", "b", "c"]
 reveal_type(o)  # revealed: list[LiteralString]
+
+p: dict[int, int] = {}
+reveal_type(p)  # revealed: dict[int, int]
+
+q: dict[int | str, int] = {1: 1, 2: 2, 3: 3}
+reveal_type(q)  # revealed: dict[int | str, int]
+
+r: dict[int | str, int | str] = {1: 1, 2: 2, 3: 3}
+reveal_type(r)  # revealed: dict[int | str, int | str]
 ```
 
 ## Incorrect collection literal assignments are complained aobut
 
 ```py
-# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
+# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
-# error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
+# error: [invalid-assignment] "Object of type `set[Unknown | int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
 ```
 
@@ -233,4 +242,48 @@ reveal_type(x)  # revealed: Foo
 ```pyi
 x: int = 1
 reveal_type(x) # revealed: Literal[1]
+```
+
+## Annotations influence generic call inference
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+def f[T](x: T) -> list[T]:
+    return [x]
+
+a = f("a")
+reveal_type(a)  # revealed: list[Literal["a"]]
+
+b: list[int | Literal["a"]] = f("a")
+reveal_type(b)  # revealed: list[int | Literal["a"]]
+
+c: list[int | str] = f("a")
+reveal_type(c)  # revealed: list[int | str]
+
+d: list[int | tuple[int, int]] = f((1, 2))
+reveal_type(d)  # revealed: list[int | tuple[int, int]]
+
+e: list[int] = f(True)
+reveal_type(e)  # revealed: list[int]
+
+# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `list[int]`"
+g: list[int] = f("a")
+
+# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `tuple[int]`"
+h: tuple[int] = f("a")
+
+def f2[T: int](x: T) -> T:
+    return x
+
+i: int = f2(True)
+reveal_type(i)  # revealed: int
+
+j: int | str = f2(True)
+reveal_type(j)  # revealed: Literal[True]
 ```

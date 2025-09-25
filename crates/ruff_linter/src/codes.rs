@@ -341,6 +341,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "221") => (RuleGroup::Stable, rules::flake8_async::rules::RunProcessInAsyncFunction),
         (Flake8Async, "222") => (RuleGroup::Stable, rules::flake8_async::rules::WaitForProcessInAsyncFunction),
         (Flake8Async, "230") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOpenCallInAsyncFunction),
+        (Flake8Async, "240") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingPathMethodInAsyncFunction),
         (Flake8Async, "250") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingInputInAsyncFunction),
         (Flake8Async, "251") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingSleepInAsyncFunction),
 
@@ -394,6 +395,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
         (Flake8Bugbear, "911") => (RuleGroup::Stable, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
+        (Flake8Bugbear, "912") => (RuleGroup::Preview, rules::flake8_bugbear::rules::MapWithoutExplicitStrict),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
@@ -1051,6 +1053,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "063") => (RuleGroup::Preview, rules::ruff::rules::AccessAnnotationsFromClassDict),
         (Ruff, "064") => (RuleGroup::Preview, rules::ruff::rules::NonOctalPermissions),
+        (Ruff, "065") => (RuleGroup::Preview, rules::ruff::rules::LoggingEagerConversion),
+
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
