@@ -687,14 +687,7 @@ fn unused_imports_in_scope<'a, 'b>(
 /// Returns a `Vec` of bindings to unused import statements that
 /// are shadowed by a given binding.
 ///
-/// Beginning with the collection of all bindings shadowed by
-/// the given one, we iterate over references to the module.
-/// Associated to each reference, we attempt to build a [`QualifiedName`]
-/// corresponding to an iterated attribute access (e.g. `a.b.foo`).
-/// We then determine the closest matching import statement to that
-/// qualified name, and mark it as used.
-///
-/// For example, given the following module:
+/// This is best explained by example. So suppose we have:
 ///
 /// ```python
 /// import a
@@ -706,16 +699,29 @@ fn unused_imports_in_scope<'a, 'b>(
 /// a.b.foo()
 /// ```
 ///
-/// The function below expects to receive the binding to
-/// `import a.b` and will return the vector with
-/// a single member corresponding to the binding created by
-/// `import a.b.c`.
+/// As of 2025-09-25, Ruff's semantic model, upon visiting
+/// the whole module, will have a single live binding for
+/// the symbol `a` that points to the line `import a.b.c`,
+/// and the remaining two import bindings are considered shadowed
+/// by the last.
 ///
-/// The qualified name associated to the reference from the
-/// dunder all export is `"a"` and the qualified name associated
-/// to the reference in the last line is `"a.b.foo"`. The closest
-/// matches are `import a` and `import a.b`, respectively, leaving
-/// `import a.b.c` unused.
+/// This function expects to receive the `id`
+/// for the live binding and will begin by collecting
+/// all bindings shadowed by the given one - i.e. all
+/// the different import statements binding the symbol `a`.
+/// We iterate over references to this
+/// module and decide (somewhat subjectively) which
+/// import statement the user "intends" to reference. To that end,
+/// to each reference we attempt to build a [`QualifiedName`]
+/// corresponding to an iterated attribute access (e.g. `a.b.foo`).
+/// We then determine the closest matching import statement to that
+/// qualified name, and mark it as used.
+///
+/// In the present example, the qualified name associated to the
+/// reference from the dunder all export is `"a"` and the qualified
+/// name associated to the reference in the last line is `"a.b.foo"`.
+/// The closest matches are `import a` and `import a.b`, respectively,
+/// leaving `import a.b.c` unused.
 ///
 /// For a precise definition of "closest match" see [`best_match`]
 /// and [`rank_matches`].
@@ -794,6 +800,12 @@ impl<'a, 'b> MarkedBindings<'a, 'b> {
     }
 }
 
+/// Returns `Some` [`QualifiedName`] delineating the path for the
+/// maximal [`ExprName`] or [`ExprAttribute`] containing the expression
+/// associated to the given [`NodeId`], or `None` otherwise.
+///
+/// For example, if the `expr_id` points to `a` in `a.b.c.foo()`
+/// then the qualified name would have segments [`a`, `b`, `c`, `foo`].
 fn expand_to_qualified_name_attribute<'b>(
     semantic: &SemanticModel<'b>,
     expr_id: NodeId,
@@ -846,6 +858,16 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
     }
 }
 
+/// Returns a pair with first component the length of the largest
+/// shared prefix between the qualified name of the import binding
+/// and the `prototype` and second component the length of the
+/// qualified name of the import binding (i.e. the number of path
+/// segments). Moreover, we regard the second component as ordered
+/// in reverse.
+///
+/// For example, if the binding corresponds to `import a.b.c`
+/// and the prototype to `a.b.foo()`, then the function returns
+/// `(2,std::cmp::Reverse(3))`.
 fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
     let Some(import) = binding.as_any_import() else {
         unreachable!()
@@ -860,6 +882,10 @@ fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cm
     (left, std::cmp::Reverse(qname.segments().len()))
 }
 
+/// Returns the import binding that shares the longest prefix
+/// with the `prototype` and is of minimal length amongst these.
+///
+/// See also [`rank_matches`].
 fn best_match<'b, 'c>(
     bindings: &Vec<&'b Binding<'c>>,
     prototype: &QualifiedName,
