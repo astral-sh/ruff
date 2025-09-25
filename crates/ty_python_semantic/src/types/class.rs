@@ -3463,8 +3463,8 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             }
         };
 
-        let init_name: &Name = &"__init__".into();
-        let new_name: &Name = &"__new__".into();
+        const INIT_NAME: Name = Name::new_static("__init__");
+        const NEW_NAME: Name = Name::new_static("__new__");
 
         let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
         let table = place_table(db, class_body_scope);
@@ -3481,7 +3481,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
                     if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
-                        (![init_name, new_name].contains(&name))
+                        (![&INIT_NAME, &NEW_NAME].contains(&name))
                             .then_some((name.to_string(), place_and_qual))
                     } else {
                         None
@@ -3498,7 +3498,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     .place_table(function_scope_id)
                     .members()
                     .filter_map(|member| member.as_instance_attribute())
-                    .filter(|name| *name != init_name && *name != new_name)
+                    .filter(|name| *name != INIT_NAME && *name != NEW_NAME)
                     .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
             })
