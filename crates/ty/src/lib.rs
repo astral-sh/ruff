@@ -51,6 +51,10 @@ pub fn run() -> anyhow::Result<ExitStatus> {
             shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
+        Command::CompletionEval => {
+            ty_completion_eval::run()?;
+            Ok(ExitStatus::Success)
+        }
     }
 }
 

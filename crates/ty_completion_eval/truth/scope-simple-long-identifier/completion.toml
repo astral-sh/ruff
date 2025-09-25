@@ -1,0 +1,5 @@
+[answer]
+symbol = "simple_long_identifier"
+
+[settings]
+auto-import = false

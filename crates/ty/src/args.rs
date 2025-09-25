@@ -31,6 +31,10 @@ pub(crate) enum Command {
     /// Generate shell completion
     #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+
+    /// Do a completion evaluation.
+    #[clap(hide = true)]
+    CompletionEval,
 }
 
 #[derive(Debug, Parser)]

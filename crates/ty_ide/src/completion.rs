@@ -238,6 +238,7 @@ pub fn completion<'db>(
         .map(|c| Completion::from_semantic_completion(db, c))
         .collect();
 
+    dbg!(&settings, &scoped);
     if settings.auto_import {
         if let Some(scoped) = scoped {
             add_unimported_completions(db, file, &parsed, scoped, &mut completions);

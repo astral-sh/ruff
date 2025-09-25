@@ -4203,6 +4203,7 @@ dependencies = [
  "ruff_db",
  "ruff_python_ast",
  "ruff_python_trivia",
+ "ruff_text_size",
  "salsa",
  "tempfile",
  "toml",
@@ -4210,6 +4211,7 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "ty_combine",
+ "ty_completion_eval",
  "ty_project",
  "ty_python_semantic",
  "ty_server",
@@ -4225,6 +4227,40 @@ dependencies = [
  "ruff_db",
  "ruff_python_ast",
  "ty_python_semantic",
+]
+
+[[package]]
+name = "ty_completion_eval"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.9.4",
+ "bstr",
+ "crossbeam",
+ "jod-thread",
+ "lsp-server",
+ "lsp-types",
+ "memchr",
+ "ruff_db",
+ "ruff_macros",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash",
+ "salsa",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "thiserror 2.0.16",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "ty_combine",
+ "ty_ide",
+ "ty_project",
+ "ty_python_semantic",
+ "ty_vendored",
 ]
 
 [[package]]
