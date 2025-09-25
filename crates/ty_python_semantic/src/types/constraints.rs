@@ -558,8 +558,8 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns when
-    /// `then_node` evaluates to; otherwise it returns when `else_node` evaluates to.
+    /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns what
+    /// `then_node` evaluates to; otherwise it returns what `else_node` evaluates to.
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
@@ -584,7 +584,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         assignment: impl IntoIterator<Item = ConstraintAssignment<'db>>,
-    ) -> Node<'db> {
+    ) -> Self {
         assignment.into_iter().fold(self, |restricted, assignment| {
             restricted.restrict_one(db, assignment)
         })
@@ -593,9 +593,7 @@ impl<'db> Node<'db> {
     /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
     /// particular value. (That variable will be not be checked when evaluating the result, and
     /// will not be present in the result.)
-    ///
-    /// Also returns whether the restricted variable appeared in the BDD.
-    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> Node<'db> {
+    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
