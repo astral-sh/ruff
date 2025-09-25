@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_trivia_integration_tests/tests/simple_tokenizer.rs
+expression: test_case.tokens()
+---
+[
+    SimpleToken {
+        kind: Name,
+        range: 0..1,
+    },
+    SimpleToken {
+        kind: Other,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 2..6,
+    },
+]
