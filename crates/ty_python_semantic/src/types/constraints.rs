@@ -125,7 +125,7 @@ where
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         for child in self {
-            if result.union(db, &f(child)).is_always_satisfied() {
+            if result.union(db, f(child)).is_always_satisfied() {
                 return result;
             }
         }
@@ -139,7 +139,7 @@ where
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::always();
         for child in self {
-            if result.intersect(db, &f(child)).is_never_satisfied() {
+            if result.intersect(db, f(child)).is_never_satisfied() {
                 return result;
             }
         }
@@ -152,7 +152,7 @@ where
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct ConstraintSet<'db> {
     /// The BDD representing this constraint set
     node: Node<'db>,
@@ -172,29 +172,29 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns whether this constraint set never holds
-    pub(crate) fn is_never_satisfied(&self) -> bool {
+    pub(crate) fn is_never_satisfied(self) -> bool {
         self.node.is_never_satisfied()
     }
 
     /// Returns whether this constraint set always holds
-    pub(crate) fn is_always_satisfied(&self) -> bool {
+    pub(crate) fn is_always_satisfied(self) -> bool {
         self.node.is_always_satisfied()
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
-    pub(crate) fn union(&mut self, db: &'db dyn Db, other: &Self) -> &Self {
+    pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node).simplify(db);
-        self
+        *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
-    pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: &Self) -> &Self {
+    pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.and(db, other.node).simplify(db);
-        self
+        *self
     }
 
     /// Returns the negation of this constraint set.
-    pub(crate) fn negate(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
             node: self.node.negate(db).simplify(db),
         }
@@ -205,7 +205,7 @@ impl<'db> ConstraintSet<'db> {
     /// constraint set is already saturated.
     pub(crate) fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         if !self.is_never_satisfied() {
-            self.intersect(db, &other());
+            self.intersect(db, other());
         }
         self
     }
@@ -215,7 +215,7 @@ impl<'db> ConstraintSet<'db> {
     /// already saturated.
     pub(crate) fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         if !self.is_always_satisfied() {
-            self.union(db, &other());
+            self.union(db, other());
         }
         self
     }
@@ -242,7 +242,7 @@ impl<'db> ConstraintSet<'db> {
         Self::range(db, lower, typevar, upper).negate(db)
     }
 
-    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.display(db)
     }
 }
