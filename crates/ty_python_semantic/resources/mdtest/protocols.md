@@ -1761,7 +1761,7 @@ class `T` has a method `m` which is assignable to the `Callable` supertype of th
 
 ```py
 from typing import Protocol
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, is_assignable_to, static_assert
 
 class P(Protocol):
     def m(self, x: int, /) -> None: ...
@@ -1773,12 +1773,30 @@ class NotSubtype:
     def m(self, x: int) -> int:
         return 42
 
+class NominalWithClassMethod:
+    @classmethod
+    def m(cls, x: int) -> None: ...
+
+class NominalWithStaticMethod:
+    @staticmethod
+    def m(_, x: int) -> None: ...
+
 class DefinitelyNotSubtype:
     m = None
 
 static_assert(is_subtype_of(NominalSubtype, P))
-static_assert(not is_subtype_of(DefinitelyNotSubtype, P))
-static_assert(not is_subtype_of(NotSubtype, P))
+static_assert(not is_assignable_to(DefinitelyNotSubtype, P))
+static_assert(not is_assignable_to(NotSubtype, P))
+
+# `m` has the correct signature when accessed on instances of `NominalWithClassMethod`,
+# but not when accessed on the class object `NominalWithClassMethod` itself
+#
+# TODO: this should pass
+static_assert(not is_assignable_to(NominalWithClassMethod, P))  # error: [static-assert-error]
+
+# Conversely, `m` has the correct signature when accessed on the class object
+# `NominalWithStaticMethod`, but not when accessed on instances of `NominalWithStaticMethod`
+static_assert(not is_assignable_to(NominalWithStaticMethod, P))
 ```
 
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
@@ -2010,6 +2028,98 @@ static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunct
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
 # TODO: should pass
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
+```
+
+## Subtyping of protocols with `@classmethod` or `@staticmethod` members
+
+The typing spec states that protocols may have `@classmethod` or `@staticmethod` method members.
+However, as of 2025/09/24, the spec does not elaborate on how these members should behave with
+regards to subtyping and assignability (nor are there any tests in the typing conformance suite).
+Ty's behaviour is therefore derived from first principles and the
+[mypy test suite](https://github.com/python/mypy/blob/354bea6352ee7a38b05e2f42c874e7d1f7bf557a/test-data/unit/check-protocols.test#L1231-L1263).
+
+A protocol `P` with a `@classmethod` method member `x` can only be satisfied by a nominal type `N`
+if `N.x` is a callable object that evaluates to the same type whether it is accessed on inhabitants
+of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent to the signature of
+`P.x` after the descriptor protocol has been invoked on `P.x`:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
+
+class PClassMethod(Protocol):
+    @classmethod
+    def x(cls, val: int) -> str: ...
+
+class PStaticMethod(Protocol):
+    @staticmethod
+    def x(val: int) -> str: ...
+
+class NNotCallable:
+    x = None
+
+class NInstanceMethod:
+    def x(self, val: int) -> str:
+        return "foo"
+
+class NClassMethodGood:
+    @classmethod
+    def x(cls, val: int) -> str:
+        return "foo"
+
+class NClassMethodBad:
+    @classmethod
+    def x(cls, val: str) -> int:
+        return 42
+
+class NStaticMethodGood:
+    @staticmethod
+    def x(val: int) -> str:
+        return "foo"
+
+class NStaticMethodBad:
+    @staticmethod
+    def x(cls, val: int) -> str:
+        return "foo"
+
+# `PClassMethod.x` and `PStaticMethod.x` evaluate to callable types with equivalent signatures
+# whether you access them on the protocol class or instances of the protocol.
+# That means that they are equivalent protocols!
+static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
+
+# TODO: these should all pass
+static_assert(not is_assignable_to(NNotCallable, PClassMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NNotCallable, PStaticMethod))  # error: [static-assert-error]
+static_assert(is_disjoint_from(NNotCallable, PClassMethod))  # error: [static-assert-error]
+static_assert(is_disjoint_from(NNotCallable, PStaticMethod))  # error: [static-assert-error]
+
+# `NInstanceMethod.x` has the correct type when accessed on an instance of
+# `NInstanceMethod`, but not when accessed on the class object itself
+#
+# TODO: these should pass
+static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [static-assert-error]
+
+# A nominal type with a `@staticmethod` can satisfy a protocol with a `@classmethod`
+# if the staticmethod duck-types the same as the classmethod member
+# both when accessed on the class and when accessed on an instance of the class
+# The same also applies for a nominal type with a `@classmethod` and a protocol
+# with a `@staticmethod` member
+static_assert(is_assignable_to(NClassMethodGood, PClassMethod))
+static_assert(is_assignable_to(NClassMethodGood, PStaticMethod))
+# TODO: these should all pass:
+static_assert(is_subtype_of(NClassMethodGood, PClassMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))  # error: [static-assert-error]
+
+static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
+static_assert(is_assignable_to(NStaticMethodGood, PStaticMethod))
+# TODO: these should all pass:
+static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
 ```
 
 ## Equivalence of protocols with method or property members
@@ -2846,7 +2956,6 @@ Add tests for:
 - Protocols with instance-method members, including:
     - Protocols with methods that have parameters or the return type unannotated
     - Protocols with methods that have parameters or the return type annotated with `Any`
-- Protocols with `@classmethod` and `@staticmethod`
 - Assignability of non-instance types to protocols with instance-method members (e.g. a
     class-literal type can be a subtype of `Sized` if its metaclass has a `__len__` method)
 - Protocols with methods that have annotated `self` parameters.
