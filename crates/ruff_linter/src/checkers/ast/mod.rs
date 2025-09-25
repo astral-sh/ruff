@@ -2974,10 +2974,37 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected Expr::Lambda");
                 };
 
+                // Here we add the implicit scope surrounding a lambda which allows code in the
+                // lambda to access `__class__` at runtime when the lambda is defined within a class.
+                // See the `ScopeKind::DunderClassCell` docs for more information.
+                let added_dunder_class_scope = if self
+                    .semantic
+                    .parent_scope(self.semantic.current_scope())
+                    .is_some_and(|parent| parent.kind.is_class())
+                {
+                    self.semantic.push_scope(ScopeKind::DunderClassCell);
+                    let binding_id = self.semantic.push_binding(
+                        TextRange::default(),
+                        BindingKind::DunderClassCell,
+                        BindingFlags::empty(),
+                    );
+                    self.semantic
+                        .current_scope_mut()
+                        .add("__class__", binding_id);
+                    true
+                } else {
+                    false
+                };
+
                 if let Some(parameters) = parameters {
                     self.visit_parameters(parameters);
                 }
                 self.visit_expr(body);
+
+                // Clean up the dunder class scope if we added it
+                if added_dunder_class_scope {
+                    self.semantic.pop_scope();
+                }
             }
         }
         self.semantic.restore(snapshot);
