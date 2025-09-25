@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.13.2
+
+Released on 2025-09-25.
+
+### Preview features
+
+- \[`flake8-async`\] Implement `blocking-path-method` (`ASYNC240`) ([#20264](https://github.com/astral-sh/ruff/pull/20264))
+- \[`flake8-bugbear`\] Implement `map-without-explicit-strict` (`B912`) ([#20429](https://github.com/astral-sh/ruff/pull/20429))
+- \[`flake8-bultins`\] Detect class-scope builtin shadowing in decorators, default args, and attribute initializers (`A003`) ([#20178](https://github.com/astral-sh/ruff/pull/20178))
+- \[`ruff`\] Implement `logging-eager-conversion` (`RUF065`) ([#19942](https://github.com/astral-sh/ruff/pull/19942))
+- Include `.pyw` files by default when linting and formatting ([#20458](https://github.com/astral-sh/ruff/pull/20458))
+
+### Bug fixes
+
+- Deduplicate input paths ([#20105](https://github.com/astral-sh/ruff/pull/20105))
+- \[`flake8-comprehensions`\] Preserve trailing commas for single-element lists (`C409`) ([#19571](https://github.com/astral-sh/ruff/pull/19571))
+- \[`flake8-pyi`\] Avoid syntax error from conflict with `PIE790` (`PYI021`) ([#20010](https://github.com/astral-sh/ruff/pull/20010))
+- \[`flake8-simplify`\] Correct fix for positive `maxsplit` without separator (`SIM905`) ([#20056](https://github.com/astral-sh/ruff/pull/20056))
+- \[`pyupgrade`\] Fix `UP008` not to apply when `__class__` is a local variable ([#20497](https://github.com/astral-sh/ruff/pull/20497))
+- \[`ruff`\] Fix `B004` to skip invalid `hasattr`/`getattr` calls ([#20486](https://github.com/astral-sh/ruff/pull/20486))
+- \[`ruff`\] Replace `-nan` with `nan` when using the value to construct a `Decimal` (`FURB164` ) ([#20391](https://github.com/astral-sh/ruff/pull/20391))
+
+### Documentation
+
+- Add 'Finding ways to help' to CONTRIBUTING.md ([#20567](https://github.com/astral-sh/ruff/pull/20567))
+- Update import path to `ruff-wasm-web` ([#20539](https://github.com/astral-sh/ruff/pull/20539))
+- \[`flake8-bandit`\] Clarify the supported hashing functions (`S324`) ([#20534](https://github.com/astral-sh/ruff/pull/20534))
+
+### Other changes
+
+- \[`playground`\] Allow hover quick fixes to appear for overlapping diagnostics ([#20527](https://github.com/astral-sh/ruff/pull/20527))
+- \[`playground`\] Fix non‑BMP code point handling in quick‑fixes and markers ([#20526](https://github.com/astral-sh/ruff/pull/20526))
+
+### Contributors
+
+- [@BurntSushi](https://github.com/BurntSushi)
+- [@mtshiba](https://github.com/mtshiba)
+- [@second-ed](https://github.com/second-ed)
+- [@danparizher](https://github.com/danparizher)
+- [@ShikChen](https://github.com/ShikChen)
+- [@PieterCK](https://github.com/PieterCK)
+- [@GDYendell](https://github.com/GDYendell)
+- [@RazerM](https://github.com/RazerM)
+- [@TaKO8Ki](https://github.com/TaKO8Ki)
+- [@amyreese](https://github.com/amyreese)
+- [@ntbre](https://github.com/ntBre)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.13.1
 
 Released on 2025-09-18.
