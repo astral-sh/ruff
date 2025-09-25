@@ -2043,14 +2043,19 @@ impl ArgumentForms {
     }
 }
 
+#[derive(Default, Clone, Copy)]
+struct ParameterInfo {
+    matched: bool,
+    suppress_missing_error: bool,
+}
+
 struct ArgumentMatcher<'a, 'db> {
     parameters: &'a Parameters<'db>,
     argument_forms: &'a mut ArgumentForms,
     errors: &'a mut Vec<BindingError<'db>>,
 
     argument_matches: Vec<MatchedArgument<'db>>,
-    parameter_matched: Vec<bool>,
-    suppress_missing_error: Vec<bool>,
+    parameter_info: Vec<ParameterInfo>,
     next_positional: usize,
     first_excess_positional: Option<usize>,
     num_synthetic_args: usize,
@@ -2069,8 +2074,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             argument_forms,
             errors,
             argument_matches: vec![MatchedArgument::default(); arguments.len()],
-            parameter_matched: vec![false; parameters.len()],
-            suppress_missing_error: vec![false; parameters.len()],
+            parameter_info: vec![ParameterInfo::default(); parameters.len()],
             next_positional: 0,
             first_excess_positional: None,
             num_synthetic_args: 0,
@@ -2112,7 +2116,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 }
             }
         }
-        if self.parameter_matched[parameter_index] {
+        if self.parameter_info[parameter_index].matched {
             if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
                 self.errors.push(BindingError::ParameterAlreadyAssigned {
                     argument_index: self.get_argument_index(argument_index),
@@ -2133,7 +2137,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         matched_argument.parameters.push(parameter_index);
         matched_argument.types.push(argument_type);
         matched_argument.matched = true;
-        self.parameter_matched[parameter_index] = true;
+        self.parameter_info[parameter_index].matched = true;
     }
 
     fn match_positional(
@@ -2189,7 +2193,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         argument_index: self.get_argument_index(argument_index),
                         parameter: ParameterContext::new(parameter, parameter_index, true),
                     });
-                self.suppress_missing_error[parameter_index] = true;
+                self.parameter_info[parameter_index].suppress_missing_error = true;
             } else {
                 self.errors.push(BindingError::UnknownArgument {
                     argument_name: ast::name::Name::new(name),
@@ -2316,7 +2320,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             };
 
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
-                if self.parameter_matched[parameter_index] && !parameter.is_keyword_variadic() {
+                if self.parameter_info[parameter_index].matched && !parameter.is_keyword_variadic()
+                {
                     continue;
                 }
                 if matches!(
@@ -2348,9 +2353,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         let mut missing = vec![];
-        for (index, matched) in self.parameter_matched.iter().copied().enumerate() {
+        for (
+            index,
+            ParameterInfo {
+                matched,
+                suppress_missing_error,
+            },
+        ) in self.parameter_info.iter().copied().enumerate()
+        {
             if !matched {
-                if self.suppress_missing_error[index] {
+                if suppress_missing_error {
                     continue;
                 }
                 let param = &self.parameters[index];
