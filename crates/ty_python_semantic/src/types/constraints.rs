@@ -608,12 +608,12 @@ impl<'db> Node<'db> {
         right: SatisfiedConstraint<'db>,
         replacement_node: Node<'db>,
     ) -> Self {
-        let (when_not_left, _) = self.restrict(db, [left.flipped()]);
-        let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
         let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
         if !both_found {
             return self;
         }
+        let (when_not_left, _) = self.restrict(db, [left.flipped()]);
+        let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
 
@@ -639,13 +639,13 @@ impl<'db> Node<'db> {
         right: SatisfiedConstraint<'db>,
         replacement_node: Node<'db>,
     ) -> Self {
-        let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
-        let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
-        let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
         let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
         if !both_found {
             return self;
         }
+        let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
+        let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
+        let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
 
