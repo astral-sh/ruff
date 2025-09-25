@@ -13,7 +13,8 @@ use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DisplayGithubDiagnostics, GithubRenderer, Severity, Span,
+    DisplayDiagnostics, DisplayGithubDiagnostics, GithubRenderer, Severity, Span, SubDiagnostic,
+    SubDiagnosticSeverity,
 };
 use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
 use ruff_linter::settings::types::OutputFormat;
@@ -893,7 +894,9 @@ impl From<&FormatCommandError> for Diagnostic {
         let annotation = error.path().map(|path| {
             let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
             let span = Span::from(file);
-            Annotation::primary(span)
+            let mut annotation = Annotation::primary(span);
+            annotation.set_file_level(true);
+            annotation
         });
 
         let mut diagnostic = match error {
@@ -912,8 +915,24 @@ impl From<&FormatCommandError> for Diagnostic {
                 Severity::Error,
                 display_parse_error,
             ),
-            FormatCommandError::Panic(_, panic_error) => {
-                Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, panic_error)
+            FormatCommandError::Panic(path, panic_error) => {
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::Panic,
+                    Severity::Fatal,
+                    panic_error.to_diagnostic_message(path.as_ref().map(|path| path.display())),
+                );
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    "This indicates a bug in Ruff.",
+                ));
+                let report_message = "If you could open an issue at \
+                                        https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, \
+                                        we'd be very appreciative!";
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    report_message,
+                ));
+                diagnostic
             }
 
             // I/O errors
@@ -1252,5 +1271,118 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+    use std::path::PathBuf;
+
+    use ignore::Error;
+    use insta::assert_snapshot;
+
+    use ruff_db::panic::catch_unwind;
+    use ruff_linter::logging::DisplayParseError;
+    use ruff_linter::source_kind::{SourceError, SourceKind};
+    use ruff_python_formatter::FormatModuleError;
+    use ruff_python_parser::{ParseError, ParseErrorType};
+    use ruff_text_size::TextRange;
+
+    use crate::commands::format::{FormatCommandError, FormatMode, FormatResults};
+
+    #[test]
+    fn error_diagnostics() -> anyhow::Result<()> {
+        let path = PathBuf::from("test.py");
+        let source_kind = SourceKind::Python("1".to_string());
+
+        let panic_error = catch_unwind(|| {
+            panic!("Test panic for FormatCommandError");
+        })
+        .unwrap_err();
+
+        let errors = [
+            FormatCommandError::Ignore(Error::WithPath {
+                path: path.clone(),
+                err: Box::new(Error::Io(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "Permission denied",
+                ))),
+            }),
+            FormatCommandError::Parse(DisplayParseError::from_source_kind(
+                ParseError {
+                    error: ParseErrorType::UnexpectedIndentation,
+                    location: TextRange::default(),
+                },
+                Some(path.clone()),
+                &source_kind,
+            )),
+            FormatCommandError::Panic(Some(path.clone()), Box::new(panic_error)),
+            FormatCommandError::Read(
+                Some(path.clone()),
+                SourceError::Io(io::Error::new(io::ErrorKind::NotFound, "File not found")),
+            ),
+            FormatCommandError::Format(
+                Some(path.clone()),
+                FormatModuleError::ParseError(ParseError {
+                    error: ParseErrorType::EmptySlice,
+                    location: TextRange::default(),
+                }),
+            ),
+            FormatCommandError::Write(
+                Some(path.clone()),
+                SourceError::Io(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "Cannot write to file",
+                )),
+            ),
+            FormatCommandError::Diff(
+                Some(path.clone()),
+                io::Error::other("Failed to generate diff"),
+            ),
+            FormatCommandError::RangeFormatNotebook(Some(path)),
+        ];
+
+        let results = FormatResults::new(&[], FormatMode::Check);
+        let mut buf = Vec::new();
+        results.write_changed_preview(
+            &mut buf,
+            ruff_linter::settings::types::OutputFormat::Full,
+            &errors,
+        )?;
+
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
+        let _s = settings.bind_to_scope();
+
+        assert_snapshot!(str::from_utf8(&buf)?, @r"
+        io: test.py: Permission denied
+        --> test.py:1:1
+
+        invalid-syntax: Failed to parse test.py:1:1: Unexpected indentation
+        --> test.py:1:1
+
+        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
+        --> test.py:1:1
+        info: This indicates a bug in Ruff.
+        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
+
+        io: File not found
+        --> test.py:1:1
+
+        invalid-syntax: Expected index or slice expression
+        --> test.py:1:1
+
+        io: Cannot write to file
+        --> test.py:1:1
+
+        io: Failed to generate diff
+        --> test.py:1:1
+
+        range-format-notebook: Range formatting isn't supported for notebooks.
+        --> test.py:1:1
+        ");
+
+        Ok(())
     }
 }
