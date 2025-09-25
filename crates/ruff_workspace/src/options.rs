@@ -2303,7 +2303,7 @@ pub struct IsortOptions {
     /// Order imports by type, which is determined by case, in addition to
     /// alphabetically.
     ///
-    /// Note that this takes precedence over the
+    /// Note that this option takes precedence over the
     /// [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.
     #[option(
         default = r#"true"#,
