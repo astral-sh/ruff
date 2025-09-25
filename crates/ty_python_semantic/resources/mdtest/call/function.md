@@ -694,11 +694,23 @@ def _(
 
 ### Mixed argument and parameter containing variadic
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 def f(x: int, *args: str) -> int:
     return 1
 
-def _(args1: list[int], args2: tuple[int], args3: tuple[int, int], args4: tuple[int, ...]) -> None:
+def _(
+    args1: list[int],
+    args2: tuple[int],
+    args3: tuple[int, int],
+    args4: tuple[int, ...],
+    args5: tuple[int, *tuple[str, ...]],
+    args6: tuple[int, int, *tuple[str, ...]],
+) -> None:
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
     reveal_type(f(*args1))  # revealed: int
 
@@ -711,6 +723,13 @@ def _(args1: list[int], args2: tuple[int], args3: tuple[int, int], args4: tuple[
 
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
     reveal_type(f(*args4))  # revealed: int
+
+    # The first element of the tuple matches the required argument;
+    # all subsequent elements match the variadic argument
+    reveal_type(f(*args5))  # revealed: int
+
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    reveal_type(f(*args6))  # revealed: int
 ```
 
 ### Keyword argument, positional-or-keyword parameter
