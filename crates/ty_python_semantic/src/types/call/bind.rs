@@ -1583,7 +1583,7 @@ impl<'db> CallableBinding<'db> {
             let argument_type = argument_type.unwrap_or_else(Type::unknown);
             // TODO: Add support for `**kwargs`. Should we avoid doing any filtering if `**kwargs`
             // is present to any incorrect filtering?
-            if matches!(argument, Argument::Variadic(_)) {
+            if matches!(argument, Argument::Variadic) {
                 for (index, &unpacked_argument_type) in
                     argument_type.iterate(db).all_elements().enumerate()
                 {
