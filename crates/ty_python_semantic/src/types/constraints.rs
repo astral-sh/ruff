@@ -259,7 +259,7 @@ impl From<bool> for ConstraintSet<'_> {
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
-    constraint: RangeConstraint<'db>,
+    range: RangeConstraint<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -267,20 +267,27 @@ impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
 
 #[salsa::tracked]
 impl<'db> ConstrainedTypeVar<'db> {
+    fn when_true(self) -> SatisfiedConstraint<'db> {
+        SatisfiedConstraint::Positive(self)
+    }
+
+    fn when_false(self) -> SatisfiedConstraint<'db> {
+        SatisfiedConstraint::Negative(self)
+    }
+
     fn contains(self, db: &'db dyn Db, other: Self) -> bool {
         if self.typevar(db) != other.typevar(db) {
             return false;
         }
-        self.constraint(db).contains(db, other.constraint(db))
+        self.range(db).contains(db, other.range(db))
     }
 
     fn display(self, db: &'db dyn Db) -> impl Display {
-        self.constraint(db)
-            .display(db, self.typevar(db).display(db))
+        self.range(db).display(db, self.typevar(db).display(db))
     }
 
     fn display_negated(self, db: &'db dyn Db) -> impl Display {
-        self.constraint(db)
+        self.range(db)
             .display_negated(db, self.typevar(db).display(db))
     }
 }
@@ -317,8 +324,8 @@ impl<'db> RangeConstraint<'db> {
             return Node::AlwaysTrue;
         }
 
-        let constraint = RangeConstraint { lower, upper };
-        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, constraint))
+        let range = RangeConstraint { lower, upper };
+        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, range))
     }
 
     fn contains(self, db: &'db dyn Db, other: RangeConstraint<'db>) -> bool {
@@ -350,7 +357,7 @@ impl<'db> RangeConstraint<'db> {
 
     fn display_inner(self, db: &'db dyn Db, typevar: impl Display, negated: bool) -> impl Display {
         struct DisplayRangeConstraint<'db, D> {
-            constraint: RangeConstraint<'db>,
+            range: RangeConstraint<'db>,
             typevar: D,
             negated: bool,
             db: &'db dyn Db,
@@ -358,13 +365,13 @@ impl<'db> RangeConstraint<'db> {
 
         impl<D: Display> Display for DisplayRangeConstraint<'_, D> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if (self.constraint.lower).is_equivalent_to(self.db, self.constraint.upper) {
+                if (self.range.lower).is_equivalent_to(self.db, self.range.upper) {
                     return write!(
                         f,
                         "({} {} {})",
                         &self.typevar,
                         if self.negated { "≠" } else { "=" },
-                        self.constraint.lower.display(self.db)
+                        self.range.lower.display(self.db)
                     );
                 }
 
@@ -372,19 +379,19 @@ impl<'db> RangeConstraint<'db> {
                     f.write_str("¬")?;
                 }
                 f.write_str("(")?;
-                if !self.constraint.lower.is_never() {
-                    write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
+                if !self.range.lower.is_never() {
+                    write!(f, "{} ≤ ", self.range.lower.display(self.db))?;
                 }
                 self.typevar.fmt(f)?;
-                if !self.constraint.upper.is_object() {
-                    write!(f, " ≤ {}", self.constraint.upper.display(self.db))?;
+                if !self.range.upper.is_object() {
+                    write!(f, " ≤ {}", self.range.upper.display(self.db))?;
                 }
                 f.write_str(")")
             }
         }
 
         DisplayRangeConstraint {
-            constraint: self,
+            range: self,
             typevar,
             negated,
             db,
@@ -422,8 +429,14 @@ impl<'db> Node<'db> {
         if_true: Node<'db>,
         if_false: Node<'db>,
     ) -> Self {
-        debug_assert!(if_true.atom(db).is_none_or(|atom| atom > constraint));
-        debug_assert!(if_false.atom(db).is_none_or(|atom| atom > constraint));
+        debug_assert!(
+            (if_true.root_constraint(db))
+                .is_none_or(|root_constraint| root_constraint > constraint)
+        );
+        debug_assert!(
+            (if_false.root_constraint(db))
+                .is_none_or(|root_constraint| root_constraint > constraint)
+        );
         if if_true == if_false {
             return if_true;
         }
@@ -463,9 +476,9 @@ impl<'db> Node<'db> {
 
     /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
     /// node.
-    fn atom(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
+    fn root_constraint(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
         match self {
-            Node::Interior(interior) => Some(interior.atom(db)),
+            Node::Interior(interior) => Some(interior.constraint(db)),
             _ => None,
         }
     }
@@ -527,13 +540,13 @@ impl<'db> Node<'db> {
             }
             (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(interior)) => Node::new(
                 db,
-                interior.atom(db),
+                interior.constraint(db),
                 self.iff(db, interior.if_true(db)),
                 self.iff(db, interior.if_false(db)),
             ),
             (Node::Interior(interior), Node::AlwaysTrue | Node::AlwaysFalse) => Node::new(
                 db,
-                interior.atom(db),
+                interior.constraint(db),
                 interior.if_true(db).iff(db, other),
                 interior.if_false(db).iff(db, other),
             ),
@@ -712,7 +725,7 @@ impl<'db> Node<'db> {
         let Node::Interior(interior) = self else {
             return;
         };
-        f(interior.atom(db));
+        f(interior.constraint(db));
         interior.if_true(db).for_each_constraint(db, f);
         interior.if_false(db).for_each_constraint(db, f);
     }
@@ -739,13 +752,11 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => {}
                     Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
                     Node::Interior(interior) => {
-                        let interior_atom = interior.atom(db);
-                        self.current_clause
-                            .push(SatisfiedConstraint::Positive(interior_atom));
+                        let interior_constraint = interior.constraint(db);
+                        self.current_clause.push(interior_constraint.when_true());
                         self.visit_node(db, interior.if_true(db));
                         self.current_clause.pop();
-                        self.current_clause
-                            .push(SatisfiedConstraint::Negative(interior_atom));
+                        self.current_clause.push(interior_constraint.when_false());
                         self.visit_node(db, interior.if_false(db));
                         self.current_clause.pop();
                     }
@@ -793,7 +804,7 @@ impl<'db> Node<'db> {
 /// An interior node of a BDD
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct InteriorNode<'db> {
-    atom: ConstrainedTypeVar<'db>,
+    constraint: ConstrainedTypeVar<'db>,
     if_true: Node<'db>,
     if_false: Node<'db>,
 }
@@ -807,7 +818,7 @@ impl<'db> InteriorNode<'db> {
     fn negate(self, db: &'db dyn Db) -> Node<'db> {
         Node::new(
             db,
-            self.atom(db),
+            self.constraint(db),
             self.if_true(db).negate(db),
             self.if_false(db).negate(db),
         )
@@ -815,24 +826,24 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_atom = self.atom(db);
-        let other_atom = other.atom(db);
-        match self_atom.cmp(&other_atom) {
+        let self_constraint = self.constraint(db);
+        let other_constraint = other.constraint(db);
+        match self_constraint.cmp(&other_constraint) {
             Ordering::Equal => Node::new(
                 db,
-                self_atom,
+                self_constraint,
                 self.if_true(db).or(db, other.if_true(db)),
                 self.if_false(db).or(db, other.if_false(db)),
             ),
             Ordering::Less => Node::new(
                 db,
-                self_atom,
+                self_constraint,
                 self.if_true(db).or(db, Node::Interior(other)),
                 self.if_false(db).or(db, Node::Interior(other)),
             ),
             Ordering::Greater => Node::new(
                 db,
-                other_atom,
+                other_constraint,
                 Node::Interior(self).or(db, other.if_true(db)),
                 Node::Interior(self).or(db, other.if_false(db)),
             ),
@@ -841,24 +852,24 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_atom = self.atom(db);
-        let other_atom = other.atom(db);
-        match self_atom.cmp(&other_atom) {
+        let self_constraint = self.constraint(db);
+        let other_constraint = other.constraint(db);
+        match self_constraint.cmp(&other_constraint) {
             Ordering::Equal => Node::new(
                 db,
-                self_atom,
+                self_constraint,
                 self.if_true(db).and(db, other.if_true(db)),
                 self.if_false(db).and(db, other.if_false(db)),
             ),
             Ordering::Less => Node::new(
                 db,
-                self_atom,
+                self_constraint,
                 self.if_true(db).and(db, Node::Interior(other)),
                 self.if_false(db).and(db, Node::Interior(other)),
             ),
             Ordering::Greater => Node::new(
                 db,
-                other_atom,
+                other_constraint,
                 Node::Interior(self).and(db, other.if_true(db)),
                 Node::Interior(self).and(db, other.if_false(db)),
             ),
@@ -867,24 +878,24 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_atom = self.atom(db);
-        let other_atom = other.atom(db);
-        match self_atom.cmp(&other_atom) {
+        let self_constraint = self.constraint(db);
+        let other_constraint = other.constraint(db);
+        match self_constraint.cmp(&other_constraint) {
             Ordering::Equal => Node::new(
                 db,
-                self_atom,
+                self_constraint,
                 self.if_true(db).iff(db, other.if_true(db)),
                 self.if_false(db).iff(db, other.if_false(db)),
             ),
             Ordering::Less => Node::new(
                 db,
-                self_atom,
+                self_constraint,
                 self.if_true(db).iff(db, Node::Interior(other)),
                 self.if_false(db).iff(db, Node::Interior(other)),
             ),
             Ordering::Greater => Node::new(
                 db,
-                other_atom,
+                other_constraint,
                 Node::Interior(self).iff(db, other.if_true(db)),
                 Node::Interior(self).iff(db, other.if_false(db)),
             ),
@@ -900,22 +911,22 @@ impl<'db> InteriorNode<'db> {
         // If this node's variable is larger than the assignment's variable, then we have reached a
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
-        let self_atom = self.atom(db);
-        if assignment.constraint() < self_atom {
+        let self_constraint = self.constraint(db);
+        if assignment.constraint() < self_constraint {
             return (Node::Interior(self), false);
         }
 
         // Otherwise, check if this node's variable is in the assignment. If so, substitute the
         // variable by replacing this node with its if_false/if_true edge, accordingly.
-        if assignment == SatisfiedConstraint::Positive(self_atom) {
+        if assignment == self_constraint.when_true() {
             (self.if_true(db), true)
-        } else if assignment == SatisfiedConstraint::Negative(self_atom) {
+        } else if assignment == self_constraint.when_false() {
             (self.if_false(db), true)
         } else {
             let (if_true, found_in_true) = self.if_true(db).restrict_one(db, assignment);
             let (if_false, found_in_false) = self.if_false(db).restrict_one(db, assignment);
             (
-                Node::new(db, self_atom, if_true, if_false),
+                Node::new(db, self_constraint, if_true, if_false),
                 found_in_true || found_in_false,
             )
         }
@@ -923,169 +934,155 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
-        let mut seen_atoms = FxHashSet::default();
-        Node::Interior(self).for_each_constraint(db, &mut |atom| {
-            seen_atoms.insert(atom);
+        let mut seen_constraints = FxHashSet::default();
+        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+            seen_constraints.insert(constraint);
         });
 
-        let mut to_visit: Vec<(_, _)> = seen_atoms.iter().copied().tuple_combinations().collect();
+        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
+            .tuple_combinations()
+            .collect();
         let mut simplified = Node::Interior(self);
-        while let Some((left_atom, right_atom)) = to_visit.pop() {
-            let typevar = left_atom.typevar(db);
-            if typevar != right_atom.typevar(db) {
+        while let Some((left_constraint, right_constraint)) = to_visit.pop() {
+            let typevar = left_constraint.typevar(db);
+            if typevar != right_constraint.typevar(db) {
                 continue;
             }
 
-            let larger_smaller = if left_atom.contains(db, right_atom) {
-                Some((left_atom, right_atom))
-            } else if right_atom.contains(db, left_atom) {
-                Some((right_atom, left_atom))
+            let larger_smaller = if left_constraint.contains(db, right_constraint) {
+                Some((left_constraint, right_constraint))
+            } else if right_constraint.contains(db, left_constraint) {
+                Some((right_constraint, left_constraint))
             } else {
                 None
             };
-            if let Some((larger_atom, smaller_atom)) = larger_smaller {
+            if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
                 /*
                 eprintln!(
                     "==> {} contains {}",
-                    left_atom.display(db),
-                    right_atom.display(db),
+                    left_constraint.display(db),
+                    right_constraint.display(db),
                 );
                 */
                 simplified = simplified.substitute_union(
                     db,
-                    SatisfiedConstraint::Positive(larger_atom),
-                    SatisfiedConstraint::Positive(smaller_atom),
-                    Node::new_satisfied_constraint(db, SatisfiedConstraint::Positive(larger_atom)),
+                    larger_constraint.when_true(),
+                    smaller_constraint.when_true(),
+                    Node::new_satisfied_constraint(db, larger_constraint.when_true()),
                 );
                 simplified = simplified.substitute_intersection(
                     db,
-                    SatisfiedConstraint::Negative(larger_atom),
-                    SatisfiedConstraint::Negative(smaller_atom),
-                    Node::new_satisfied_constraint(db, SatisfiedConstraint::Negative(larger_atom)),
+                    larger_constraint.when_false(),
+                    smaller_constraint.when_false(),
+                    Node::new_satisfied_constraint(db, larger_constraint.when_false()),
                 );
 
                 simplified = simplified.substitute_intersection(
                     db,
-                    SatisfiedConstraint::Negative(larger_atom),
-                    SatisfiedConstraint::Positive(smaller_atom),
+                    larger_constraint.when_false(),
+                    smaller_constraint.when_true(),
                     Node::AlwaysFalse,
                 );
                 simplified = simplified.substitute_union(
                     db,
-                    SatisfiedConstraint::Positive(larger_atom),
-                    SatisfiedConstraint::Negative(smaller_atom),
+                    larger_constraint.when_true(),
+                    smaller_constraint.when_false(),
                     Node::AlwaysTrue,
                 );
             }
 
-            let left_constraint = left_atom.constraint(db);
-            let right_constraint = right_atom.constraint(db);
-            match left_constraint.intersect(db, right_constraint) {
-                Some(intersection) => {
+            let left_range = left_constraint.range(db);
+            let right_range = right_constraint.range(db);
+            match left_range.intersect(db, right_range) {
+                Some(intersection_range) => {
                     let intersection_constraint =
-                        ConstrainedTypeVar::new(db, typevar, intersection);
-                    if seen_atoms.insert(intersection_constraint) {
+                        ConstrainedTypeVar::new(db, typevar, intersection_range);
+                    if seen_constraints.insert(intersection_constraint) {
                         to_visit.extend(
-                            (seen_atoms.iter().copied())
+                            (seen_constraints.iter().copied())
                                 .filter(|seen| *seen != intersection_constraint)
                                 .map(|seen| (seen, intersection_constraint)),
                         );
                     }
-                    let positive_intersection_node = Node::new_satisfied_constraint(
-                        db,
-                        SatisfiedConstraint::Positive(intersection_constraint),
-                    );
-                    let negative_intersection_node = Node::new_satisfied_constraint(
-                        db,
-                        SatisfiedConstraint::Negative(intersection_constraint),
-                    );
+                    let positive_intersection_node =
+                        Node::new_satisfied_constraint(db, intersection_constraint.when_true());
+                    let negative_intersection_node =
+                        Node::new_satisfied_constraint(db, intersection_constraint.when_false());
 
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Positive(left_atom),
-                        SatisfiedConstraint::Positive(right_atom),
+                        left_constraint.when_true(),
+                        right_constraint.when_true(),
                         positive_intersection_node,
                     );
                     simplified = simplified.substitute_union(
                         db,
-                        SatisfiedConstraint::Negative(left_atom),
-                        SatisfiedConstraint::Negative(right_atom),
+                        left_constraint.when_false(),
+                        right_constraint.when_false(),
                         negative_intersection_node,
                     );
 
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Positive(left_atom),
-                        SatisfiedConstraint::Negative(right_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Positive(left_atom),
-                        )
-                        .and(db, negative_intersection_node),
+                        left_constraint.when_true(),
+                        right_constraint.when_false(),
+                        Node::new_satisfied_constraint(db, left_constraint.when_true())
+                            .and(db, negative_intersection_node),
                     );
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Negative(left_atom),
-                        SatisfiedConstraint::Positive(right_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Positive(right_atom),
-                        )
-                        .and(db, negative_intersection_node),
+                        left_constraint.when_false(),
+                        right_constraint.when_true(),
+                        Node::new_satisfied_constraint(db, right_constraint.when_true())
+                            .and(db, negative_intersection_node),
                     );
 
                     simplified = simplified.substitute_union(
                         db,
-                        SatisfiedConstraint::Positive(left_atom),
-                        SatisfiedConstraint::Negative(right_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Negative(right_atom),
-                        )
-                        .or(db, positive_intersection_node),
+                        left_constraint.when_true(),
+                        right_constraint.when_false(),
+                        Node::new_satisfied_constraint(db, right_constraint.when_false())
+                            .or(db, positive_intersection_node),
                     );
                     simplified = simplified.substitute_union(
                         db,
-                        SatisfiedConstraint::Negative(left_atom),
-                        SatisfiedConstraint::Positive(right_atom),
-                        Node::new_satisfied_constraint(
-                            db,
-                            SatisfiedConstraint::Negative(left_atom),
-                        )
-                        .or(db, positive_intersection_node),
+                        left_constraint.when_false(),
+                        right_constraint.when_true(),
+                        Node::new_satisfied_constraint(db, left_constraint.when_false())
+                            .or(db, positive_intersection_node),
                     );
                 }
                 None => {
                     /*
                     eprintln!(
                         "==> {} ∧ {} is empty",
-                        left_atom.display(db),
-                        right_atom.display(db)
+                        left_constraint.display(db),
+                        right_constraint.display(db)
                     );
                     */
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Positive(left_atom),
-                        SatisfiedConstraint::Positive(right_atom),
+                        left_constraint.when_true(),
+                        right_constraint.when_true(),
                         Node::AlwaysFalse,
                     );
                     simplified = simplified.substitute_union(
                         db,
-                        SatisfiedConstraint::Negative(left_atom),
-                        SatisfiedConstraint::Negative(right_atom),
+                        left_constraint.when_false(),
+                        right_constraint.when_false(),
                         Node::AlwaysTrue,
                     );
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Positive(left_atom),
-                        SatisfiedConstraint::Negative(right_atom),
-                        Node::new_constraint(db, left_atom),
+                        left_constraint.when_true(),
+                        right_constraint.when_false(),
+                        Node::new_constraint(db, left_constraint),
                     );
                     simplified = simplified.substitute_intersection(
                         db,
-                        SatisfiedConstraint::Negative(left_atom),
-                        SatisfiedConstraint::Positive(right_atom),
-                        Node::new_constraint(db, right_atom),
+                        left_constraint.when_false(),
+                        right_constraint.when_true(),
+                        Node::new_constraint(db, right_constraint),
                     );
                 }
             }
