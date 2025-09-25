@@ -73,20 +73,6 @@ fn handle_parenthesized_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    // As a special-case, ignore comments within f-strings, like:
-    // ```python
-    // (
-    //     f'{1}' # comment
-    //     f'{2}'
-    // )
-    // ```
-    // These can't be parenthesized, as they must fall between two string tokens in an implicit
-    // concatenation. But the expression ranges only include the `1` and `2` above, so we also
-    // can't lex the contents between them.
-    if comment.enclosing_node().is_expr_f_string() {
-        return CommentPlacement::Default(comment);
-    }
-
     let Some(preceding) = comment.preceding_node() else {
         return CommentPlacement::Default(comment);
     };
