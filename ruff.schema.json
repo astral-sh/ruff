@@ -1843,7 +1843,7 @@
           ]
         },
         "order-by-type": {
-          "description": "Order imports by type, which is determined by case, in addition to alphabetically.\n\nNote that this takes precedence over the [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.",
+          "description": "Order imports by type, which is determined by case, in addition to alphabetically.\n\nNote that this option takes precedence over the [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.",
           "type": [
             "boolean",
             "null"
