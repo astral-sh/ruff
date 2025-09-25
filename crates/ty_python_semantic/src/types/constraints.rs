@@ -617,8 +617,8 @@ impl<'db> Node<'db> {
             // with the input.
             return self;
         }
-        let (when_not_left, _) = self.restrict(db, [left.flipped()]);
-        let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
+        let (when_not_left, _) = self.restrict(db, [left.negated()]);
+        let (when_left_but_not_right, _) = self.restrict(db, [left, right.negated()]);
 
         // The result should test `replacement`, and when it's true, it should produce the same
         // output that input would when `left ∧ right` is true. When replacement is false, it
@@ -676,9 +676,9 @@ impl<'db> Node<'db> {
             // with the input.
             return self;
         }
-        let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
-        let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
-        let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
+        let (when_l0_r0, _) = self.restrict(db, [left.negated(), right.negated()]);
+        let (when_l1_r0, _) = self.restrict(db, [left, right.negated()]);
+        let (when_l0_r1, _) = self.restrict(db, [left.negated(), right]);
 
         // The result should test `replacement`, and when it's true, it should produce the same
         // output that input would when `left ∨ right` is true. For OR, this is the union of what
@@ -1152,7 +1152,7 @@ impl<'db> ConstraintAssignment<'db> {
         }
     }
 
-    fn flipped(self) -> Self {
+    fn negated(self) -> Self {
         match self {
             ConstraintAssignment::Positive(constraint) => {
                 ConstraintAssignment::Negative(constraint)
@@ -1163,8 +1163,8 @@ impl<'db> ConstraintAssignment<'db> {
         }
     }
 
-    fn flip(&mut self) {
-        *self = self.flipped();
+    fn negate(&mut self) {
+        *self = self.negated();
     }
 
     // Keep this for future debugging needs, even though it's not currently used when rendering
@@ -1215,14 +1215,14 @@ impl<'db> SatisfiedClause<'db> {
 
     /// Invokes a closure with the last constraint in this clause negated. Returns the clause back
     /// to its original state after invoking the closure.
-    fn with_flipped_last_constraint(&mut self, f: impl for<'a> FnOnce(&'a Self)) {
+    fn with_negated_last_constraint(&mut self, f: impl for<'a> FnOnce(&'a Self)) {
         if self.constraints.is_empty() {
             return;
         }
         let last_index = self.constraints.len() - 1;
-        self.constraints[last_index].flip();
+        self.constraints[last_index].negate();
         f(self);
-        self.constraints[last_index].flip();
+        self.constraints[last_index].negate();
     }
 
     /// Removes another clause from this clause, if it appears as a prefix of this clause. Returns
@@ -1327,7 +1327,7 @@ impl<'db> SatisfiedClauses<'db> {
             let (clause, rest) = self.clauses[..=i]
                 .split_last_mut()
                 .expect("index should be in range");
-            clause.with_flipped_last_constraint(|clause| {
+            clause.with_negated_last_constraint(|clause| {
                 for existing in rest {
                     changes_made |= existing.remove_prefix(clause);
                 }
@@ -1336,7 +1336,7 @@ impl<'db> SatisfiedClauses<'db> {
             let (clause, rest) = self.clauses[i..]
                 .split_first_mut()
                 .expect("index should be in range");
-            clause.with_flipped_last_constraint(|clause| {
+            clause.with_negated_last_constraint(|clause| {
                 for existing in rest {
                     changes_made |= existing.remove_prefix(clause);
                 }
