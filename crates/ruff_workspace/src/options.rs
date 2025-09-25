@@ -2302,6 +2302,9 @@ pub struct IsortOptions {
 
     /// Order imports by type, which is determined by case, in addition to
     /// alphabetically.
+    ///
+    /// Note that this option takes precedence over the
+    /// [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.
     #[option(
         default = r#"true"#,
         value_type = "bool",
@@ -2324,6 +2327,9 @@ pub struct IsortOptions {
     pub force_sort_within_sections: Option<bool>,
 
     /// Sort imports taking into account case sensitivity.
+    ///
+    /// Note that the [`order-by-type`](#lint_isort_order-by-type) setting will
+    /// take precedence over this one when enabled.
     #[option(
         default = r#"false"#,
         value_type = "bool",
