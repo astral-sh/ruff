@@ -267,12 +267,12 @@ impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
 
 #[salsa::tracked]
 impl<'db> ConstrainedTypeVar<'db> {
-    fn when_true(self) -> SatisfiedConstraint<'db> {
-        SatisfiedConstraint::Positive(self)
+    fn when_true(self) -> ConstraintAssignment<'db> {
+        ConstraintAssignment::Positive(self)
     }
 
-    fn when_false(self) -> SatisfiedConstraint<'db> {
-        SatisfiedConstraint::Negative(self)
+    fn when_false(self) -> ConstraintAssignment<'db> {
+        ConstraintAssignment::Negative(self)
     }
 
     fn contains(self, db: &'db dyn Db, other: Self) -> bool {
@@ -457,15 +457,15 @@ impl<'db> Node<'db> {
     /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
     /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
     /// a negative constraint, it returns the negation of that BDD node.)
-    fn new_satisfied_constraint(db: &'db dyn Db, constraint: SatisfiedConstraint<'db>) -> Self {
+    fn new_satisfied_constraint(db: &'db dyn Db, constraint: ConstraintAssignment<'db>) -> Self {
         match constraint {
-            SatisfiedConstraint::Positive(constraint) => Self::Interior(InteriorNode::new(
+            ConstraintAssignment::Positive(constraint) => Self::Interior(InteriorNode::new(
                 db,
                 constraint,
                 Node::AlwaysTrue,
                 Node::AlwaysFalse,
             )),
-            SatisfiedConstraint::Negative(constraint) => Self::Interior(InteriorNode::new(
+            ConstraintAssignment::Negative(constraint) => Self::Interior(InteriorNode::new(
                 db,
                 constraint,
                 Node::AlwaysFalse,
@@ -573,7 +573,7 @@ impl<'db> Node<'db> {
     fn restrict(
         self,
         db: &'db dyn Db,
-        assignment: impl IntoIterator<Item = SatisfiedConstraint<'db>>,
+        assignment: impl IntoIterator<Item = ConstraintAssignment<'db>>,
     ) -> (Node<'db>, bool) {
         assignment
             .into_iter()
@@ -591,7 +591,7 @@ impl<'db> Node<'db> {
     fn restrict_one(
         self,
         db: &'db dyn Db,
-        assignment: SatisfiedConstraint<'db>,
+        assignment: ConstraintAssignment<'db>,
     ) -> (Node<'db>, bool) {
         match self {
             Node::AlwaysTrue => (Node::AlwaysTrue, false),
@@ -604,8 +604,8 @@ impl<'db> Node<'db> {
     fn substitute_intersection(
         self,
         db: &'db dyn Db,
-        left: SatisfiedConstraint<'db>,
-        right: SatisfiedConstraint<'db>,
+        left: ConstraintAssignment<'db>,
+        right: ConstraintAssignment<'db>,
         replacement_node: Node<'db>,
     ) -> Self {
         let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
@@ -635,8 +635,8 @@ impl<'db> Node<'db> {
     fn substitute_union(
         self,
         db: &'db dyn Db,
-        left: SatisfiedConstraint<'db>,
-        right: SatisfiedConstraint<'db>,
+        left: ConstraintAssignment<'db>,
+        right: ConstraintAssignment<'db>,
         replacement_node: Node<'db>,
     ) -> Self {
         let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
@@ -854,7 +854,7 @@ impl<'db> InteriorNode<'db> {
     fn restrict_one(
         self,
         db: &'db dyn Db,
-        assignment: SatisfiedConstraint<'db>,
+        assignment: ConstraintAssignment<'db>,
     ) -> (Node<'db>, bool) {
         // If this node's variable is larger than the assignment's variable, then we have reached a
         // point in the BDD where the assignment can no longer affect the result,
@@ -1028,23 +1028,27 @@ impl<'db> InteriorNode<'db> {
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum SatisfiedConstraint<'db> {
+enum ConstraintAssignment<'db> {
     Positive(ConstrainedTypeVar<'db>),
     Negative(ConstrainedTypeVar<'db>),
 }
 
-impl<'db> SatisfiedConstraint<'db> {
+impl<'db> ConstraintAssignment<'db> {
     fn constraint(self) -> ConstrainedTypeVar<'db> {
         match self {
-            SatisfiedConstraint::Positive(constraint) => constraint,
-            SatisfiedConstraint::Negative(constraint) => constraint,
+            ConstraintAssignment::Positive(constraint) => constraint,
+            ConstraintAssignment::Negative(constraint) => constraint,
         }
     }
 
     fn flipped(self) -> Self {
         match self {
-            SatisfiedConstraint::Positive(constraint) => SatisfiedConstraint::Negative(constraint),
-            SatisfiedConstraint::Negative(constraint) => SatisfiedConstraint::Positive(constraint),
+            ConstraintAssignment::Positive(constraint) => {
+                ConstraintAssignment::Negative(constraint)
+            }
+            ConstraintAssignment::Negative(constraint) => {
+                ConstraintAssignment::Positive(constraint)
+            }
         }
     }
 
@@ -1056,23 +1060,25 @@ impl<'db> SatisfiedConstraint<'db> {
     // constraint sets.
     #[expect(dead_code)]
     fn display(self, db: &'db dyn Db) -> impl Display {
-        struct DisplaySatisfiedConstraint<'db> {
-            constraint: SatisfiedConstraint<'db>,
+        struct DisplayConstraintAssignment<'db> {
+            constraint: ConstraintAssignment<'db>,
             db: &'db dyn Db,
         }
 
-        impl Display for DisplaySatisfiedConstraint<'_> {
+        impl Display for DisplayConstraintAssignment<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.constraint {
-                    SatisfiedConstraint::Positive(constraint) => constraint.display(self.db).fmt(f),
-                    SatisfiedConstraint::Negative(constraint) => {
+                    ConstraintAssignment::Positive(constraint) => {
+                        constraint.display(self.db).fmt(f)
+                    }
+                    ConstraintAssignment::Negative(constraint) => {
                         constraint.display_negated(self.db).fmt(f)
                     }
                 }
             }
         }
 
-        DisplaySatisfiedConstraint {
+        DisplayConstraintAssignment {
             constraint: self,
             db,
         }
@@ -1082,11 +1088,11 @@ impl<'db> SatisfiedConstraint<'db> {
 /// A single clause in the DNF representation of a BDD
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClause<'db> {
-    constraints: Vec<SatisfiedConstraint<'db>>,
+    constraints: Vec<ConstraintAssignment<'db>>,
 }
 
 impl<'db> SatisfiedClause<'db> {
-    fn push(&mut self, constraint: SatisfiedConstraint<'db>) {
+    fn push(&mut self, constraint: ConstraintAssignment<'db>) {
         self.constraints.push(constraint);
     }
 
@@ -1134,10 +1140,10 @@ impl<'db> SatisfiedClause<'db> {
                         f.write_str(" ∧ ")?;
                     }
                     match constraint {
-                        SatisfiedConstraint::Positive(constraint) => {
+                        ConstraintAssignment::Positive(constraint) => {
                             write!(f, "{}", constraint.display(self.db))?;
                         }
-                        SatisfiedConstraint::Negative(constraint) => {
+                        ConstraintAssignment::Negative(constraint) => {
                             write!(f, "{}", constraint.display_negated(self.db))?;
                         }
                     }
