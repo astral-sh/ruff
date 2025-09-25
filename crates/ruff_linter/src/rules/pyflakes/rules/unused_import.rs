@@ -652,12 +652,23 @@ fn unused_imports_in_scope<'a, 'b>(
             if is_refined_submodule_import_match_enabled(settings)
                 // No need to apply refined logic if there is only a single binding
                 && scope.shadowed_bindings(id).nth(1).is_some()
-                // Only apply the new logic when all shadowed bindings
-                // are un-aliased imports and submodule imports to avoid
+                // Only apply the new logic in certain situations to avoid
                 // complexity, false positives, and intersection with
                 // `redefined-while-unused` (`F811`).
-                && scope.shadowed_bindings(id).all(|shadow| {
+                && scope.shadowed_bindings(id).enumerate().all(|(i,shadow)| {
                     let shadowed_binding = semantic.binding(shadow);
+                    // Bail if one of the shadowed bindings is
+                    // used before the last live binding. This is
+                    // to avoid situations like this:
+                    //
+                    // ```
+                    // import a
+                    // a.b
+                    // import a.b
+                    // ```
+                    if i>0 && shadowed_binding.is_used() {
+                        return false
+                    }
                     matches!(
                         shadowed_binding.kind,
                         BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
