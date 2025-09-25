@@ -570,14 +570,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     attribute_type
                 };
 
-                let proto_member_as_bound_method = method.bind_self(db);
-
-                attribute_type.has_relation_to_impl(
-                    db,
-                    proto_member_as_bound_method,
-                    relation,
-                    visitor,
-                )
+                attribute_type.has_relation_to_impl(db, method.bind_self(db), relation, visitor)
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
