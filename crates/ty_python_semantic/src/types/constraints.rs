@@ -600,28 +600,55 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns a new BDD with any occurence of `left ∧ right` replaced with `replacement_node`.
+    /// Returns a new BDD with any occurence of `left ∧ right` replaced with `replacement`.
     fn substitute_intersection(
         self,
         db: &'db dyn Db,
         left: ConstraintAssignment<'db>,
         right: ConstraintAssignment<'db>,
-        replacement_node: Node<'db>,
+        replacement: Node<'db>,
     ) -> Self {
+        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
+        //   - left and right are both true
+        //   - left is false
+        //   - left is true and right is false
+        // This covers the entire truth table of `left ∧ right`.
         let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
         if !both_found {
+            // If left and right are not both present in the input BDD, we should not even attempt
+            // the subtitution, since the Shannon expansion might introduce the missing variables!
+            // That confuses us below when we try to detect whether the substitution is consistent
+            // with the input.
             return self;
         }
         let (when_not_left, _) = self.restrict(db, [left.flipped()]);
         let (when_left_but_not_right, _) = self.restrict(db, [left, right.flipped()]);
+
+        // The result should test `replacement`, and when it's true, it should produce the same
+        // output that input would when `left ∧ right` is true. When replacement is false, it
+        // should fall back on testing left and right individually to make sure we produce the
+        // correct outputs in the `¬(left ∧ right)` case. So the result is
+        //
+        //   if replacement
+        //     when_left_and_right
+        //   else if not left
+        //     when_not_left
+        //   else if not right
+        //     when_left_but_not_right
+        //   else
+        //     false
+        //
+        //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
         let left_node = Node::new_satisfied_constraint(db, left);
         let right_node = Node::new_satisfied_constraint(db, right);
-
         let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
         let left_result = left_node.ite(db, right_result, when_not_left);
-        let result = replacement_node.ite(db, when_left_and_right, left_result);
+        let result = replacement.ite(db, when_left_and_right, left_result);
 
-        let validity = replacement_node.iff(db, left_node.and(db, right_node));
+        // Lastly, verify that the result is consistent with the input. (It must produce the same
+        // results when `left ∧ right`.) If it doesn't, the substitution isn't valid, and we should
+        // return the original BDD unmodified.
+        let validity = replacement.iff(db, left_node.and(db, right_node));
         let constrained_original = self.and(db, validity);
         let constrained_replacement = result.and(db, validity);
         if constrained_original == constrained_replacement {
@@ -631,31 +658,54 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns a new BDD with any occurence of `left ∨ right` replaced with `replacement_node`.
+    /// Returns a new BDD with any occurence of `left ∨ right` replaced with `replacement`.
     fn substitute_union(
         self,
         db: &'db dyn Db,
         left: ConstraintAssignment<'db>,
         right: ConstraintAssignment<'db>,
-        replacement_node: Node<'db>,
+        replacement: Node<'db>,
     ) -> Self {
+        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
+        //   - left and right are both true
+        //   - left is true and right is false
+        //   - left is false and right is true
+        //   - left and right are both false
+        // This covers the entire truth table of `left ∨ right`.
         let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
         if !both_found {
+            // If left and right are not both present in the input BDD, we should not even attempt
+            // the subtitution, since the Shannon expansion might introduce the missing variables!
+            // That confuses us below when we try to detect whether the substitution is consistent
+            // with the input.
             return self;
         }
         let (when_l0_r0, _) = self.restrict(db, [left.flipped(), right.flipped()]);
         let (when_l1_r0, _) = self.restrict(db, [left, right.flipped()]);
         let (when_l0_r1, _) = self.restrict(db, [left.flipped(), right]);
-        let left_node = Node::new_satisfied_constraint(db, left);
-        let right_node = Node::new_satisfied_constraint(db, right);
 
-        let result = replacement_node.ite(
+        // The result should test `replacement`, and when it's true, it should produce the same
+        // output that input would when `left ∨ right` is true. For OR, this is the union of what
+        // the input produces for the three cases that comprise `left ∨ right`. When `replacement`
+        // is false, the result should produce the same output that input would when
+        // `¬(left ∨ right)`, i.e. when `left ∧ right`. So the result is
+        //
+        //   if replacement
+        //     or(when_l1_r1, when_l1_r0, when_r0_l1)
+        //   else
+        //     when_l0_r0
+        let result = replacement.ite(
             db,
             when_l1_r0.or(db, when_l0_r1.or(db, when_l1_r1)),
             when_l0_r0,
         );
 
-        let validity = replacement_node.iff(db, left_node.or(db, right_node));
+        // Lastly, verify that the result is consistent with the input. (It must produce the same
+        // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
+        // return the original BDD unmodified.
+        let left_node = Node::new_satisfied_constraint(db, left);
+        let right_node = Node::new_satisfied_constraint(db, right);
+        let validity = replacement.iff(db, left_node.or(db, right_node));
         let constrained_original = self.and(db, validity);
         let constrained_replacement = result.and(db, validity);
         if constrained_original == constrained_replacement {
