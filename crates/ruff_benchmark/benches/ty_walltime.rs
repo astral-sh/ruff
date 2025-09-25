@@ -199,7 +199,8 @@ static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY312,
         },
-        75000,
+        // TODO: With better decorator support, `__slots__` support, etc., it should be possible to reduce the number of errors considerably.
+        70000,
     )
 });
 
