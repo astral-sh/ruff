@@ -2445,6 +2445,7 @@ requires-python = ">= 3.11"
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -2758,6 +2759,7 @@ requires-python = ">= 3.11"
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -3070,6 +3072,7 @@ requires-python = ">= 3.11"
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -3434,6 +3437,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -3814,6 +3818,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -4142,6 +4147,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -4470,6 +4476,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -4755,6 +4762,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -5093,6 +5101,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_statements = 50
         linter.pylint.max_public_methods = 20
         linter.pylint.max_locals = 15
+        linter.pylint.max_nested_blocks = 5
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
 
