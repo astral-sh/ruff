@@ -1,0 +1,77 @@
+use itertools::Itertools;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::{FixAvailability, Violation};
+
+/// ## What it does
+/// Checks for comparisons between floating-point values using `==` or `!=`.
+///
+/// ## Why is this bad?
+/// Directly comparing floats can produce unreliable results due to the
+/// inherent imprecision of floating-point arithmetic.
+///
+/// ## Example
+/// ```python
+/// assert 0.1 + 0.2 == 0.3  # AssertionError
+/// ```
+/// Use instead:
+/// ```python
+/// import math
+///
+/// assert math.isclose(0.1 + 0.2, 0.3, rel_tol=1e-9, abs_tol=1e-9)
+/// ```
+#[derive(ViolationMetadata)]
+pub(crate) struct FloatComparison {
+    pub left: String,
+    pub right: String,
+    pub operand: String,
+}
+
+impl Violation for FloatComparison {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "Comparison `{} {} {}` should be replaced by `math.isclose({}, {}, rel_tol=1e-09, abs_tol=1e-09)`",
+            self.left, self.operand, self.right, self.left, self.right,
+        )
+    }
+}
+
+/// E723
+pub(crate) fn float_comparison(checker: &Checker, compare: &ast::ExprCompare) {
+    let locator = checker.locator();
+
+    for (left, right, operand) in std::iter::once(&*compare.left)
+        .chain(&compare.comparators)
+        .tuple_windows()
+        .zip(&compare.ops)
+        .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
+        .filter(|((left, right), _)| has_float(left) || has_float(right))
+        .map(|((left, right), op)| (left, right, op))
+    {
+        checker.report_diagnostic(
+            FloatComparison {
+                left: locator.slice(left.range()).to_string(),
+                right: locator.slice(right.range()).to_string(),
+                operand: operand.to_string(),
+            },
+            TextRange::new(left.start(), right.end()),
+        );
+    }
+}
+
+fn has_float(expr: &Expr) -> bool {
+    match expr {
+        Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+            matches!(value, ast::Number::Float(_))
+        }
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => has_float(left) || has_float(right),
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand),
+        _ => false,
+    }
+}

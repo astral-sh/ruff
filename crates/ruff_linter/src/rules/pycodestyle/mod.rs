@@ -75,6 +75,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::FloatComparison, Path::new("E723.py"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]

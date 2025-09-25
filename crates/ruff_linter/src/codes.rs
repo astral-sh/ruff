@@ -149,6 +149,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E714") => (RuleGroup::Stable, rules::pycodestyle::rules::NotIsTest),
         (Pycodestyle, "E721") => (RuleGroup::Stable, rules::pycodestyle::rules::TypeComparison),
         (Pycodestyle, "E722") => (RuleGroup::Stable, rules::pycodestyle::rules::BareExcept),
+        (Pycodestyle, "E723") => (RuleGroup::Preview, rules::pycodestyle::rules::FloatComparison),
         (Pycodestyle, "E731") => (RuleGroup::Stable, rules::pycodestyle::rules::LambdaAssignment),
         (Pycodestyle, "E741") => (RuleGroup::Stable, rules::pycodestyle::rules::AmbiguousVariableName),
         (Pycodestyle, "E742") => (RuleGroup::Stable, rules::pycodestyle::rules::AmbiguousClassName),
