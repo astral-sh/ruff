@@ -229,7 +229,7 @@ impl<'db> ConstraintSet<'db> {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
         Self {
-            node: RangeConstraint::new_node(db, lower, typevar, upper),
+            node: ConstrainedTypeVar::new_node(db, lower, typevar, upper),
         }
     }
 
@@ -259,7 +259,8 @@ impl From<bool> for ConstraintSet<'_> {
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
-    range: RangeConstraint<'db>,
+    lower: Type<'db>,
+    upper: Type<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -267,39 +268,6 @@ impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
 
 #[salsa::tracked]
 impl<'db> ConstrainedTypeVar<'db> {
-    fn when_true(self) -> ConstraintAssignment<'db> {
-        ConstraintAssignment::Positive(self)
-    }
-
-    fn when_false(self) -> ConstraintAssignment<'db> {
-        ConstraintAssignment::Negative(self)
-    }
-
-    fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db) != other.typevar(db) {
-            return false;
-        }
-        self.range(db).contains(db, other.range(db))
-    }
-
-    fn display(self, db: &'db dyn Db) -> impl Display {
-        self.range(db).display(db, self.typevar(db).display(db))
-    }
-
-    fn display_negated(self, db: &'db dyn Db) -> impl Display {
-        self.range(db)
-            .display_negated(db, self.typevar(db).display(db))
-    }
-}
-
-/// Defines the lower and upper bounds of an individual constraint.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct RangeConstraint<'db> {
-    lower: Type<'db>,
-    upper: Type<'db>,
-}
-
-impl<'db> RangeConstraint<'db> {
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
@@ -324,19 +292,29 @@ impl<'db> RangeConstraint<'db> {
             return Node::AlwaysTrue;
         }
 
-        let range = RangeConstraint { lower, upper };
-        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, range))
+        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
+    }
+    fn when_true(self) -> ConstraintAssignment<'db> {
+        ConstraintAssignment::Positive(self)
     }
 
-    fn contains(self, db: &'db dyn Db, other: RangeConstraint<'db>) -> bool {
-        self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper)
+    fn when_false(self) -> ConstraintAssignment<'db> {
+        ConstraintAssignment::Negative(self)
+    }
+
+    fn contains(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.typevar(db) != other.typevar(db) {
+            return false;
+        }
+        self.lower(db).is_subtype_of(db, other.lower(db))
+            && other.upper(db).is_subtype_of(db, self.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
-    fn intersect(&self, db: &'db dyn Db, other: RangeConstraint<'db>) -> Option<Self> {
+    fn intersect(self, db: &'db dyn Db, other: Self) -> Option<Self> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = UnionType::from_elements(db, [self.lower, other.lower]);
-        let upper = IntersectionType::from_elements(db, [self.upper, other.upper]);
+        let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]);
+        let upper = IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]);
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
@@ -344,34 +322,35 @@ impl<'db> RangeConstraint<'db> {
             return None;
         }
 
-        Some(Self { lower, upper })
+        Some(Self::new(db, self.typevar(db), lower, upper))
     }
 
-    fn display(self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
-        self.display_inner(db, typevar, false)
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        self.display_inner(db, false)
     }
 
-    fn display_negated(self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
-        self.display_inner(db, typevar, true)
+    fn display_negated(self, db: &'db dyn Db) -> impl Display {
+        self.display_inner(db, true)
     }
 
-    fn display_inner(self, db: &'db dyn Db, typevar: impl Display, negated: bool) -> impl Display {
-        struct DisplayRangeConstraint<'db, D> {
-            range: RangeConstraint<'db>,
-            typevar: D,
+    fn display_inner(self, db: &'db dyn Db, negated: bool) -> impl Display {
+        struct DisplayConstrainedTypeVar<'db> {
+            constraint: ConstrainedTypeVar<'db>,
             negated: bool,
             db: &'db dyn Db,
         }
 
-        impl<D: Display> Display for DisplayRangeConstraint<'_, D> {
+        impl Display for DisplayConstrainedTypeVar<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if (self.range.lower).is_equivalent_to(self.db, self.range.upper) {
+                let lower = self.constraint.lower(self.db);
+                let upper = self.constraint.upper(self.db);
+                if lower.is_equivalent_to(self.db, upper) {
                     return write!(
                         f,
                         "({} {} {})",
-                        &self.typevar,
+                        self.constraint.typevar(self.db).display(self.db),
                         if self.negated { "≠" } else { "=" },
-                        self.range.lower.display(self.db)
+                        lower.display(self.db)
                     );
                 }
 
@@ -379,20 +358,19 @@ impl<'db> RangeConstraint<'db> {
                     f.write_str("¬")?;
                 }
                 f.write_str("(")?;
-                if !self.range.lower.is_never() {
-                    write!(f, "{} ≤ ", self.range.lower.display(self.db))?;
+                if !lower.is_never() {
+                    write!(f, "{} ≤ ", lower.display(self.db))?;
                 }
-                self.typevar.fmt(f)?;
-                if !self.range.upper.is_object() {
-                    write!(f, " ≤ {}", self.range.upper.display(self.db))?;
+                self.constraint.typevar(self.db).display(self.db).fmt(f)?;
+                if !upper.is_object() {
+                    write!(f, " ≤ {}", upper.display(self.db))?;
                 }
                 f.write_str(")")
             }
         }
 
-        DisplayRangeConstraint {
-            range: self,
-            typevar,
+        DisplayConstrainedTypeVar {
+            constraint: self,
             negated,
             db,
         }
@@ -1011,15 +989,11 @@ impl<'db> InteriorNode<'db> {
             // There are some simplifications we can make when the intersection of the two
             // constraints is empty, and others that we can make when the intersection is
             // non-empty.
-            let left_range = left_constraint.range(db);
-            let right_range = right_constraint.range(db);
-            match left_range.intersect(db, right_range) {
-                Some(intersection_range) => {
+            match left_constraint.intersect(db, right_constraint) {
+                Some(intersection_constraint) => {
                     // If the intersection is non-empty, we need to create a new constraint to
                     // represent that intersection. We also need to add the new constraint to our
                     // seen set and (if we haven't already seen it) to the to-visit queue.
-                    let intersection_constraint =
-                        ConstrainedTypeVar::new(db, typevar, intersection_range);
                     if seen_constraints.insert(intersection_constraint) {
                         to_visit.extend(
                             (seen_constraints.iter().copied())
