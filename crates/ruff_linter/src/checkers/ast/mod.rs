@@ -2974,6 +2974,10 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected Expr::Lambda");
                 };
 
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
+                }
+
                 // Here we add the implicit scope surrounding a lambda which allows code in the
                 // lambda to access `__class__` at runtime when the lambda is defined within a class.
                 // See the `ScopeKind::DunderClassCell` docs for more information.
@@ -2995,10 +2999,6 @@ impl<'a> Checker<'a> {
                 } else {
                     false
                 };
-
-                if let Some(parameters) = parameters {
-                    self.visit_parameters(parameters);
-                }
                 self.visit_expr(body);
 
                 // Clean up the dunder class scope if we added it
