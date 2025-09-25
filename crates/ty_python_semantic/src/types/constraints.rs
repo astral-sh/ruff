@@ -471,6 +471,15 @@ impl<'db> Node<'db> {
         matches!(self, Node::AlwaysFalse)
     }
 
+    /// Returns the number of internal nodes in this BDD. This is a decent proxy for the complexity
+    /// of the function that the BDD represents.
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => 0,
+            Node::Interior(interior) => interior.interior_node_count(db),
+        }
+    }
+
     /// Returns the negation of this BDD.
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
@@ -571,6 +580,18 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => (Node::AlwaysTrue, false),
             Node::AlwaysFalse => (Node::AlwaysFalse, false),
             Node::Interior(interior) => interior.restrict_one(db, assignment),
+        }
+    }
+
+    fn minimize(self, db: &'db dyn Db, assignment: Node<'db>) -> Minimized<'db, 'db> {
+        match (self, assignment) {
+            (_, Node::AlwaysTrue) => Minimized::OwnedTwo([Node::AlwaysTrue, Node::AlwaysFalse]),
+            (_, Node::AlwaysFalse) | (Node::AlwaysTrue | Node::AlwaysFalse, _) => {
+                Minimized::OwnedOne(self)
+            }
+            (Node::Interior(interior), Node::Interior(assignment)) => {
+                Minimized::Borrowed(interior.minimize(db, assignment))
+            }
         }
     }
 
@@ -787,6 +808,11 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        1 + self.if_true(db).interior_node_count(db) + self.if_false(db).interior_node_count(db)
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn negate(self, db: &'db dyn Db) -> Node<'db> {
         Node::new(
             db,
@@ -902,6 +928,38 @@ impl<'db> InteriorNode<'db> {
                 found_in_true || found_in_false,
             )
         }
+    }
+
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    fn minimize(self, db: &'db dyn Db, assignment: Self) -> Box<[Node<'db>]> {
+        let self_constraint = self.constraint(db);
+        let assignment_constraint = assignment.constraint(db);
+        let (true_minimized, false_minimized) = match self_constraint.cmp(&assignment_constraint) {
+            Ordering::Equal => (
+                self.if_true(db).minimize(db, assignment.if_true(db)),
+                self.if_false(db).minimize(db, assignment.if_false(db)),
+            ),
+            Ordering::Less => (
+                self.if_true(db).minimize(db, Node::Interior(assignment)),
+                self.if_false(db).minimize(db, Node::Interior(assignment)),
+            ),
+            Ordering::Greater => (
+                Node::Interior(self).minimize(db, assignment.if_true(db)),
+                Node::Interior(self).minimize(db, assignment.if_false(db)),
+            ),
+        };
+        let mut result = Vec::new();
+        for if_true in true_minimized.as_slice() {
+            for if_false in false_minimized.as_slice() {
+                result.push(Node::new(db, self_constraint, *if_true, *if_false));
+            }
+        }
+        let minimum_size = (result.iter())
+            .map(|node| node.interior_node_count(db))
+            .min()
+            .expect("minimizing should never produce an empty BDD");
+        result.retain(|node| node.interior_node_count(db) == minimum_size);
+        result.into_boxed_slice()
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
@@ -1107,6 +1165,23 @@ impl<'db> InteriorNode<'db> {
         }
 
         simplified
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum Minimized<'a, 'db> {
+    OwnedOne(Node<'db>),
+    OwnedTwo([Node<'db>; 2]),
+    Borrowed(&'a [Node<'db>]),
+}
+
+impl<'a, 'db> Minimized<'a, 'db> {
+    fn as_slice(&'a self) -> &'a [Node<'db>] {
+        match self {
+            Minimized::OwnedOne(owned) => std::slice::from_ref(owned),
+            Minimized::OwnedTwo(owned) => owned,
+            Minimized::Borrowed(borrowed) => borrowed,
+        }
     }
 }
 
