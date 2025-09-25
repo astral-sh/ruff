@@ -53,13 +53,13 @@ impl Violation for SuppressibleException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuppressibleException { exception } = self;
-        format!("Replace `try`-`except`-`pass` block with `with contextlib.suppress({exception})`")
+        format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
     }
 
     fn fix_title(&self) -> Option<String> {
         let SuppressibleException { exception } = self;
         Some(format!(
-            "Replace `try`-`except`-`pass` with `with contextlib.suppress({exception})`"
+            "Replace `try`-`except`-`pass` with `with contextlib.suppress({exception}): ...`"
         ))
     }
 }
