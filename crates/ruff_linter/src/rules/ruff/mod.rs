@@ -17,12 +17,12 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
+    use crate::assert_diagnostics;
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
