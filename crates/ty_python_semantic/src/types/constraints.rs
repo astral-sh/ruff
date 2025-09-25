@@ -313,20 +313,16 @@ impl<'db> RangeConstraint<'db> {
 
         // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
         // to _any_ type, and the constraint does nothing.
-        let constraint = RangeConstraint { lower, upper };
-        if constraint.is_always() {
+        if lower.is_never() && upper.is_object() {
             return Node::AlwaysTrue;
         }
 
+        let constraint = RangeConstraint { lower, upper };
         Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, constraint))
     }
 
     fn contains(self, db: &'db dyn Db, other: RangeConstraint<'db>) -> bool {
         self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper)
-    }
-
-    fn is_always(self) -> bool {
-        self.lower.is_never() && self.upper.is_object()
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
