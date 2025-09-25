@@ -600,7 +600,7 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns a new BDD with any occurence of `left ∧ right` replaced with `replacement`.
+    /// Returns a new BDD with any occurrence of `left ∧ right` replaced with `replacement`.
     fn substitute_intersection(
         self,
         db: &'db dyn Db,
@@ -616,7 +616,7 @@ impl<'db> Node<'db> {
         let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
         if !both_found {
             // If left and right are not both present in the input BDD, we should not even attempt
-            // the subtitution, since the Shannon expansion might introduce the missing variables!
+            // the substitution, since the Shannon expansion might introduce the missing variables!
             // That confuses us below when we try to detect whether the substitution is consistent
             // with the input.
             return self;
@@ -658,7 +658,7 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns a new BDD with any occurence of `left ∨ right` replaced with `replacement`.
+    /// Returns a new BDD with any occurrence of `left ∨ right` replaced with `replacement`.
     fn substitute_union(
         self,
         db: &'db dyn Db,
@@ -675,7 +675,7 @@ impl<'db> Node<'db> {
         let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
         if !both_found {
             // If left and right are not both present in the input BDD, we should not even attempt
-            // the subtitution, since the Shannon expansion might introduce the missing variables!
+            // the substitution, since the Shannon expansion might introduce the missing variables!
             // That confuses us below when we try to detect whether the substitution is consistent
             // with the input.
             return self;
