@@ -933,7 +933,7 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
 
 ## Filtering based on variaidic arguments
 
-This is the step 4 of the overload call evaluation algorithm which specifies that:
+This is step 4 of the overload call evaluation algorithm which specifies that:
 
 > If the argument list is compatible with two or more overloads, determine whether one or more of
 > the overloads has a variadic parameter (either `*args` or `**kwargs`) that maps to a corresponding

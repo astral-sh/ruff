@@ -2090,7 +2090,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn assign_argument(
         &mut self,
         argument_index: usize,
