@@ -248,7 +248,16 @@ impl Printer {
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
-            OutputFormat::Concise | OutputFormat::Full => {
+            OutputFormat::Concise => {
+                TextEmitter::default()
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .with_show_fix_diff(self.format == OutputFormat::Full && preview)
+                    .with_show_source(self.format == OutputFormat::Full)
+                    .with_fix_applicability(self.unsafe_fixes.required_applicability())
+                    .with_preview(preview)
+                    .emit(writer, &diagnostics.inner, &context)?;
+            }
+            OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.format == OutputFormat::Full && preview)
