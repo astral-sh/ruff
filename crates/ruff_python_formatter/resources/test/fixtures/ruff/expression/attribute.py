@@ -169,3 +169,9 @@ result = (
     # dangling before dot
     .b # trailing end-of-line
 )
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19350
+variable = (
+    (something)  # a comment
+    .fist_method("some string")
+)
