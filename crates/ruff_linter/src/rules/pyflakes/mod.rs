@@ -457,6 +457,7 @@ mod tests {
     )]
     #[test_case(
         r"
+        # reverts to stable behavior - used between imports
         import a
         a.foo()
         import a.b",
@@ -464,6 +465,7 @@ mod tests {
     )]
     #[test_case(
         r"
+        # reverts to stable behavior - used between imports
         import a
         a.foo()
         a = 1
@@ -472,6 +474,7 @@ mod tests {
     )]
     #[test_case(
         r"
+        # reverts to stable behavior - used between imports
         import a
         a.foo()
         import a.b
@@ -501,6 +504,7 @@ mod tests {
     )]
     #[test_case(
         r"
+        # refined logic only applied _within_ scope
         import a
         def foo():
             import a.b
@@ -509,6 +513,7 @@ mod tests {
     )]
     #[test_case(
         r"
+        # reverts to stable behavior - used between bindings
         import a
         a.b
         import a.b",
@@ -516,6 +521,7 @@ mod tests {
     )]
     #[test_case(
         r"
+        # reverts to stable behavior - used between bindings
         import a.b
         a
         import a",
