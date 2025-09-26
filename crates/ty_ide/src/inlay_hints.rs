@@ -264,6 +264,15 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 }
                 source_order::walk_expr(self, expr);
             }
+            Expr::Attribute(attribute) => {
+                if self.in_assignment {
+                    if attribute.ctx.is_store() {
+                        let ty = expr.inferred_type(&self.model);
+                        self.add_type_hint(expr.range().end(), ty);
+                    }
+                }
+                source_order::walk_expr(self, expr);
+            }
             Expr::Call(call) => {
                 let argument_names =
                     inlay_hint_function_argument_details(self.db, &self.model, call)
@@ -433,6 +442,31 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
         y = 2
+        ");
+    }
+
+    #[test]
+    fn test_assign_attribute_of_instance() {
+        let test = inlay_hint_test(
+            "
+            class A:
+                def __init__(self, y):
+                    self.x = 1
+                    self.y = y
+
+            a = A(2)
+            a.y = 3
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class A:
+            def __init__(self, y):
+                self.x[: Literal[1]] = 1
+                self.y[: Unknown] = y
+
+        a[: A] = A([y=]2)
+        a.y[: Literal[3]] = 3
         ");
     }
 

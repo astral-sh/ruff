@@ -367,7 +367,9 @@ impl<'db> Signature<'db> {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
@@ -549,10 +551,7 @@ impl<'db> Signature<'db> {
             let self_type = self_type.unwrap_or(Type::unknown());
             let other_type = other_type.unwrap_or(Type::unknown());
             !result
-                .intersect(
-                    db,
-                    &self_type.is_equivalent_to_impl(db, other_type, visitor),
-                )
+                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
                 .is_never_satisfied()
         };
 
@@ -697,10 +696,7 @@ impl<'db> Signature<'db> {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
             !result
-                .intersect(
-                    db,
-                    &type1.has_relation_to_impl(db, type2, relation, visitor),
-                )
+                .intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
                 .is_never_satisfied()
         };
 
@@ -1334,6 +1330,17 @@ impl<'db> Parameters<'db> {
             .and_then(|parameter| parameter.is_positional().then_some(parameter))
     }
 
+    /// Return a positional-only parameter (with index) with the given name.
+    pub(crate) fn positional_only_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
+        self.iter().enumerate().find(|(_, parameter)| {
+            parameter.is_positional_only()
+                && parameter
+                    .name()
+                    .map(|p_name| p_name == name)
+                    .unwrap_or(false)
+        })
+    }
+
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
     pub(crate) fn variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
@@ -1549,7 +1556,9 @@ impl<'db> Parameter<'db> {
             annotated_type: parameter.annotation().map(|annotation| {
                 definition_expression_type(db, definition, annotation).apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 )
             }),
             kind,

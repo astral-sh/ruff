@@ -387,6 +387,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
                 f.write_str("<method-wrapper `startswith` of `str` object>")
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::PathOpen) => {
+                f.write_str("bound method `Path.open`")
+            }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
