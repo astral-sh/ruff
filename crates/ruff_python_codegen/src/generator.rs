@@ -127,6 +127,11 @@ impl<'a> Generator<'a> {
         self.generate()
     }
 
+    pub fn expr_parenthesized(mut self, expr: &Expr) -> String {
+        self.unparse_expr(expr, precedence::MAX);
+        self.generate()
+    }
+
     fn newline(&mut self) {
         if !self.initial {
             self.num_newlines = std::cmp::max(self.num_newlines, 1);
