@@ -844,6 +844,16 @@ impl<'a> FormatResults<'a> {
             diagnostic.annotate(annotation);
             diagnostic.set_fix(fix);
 
+            // TODO(brent) this offset is a hack to get the header of the diagnostic message, which
+            // is rendered by our fork of `annotate-snippets`, to align with our manually-rendered
+            // diff. `annotate-snippets` computes the alignment of the arrow in the header based on
+            // the maximum line number width in its rendered snippet. However, we don't have a
+            // reasonable range to underline in an annotation, so we don't send `annotate-snippets`
+            // a snippet to measure. If we commit to staying on our fork, a more robust way of
+            // handling this would be to move the diff rendering in
+            // `ruff_db::diagnostic::render::full` into `annotate-snippets`, likely as another
+            // `DisplayLine` variant and update the `lineno_width` calculation in
+            // `DisplayList::fmt`. That would handle this offset "automatically."
             let lines = OneIndexed::new(line_count as usize).unwrap_or_default();
             diagnostic.set_header_offset(lines.digits().get());
 
