@@ -609,12 +609,19 @@ impl<'db> Node<'db> {
     /// minimization.
     fn minimizations(self, db: &'db dyn Db, do_not_care: Node<'db>) -> Minimized<'db, 'db> {
         match (self, do_not_care) {
-            (_, Node::AlwaysTrue) => Minimized::OwnedTwo([Node::AlwaysTrue, Node::AlwaysFalse]),
-            (_, Node::AlwaysFalse) | (Node::AlwaysTrue | Node::AlwaysFalse, _) => {
+            // If we never care about this node, then its minimization can evaluate to any result.
+            (_, Node::AlwaysTrue) => {
+                Minimized::OwnedTwo([Node::AlwaysTrue, Node::AlwaysFalse])
+            }
+            // If we always care about this node, then its minimization should behave the same as
+            // the node itself.
+            (_, Node::AlwaysFalse) => {
                 Minimized::OwnedOne(self)
             }
-            (Node::Interior(interior), Node::Interior(do_not_care)) => {
-                Minimized::Borrowed(interior.minimizations(db, do_not_care))
+            // If we sometimes care about this node, we need to recurse down, finding the
+            // minimizations of each side and combining them back together.
+            (_, Node::Interior(do_not_care)) => {
+                Minimized::Borrowed(do_not_care.minimizations_of(db, self))
             }
         }
     }
@@ -955,22 +962,35 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-    fn minimizations(self, db: &'db dyn Db, do_not_care: Self) -> Box<[Node<'db>]> {
-        let self_constraint = self.constraint(db);
+    fn minimizations_of(self, db: &'db dyn Db, node: Node<'db>) -> Box<[Node<'db>]> {
+        let do_not_care = self;
         let do_not_care_constraint = do_not_care.constraint(db);
-        let (true_minimized, false_minimized) = match self_constraint.cmp(&do_not_care_constraint) {
-            Ordering::Equal => (
-                (self.if_true(db)).minimizations(db, do_not_care.if_true(db)),
-                (self.if_false(db)).minimizations(db, do_not_care.if_false(db)),
+        let (constraint, true_minimized, false_minimized) = match node {
+            Node::AlwaysTrue | Node::AlwaysFalse => (
+                do_not_care_constraint,
+                node.minimizations(db, do_not_care.if_true(db)),
+                node.minimizations(db, do_not_care.if_false(db)),
             ),
-            Ordering::Less => (
-                (self.if_true(db)).minimizations(db, Node::Interior(do_not_care)),
-                (self.if_false(db)).minimizations(db, Node::Interior(do_not_care)),
-            ),
-            Ordering::Greater => (
-                Node::Interior(self).minimizations(db, do_not_care.if_true(db)),
-                Node::Interior(self).minimizations(db, do_not_care.if_false(db)),
-            ),
+            Node::Interior(node) => {
+                let node_constraint = node.constraint(db);
+                match node_constraint.cmp(&do_not_care_constraint) {
+                    Ordering::Equal => (
+                        node_constraint,
+                        (node.if_true(db)).minimizations(db, do_not_care.if_true(db)),
+                        (node.if_false(db)).minimizations(db, do_not_care.if_false(db)),
+                    ),
+                    Ordering::Less => (
+                        node_constraint,
+                        (node.if_true(db)).minimizations(db, Node::Interior(do_not_care)),
+                        (node.if_false(db)).minimizations(db, Node::Interior(do_not_care)),
+                    ),
+                    Ordering::Greater => (
+                        do_not_care_constraint,
+                        Node::Interior(node).minimizations(db, do_not_care.if_true(db)),
+                        Node::Interior(node).minimizations(db, do_not_care.if_false(db)),
+                    ),
+                }
+            }
         };
         let mut result = Vec::new();
         for if_true in true_minimized.as_slice() {
@@ -1059,22 +1079,7 @@ impl<'db> InteriorNode<'db> {
 
                 // smaller ∧ ¬larger = false
                 // (¬larger removes everything that's present in smaller)
-                simplified = simplified.minimize(
-                    db,
-                    Node::new_satisfied_constraint(db, smaller_constraint.when_true()).and(
-                        db,
-                        Node::new_satisfied_constraint(db, larger_constraint.when_false()),
-                    ),
-                );
-
-                // larger ∨ ¬smaller = true
-                // (larger fills in everything that's missing in ¬smaller)
-                simplified = simplified.substitute_union(
-                    db,
-                    larger_constraint.when_true(),
-                    smaller_constraint.when_false(),
-                    Node::AlwaysTrue,
-                );
+                simplified = simplified.minimize(db, smaller_node.and(db, not_larger_node));
             }
 
             // There are some simplifications we can make when the intersection of the two
@@ -1161,19 +1166,10 @@ impl<'db> InteriorNode<'db> {
                     // and right is empty.
 
                     // left ∧ right = false
-                    simplified = simplified.substitute_intersection(
+                    simplified = simplified.minimize(
                         db,
-                        left_constraint.when_true(),
-                        right_constraint.when_true(),
-                        Node::AlwaysFalse,
-                    );
-
-                    // ¬left ∨ ¬right = true
-                    simplified = simplified.substitute_union(
-                        db,
-                        left_constraint.when_false(),
-                        right_constraint.when_false(),
-                        Node::AlwaysTrue,
+                        Node::new_constraint(db, left_constraint)
+                            .and(db, Node::new_constraint(db, right_constraint)),
                     );
 
                     // left ∧ ¬right = left
