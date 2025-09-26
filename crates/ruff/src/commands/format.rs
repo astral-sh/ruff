@@ -874,13 +874,10 @@ impl From<&FormatCommandError> for Diagnostic {
             FormatCommandError::Ignore(error) => {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
             }
-            // TODO(brent) not sure if this is correct, DisplayParseError includes some
-            // color and other formatting. I think we'd rather have access to the `path` and
-            // underlying ParseError directly, like in other variants here.
             FormatCommandError::Parse(display_parse_error) => Diagnostic::new(
                 DiagnosticId::InvalidSyntax,
                 Severity::Error,
-                display_parse_error,
+                &display_parse_error.error().error,
             ),
             FormatCommandError::Panic(path, panic_error) => {
                 return create_panic_diagnostic(panic_error, path.as_deref());
@@ -1308,7 +1305,7 @@ mod tests {
         io: test.py: Permission denied
         --> test.py:1:1
 
-        invalid-syntax: Failed to parse test.py:1:1: Unexpected indentation
+        invalid-syntax: Unexpected indentation
         --> test.py:1:1
 
         io: File not found
