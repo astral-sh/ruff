@@ -631,7 +631,7 @@ struct DefinitionInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
 
-    /// The definitions that are deferred.
+    /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
     /// The diagnostics for this region.

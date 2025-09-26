@@ -1,5 +1,12 @@
 # Generic classes: Legacy syntax
 
+We use TypeVar defaults here, which was added in Python 3.13 for legacy typevars.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ## Defining a generic class
 
 At its simplest, to define a generic class using the legacy syntax, you inherit from the
