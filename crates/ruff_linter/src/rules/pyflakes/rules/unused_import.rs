@@ -826,6 +826,19 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
 
     let best_name = best_import.qualified_name();
 
+    // We loop through all bindings in case there are repeated instances
+    // of the `best_name`. For example, if we have
+    //
+    // ```python
+    // import a
+    // import a
+    //
+    // a.foo()
+    // ```
+    //
+    // then we want to mark both import statements as used. It
+    // is the job of `redefined-while-unused` (`F811`) to catch
+    // the repeated binding in this case.
     for (binding, is_used) in marked.iter_mut() {
         if *is_used {
             continue;
