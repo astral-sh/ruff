@@ -119,7 +119,7 @@ def f(x: int) -> list[int]: ...
 @overload
 def f(x: str) -> list[str]: ...
 def f(x: int | str) -> list[int] | list[str]:
-    # `list[int] | list[str]` is a different type than `list[int | str]`.
+    # `list[int] | list[str]` is disjoint from `list[int | str]`.
     if isinstance(x, int):
         return list1(x)
     else:
