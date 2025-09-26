@@ -849,7 +849,7 @@ impl<'db> Specialization<'db> {
             {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return ConstraintSet::from(false),
+                    TypeRelation::Subtyping => {}
                 }
             }
 

@@ -312,12 +312,10 @@ def match_exhaustive(x: A[D] | B[E] | C[F]):
         case C():
             pass
         case _:
-            # TODO: both of these are false positives (https://github.com/astral-sh/ty/issues/456)
-            no_diagnostic_here  # error: [unresolved-reference]
-            assert_never(x)  # error: [type-assertion-failure]
+            no_diagnostic_here
+            assert_never(x)
 
-# TODO: false-positive diagnostic (https://github.com/astral-sh/ty/issues/456)
-def match_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:  # error: [invalid-return-type]
+def match_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:
     match x:
         case A():
             return 0
