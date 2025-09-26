@@ -871,10 +871,6 @@ impl From<&FormatCommandError> for Diagnostic {
         });
 
         let mut diagnostic = match error {
-            // TODO(brent) also not sure about this one. Most of the ignore::Error variants
-            // do fit pretty well under Io errors, but we could match and be even more
-            // specific if we wanted. We already have a `DiagnosticId::InvalidGlob`, which
-            // could map to Error::Glob, for example.
             FormatCommandError::Ignore(error) => {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
             }
