@@ -917,10 +917,10 @@ impl From<&FormatCommandError> for Diagnostic {
                     &parse_error.error,
                 ),
                 FormatModuleError::FormatError(format_error) => {
-                    Diagnostic::new(DiagnosticId::FormatError, Severity::Error, format_error)
+                    Diagnostic::new(DiagnosticId::InternalError, Severity::Error, format_error)
                 }
                 FormatModuleError::PrintError(print_error) => {
-                    Diagnostic::new(DiagnosticId::FormatError, Severity::Error, print_error)
+                    Diagnostic::new(DiagnosticId::InternalError, Severity::Error, print_error)
                 }
             },
             FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(

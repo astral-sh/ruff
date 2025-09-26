@@ -446,7 +446,7 @@ impl Diagnostic {
             | DiagnosticId::DeprecatedSetting
             | DiagnosticId::Unformatted
             | DiagnosticId::InvalidCliOption
-            | DiagnosticId::FormatError => None,
+            | DiagnosticId::InternalError => None,
             DiagnosticId::Lint(lint_name) => {
                 Some(format!("{}/rules/{lint_name}", env!("CARGO_PKG_HOMEPAGE")))
             }
@@ -1039,10 +1039,10 @@ pub enum DiagnosticId {
     /// Use of an invalid command-line option.
     InvalidCliOption,
 
-    /// Something went wrong while formatting.
+    /// An internal assumption was violated.
     ///
-    /// This often indicates a bug in the formatter.
-    FormatError,
+    /// This indicates a bug in the program rather than a user error.
+    InternalError,
 }
 
 impl DiagnosticId {
@@ -1084,7 +1084,7 @@ impl DiagnosticId {
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
-            DiagnosticId::FormatError => "format-error",
+            DiagnosticId::InternalError => "internal-error",
         }
     }
 
