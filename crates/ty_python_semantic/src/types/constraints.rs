@@ -1058,8 +1058,6 @@ impl<'db> InteriorNode<'db> {
                     Node::new_satisfied_constraint(db, smaller_constraint.when_true());
                 let not_larger_node =
                     Node::new_satisfied_constraint(db, larger_constraint.when_false());
-                let not_smaller_node =
-                    Node::new_satisfied_constraint(db, smaller_constraint.when_false());
 
                 // larger ∨ smaller = larger
                 simplified = simplified.substitute_union(
