@@ -4,8 +4,9 @@ use std::io::Write;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
-    Span, UnifiedFile,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+    DisplayDiagnostics, DisplayGithubDiagnostics, FileResolver, GithubRenderer, Input, LintName,
+    SecondaryCode, Severity, Span, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -17,6 +18,7 @@ pub use sarif::SarifEmitter;
 
 use crate::Fix;
 use crate::registry::Rule;
+use crate::settings::types::{OutputFormat, RuffOutputFormat};
 
 mod grouped;
 mod sarif;
@@ -156,6 +158,41 @@ impl<'a> EmitterContext<'a> {
     pub fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
         self.notebook_indexes.get(name)
     }
+}
+
+pub fn render_diagnostics(
+    writer: &mut dyn Write,
+    format: OutputFormat,
+    config: DisplayDiagnosticConfig,
+    context: &EmitterContext<'_>,
+    diagnostics: &[Diagnostic],
+) -> std::io::Result<()> {
+    match DiagnosticFormat::try_from(format) {
+        Ok(format) => {
+            let config = config.format(format);
+            let value = DisplayDiagnostics::new(context, &config, diagnostics);
+            write!(writer, "{value}")?;
+        }
+        Err(RuffOutputFormat::Github) => {
+            let renderer = GithubRenderer::new(context, "Ruff");
+            let value = DisplayGithubDiagnostics::new(&renderer, diagnostics);
+            write!(writer, "{value}")?;
+        }
+        Err(RuffOutputFormat::Grouped) => {
+            GroupedEmitter::default()
+                .with_show_fix_status(config.show_fix_status())
+                .with_applicability(config.fix_applicability())
+                .emit(writer, diagnostics, context)
+                .map_err(std::io::Error::other)?;
+        }
+        Err(RuffOutputFormat::Sarif) => {
+            SarifEmitter
+                .emit(writer, diagnostics, context)
+                .map_err(std::io::Error::other)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

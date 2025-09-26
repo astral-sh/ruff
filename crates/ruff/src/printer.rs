@@ -10,15 +10,14 @@ use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
-    DisplayGithubDiagnostics, GithubRenderer, SecondaryCode,
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
+use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
-use ruff_linter::settings::types::{OutputFormat, RuffOutputFormat, UnsafeFixes};
+use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -233,27 +232,7 @@ impl Printer {
             .with_fix_applicability(self.unsafe_fixes.required_applicability())
             .show_fix_diff(preview);
 
-        match DiagnosticFormat::try_from(self.format) {
-            Ok(format) => {
-                let config = config.format(format);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            Err(RuffOutputFormat::Github) => {
-                let renderer = GithubRenderer::new(&context, "Ruff");
-                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            Err(RuffOutputFormat::Grouped) => {
-                GroupedEmitter::default()
-                    .with_show_fix_status(config.show_fix_status())
-                    .with_applicability(config.fix_applicability())
-                    .emit(writer, &diagnostics.inner, &context)?;
-            }
-            Err(RuffOutputFormat::Sarif) => {
-                SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
-            }
-        }
+        render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
 
         if matches!(
             self.format,
