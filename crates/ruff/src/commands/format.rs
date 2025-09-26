@@ -13,10 +13,11 @@ use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DisplayGithubDiagnostics, GithubRenderer, Severity, Span, SubDiagnostic,
-    SubDiagnosticSeverity,
+    DisplayDiagnostics, DisplayGithubDiagnostics, GithubRenderer, Severity, Span,
 };
-use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
+use ruff_linter::message::{
+    Emitter, EmitterContext, GroupedEmitter, SarifEmitter, create_panic_diagnostic,
+};
 use ruff_linter::settings::types::OutputFormat;
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
@@ -886,23 +887,7 @@ impl From<&FormatCommandError> for Diagnostic {
                 display_parse_error,
             ),
             FormatCommandError::Panic(path, panic_error) => {
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::Panic,
-                    Severity::Fatal,
-                    panic_error.to_diagnostic_message(path.as_ref().map(|path| path.display())),
-                );
-                diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    "This indicates a bug in Ruff.",
-                ));
-                let report_message = "If you could open an issue at \
-                                        https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, \
-                                        we'd be very appreciative!";
-                diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    report_message,
-                ));
-                diagnostic
+                return create_panic_diagnostic(panic_error, path.as_deref());
             }
 
             // I/O errors
@@ -1351,6 +1336,7 @@ mod tests {
         --> test.py:1:1
         info: This indicates a bug in Ruff.
         info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
+        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
         ");
 
         Ok(())

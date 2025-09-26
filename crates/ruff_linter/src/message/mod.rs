@@ -1,17 +1,20 @@
+use std::backtrace::BacktraceStatus;
 use std::fmt::Display;
 use std::io::Write;
+use std::path::Path;
 
+use ruff_db::panic::PanicError;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
-    Span, UnifiedFile,
+    Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
 pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::SourceFile;
+use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
@@ -39,6 +42,55 @@ pub fn create_syntax_error_diagnostic(
     let span = span.into().with_range(range.range());
     diag.annotate(Annotation::primary(span));
     diag
+}
+
+/// Create a `Diagnostic` from a panic.
+pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(
+        DiagnosticId::Panic,
+        Severity::Fatal,
+        error.to_diagnostic_message(path.as_ref().map(|path| path.display())),
+    );
+
+    diagnostic.sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "This indicates a bug in Ruff.",
+    ));
+    let report_message = "If you could open an issue at \
+                            https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, \
+                            we'd be very appreciative!";
+    diagnostic.sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        report_message,
+    ));
+
+    if let Some(backtrace) = &error.backtrace {
+        match backtrace.status() {
+            BacktraceStatus::Disabled => {
+                diagnostic.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
+                        ));
+            }
+            BacktraceStatus::Captured => {
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format!("Backtrace:\n{backtrace}"),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(path) = path {
+        let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
+        let span = Span::from(file);
+        let mut annotation = Annotation::primary(span);
+        annotation.set_file_level(true);
+        diagnostic.annotate(annotation);
+    }
+
+    diagnostic
 }
 
 #[expect(clippy::too_many_arguments)]

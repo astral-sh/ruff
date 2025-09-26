@@ -2477,5 +2477,5 @@ fn stable_output_format_warning() {
     ----- stderr -----
     warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
     ",
-    )
+    );
 }
