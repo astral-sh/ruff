@@ -312,6 +312,7 @@ fn handle_enclosed_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::Alias(alias) => handle_alias_from_comment(comment, alias, source),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprStringLiteral(_) => match comment.enclosing_parent() {
@@ -1965,6 +1966,29 @@ fn handle_import_from_comment<'a>(
     } else {
         CommentPlacement::Default(comment)
     }
+}
+
+fn handle_alias_from_comment<'a>(
+    comment: DecoratedComment<'a>,
+    alias: &'a ast::Alias,
+    source: &str,
+) -> CommentPlacement<'a> {
+    if let Some(asname) = alias.asname.as_ref() {
+        // Determine if the comment is between the `as` token and the alias name.
+        let mut tokens =
+            SimpleTokenizer::new(source, TextRange::new(alias.name.end(), asname.start()))
+                .skip_trivia();
+
+        if let Some(as_token) = tokens.find(|t| t.kind() == SimpleTokenKind::As)
+            && (comment.line_position().is_end_of_line() || comment.line_position().is_own_line())
+            && as_token.end() <= comment.start()
+            && comment.end() <= asname.start()
+        {
+            return CommentPlacement::trailing(alias, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attach an enclosed end-of-line comment to a [`ast::StmtWith`].

@@ -37,3 +37,7 @@ from a import \
 )
 
 from tqdm .  auto import tqdm
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19138
+from y import(e as#
+r)
