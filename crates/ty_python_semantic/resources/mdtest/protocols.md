@@ -607,10 +607,21 @@ class HasXY(Protocol):
 class Foo:
     x: int
 
+class IntSub(int): ...
+
+class HasXIntSub(Protocol):
+    x: IntSub
+
 static_assert(is_subtype_of(Foo, HasX))
 static_assert(is_assignable_to(Foo, HasX))
 static_assert(not is_subtype_of(Foo, HasXY))
 static_assert(not is_assignable_to(Foo, HasXY))
+
+# TODO: these should pass
+static_assert(not is_subtype_of(HasXIntSub, HasX))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasXIntSub, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasX, HasXIntSub))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasX, HasXIntSub))  # error: [static-assert-error]
 
 class FooSub(Foo): ...
 
@@ -1546,6 +1557,22 @@ static_assert(is_subtype_of(XImplicitFinal, HasXProperty))
 static_assert(is_assignable_to(XImplicitFinal, HasXProperty))
 ```
 
+But only if it has the correct type:
+
+```py
+class XAttrBad:
+    x: str
+
+class HasStrXProperty(Protocol):
+    @property
+    def x(self) -> str: ...
+
+# TODO: these should pass
+static_assert(not is_assignable_to(XAttrBad, HasXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasStrXProperty, HasXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasXProperty, HasStrXProperty))  # error: [static-assert-error]
+```
+
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below
 example satisfies the `HasXProperty` interface even though the type of the `x` attribute on `XSub`
 is a subtype of `int` rather than being exactly `int`.
@@ -1558,6 +1585,13 @@ class XSub:
 
 static_assert(is_subtype_of(XSub, HasXProperty))
 static_assert(is_assignable_to(XSub, HasXProperty))
+
+class XSubProto(Protocol):
+    @property
+    def x(self) -> XSub: ...
+
+static_assert(is_subtype_of(XSubProto, HasXProperty))
+static_assert(is_assignable_to(XSubProto, HasXProperty))
 ```
 
 A read/write property on a protocol, where the getter returns the same type that the setter takes,
@@ -1582,8 +1616,8 @@ class XReadProperty:
         return 42
 
 # TODO: these should pass
-static_assert(not is_subtype_of(XReadProperty, HasXProperty))  # error: [static-assert-error]
-static_assert(not is_assignable_to(XReadProperty, HasXProperty))  # error: [static-assert-error]
+static_assert(not is_subtype_of(XReadProperty, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(XReadProperty, HasMutableXProperty))  # error: [static-assert-error]
 
 class XReadWriteProperty:
     @property
@@ -1593,18 +1627,19 @@ class XReadWriteProperty:
     @x.setter
     def x(self, val: int) -> None: ...
 
-static_assert(is_subtype_of(XReadWriteProperty, HasXProperty))
-static_assert(is_assignable_to(XReadWriteProperty, HasXProperty))
+static_assert(is_subtype_of(XReadWriteProperty, HasMutableXProperty))
+static_assert(is_assignable_to(XReadWriteProperty, HasMutableXProperty))
 
 class XSub:
     x: MyInt
 
-static_assert(not is_subtype_of(XSub, XReadWriteProperty))
-static_assert(not is_assignable_to(XSub, XReadWriteProperty))
+# TODO: these should pass
+static_assert(not is_subtype_of(XSub, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(XSub, HasMutableXProperty))  # error: [static-assert-error]
 ```
 
 A protocol with a read/write property `x` is exactly equivalent to a protocol with a mutable
-attribute `x`. Both are subtypes of a protocol with a read-only prooperty `x`:
+attribute `x`. Both are subtypes of a protocol with a read-only property `x`:
 
 ```py
 from ty_extensions import is_equivalent_to
@@ -1618,8 +1653,22 @@ static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))  # error: 
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))
 
+static_assert(is_subtype_of(HasMutableXAttr, HasMutableXProperty))
+static_assert(is_assignable_to(HasMutableXAttr, HasMutableXProperty))
+
 static_assert(is_subtype_of(HasMutableXProperty, HasXProperty))
 static_assert(is_assignable_to(HasMutableXProperty, HasXProperty))
+
+static_assert(is_subtype_of(HasMutableXProperty, HasMutableXAttr))
+static_assert(is_assignable_to(HasMutableXProperty, HasMutableXAttr))
+
+class HasMutableXAttrWrongType(Protocol):
+    x: str
+
+# TODO: these should pass
+static_assert(not is_assignable_to(HasMutableXAttrWrongType, HasXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasMutableXAttrWrongType, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasMutableXProperty, HasMutableXAttrWrongType))  # error: [static-assert-error]
 ```
 
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
@@ -2212,6 +2261,129 @@ static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
 static_assert(is_equivalent_to(A | B | P3, P4 | B | A))  # error: [static-assert-error]
 ```
 
+## Subtyping between two protocol types with method members
+
+A protocol `PSub` with a method member can be considered a subtype of a protocol `PSuper` with a
+method member if the signature of the member on `PSub` is a subtype of the signature of the member
+on `PSuper`:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+
+class Super: ...
+class Sub(Super): ...
+class Unrelated: ...
+
+class MethodPSuper(Protocol):
+    def f(self) -> Super: ...
+
+class MethodPSub(Protocol):
+    def f(self) -> Sub: ...
+
+class MethodPUnrelated(Protocol):
+    def f(self) -> Unrelated: ...
+
+static_assert(is_subtype_of(MethodPSub, MethodPSuper))
+
+# TODO: these should pass
+static_assert(not is_assignable_to(MethodPUnrelated, MethodPSuper))  # error: [static-assert-error]
+static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))  # error: [static-assert-error]
+static_assert(not is_assignable_to(MethodPSuper, MethodPSub))  # error: [static-assert-error]
+```
+
+## Subtyping between protocols with method members and protocols with non-method members
+
+A protocol with a method member can be considered a subtype of a protocol with a read-only
+`@property` member that returns a `Callable` type:
+
+```py
+from typing import Protocol, Callable
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+
+class PropertyInt(Protocol):
+    @property
+    def f(self) -> Callable[[], int]: ...
+
+class PropertyBool(Protocol):
+    @property
+    def f(self) -> Callable[[], bool]: ...
+
+class PropertyNotReturningCallable(Protocol):
+    @property
+    def f(self) -> int: ...
+
+class PropertyWithIncorrectSignature(Protocol):
+    @property
+    def f(self) -> Callable[[object], int]: ...
+
+class Method(Protocol):
+    def f(self) -> bool: ...
+
+static_assert(is_subtype_of(Method, PropertyInt))
+static_assert(is_subtype_of(Method, PropertyBool))
+
+# TODO: these should pass
+static_assert(not is_assignable_to(Method, PropertyNotReturningCallable))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Method, PropertyWithIncorrectSignature))  # error: [static-assert-error]
+```
+
+However, a protocol with a method member can never be considered a subtype of a protocol with a
+writable property member of the same name, as method members are covariant and immutable:
+
+```py
+class ReadWriteProperty(Protocol):
+    @property
+    def f(self) -> Callable[[], bool]: ...
+    @f.setter
+    def f(self, val: Callable[[], bool]): ...
+
+# TODO: should pass
+static_assert(not is_assignable_to(Method, ReadWriteProperty))  # error: [static-assert-error]
+```
+
+And for the same reason, they are never assignable to attribute members (which are also mutable):
+
+```py
+class Attribute(Protocol):
+    f: Callable[[], bool]
+
+# TODO: should pass
+static_assert(not is_assignable_to(Method, Attribute))  # error: [static-assert-error]
+```
+
+Protocols with attribute members, meanwhile, cannot be assigned to protocols with method members,
+since a method member is guaranteed to exist on the meta-type as well as the instance type, whereas
+this is not true for attribute members. The same principle also applies for protocols with property
+members
+
+```py
+# TODO: this should pass
+static_assert(not is_assignable_to(PropertyBool, Method))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Attribute, Method))  # error: [static-assert-error]
+```
+
+But an exception to this rule is if an attribute member is marked as `ClassVar`, as this guarantees
+that the member will be available on the meta-type as well as the instance type for inhabitants of
+the protocol:
+
+```py
+from typing import ClassVar
+
+class ClassVarAttribute(Protocol):
+    f: ClassVar[Callable[[], bool]]
+
+static_assert(is_subtype_of(ClassVarAttribute, Method))
+static_assert(is_assignable_to(ClassVarAttribute, Method))
+
+class ClassVarAttributeBad(Protocol):
+    f: ClassVar[Callable[[], str]]
+
+# TODO: these should pass:
+static_assert(not is_subtype_of(ClassVarAttributeBad, Method))  # error: [static-assert-error]
+static_assert(not is_assignable_to(ClassVarAttributeBad, Method))  # error: [static-assert-error]
+```
+
 ## Narrowing of protocols
 
 <!-- snapshot-diagnostics -->
@@ -2549,7 +2721,10 @@ class RecursiveOptionalParent(Protocol):
 
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
-static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
+# Due to invariance of mutable attribute members, neither is assignable to the other
+#
+# TODO: should pass
+static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))  # error: [static-assert-error]
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 
 class Other(Protocol):
