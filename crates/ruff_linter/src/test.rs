@@ -449,9 +449,9 @@ pub(crate) fn print_jupyter_messages(
     let config = DisplayDiagnosticConfig::default()
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
-        .show_fix_status(true)
+        .with_show_fix_status(true)
         .show_fix_diff(true)
-        .fix_applicability(Applicability::DisplayOnly);
+        .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(
         &EmitterContext::new(&FxHashMap::from_iter([(
@@ -468,9 +468,9 @@ pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
     let config = DisplayDiagnosticConfig::default()
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
-        .show_fix_status(true)
+        .with_show_fix_status(true)
         .show_fix_diff(true)
-        .fix_applicability(Applicability::DisplayOnly);
+        .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(
         &EmitterContext::new(&FxHashMap::default()),
