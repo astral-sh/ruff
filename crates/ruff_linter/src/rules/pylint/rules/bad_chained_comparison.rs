@@ -7,10 +7,10 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for semanticly different operators in a chained comparison
+/// Checks for semantically different operators in a chained comparison
 ///
 /// ## Why it this bad?
-/// Combining semanticly different operators in a chained comparison
+/// Combining semantically different operators in a chained comparison
 /// can be misleading or a mistake.
 ///
 /// ## Example
