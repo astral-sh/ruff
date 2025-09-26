@@ -256,31 +256,12 @@ impl Printer {
                     .with_fix_applicability(self.unsafe_fixes.required_applicability())
                     .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
-
-                self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Grouped => {
                 GroupedEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.inner, &context)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
-                self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
                 let renderer = GithubRenderer::new(&context, "Ruff");
@@ -305,6 +286,20 @@ impl Printer {
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
             }
+        }
+
+        if matches!(
+            self.format,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        ) {
+            if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                if !diagnostics.fixed.is_empty() {
+                    writeln!(writer)?;
+                    print_fix_summary(writer, &diagnostics.fixed)?;
+                    writeln!(writer)?;
+                }
+            }
+            self.write_summary_text(writer, diagnostics)?;
         }
 
         writer.flush()?;
