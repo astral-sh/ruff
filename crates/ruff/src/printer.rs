@@ -225,7 +225,13 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        let config = DisplayDiagnosticConfig::default().preview(preview);
+        let config = DisplayDiagnosticConfig::default()
+            .preview(preview)
+            .hide_severity(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
+            .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+            .fix_applicability(self.unsafe_fixes.required_applicability())
+            .show_fix_diff(preview);
 
         match self.format {
             OutputFormat::Json => {
@@ -249,23 +255,12 @@ impl Printer {
                 write!(writer, "{value}")?;
             }
             OutputFormat::Concise => {
-                let config = config
-                    .format(DiagnosticFormat::Concise)
-                    .hide_severity(true)
-                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
-                    .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .fix_applicability(self.unsafe_fixes.required_applicability());
+                let config = config.format(DiagnosticFormat::Concise);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Full => {
-                let config = config
-                    .format(DiagnosticFormat::Full)
-                    .hide_severity(true)
-                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
-                    .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .fix_applicability(self.unsafe_fixes.required_applicability())
-                    .show_fix_diff(preview);
+                let config = config.format(DiagnosticFormat::Full);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
