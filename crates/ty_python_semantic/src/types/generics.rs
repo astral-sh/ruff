@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::types::constraints::ConstraintSet;
 
 use itertools::Itertools;
@@ -392,7 +390,7 @@ impl<'db> GenericContext<'db> {
             // requirement for legacy contexts.)
             let partial = PartialSpecialization {
                 generic_context: self,
-                types: Cow::Borrowed(&expanded[0..idx]),
+                types: &expanded[0..idx],
             };
             let default =
                 default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
@@ -947,18 +945,7 @@ impl<'db> Specialization<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
-    types: Cow<'a, [Type<'db>]>,
-}
-
-pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    specialization: &PartialSpecialization<'_, 'db>,
-    visitor: &V,
-) {
-    walk_generic_context(db, specialization.generic_context, visitor);
-    for ty in &*specialization.types {
-        visitor.visit_type(db, *ty);
-    }
+    types: &'a [Type<'db>],
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -974,31 +961,6 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .variables(db)
             .get_index_of(&bound_typevar)?;
         self.types.get(index).copied()
-    }
-
-    pub(crate) fn to_owned(&self) -> PartialSpecialization<'db, 'db> {
-        PartialSpecialization {
-            generic_context: self.generic_context,
-            types: Cow::from(self.types.clone().into_owned()),
-        }
-    }
-
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> PartialSpecialization<'db, 'db> {
-        let generic_context = self.generic_context.normalized_impl(db, visitor);
-        let types: Cow<_> = self
-            .types
-            .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect();
-
-        PartialSpecialization {
-            generic_context,
-            types,
-        }
     }
 }
 
