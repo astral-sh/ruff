@@ -249,22 +249,25 @@ impl Printer {
                 write!(writer, "{value}")?;
             }
             OutputFormat::Concise => {
-                TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.format == OutputFormat::Full && preview)
-                    .with_show_source(self.format == OutputFormat::Full)
-                    .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                    .with_preview(preview)
-                    .emit(writer, &diagnostics.inner, &context)?;
+                let config = config
+                    .format(DiagnosticFormat::Concise)
+                    .hide_severity(true)
+                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
+                    .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .fix_applicability(self.unsafe_fixes.required_applicability());
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Full => {
-                TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.format == OutputFormat::Full && preview)
-                    .with_show_source(self.format == OutputFormat::Full)
-                    .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                    .with_preview(preview)
-                    .emit(writer, &diagnostics.inner, &context)?;
+                let config = config
+                    .format(DiagnosticFormat::Full)
+                    .hide_severity(true)
+                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
+                    .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .fix_applicability(self.unsafe_fixes.required_applicability())
+                    .show_fix_diff(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Grouped => {
                 GroupedEmitter::default()
