@@ -811,8 +811,34 @@ impl<'a> FormatResults<'a> {
                 (fix, line_count)
             };
 
+            // Locate the first and last characters that differ to use as the diagnostic
+            // range.
+            let range = {
+                let mut start = None;
+                let mut end = None;
+                for ((offset, old), new) in unformatted
+                    .source_code()
+                    .char_indices()
+                    .zip(formatted.source_code().chars())
+                {
+                    if old != new {
+                        if start.is_none() {
+                            start = Some(offset);
+                        } else {
+                            end = Some(offset);
+                        }
+                    }
+                }
+
+                let start =
+                    start.map_or(TextSize::ZERO, |start| TextSize::try_from(start).unwrap());
+                let end = end.map_or(start, |end| TextSize::try_from(end).unwrap());
+
+                TextRange::new(start, end)
+            };
+
             let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
-            let span = Span::from(source_file);
+            let span = Span::from(source_file).with_range(range);
             let mut annotation = Annotation::primary(span);
             annotation.set_file_level(true);
             diagnostic.annotate(annotation);

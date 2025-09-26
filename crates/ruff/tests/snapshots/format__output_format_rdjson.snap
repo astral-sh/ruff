@@ -7,6 +7,7 @@ info:
     - "--no-cache"
     - "--output-format"
     - rdjson
+    - "--preview"
     - "--check"
     - input.py
 ---
@@ -20,7 +21,17 @@ exit_code: 1
         "value": "unformatted"
       },
       "location": {
-        "path": "[TMP]/input.py"
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 35,
+            "line": 5
+          },
+          "start": {
+            "column": 1,
+            "line": 1
+          }
+        }
       },
       "message": "File would be reformatted",
       "suggestions": [

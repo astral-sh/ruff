@@ -7,6 +7,7 @@ info:
     - "--no-cache"
     - "--output-format"
     - sarif
+    - "--preview"
     - "--check"
     - input.py
 ---
@@ -54,8 +55,8 @@ exit_code: 1
                   "uri": "[TMP]/input.py"
                 },
                 "region": {
-                  "endColumn": 1,
-                  "endLine": 1,
+                  "endColumn": 35,
+                  "endLine": 5,
                   "startColumn": 1,
                   "startLine": 1
                 }

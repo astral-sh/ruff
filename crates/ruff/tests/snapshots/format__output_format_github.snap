@@ -7,12 +7,13 @@ info:
     - "--no-cache"
     - "--output-format"
     - github
+    - "--preview"
     - "--check"
     - input.py
 ---
 success: false
 exit_code: 1
 ----- stdout -----
-::error title=Ruff (unformatted),file=[TMP]/input.py,line=1,col=1,endLine=1,endColumn=1::input.py:1:1: unformatted: File would be reformatted
+::error title=Ruff (unformatted),file=[TMP]/input.py,line=1,col=1,endLine=5,endColumn=35::input.py:1:1: unformatted: File would be reformatted
 
 ----- stderr -----

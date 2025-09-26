@@ -7,6 +7,7 @@ info:
     - "--no-cache"
     - "--output-format"
     - gitlab
+    - "--preview"
     - "--check"
     - input.py
 ---
@@ -27,8 +28,8 @@ exit_code: 1
           "column": 1
         },
         "end": {
-          "line": 1,
-          "column": 1
+          "line": 5,
+          "column": 35
         }
       }
     }

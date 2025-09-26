@@ -7,6 +7,7 @@ info:
     - "--no-cache"
     - "--output-format"
     - json
+    - "--preview"
     - "--check"
     - input.py
 ---
@@ -18,8 +19,8 @@ exit_code: 1
     "cell": null,
     "code": "unformatted",
     "end_location": {
-      "column": 1,
-      "row": 1
+      "column": 35,
+      "row": 5
     },
     "filename": "[TMP]/input.py",
     "fix": {
