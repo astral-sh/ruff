@@ -1682,3 +1682,57 @@ def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: Unknown
     reveal_type(f(*(arg,)))  # revealed: Unknown
 ```
+
+## Bi-directional Type Inference
+
+Type inference accounts for the type of each overload.
+
+```py
+from typing import TypedDict, overload
+
+class T(TypedDict):
+  x: int
+
+@overload
+def f(a: list[T], b: int):
+  ...
+
+@overload
+def f(a: list[dict[str, int]], b: str):
+  ...
+
+def f(a: list[dict[str, int]] | list[T], b: int | str):
+  ...
+
+def int_or_str() -> int | str:
+  return 1
+
+f([{ "x": 1 }], int_or_str())
+
+# error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `T` constructor"
+# error: [invalid-key] "Invalid key access on TypedDict `T`: Unknown key "y""
+f([{ "y": 1 }], int_or_str())
+```
+
+Non-matching overloads do not produce errors:
+
+```py
+from typing import TypedDict, overload
+
+class T(TypedDict):
+  x: int
+
+@overload
+def f(a: T, b: int):
+  ...
+
+@overload
+def f(a: dict[str, int], b: str):
+  ...
+
+def f(a: T | dict[str, int], b: int | str):
+  ...
+
+# TODO
+f({ "y": 1 }, "a")
+```

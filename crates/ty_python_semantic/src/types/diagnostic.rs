@@ -1975,7 +1975,7 @@ pub(super) fn report_invalid_assignment<'db>(
     if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
         && let Some(value) = annotated_assignment.value(context.module())
     {
-        // Re-infer the RHS of the annotated assignment, ignoring the type context, for more precise
+        // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
         // error messages.
         source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
     }
