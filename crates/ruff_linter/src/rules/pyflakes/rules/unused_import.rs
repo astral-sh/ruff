@@ -886,10 +886,10 @@ fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cm
 /// with the `prototype` and is of minimal length amongst these.
 ///
 /// See also [`rank_matches`].
-fn best_match<'b, 'c>(
-    bindings: &Vec<&'b Binding<'c>>,
+fn best_match<'a, 'b>(
+    bindings: &Vec<&'a Binding<'b>>,
     prototype: &QualifiedName,
-) -> Option<&'b Binding<'c>> {
+) -> Option<&'a Binding<'b>> {
     bindings
         .iter()
         .copied()
