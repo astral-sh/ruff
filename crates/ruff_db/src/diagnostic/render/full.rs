@@ -573,7 +573,7 @@ print()
         let mut diagnostic = env.err().build();
         let span = env.path("example.py").with_range(TextRange::default());
         let mut annotation = Annotation::primary(span);
-        annotation.set_file_level(true);
+        annotation.hide_snippet(true);
         diagnostic.annotate(annotation);
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"

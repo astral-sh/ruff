@@ -155,7 +155,7 @@ impl<'a> Annotation<'a> {
         self
     }
 
-    pub fn is_file_level(mut self, yes: bool) -> Self {
+    pub fn hide_snippet(mut self, yes: bool) -> Self {
         self.is_file_level = yes;
         self
     }

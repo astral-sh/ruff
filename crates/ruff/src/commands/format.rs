@@ -840,7 +840,7 @@ impl<'a> FormatResults<'a> {
             let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
             let span = Span::from(source_file).with_range(range);
             let mut annotation = Annotation::primary(span);
-            annotation.set_file_level(true);
+            annotation.hide_snippet(true);
             diagnostic.annotate(annotation);
             diagnostic.set_fix(fix);
 
@@ -900,7 +900,7 @@ impl From<&FormatCommandError> for Diagnostic {
             let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
             let span = Span::from(file);
             let mut annotation = Annotation::primary(span);
-            annotation.set_file_level(true);
+            annotation.hide_snippet(true);
             annotation
         });
 

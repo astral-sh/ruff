@@ -86,7 +86,7 @@ pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagn
         let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
         let span = Span::from(file);
         let mut annotation = Annotation::primary(span);
-        annotation.set_file_level(true);
+        annotation.hide_snippet(true);
         diagnostic.annotate(annotation);
     }
 
@@ -122,7 +122,7 @@ where
     // actually need it, but we need to be able to cache the new diagnostic model first. See
     // https://github.com/astral-sh/ruff/issues/19688.
     if range == TextRange::default() {
-        annotation.set_file_level(true);
+        annotation.hide_snippet(true);
     }
     diagnostic.annotate(annotation);
 

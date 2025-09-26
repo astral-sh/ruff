@@ -408,7 +408,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
-    is_file_level: bool,
+    hide_snippet: bool,
     notebook_index: Option<NotebookIndex>,
 }
 
@@ -456,7 +456,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
             notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
@@ -722,8 +722,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
-    /// Whether this annotation applies to an entire file, rather than a snippet within it.
-    is_file_level: bool,
+    /// Whether the snippet for this annotation should be hidden instead of rendered.
+    hide_snippet: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -745,7 +745,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
         }
     }
 
@@ -771,7 +771,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann.is_file_level(self.is_file_level)
+        ann.hide_snippet(self.hide_snippet)
     }
 }
 
