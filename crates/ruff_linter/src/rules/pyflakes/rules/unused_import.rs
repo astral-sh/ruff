@@ -655,25 +655,7 @@ fn unused_imports_in_scope<'a, 'b>(
                 // Only apply the new logic in certain situations to avoid
                 // complexity, false positives, and intersection with
                 // `redefined-while-unused` (`F811`).
-                && scope.shadowed_bindings(id).enumerate().all(|(i,shadow)| {
-                    let shadowed_binding = semantic.binding(shadow);
-                    // Bail if one of the shadowed bindings is
-                    // used before the last live binding. This is
-                    // to avoid situations like this:
-                    //
-                    // ```
-                    // import a
-                    // a.b
-                    // import a.b
-                    // ```
-                    if i>0 && shadowed_binding.is_used() {
-                        return false
-                    }
-                    matches!(
-                        shadowed_binding.kind,
-                        BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
-                    ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
-                })
+                && has_simple_shadowed_bindings(scope, id, semantic)
             {
                 unused_imports_from_binding(semantic, id, scope)
             } else if bdg.is_used() {
@@ -894,4 +876,27 @@ fn best_match<'a, 'b>(
         .iter()
         .copied()
         .max_by_key(|binding| rank_matches(binding, prototype))
+}
+
+#[inline]
+fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &SemanticModel) -> bool {
+    scope.shadowed_bindings(id).enumerate().all(|(i, shadow)| {
+        let shadowed_binding = semantic.binding(shadow);
+        // Bail if one of the shadowed bindings is
+        // used before the last live binding. This is
+        // to avoid situations like this:
+        //
+        // ```
+        // import a
+        // a.b
+        // import a.b
+        // ```
+        if i > 0 && shadowed_binding.is_used() {
+            return false;
+        }
+        matches!(
+            shadowed_binding.kind,
+            BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
+        ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
+    })
 }
