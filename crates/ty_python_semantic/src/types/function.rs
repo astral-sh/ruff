@@ -74,7 +74,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::signatures::{CallableSignature, Signature, SignatureFlags};
+use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
@@ -343,7 +343,33 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
-        self.signature_impl(db, inherited_generic_context, false)
+        let mut signature = self.raw_signature(db, inherited_generic_context);
+
+        let scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let function_node = scope.node(db).expect_function().node(&module);
+        let index = semantic_index(db, scope.file(db));
+        let file_scope_id = scope.file_scope_id(db);
+        let is_generator = file_scope_id.is_generator_function(index);
+
+        if function_node.is_async && !is_generator {
+            signature = signature.wrap_coroutine_return_type(db);
+        }
+        signature = signature.mark_typevars_inferable(db);
+
+        let pep695_ctx = function_node.type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(db, index, self.definition(db), type_params)
+        });
+        let legacy_ctx = GenericContext::from_function_params(
+            db,
+            self.definition(db),
+            signature.parameters(),
+            signature.return_ty,
+        );
+        signature.generic_context =
+            GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
+
+        signature
     }
 
     /// Typed internally-visible "raw" signature for this function.
@@ -356,19 +382,10 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    pub(crate) fn raw_signature(
+    fn raw_signature(
         self,
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
-    ) -> Signature<'db> {
-        self.signature_impl(db, inherited_generic_context, true)
-    }
-
-    fn signature_impl(
-        self,
-        db: &'db dyn Db,
-        inherited_generic_context: Option<GenericContext<'db>>,
-        raw: bool,
     ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
@@ -431,35 +448,26 @@ impl<'db> OverloadLiteral<'db> {
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
-        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+        let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
         let file_scope_id = scope.file_scope_id(db);
 
-        let mut flags = SignatureFlags::empty();
-        if file_scope_id.is_generator_function(index) {
-            flags |= SignatureFlags::IS_GENERATOR;
-        }
-        if has_implicitly_positional_only_first_param(
+        let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
             db,
             self,
             function_stmt_node,
             file_scope_id,
             index,
-        ) {
-            flags |= SignatureFlags::HAS_IMPLICITLY_POSITIONAL_FIRST_PARAMETER;
-        }
-        if !raw {
-            flags |= SignatureFlags::MARK_TYPEVARS_INFERABLE;
-            flags |= SignatureFlags::COROUTINE_RETURN_TYPE;
-        }
+        );
+
         Signature::from_function(
             db,
-            generic_context,
+            pep695_ctx,
             inherited_generic_context,
             definition,
             function_stmt_node,
-            flags,
+            has_implicitly_positional_first_parameter,
         )
     }
 
