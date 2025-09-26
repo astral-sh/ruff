@@ -587,9 +587,6 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Write a list of the files that would be changed and any errors to the given writer.
-    ///
-    /// Errors are reported first in the order they are provided, followed by the remaining
-    /// diagnostics sorted by file name.
     fn write_changed_preview(
         &self,
         f: &mut impl Write,
@@ -601,6 +598,7 @@ impl<'a> FormatResults<'a> {
             .iter()
             .map(Diagnostic::from)
             .chain(self.to_diagnostics(&mut notebook_index))
+            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
             .collect();
 
         let context = EmitterContext::new(&notebook_index);
@@ -746,87 +744,84 @@ impl<'a> FormatResults<'a> {
         &self,
         notebook_index: &mut FxHashMap<String, NotebookIndex>,
     ) -> impl Iterator<Item = Diagnostic> {
-        self.results
-            .iter()
-            .filter_map(|result| {
-                let FormatResult::Diff {
-                    unformatted,
-                    formatted,
-                } = &result.result
-                else {
-                    return None;
-                };
+        self.results.iter().filter_map(|result| {
+            let FormatResult::Diff {
+                unformatted,
+                formatted,
+            } = &result.result
+            else {
+                return None;
+            };
 
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::Unformatted,
-                    Severity::Error,
-                    "File would be reformatted",
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::Unformatted,
+                Severity::Error,
+                "File would be reformatted",
+            );
+
+            let path = result.path.to_string_lossy();
+            // For now, report the edit as a replacement of the whole file's contents. For
+            // scripts, this is a single `Edit`, but notebook edits must be split by cell in
+            // order to render them as diffs.
+            //
+            // We also attempt to estimate the line number width for aligning the
+            // annotate-snippets header. This is only an estimate because we don't actually know
+            // if the maximum line number present in the document will be rendered as part of
+            // the diff, either as a changed line or as an unchanged context line. For
+            // notebooks, we refine our estimate by checking the number of lines in each cell
+            // individually, otherwise we could use `formatted.source_code().count_lines(...)`
+            // in both cases.
+            let (fix, line_count) = if let SourceKind::IpyNotebook(formatted) = formatted
+                && let SourceKind::IpyNotebook(unformatted) = unformatted
+            {
+                notebook_index.insert(path.to_string(), unformatted.index().clone());
+
+                let mut edits = formatted
+                    .cell_offsets()
+                    .ranges()
+                    .zip(unformatted.cell_offsets().ranges())
+                    .map(|(formatted_range, unformatted_range)| {
+                        let formatted = &formatted.source_code()[formatted_range];
+                        Edit::range_replacement(formatted.to_string(), unformatted_range)
+                    });
+
+                let fix = Fix::safe_edits(
+                    edits
+                        .next()
+                        .expect("Formatted files must have at least one edit"),
+                    edits,
                 );
+                let source = formatted.source_code();
+                let line_count = formatted
+                    .cell_offsets()
+                    .ranges()
+                    .map(|range| source.count_lines(range))
+                    .max()
+                    .unwrap_or_default();
+                (fix, line_count)
+            } else {
+                let fix = Fix::safe_edit(Edit::range_replacement(
+                    formatted.source_code().to_string(),
+                    TextRange::up_to(unformatted.source_code().text_len()),
+                ));
+                let line_count = formatted
+                    .source_code()
+                    .count_lines(TextRange::up_to(formatted.source_code().text_len()));
+                (fix, line_count)
+            };
 
-                let path = result.path.to_string_lossy();
-                // For now, report the edit as a replacement of the whole file's contents. For
-                // scripts, this is a single `Edit`, but notebook edits must be split by cell in
-                // order to render them as diffs.
-                //
-                // We also attempt to estimate the line number width for aligning the
-                // annotate-snippets header. This is only an estimate because we don't actually know
-                // if the maximum line number present in the document will be rendered as part of
-                // the diff, either as a changed line or as an unchanged context line. For
-                // notebooks, we refine our estimate by checking the number of lines in each cell
-                // individually, otherwise we could use `formatted.source_code().count_lines(...)`
-                // in both cases.
-                let (fix, line_count) = if let SourceKind::IpyNotebook(formatted) = formatted
-                    && let SourceKind::IpyNotebook(unformatted) = unformatted
-                {
-                    notebook_index.insert(path.to_string(), unformatted.index().clone());
+            let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
+            let span = Span::from(source_file);
+            let mut annotation = Annotation::primary(span);
+            annotation.set_file_level(true);
+            diagnostic.annotate(annotation);
+            diagnostic.set_fix(fix);
 
-                    let mut edits = formatted
-                        .cell_offsets()
-                        .ranges()
-                        .zip(unformatted.cell_offsets().ranges())
-                        .map(|(formatted_range, unformatted_range)| {
-                            let formatted = &formatted.source_code()[formatted_range];
-                            Edit::range_replacement(formatted.to_string(), unformatted_range)
-                        });
+            let lines = OneIndexed::new(line_count as usize).unwrap_or_default();
+            diagnostic.set_header_offset(lines.digits().get());
 
-                    let fix = Fix::safe_edits(
-                        edits
-                            .next()
-                            .expect("Formatted files must have at least one edit"),
-                        edits,
-                    );
-                    let source = formatted.source_code();
-                    let line_count = formatted
-                        .cell_offsets()
-                        .ranges()
-                        .map(|range| source.count_lines(range))
-                        .max()
-                        .unwrap_or_default();
-                    (fix, line_count)
-                } else {
-                    let fix = Fix::safe_edit(Edit::range_replacement(
-                        formatted.source_code().to_string(),
-                        TextRange::up_to(unformatted.source_code().text_len()),
-                    ));
-                    let line_count = formatted
-                        .source_code()
-                        .count_lines(TextRange::up_to(formatted.source_code().text_len()));
-                    (fix, line_count)
-                };
-
-                let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
-                let span = Span::from(source_file);
-                let mut annotation = Annotation::primary(span);
-                annotation.set_file_level(true);
-                diagnostic.annotate(annotation);
-                diagnostic.set_fix(fix);
-
-                let lines = OneIndexed::new(line_count as usize).unwrap_or_default();
-                diagnostic.set_header_offset(lines.digits().get());
-
-                Some(diagnostic)
-            })
-            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
+            Some(diagnostic)
+        })
     }
 }
 
@@ -1337,11 +1332,6 @@ mod tests {
         invalid-syntax: Failed to parse test.py:1:1: Unexpected indentation
         --> test.py:1:1
 
-        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
-        --> test.py:1:1
-        info: This indicates a bug in Ruff.
-        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-
         io: File not found
         --> test.py:1:1
 
@@ -1356,6 +1346,11 @@ mod tests {
 
         range-format-notebook: Range formatting isn't supported for notebooks.
         --> test.py:1:1
+
+        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
+        --> test.py:1:1
+        info: This indicates a bug in Ruff.
+        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
         ");
 
         Ok(())
