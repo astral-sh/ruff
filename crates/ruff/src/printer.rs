@@ -247,7 +247,7 @@ impl Printer {
             Err(RuffOutputFormat::Grouped) => {
                 GroupedEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_applicability(self.unsafe_fixes.required_applicability())
                     .emit(writer, &diagnostics.inner, &context)?;
             }
             Err(RuffOutputFormat::Sarif) => {
