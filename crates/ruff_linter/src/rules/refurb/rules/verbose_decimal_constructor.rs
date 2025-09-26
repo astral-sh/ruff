@@ -90,8 +90,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // using this regex:
             // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
             // _after_ trimming whitespace from the string and removing all occurrences of "_".
-            let mut trimmed = Cow::from(str_literal.to_str().trim_whitespace());
-            if memchr::memchr(b'_', trimmed.as_bytes()).is_some() {
+            let original_str = str_literal.to_str().trim_whitespace();
+            let mut trimmed = Cow::from(original_str);
+            let has_digit_separators = memchr::memchr(b'_', trimmed.as_bytes()).is_some();
+            if has_digit_separators {
                 trimmed = Cow::from(trimmed.replace('_', ""));
             }
             // Extract the unary sign, if any.
@@ -128,7 +130,14 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 _ => rest,
             };
 
-            let replacement = format!("{unary}{rest}");
+            // If the original string had digit separators, preserve them in the integer literal
+            let replacement = if has_digit_separators {
+                // Convert to integer literal but preserve the original digit separators
+                original_str.to_string()
+            } else {
+                format!("{unary}{rest}")
+            };
+
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),

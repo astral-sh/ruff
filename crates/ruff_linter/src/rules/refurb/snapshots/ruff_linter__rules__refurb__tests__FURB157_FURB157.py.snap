@@ -167,12 +167,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^
 24 | Decimal("__1____000") 
    |
-help: Replace with `1000`
+help: Replace with `1_000`
 20 | # See https://github.com/astral-sh/ruff/issues/13807
 21 | 
 22 | # Errors
    - Decimal("1_000")
-23 + Decimal(1000)
+23 + Decimal(1_000)
 24 | Decimal("__1____000") 
 25 | 
 26 | # Ok
@@ -187,12 +187,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 25 |
 26 | # Ok
    |
-help: Replace with `1000`
+help: Replace with `__1____000`
 21 | 
 22 | # Errors
 23 | Decimal("1_000")
    - Decimal("__1____000") 
-24 + Decimal(1000) 
+24 + Decimal(__1____000) 
 25 | 
 26 | # Ok
 27 | Decimal("2e-4")
@@ -494,6 +494,7 @@ help: Replace with `"nan"`
 69 + Decimal("nan")
 70 | Decimal(float("   -" "nan"))
 71 | Decimal(float("-nAn"))
+72 | 
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:70:9
@@ -511,6 +512,8 @@ help: Replace with `"nan"`
    - Decimal(float("   -" "nan"))
 70 + Decimal("nan")
 71 | Decimal(float("-nAn"))
+72 | 
+73 | # Additional test cases for digit separator preservation
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:71:9
@@ -519,6 +522,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 70 | Decimal(float("   -" "nan"))
 71 | Decimal(float("-nAn"))
    |         ^^^^^^^^^^^^^
+72 |
+73 | # Additional test cases for digit separator preservation
    |
 help: Replace with `"nan"`
 68 | Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
@@ -526,3 +531,77 @@ help: Replace with `"nan"`
 70 | Decimal(float("   -" "nan"))
    - Decimal(float("-nAn"))
 71 + Decimal("nan")
+72 | 
+73 | # Additional test cases for digit separator preservation
+74 | # https://github.com/astral-sh/ruff/issues/20572
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:75:9
+   |
+73 | # Additional test cases for digit separator preservation
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Should preserve digit separators
+   |         ^^^^^^^^^^^^
+76 | Decimal("1_234_567")   # Should preserve digit separators
+77 | Decimal("-5_000")      # Should preserve negative with separators
+   |
+help: Replace with `15_000_000`
+72 | 
+73 | # Additional test cases for digit separator preservation
+74 | # https://github.com/astral-sh/ruff/issues/20572
+   - Decimal("15_000_000")  # Should preserve digit separators
+75 + Decimal(15_000_000)  # Should preserve digit separators
+76 | Decimal("1_234_567")   # Should preserve digit separators
+77 | Decimal("-5_000")      # Should preserve negative with separators
+78 | Decimal("+9_999")      # Should preserve positive with separators
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:76:9
+   |
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Should preserve digit separators
+76 | Decimal("1_234_567")   # Should preserve digit separators
+   |         ^^^^^^^^^^^
+77 | Decimal("-5_000")      # Should preserve negative with separators
+78 | Decimal("+9_999")      # Should preserve positive with separators
+   |
+help: Replace with `1_234_567`
+73 | # Additional test cases for digit separator preservation
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Should preserve digit separators
+   - Decimal("1_234_567")   # Should preserve digit separators
+76 + Decimal(1_234_567)   # Should preserve digit separators
+77 | Decimal("-5_000")      # Should preserve negative with separators
+78 | Decimal("+9_999")      # Should preserve positive with separators
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:77:9
+   |
+75 | Decimal("15_000_000")  # Should preserve digit separators
+76 | Decimal("1_234_567")   # Should preserve digit separators
+77 | Decimal("-5_000")      # Should preserve negative with separators
+   |         ^^^^^^^^
+78 | Decimal("+9_999")      # Should preserve positive with separators
+   |
+help: Replace with `-5_000`
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Should preserve digit separators
+76 | Decimal("1_234_567")   # Should preserve digit separators
+   - Decimal("-5_000")      # Should preserve negative with separators
+77 + Decimal(-5_000)      # Should preserve negative with separators
+78 | Decimal("+9_999")      # Should preserve positive with separators
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:78:9
+   |
+76 | Decimal("1_234_567")   # Should preserve digit separators
+77 | Decimal("-5_000")      # Should preserve negative with separators
+78 | Decimal("+9_999")      # Should preserve positive with separators
+   |         ^^^^^^^^
+   |
+help: Replace with `+9_999`
+75 | Decimal("15_000_000")  # Should preserve digit separators
+76 | Decimal("1_234_567")   # Should preserve digit separators
+77 | Decimal("-5_000")      # Should preserve negative with separators
+   - Decimal("+9_999")      # Should preserve positive with separators
+78 + Decimal(+9_999)      # Should preserve positive with separators
