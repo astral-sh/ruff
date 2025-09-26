@@ -295,10 +295,7 @@ pub(crate) fn format_path(
     // Format the source.
     let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
     {
-        FormattedSource::Formatted {
-            formatted,
-            unformatted,
-        } => match mode {
+        FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
                     FormatCommandError::Write(Some(path.to_path_buf()), err.into())
@@ -316,16 +313,9 @@ pub(crate) fn format_path(
                     }
                 }
 
-                FormatResult::Formatted {
-                    unformatted,
-                    formatted,
-                }
+                FormatResult::Formatted
             }
-            FormatMode::Check => FormatResult::Formatted {
-                unformatted,
-                formatted,
-            },
-            FormatMode::Diff => FormatResult::Diff {
+            FormatMode::Check | FormatMode::Diff => FormatResult::Diff {
                 unformatted,
                 formatted,
             },
@@ -350,10 +340,7 @@ pub(crate) fn format_path(
 #[derive(Debug)]
 pub(crate) enum FormattedSource {
     /// The source was formatted, and the [`SourceKind`] contains the transformed source code.
-    Formatted {
-        formatted: SourceKind,
-        unformatted: SourceKind,
-    },
+    Formatted(SourceKind),
     /// The source was unchanged.
     Unchanged,
 }
@@ -361,13 +348,7 @@ pub(crate) enum FormattedSource {
 impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted {
-                formatted,
-                unformatted,
-            } => FormatResult::Formatted {
-                formatted,
-                unformatted,
-            },
+            FormattedSource::Formatted { .. } => FormatResult::Formatted,
             FormattedSource::Unchanged => FormatResult::Unchanged,
         }
     }
@@ -420,10 +401,7 @@ pub(crate) fn format_source(
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged)
             } else {
-                Ok(FormattedSource::Formatted {
-                    formatted: SourceKind::Python(formatted),
-                    unformatted: SourceKind::Python(unformatted.to_string()),
-                })
+                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
             }
         }
         SourceKind::IpyNotebook(notebook) => {
@@ -508,10 +486,9 @@ pub(crate) fn format_source(
             let mut formatted = notebook.clone();
             formatted.update(&source_map, output);
 
-            Ok(FormattedSource::Formatted {
-                formatted: SourceKind::IpyNotebook(formatted),
-                unformatted: SourceKind::IpyNotebook(notebook.clone()),
-            })
+            Ok(FormattedSource::Formatted(SourceKind::IpyNotebook(
+                formatted,
+            )))
         }
     }
 }
@@ -519,13 +496,10 @@ pub(crate) fn format_source(
 /// The result of an individual formatting operation.
 #[derive(Debug, Clone, is_macro::Is)]
 pub(crate) enum FormatResult {
-    /// The file was formatted.
-    Formatted {
-        unformatted: SourceKind,
-        formatted: SourceKind,
-    },
+    /// The file was formatted and written back to disk.
+    Formatted,
 
-    /// The file was formatted, [`SourceKind`] contains the formatted code
+    /// The file needs to be formatted, as the `formatted` and `unformatted` contents differ.
     Diff {
         unformatted: SourceKind,
         formatted: SourceKind,
@@ -562,7 +536,7 @@ impl<'a> FormatResults<'a> {
     /// Returns `true` if any of the files require formatting.
     fn any_formatted(&self) -> bool {
         self.results.iter().any(|result| match result.result {
-            FormatResult::Formatted { .. } | FormatResult::Diff { .. } => true,
+            FormatResult::Formatted | FormatResult::Diff { .. } => true,
             FormatResult::Unchanged | FormatResult::Skipped => false,
         })
     }
@@ -597,7 +571,7 @@ impl<'a> FormatResults<'a> {
             .results
             .iter()
             .filter_map(|result| {
-                if result.result.is_formatted() {
+                if result.result.is_diff() {
                     Some(result.path.as_path())
                 } else {
                     None
@@ -710,7 +684,7 @@ impl<'a> FormatResults<'a> {
         let mut unchanged = 0u32;
         for result in self.results {
             match &result.result {
-                FormatResult::Formatted { .. } => {
+                FormatResult::Formatted => {
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
@@ -774,7 +748,7 @@ impl<'a> FormatResults<'a> {
         self.results
             .iter()
             .filter_map(|result| {
-                let FormatResult::Formatted {
+                let FormatResult::Diff {
                     unformatted,
                     formatted,
                 } = &result.result
