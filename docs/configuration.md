@@ -728,10 +728,10 @@ Options:
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
       --output-format <OUTPUT_FORMAT>
-          Output serialization format for violations. The default serialization
-          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
-          concise, full, json, json-lines, junit, grouped, github, gitlab,
-          pylint, rdjson, azure, sarif]
+          Output serialization format for violations, when used with `--check`.
+          The default serialization format is "full" [env: RUFF_OUTPUT_FORMAT=]
+          [possible values: concise, full, json, json-lines, junit, grouped,
+          github, gitlab, pylint, rdjson, azure, sarif]
   -h, --help
           Print help (see more with '--help')
 

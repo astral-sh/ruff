@@ -538,8 +538,11 @@ pub struct FormatCommand {
     #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
     pub exit_non_zero_on_format: bool,
 
-    /// Output serialization format for violations.
+    /// Output serialization format for violations, when used with `--check`.
     /// The default serialization format is "full".
+    ///
+    /// Note that this option is currently only respected in preview mode. A warning will be emitted
+    /// if this flag is used on stable.
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<OutputFormat>,
 }
