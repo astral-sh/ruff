@@ -959,7 +959,7 @@ impl<'db> InteriorNode<'db> {
                     Node::new_satisfied_constraint(db, larger_constraint.when_true()),
                 );
 
-                // ¬larger ∧ ¬smaller = ¬smaller
+                // ¬larger ∧ ¬smaller = ¬larger
                 simplified = simplified.substitute_intersection(
                     db,
                     larger_constraint.when_false(),
