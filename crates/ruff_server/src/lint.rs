@@ -287,7 +287,7 @@ fn to_lsp_diagnostic(
         let code = code.to_string();
         (
             Some(severity(&code)),
-            tags(&code),
+            tags(diagnostic),
             Some(lsp_types::NumberOrString::String(code)),
         )
     } else {
@@ -338,12 +338,17 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
     }
 }
 
-fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
-    match code {
-        // F401: <module> imported but unused
-        // F841: local variable <name> is assigned to but never used
-        // RUF059: Unused unpacked variable
-        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
-        _ => None,
-    }
+fn tags(diagnostic: &Diagnostic) -> Option<Vec<lsp_types::DiagnosticTag>> {
+    diagnostic.primary_tags().map(|tags| {
+        tags.iter()
+            .map(|tag| match tag {
+                ruff_db::diagnostic::DiagnosticTag::Unnecessary => {
+                    lsp_types::DiagnosticTag::UNNECESSARY
+                }
+                ruff_db::diagnostic::DiagnosticTag::Deprecated => {
+                    lsp_types::DiagnosticTag::DEPRECATED
+                }
+            })
+            .collect()
+    })
 }
