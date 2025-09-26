@@ -38,11 +38,12 @@ use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source,
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{ResolvedFile, Resolver, match_exclusion, python_files_in_path};
+use ruff_workspace::resolver::{
+    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, python_files_in_path,
+};
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
-use crate::resolve::resolve;
 use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -71,11 +72,11 @@ impl FormatMode {
 pub(crate) fn format(
     cli: FormatArguments,
     config_arguments: &ConfigArguments,
+    pyproject_config: &PyprojectConfig,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
+    let (paths, resolver) = python_files_in_path(&files, pyproject_config, config_arguments)?;
 
     let output_format = pyproject_config.settings.output_format;
     let preview = pyproject_config.settings.formatter.preview;

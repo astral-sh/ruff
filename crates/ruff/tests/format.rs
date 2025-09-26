@@ -2461,3 +2461,21 @@ fn cookiecutter_globbing() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn stable_output_format_warning() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--output-format=full", "-"])
+            .pass_stdin("1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1
+
+    ----- stderr -----
+    warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
+    ",
+    )
+}
