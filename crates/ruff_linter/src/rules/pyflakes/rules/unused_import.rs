@@ -726,11 +726,11 @@ fn unused_imports_from_binding<'a, 'b>(
     for ref_id in binding.references() {
         let resolved_reference = semantic.reference(ref_id);
         if !marked_dunder_all && resolved_reference.in_dunder_all_definition() {
-            let first = binding
-                .as_any_import()
-                .expect("binding to be import binding since current function called after restricting to these in `unused_imports_in_scope`")
-                .qualified_name()
-                .segments()[0];
+            let first = *binding
+                                .as_any_import()
+                                .expect("binding to be import binding since current function called after restricting to these in `unused_imports_in_scope`")
+                                .qualified_name()
+                                .segments().first().expect("import binding to have nonempty qualified name");
             mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
             marked_dunder_all = true;
             continue;
