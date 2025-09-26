@@ -597,6 +597,8 @@ impl<'db> Node<'db> {
     /// We currently use a brute-force algorithm to calculate the minimization, which should be
     /// fine for the sizes of BDDs and don't-care sets that we work with.
     fn minimize(self, db: &'db dyn Db, do_not_care: Node<'db>) -> Self {
+        eprintln!("==> minimize    {}", self.display(db));
+        eprintln!("    relative to {}", do_not_care.display(db));
         self.minimizations(db, do_not_care)
             .as_slice()
             .iter()
@@ -608,14 +610,21 @@ impl<'db> Node<'db> {
     /// Returns all of the minimizations of this BDD that have the same size as the smallest
     /// minimization.
     fn minimizations(self, db: &'db dyn Db, do_not_care: Node<'db>) -> Minimized<'db, 'db> {
+        eprintln!(" -> minimizations {}", self.display(db));
+        eprintln!(" -> relative to   {}", do_not_care.display(db));
         match (self, do_not_care) {
             // If we never care about this node, then its minimization can evaluate to any result.
             (_, Node::AlwaysTrue) => {
+                eprintln!(" -> minimizations of {}", self.display(db));
+                eprintln!("    always");
+                eprintln!("    never");
                 Minimized::OwnedTwo([Node::AlwaysTrue, Node::AlwaysFalse])
             }
             // If we always care about this node, then its minimization should behave the same as
             // the node itself.
             (_, Node::AlwaysFalse) => {
+                eprintln!(" -> minimizations of {}", self.display(db));
+                eprintln!("    {}", self.display(db));
                 Minimized::OwnedOne(self)
             }
             // If we sometimes care about this node, we need to recurse down, finding the
@@ -992,10 +1001,14 @@ impl<'db> InteriorNode<'db> {
                 }
             }
         };
+
+        eprintln!(" -> minimizations of {}", node.display(db));
         let mut result = Vec::new();
         for if_true in true_minimized.as_slice() {
             for if_false in false_minimized.as_slice() {
-                result.push(Node::new(db, self_constraint, *if_true, *if_false));
+                let x = Node::new(db, constraint, *if_true, *if_false);
+                eprintln!("    {} {}", x.interior_node_count(db), x.display(db));
+                result.push(x);
             }
         }
         let minimum_size = (result.iter())
