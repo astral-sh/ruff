@@ -2,8 +2,11 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use std::str::FromStr;
 
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
+use ruff_python_ast::{
+    self as ast, AnyStringFlags, Expr, StringFlags, helpers::is_constant, whitespace::indentation,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -15,6 +18,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::preview::is_literal_safe_fix_printf_string_formatting_enabled;
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -69,6 +73,19 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// val = (1,)
 /// print("%s" % val)  # "1"
 /// print("{}".format(val))  # "(1,)"
+/// ```
+///
+/// It is also possible for the right-hand side to have values that implement
+/// `__format__` to not behave the same as `__str__` when `None` is passed:
+///
+/// ```python
+/// class C:
+///     def __format__(*args, **kwargs):
+///         print("called my format!")
+///         return ""
+///
+/// "{}".format(C())  # prints "called my format!", returns ""
+/// "%s" % C()  # '<__main__.C object at 0x7fd0f5757250>'
 /// ```
 ///
 /// ## References
@@ -206,20 +223,18 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 }
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
-fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
-    if let Expr::Tuple(tuple) = &right {
-        if tuple.len() == 1 {
-            if !locator.contains_line_break(right.range()) {
-                let mut contents = locator.slice(right).to_string();
-                for (i, character) in contents.chars().rev().enumerate() {
-                    if character == ',' {
-                        let correct_index = contents.len() - i - 1;
-                        contents.remove(correct_index);
-                        break;
-                    }
+fn clean_params_tuple<'a>(right: &ast::ExprTuple, locator: &Locator<'a>) -> Cow<'a, str> {
+    if right.len() == 1 {
+        if !locator.contains_line_break(right.range()) {
+            let mut contents = locator.slice(right).to_string();
+            for (i, character) in contents.chars().rev().enumerate() {
+                if character == ',' {
+                    let correct_index = contents.len() - i - 1;
+                    contents.remove(correct_index);
+                    break;
                 }
-                return Cow::Owned(contents);
             }
+            return Cow::Owned(contents);
         }
     }
 
@@ -228,79 +243,83 @@ fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
 
 /// Converts a dictionary to a function call while preserving as much styling as
 /// possible.
-fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
+fn clean_params_dictionary(
+    right: &ast::ExprDict,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let Expr::Dict(ast::ExprDict {
+    let ast::ExprDict {
         items,
         range: _,
         node_index: _,
-    }) = &right
-    {
-        let mut arguments: Vec<String> = vec![];
-        let mut seen: Vec<&str> = vec![];
-        let mut indent = None;
-        for ast::DictItem { key, value } in items {
-            if let Some(key) = key {
-                if let Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: key_string, ..
-                }) = key
-                {
-                    // If the dictionary key is not a valid variable name, abort.
-                    if !is_identifier(key_string.to_str()) {
-                        return None;
-                    }
-                    // If there are multiple entries of the same key, abort.
-                    if seen.contains(&key_string.to_str()) {
-                        return None;
-                    }
-                    seen.push(key_string.to_str());
-                    if is_multi_line {
-                        if indent.is_none() {
-                            indent = indentation(locator.contents(), key);
-                        }
-                    }
+    } = right;
 
-                    let value_string = locator.slice(value);
-                    arguments.push(format!("{key_string}={value_string}"));
-                } else {
-                    // If there are any non-string keys, abort.
+    let mut arguments: Vec<String> = vec![];
+    let mut seen: Vec<&str> = vec![];
+    let mut indent = None;
+    for ast::DictItem { key, value } in items {
+        if let Some(key) = key {
+            if let Expr::StringLiteral(ast::ExprStringLiteral {
+                value: key_string, ..
+            }) = key
+            {
+                // If the dictionary key is not a valid variable name, abort.
+                if !is_identifier(key_string.to_str()) {
                     return None;
                 }
-            } else {
+                // If there are multiple entries of the same key, abort.
+                if seen.contains(&key_string.to_str()) {
+                    return None;
+                }
+                seen.push(key_string.to_str());
+                if is_multi_line {
+                    if indent.is_none() {
+                        indent = indentation(locator.contents(), key);
+                    }
+                }
+
                 let value_string = locator.slice(value);
-                arguments.push(format!("**{value_string}"));
-            }
-        }
-        // If we couldn't parse out key values, abort.
-        if arguments.is_empty() {
-            return None;
-        }
-        contents.push('(');
-        if is_multi_line {
-            let indent = indent?;
-
-            for item in &arguments {
-                contents.push_str(stylist.line_ending().as_str());
-                contents.push_str(indent);
-                contents.push_str(item);
-                contents.push(',');
-            }
-
-            contents.push_str(stylist.line_ending().as_str());
-
-            // For the ending parentheses, go back one indent.
-            let default_indent: &str = stylist.indentation();
-            if let Some(ident) = indent.strip_prefix(default_indent) {
-                contents.push_str(ident);
+                arguments.push(format!("{key_string}={value_string}"));
             } else {
-                contents.push_str(indent);
+                // If there are any non-string keys, abort.
+                return None;
             }
         } else {
-            contents.push_str(&arguments.join(", "));
+            let value_string = locator.slice(value);
+            arguments.push(format!("**{value_string}"));
         }
-        contents.push(')');
     }
+    // If we couldn't parse out key values, abort.
+    if arguments.is_empty() {
+        return None;
+    }
+    contents.push('(');
+    if is_multi_line {
+        let indent = indent?;
+
+        for item in &arguments {
+            contents.push_str(stylist.line_ending().as_str());
+            contents.push_str(indent);
+            contents.push_str(item);
+            contents.push(',');
+        }
+
+        contents.push_str(stylist.line_ending().as_str());
+
+        // For the ending parentheses, go back one indent.
+        let default_indent: &str = stylist.indentation();
+        if let Some(ident) = indent.strip_prefix(default_indent) {
+            contents.push_str(ident);
+        } else {
+            contents.push_str(indent);
+        }
+    } else {
+        contents.push_str(&arguments.join(", "));
+    }
+    contents.push(')');
+
     Some(contents)
 }
 
@@ -416,15 +435,25 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Parse the parameters.
-    let params_string = match right {
+    let (applicability, params_string) = match right {
         Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
-        | Expr::FString(_) => Cow::Owned(format!("({})", checker.locator().slice(right))),
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
+        | Expr::FString(_) => (
+            if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings()) {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            },
+            Cow::Owned(format!("({})", checker.locator().slice(right))),
+        ),
+        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => (
+            // Values may implement __format__ to not have the same behavior as %s,
+            // so these fixes should stay unsafe.
+            Applicability::Unsafe,
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
                 Cow::Owned(format!("(**{})", checker.locator().slice(right)))
@@ -444,17 +473,36 @@ pub(crate) fn printf_string_formatting(
                 // ```
                 // So we offer an unsafe fix:
                 Cow::Owned(format!("({})", checker.locator().slice(right)))
-            }
-        }
-        Expr::Tuple(_) => clean_params_tuple(right, checker.locator()),
-        Expr::Dict(_) => {
+            },
+        ),
+        Expr::Tuple(tuple) => (
+            if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings())
+                && tuple.iter().all(is_constant)
+            {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            },
+            clean_params_tuple(tuple, checker.locator()),
+        ),
+        Expr::Dict(dict) => {
             let Some(params_string) =
-                clean_params_dictionary(right, checker.locator(), checker.stylist())
+                clean_params_dictionary(dict, checker.locator(), checker.stylist())
             else {
                 checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
                 return;
             };
-            Cow::Owned(params_string)
+            let applicability =
+                if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings())
+                    && dict.iter().all(|item| {
+                        item.key.as_ref().is_some_and(is_constant) && is_constant(&item.value)
+                    })
+                {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                };
+            (applicability, Cow::Owned(params_string))
         }
         _ => return,
     };
@@ -507,10 +555,10 @@ pub(crate) fn printf_string_formatting(
     let _ = write!(&mut contents, ".format{params_string}");
 
     let mut diagnostic = checker.report_diagnostic(PrintfStringFormatting, bin_op.range());
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        contents,
-        bin_op.range(),
-    )));
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(contents, bin_op.range()),
+        applicability,
+    ));
 }
 
 #[cfg(test)]
