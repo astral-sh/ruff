@@ -1662,3 +1662,54 @@ def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: Unknown
     reveal_type(f(*(arg,)))  # revealed: Unknown
 ```
+
+## Bi-directional Type Inference
+
+Type inference accounts for parameter type annotations across all overloads.
+
+```py
+from typing import TypedDict, overload
+
+class T(TypedDict):
+    x: int
+
+@overload
+def f(a: list[T], b: int) -> int: ...
+
+@overload
+def f(a: list[dict[str, int]], b: str) -> str: ...
+
+def f(a: list[dict[str, int]] | list[T], b: int | str) -> int | str:
+    return 1
+
+def int_or_str() -> int | str:
+    return 1
+
+x = f([{"x": 1}], int_or_str())
+reveal_type(x)  # revealed: int | str
+
+# TODO: error: [no-matching-overload] "No overload of function `f` matches arguments"
+# we currently incorrectly consider `list[dict[str, int]]` a subtype of `list[T]`
+f([{"y": 1}], int_or_str())
+```
+
+Non-matching overloads do not produce diagnostics:
+
+```py
+from typing import TypedDict, overload
+
+class T(TypedDict):
+    x: int
+
+@overload
+def f(a: T, b: int) -> int: ...
+
+@overload
+def f(a: dict[str, int], b: str) -> str: ...
+
+def f(a: T | dict[str, int], b: int | str) -> int | str:
+    return 1
+
+x = f({"y": 1}, "a")
+reveal_type(x)  # revealed: str
+```

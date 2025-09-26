@@ -251,3 +251,29 @@ from ty_extensions import Intersection, Not
 def _(x: Union[Intersection[Any, Not[int]], Intersection[Any, Not[int]]]):
     reveal_type(x)  # revealed: Any & ~int
 ```
+
+## Bi-directional Type Inference
+
+Type inference accounts for parameter type annotations across all signatures in a union.
+
+```py
+from typing import TypedDict, overload
+
+class T(TypedDict):
+    x: int
+
+def _(flag: bool):
+    if flag:
+        def f(x: T) -> int:
+            return 1
+    else:
+        def f(x: dict[str, int]) -> int:
+            return 1
+
+    x = f({"x": 1})
+    reveal_type(x)  # revealed: int
+
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `T` constructor"
+    # error: [invalid-key] "Invalid key access on TypedDict `T`: Unknown key "y""
+    f({"y": 1})
+```

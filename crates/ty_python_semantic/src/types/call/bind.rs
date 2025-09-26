@@ -33,10 +33,10 @@ use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
     TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
@@ -1776,7 +1776,7 @@ impl<'db> CallableBinding<'db> {
     }
 
     /// Returns the index of the matching overload in the form of [`MatchingOverloadIndex`].
-    fn matching_overload_index(&self) -> MatchingOverloadIndex {
+    pub(crate) fn matching_overload_index(&self) -> MatchingOverloadIndex {
         let mut matching_overloads = self.matching_overloads();
         match matching_overloads.next() {
             None => MatchingOverloadIndex::None,
@@ -1794,8 +1794,15 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    /// Returns all overloads for this call binding, including overloads that did not match.
+    pub(crate) fn overloads(&self) -> &[Binding<'db>] {
+        self.overloads.as_slice()
+    }
+
     /// Returns an iterator over all the overloads that matched for this call binding.
-    pub(crate) fn matching_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> {
+    pub(crate) fn matching_overloads(
+        &self,
+    ) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
         self.overloads
             .iter()
             .enumerate()
@@ -2026,7 +2033,7 @@ enum OverloadCallReturnType<'db> {
 }
 
 #[derive(Debug)]
-enum MatchingOverloadIndex {
+pub(crate) enum MatchingOverloadIndex {
     /// No matching overloads found.
     None,
 
@@ -2035,6 +2042,16 @@ enum MatchingOverloadIndex {
 
     /// Multiple matching overloads found at the given indexes.
     Multiple(Vec<usize>),
+}
+
+impl MatchingOverloadIndex {
+    pub(crate) fn count(self) -> usize {
+        match self {
+            MatchingOverloadIndex::None => 0,
+            MatchingOverloadIndex::Single(_) => 1,
+            MatchingOverloadIndex::Multiple(items) => items.len(),
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -2504,9 +2521,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Some(return_ty) = self.signature.return_ty
             && let Some(call_expression_tcx) = self.call_expression_tcx.annotation
         {
-            // Ignore any specialization errors here, because the type context is only used to
-            // optionally widen the return type.
-            let _ = builder.infer(return_ty, call_expression_tcx);
+            match call_expression_tcx {
+                // A type variable is not a useful type-context for expression inference, and applying it
+                // to the return type can lead to confusing unions in nested generic calls.
+                Type::TypeVar(_) => {}
+
+                _ => {
+                    // Ignore any specialization errors here, because the type context is only used to
+                    // optionally widen the return type.
+                    let _ = builder.infer(return_ty, call_expression_tcx);
+                }
+            }
         }
 
         let parameters = self.signature.parameters();
@@ -3289,6 +3314,23 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
+                // Re-infer the argument type of call expressions, ignoring the type context for more
+                // precise error messages.
+                let provided_ty = match Self::get_argument_node(node, *argument_index) {
+                    None => *provided_ty,
+
+                    // Ignore starred arguments, as those are difficult to re-infer.
+                    Some(
+                        ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
+                        | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }),
+                    ) => *provided_ty,
+
+                    Some(
+                        ast::ArgOrKeyword::Arg(value)
+                        | ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }),
+                    ) => infer_isolated_expression(context.db(), context.scope(), value),
+                };
+
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
 
@@ -3624,22 +3666,29 @@ impl<'db> BindingError<'db> {
         }
     }
 
-    fn get_node(node: ast::AnyNodeRef, argument_index: Option<usize>) -> ast::AnyNodeRef {
+    fn get_node(node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> ast::AnyNodeRef<'_> {
         // If we have a Call node and an argument index, report the diagnostic on the correct
         // argument node; otherwise, report it on the entire provided node.
+        match Self::get_argument_node(node, argument_index) {
+            Some(ast::ArgOrKeyword::Arg(expr)) => expr.into(),
+            Some(ast::ArgOrKeyword::Keyword(expr)) => expr.into(),
+            None => node,
+        }
+    }
+
+    fn get_argument_node(
+        node: ast::AnyNodeRef<'_>,
+        argument_index: Option<usize>,
+    ) -> Option<ArgOrKeyword<'_>> {
         match (node, argument_index) {
-            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => {
-                match call_node
+            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
+                call_node
                     .arguments
                     .arguments_source_order()
                     .nth(argument_index)
-                    .expect("argument index should not be out of range")
-                {
-                    ast::ArgOrKeyword::Arg(expr) => expr.into(),
-                    ast::ArgOrKeyword::Keyword(keyword) => keyword.into(),
-                }
-            }
-            _ => node,
+                    .expect("argument index should not be out of range"),
+            ),
+            _ => None,
         }
     }
 }
