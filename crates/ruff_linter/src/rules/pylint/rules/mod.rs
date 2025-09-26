@@ -1,6 +1,7 @@
 pub(crate) use and_or_ternary::*;
 pub(crate) use assert_on_string_literal::*;
 pub(crate) use await_outside_async::*;
+pub(crate) use bad_chained_comparison::*;
 pub(crate) use bad_dunder_method_name::*;
 pub(crate) use bad_open_mode::*;
 pub(crate) use bad_staticmethod_argument::*;
@@ -111,6 +112,7 @@ pub(crate) use yield_in_init::*;
 mod and_or_ternary;
 mod assert_on_string_literal;
 mod await_outside_async;
+mod bad_chained_comparison;
 mod bad_dunder_method_name;
 mod bad_open_mode;
 mod bad_staticmethod_argument;
