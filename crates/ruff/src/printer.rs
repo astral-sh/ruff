@@ -18,7 +18,7 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
-use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
+use ruff_linter::settings::types::{OutputFormat, RuffOutputFormat, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -233,64 +233,24 @@ impl Printer {
             .fix_applicability(self.unsafe_fixes.required_applicability())
             .show_fix_diff(preview);
 
-        match self.format {
-            OutputFormat::Json => {
-                let config = config.format(DiagnosticFormat::Json);
+        match DiagnosticFormat::try_from(self.format) {
+            Ok(format) => {
+                let config = config.format(format);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
-            OutputFormat::Rdjson => {
-                let config = config.format(DiagnosticFormat::Rdjson);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+            Err(RuffOutputFormat::Github) => {
+                let renderer = GithubRenderer::new(&context, "Ruff");
+                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
-            OutputFormat::JsonLines => {
-                let config = config.format(DiagnosticFormat::JsonLines);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Junit => {
-                let config = config.format(DiagnosticFormat::Junit);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Concise => {
-                let config = config.format(DiagnosticFormat::Concise);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Full => {
-                let config = config.format(DiagnosticFormat::Full);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Grouped => {
+            Err(RuffOutputFormat::Grouped) => {
                 GroupedEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.inner, &context)?;
             }
-            OutputFormat::Github => {
-                let renderer = GithubRenderer::new(&context, "Ruff");
-                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Gitlab => {
-                let config = config.format(DiagnosticFormat::Gitlab);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Pylint => {
-                let config = config.format(DiagnosticFormat::Pylint);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Azure => {
-                let config = config.format(DiagnosticFormat::Azure);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Sarif => {
+            Err(RuffOutputFormat::Sarif) => {
                 SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
             }
         }
