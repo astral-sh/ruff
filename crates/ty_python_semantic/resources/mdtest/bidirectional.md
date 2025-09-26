@@ -55,6 +55,8 @@ def f[T](x: T, cond: bool) -> T | list[T]:
 l5: int | list[int] = f(1, True)
 ```
 
+`typed_dict.py`:
+
 ```py
 from typing import TypedDict
 
