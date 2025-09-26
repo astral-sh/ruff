@@ -1655,7 +1655,7 @@
       "type": "object",
       "properties": {
         "case-sensitive": {
-          "description": "Sort imports taking into account case sensitivity.",
+          "description": "Sort imports taking into account case sensitivity.\n\nNote that the [`order-by-type`](#lint_isort_order-by-type) setting will take precedence over this one when enabled.",
           "type": [
             "boolean",
             "null"
@@ -1843,7 +1843,7 @@
           ]
         },
         "order-by-type": {
-          "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
+          "description": "Order imports by type, which is determined by case, in addition to alphabetically.\n\nNote that this option takes precedence over the [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.",
           "type": [
             "boolean",
             "null"

@@ -65,8 +65,28 @@ impl SemanticSyntaxChecker {
                 names,
                 ..
             }) => {
-                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                if matches!(module.as_deref(), Some("__future__")) {
+                    for name in names {
+                        if !is_known_future_feature(&name.name) {
+                            // test_ok valid_future_feature
+                            // from __future__ import annotations
+
+                            // test_err invalid_future_feature
+                            // from __future__ import invalid_feature
+                            // from __future__ import annotations, invalid_feature
+                            // from __future__ import invalid_feature_1, invalid_feature_2
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::FutureFeatureNotDefined(
+                                    name.name.to_string(),
+                                ),
+                                name.range,
+                            );
+                        }
+                    }
+                    if self.seen_futures_boundary {
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                    }
                 }
                 for alias in names {
                     if alias.name.as_str() == "*" && !ctx.in_module_scope() {
@@ -978,6 +998,22 @@ impl SemanticSyntaxChecker {
     }
 }
 
+fn is_known_future_feature(name: &str) -> bool {
+    matches!(
+        name,
+        "nested_scopes"
+            | "generators"
+            | "division"
+            | "absolute_import"
+            | "with_statement"
+            | "print_function"
+            | "unicode_literals"
+            | "barry_as_FLUFL"
+            | "generator_stop"
+            | "annotations"
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
@@ -1085,6 +1121,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::MultipleStarredExpressions => {
                 write!(f, "Two starred expressions in assignment")
+            }
+            SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                write!(f, "Future feature `{name}` is not defined")
             }
         }
     }
@@ -1456,6 +1495,9 @@ pub enum SemanticSyntaxErrorKind {
     /// left-hand side of an assignment. Using multiple starred expressions makes
     /// the statement invalid and results in a `SyntaxError`.
     MultipleStarredExpressions,
+
+    /// Represents the use of a `__future__` feature that is not defined.
+    FutureFeatureNotDefined(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
