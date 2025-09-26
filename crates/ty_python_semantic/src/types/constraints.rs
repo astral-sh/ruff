@@ -583,14 +583,38 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn minimize(self, db: &'db dyn Db, assignment: Node<'db>) -> Minimized<'db, 'db> {
-        match (self, assignment) {
+    /// Returns the minimization of this BDD given a particular set of inputs that you don't care
+    /// about. The result BDD's output is undefined for all of the inputs in the `do_not_care` set,
+    /// but it will agree with this BDD for all other inputs.
+    ///
+    /// The `do_not_care` set typically encodes impossible situations in the input space. For a
+    /// specific example involving constraint sets, this lets us model two constraints that are
+    /// disjoint, whose intersection is empty. It is not possible for both constraints to be true,
+    /// and so any input with both of the corresponding BDD variables set is invalid. For those
+    /// invalid inputs, it doesn't matter which output the BDD produces. Of all of the possible
+    /// BDDs that produce correct results for the _valid_ inputs, we want the smallest one.
+    ///
+    /// We currently use a brute-force algorithm to calculate the minimization, which should be
+    /// fine for the sizes of BDDs and don't-care sets that we work with.
+    fn minimize(self, db: &'db dyn Db, do_not_care: Node<'db>) -> Self {
+        self.minimizations(db, do_not_care)
+            .as_slice()
+            .iter()
+            .copied()
+            .next()
+            .expect("all BDDs should have a minimization")
+    }
+
+    /// Returns all of the minimizations of this BDD that have the same size as the smallest
+    /// minimization.
+    fn minimizations(self, db: &'db dyn Db, do_not_care: Node<'db>) -> Minimized<'db, 'db> {
+        match (self, do_not_care) {
             (_, Node::AlwaysTrue) => Minimized::OwnedTwo([Node::AlwaysTrue, Node::AlwaysFalse]),
             (_, Node::AlwaysFalse) | (Node::AlwaysTrue | Node::AlwaysFalse, _) => {
                 Minimized::OwnedOne(self)
             }
-            (Node::Interior(interior), Node::Interior(assignment)) => {
-                Minimized::Borrowed(interior.minimize(db, assignment))
+            (Node::Interior(interior), Node::Interior(do_not_care)) => {
+                Minimized::Borrowed(interior.minimizations(db, do_not_care))
             }
         }
     }
@@ -931,21 +955,21 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-    fn minimize(self, db: &'db dyn Db, assignment: Self) -> Box<[Node<'db>]> {
+    fn minimizations(self, db: &'db dyn Db, do_not_care: Self) -> Box<[Node<'db>]> {
         let self_constraint = self.constraint(db);
-        let assignment_constraint = assignment.constraint(db);
-        let (true_minimized, false_minimized) = match self_constraint.cmp(&assignment_constraint) {
+        let do_not_care_constraint = do_not_care.constraint(db);
+        let (true_minimized, false_minimized) = match self_constraint.cmp(&do_not_care_constraint) {
             Ordering::Equal => (
-                self.if_true(db).minimize(db, assignment.if_true(db)),
-                self.if_false(db).minimize(db, assignment.if_false(db)),
+                (self.if_true(db)).minimizations(db, do_not_care.if_true(db)),
+                (self.if_false(db)).minimizations(db, do_not_care.if_false(db)),
             ),
             Ordering::Less => (
-                self.if_true(db).minimize(db, Node::Interior(assignment)),
-                self.if_false(db).minimize(db, Node::Interior(assignment)),
+                (self.if_true(db)).minimizations(db, Node::Interior(do_not_care)),
+                (self.if_false(db)).minimizations(db, Node::Interior(do_not_care)),
             ),
             Ordering::Greater => (
-                Node::Interior(self).minimize(db, assignment.if_true(db)),
-                Node::Interior(self).minimize(db, assignment.if_false(db)),
+                Node::Interior(self).minimizations(db, do_not_care.if_true(db)),
+                Node::Interior(self).minimizations(db, do_not_care.if_false(db)),
             ),
         };
         let mut result = Vec::new();
@@ -1009,12 +1033,20 @@ impl<'db> InteriorNode<'db> {
                 None
             };
             if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
+                let larger_node = Node::new_satisfied_constraint(db, larger_constraint.when_true());
+                let smaller_node =
+                    Node::new_satisfied_constraint(db, smaller_constraint.when_true());
+                let not_larger_node =
+                    Node::new_satisfied_constraint(db, larger_constraint.when_false());
+                let not_smaller_node =
+                    Node::new_satisfied_constraint(db, smaller_constraint.when_false());
+
                 // larger ∨ smaller = larger
                 simplified = simplified.substitute_union(
                     db,
                     larger_constraint.when_true(),
                     smaller_constraint.when_true(),
-                    Node::new_satisfied_constraint(db, larger_constraint.when_true()),
+                    larger_node,
                 );
 
                 // ¬larger ∧ ¬smaller = ¬larger
@@ -1022,16 +1054,17 @@ impl<'db> InteriorNode<'db> {
                     db,
                     larger_constraint.when_false(),
                     smaller_constraint.when_false(),
-                    Node::new_satisfied_constraint(db, larger_constraint.when_false()),
+                    not_larger_node,
                 );
 
                 // smaller ∧ ¬larger = false
                 // (¬larger removes everything that's present in smaller)
-                simplified = simplified.substitute_intersection(
+                simplified = simplified.minimize(
                     db,
-                    larger_constraint.when_false(),
-                    smaller_constraint.when_true(),
-                    Node::AlwaysFalse,
+                    Node::new_satisfied_constraint(db, smaller_constraint.when_true()).and(
+                        db,
+                        Node::new_satisfied_constraint(db, larger_constraint.when_false()),
+                    ),
                 );
 
                 // larger ∨ ¬smaller = true
