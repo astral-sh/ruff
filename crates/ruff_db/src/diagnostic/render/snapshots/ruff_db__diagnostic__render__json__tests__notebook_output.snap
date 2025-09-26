@@ -10,7 +10,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 10,
       "row": 2
     },
-    "filename": "notebook.ipynb",
+    "filename": "/notebook.ipynb",
     "fix": {
       "applicability": "safe",
       "edits": [
@@ -43,7 +43,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 12,
       "row": 2
     },
-    "filename": "notebook.ipynb",
+    "filename": "/notebook.ipynb",
     "fix": {
       "applicability": "safe",
       "edits": [
@@ -76,7 +76,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 6,
       "row": 4
     },
-    "filename": "notebook.ipynb",
+    "filename": "/notebook.ipynb",
     "fix": {
       "applicability": "unsafe",
       "edits": [

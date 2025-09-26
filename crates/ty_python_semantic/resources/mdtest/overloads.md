@@ -99,7 +99,7 @@ reveal_type(foo(b""))  # revealed: bytes
 ## Methods
 
 ```py
-from typing import overload
+from typing_extensions import Self, overload
 
 class Foo1:
     @overload
@@ -126,6 +126,18 @@ foo2 = Foo2()
 reveal_type(foo2.method)  # revealed: Overload[() -> None, (x: str) -> str]
 reveal_type(foo2.method())  # revealed: None
 reveal_type(foo2.method(""))  # revealed: str
+
+class Foo3:
+    @overload
+    def takes_self_or_int(self: Self, x: Self) -> Self: ...
+    @overload
+    def takes_self_or_int(self: Self, x: int) -> int: ...
+    def takes_self_or_int(self: Self, x: Self | int) -> Self | int:
+        return x
+
+foo3 = Foo3()
+reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
+reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
 ## Constructor

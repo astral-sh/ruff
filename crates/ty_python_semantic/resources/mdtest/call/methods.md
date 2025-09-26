@@ -325,7 +325,7 @@ class D(metaclass=Meta):
 reveal_type(D.f(1))  # revealed: Literal["a"]
 ```
 
-If the class method is possibly unbound, we union the return types:
+If the class method is possibly missing, we union the return types:
 
 ```py
 def flag() -> bool:

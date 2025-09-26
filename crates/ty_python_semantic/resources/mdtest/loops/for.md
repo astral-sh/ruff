@@ -228,6 +228,48 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
 ```
 
+## Union type as iterable where `Iterator[]` is used as the return type of `__iter__`
+
+This test differs from the above tests in that `Iterator` (an abstract type) is used as the return
+annotation of the `__iter__` methods, rather than a concrete type being used as the return
+annotation.
+
+```py
+from typing import Iterator, Literal
+
+class IntIterator:
+    def __iter__(self) -> Iterator[int]:
+        return iter(range(42))
+
+class StrIterator:
+    def __iter__(self) -> Iterator[str]:
+        return iter("foo")
+
+def f(x: IntIterator | StrIterator):
+    for a in x:
+        # TODO: this should be `int | str` (https://github.com/astral-sh/ty/issues/1089)
+        reveal_type(a)  # revealed: int
+```
+
+Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods:
+
+```py
+def g(
+    a: tuple[int, ...] | tuple[str, ...],
+    b: list[str] | list[int],
+    c: Literal["foo", b"bar"],
+):
+    for x in a:
+        # TODO: should be `int | str` (https://github.com/astral-sh/ty/issues/1089)
+        reveal_type(x)  # revealed: int
+    for y in b:
+        # TODO: should be `str | int` (https://github.com/astral-sh/ty/issues/1089)
+        reveal_type(y)  # revealed: str
+    for z in c:
+        # TODO: should be `LiteralString | int` (https://github.com/astral-sh/ty/issues/1089)
+        reveal_type(z)  # revealed: LiteralString
+```
+
 ## Union type as iterable where one union element has no `__iter__` method
 
 <!-- snapshot-diagnostics -->
@@ -363,7 +405,7 @@ for x in Bad():
     reveal_type(x)  # revealed: Unknown
 ```
 
-## `__iter__` returns an object with a possibly unbound `__next__` method
+## `__iter__` returns an object with a possibly missing `__next__` method
 
 ```py
 def _(flag: bool):
@@ -412,7 +454,7 @@ for y in Iterable2():
     reveal_type(y)  # revealed: Unknown
 ```
 
-## Possibly unbound `__iter__` and bad `__getitem__` method
+## Possibly missing `__iter__` and bad `__getitem__` method
 
 <!-- snapshot-diagnostics -->
 
@@ -438,12 +480,12 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int | bytes
 ```
 
-## Possibly unbound `__iter__` and not-callable `__getitem__`
+## Possibly missing `__iter__` and not-callable `__getitem__`
 
 This snippet tests that we infer the element type correctly in the following edge case:
 
 - `__iter__` is a method with the correct parameter spec that returns a valid iterator; BUT
-- `__iter__` is possibly unbound; AND
+- `__iter__` is possibly missing; AND
 - `__getitem__` is set to a non-callable type
 
 It's important that we emit a diagnostic here, but it's also important that we still use the return
@@ -466,7 +508,7 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int
 ```
 
-## Possibly unbound `__iter__` and possibly unbound `__getitem__`
+## Possibly missing `__iter__` and possibly missing `__getitem__`
 
 <!-- snapshot-diagnostics -->
 
@@ -560,7 +602,7 @@ for x in Iterable():
     reveal_type(x)  # revealed: int
 ```
 
-## Possibly unbound `__iter__` but definitely bound `__getitem__`
+## Possibly missing `__iter__` but definitely bound `__getitem__`
 
 Here, we should not emit a diagnostic: if `__iter__` is unbound, we should fallback to
 `__getitem__`:
@@ -694,7 +736,7 @@ def _(flag: bool):
         reveal_type(y)  # revealed: str | int
 ```
 
-## Possibly unbound `__iter__` and possibly invalid `__getitem__`
+## Possibly missing `__iter__` and possibly invalid `__getitem__`
 
 <!-- snapshot-diagnostics -->
 

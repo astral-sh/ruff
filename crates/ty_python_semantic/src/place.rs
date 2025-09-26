@@ -1339,12 +1339,15 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 
 mod implicit_globals {
     use ruff_python_ast as ast;
+    use ruff_python_ast::name::Name;
 
+    use crate::Program;
     use crate::db::Db;
-    use crate::place::PlaceAndQualifiers;
+    use crate::place::{Boundness, PlaceAndQualifiers};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{KnownClass, Type};
+    use crate::types::{CallableType, KnownClass, Parameter, Parameters, Signature, Type};
+    use ruff_python_ast::PythonVersion;
 
     use super::{Place, place_from_declarations};
 
@@ -1392,28 +1395,58 @@ mod implicit_globals {
         db: &'db dyn Db,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        // We special-case `__file__` here because we know that for an internal implicit global
-        // lookup in a Python module, it is always a string, even though typeshed says `str |
-        // None`.
-        if name == "__file__" {
-            Place::bound(KnownClass::Str.to_instance(db)).into()
-        } else if name == "__builtins__" {
-            Place::bound(Type::any()).into()
-        } else if name == "__debug__" {
-            Place::bound(KnownClass::Bool.to_instance(db)).into()
-        }
-        // In general we wouldn't check to see whether a symbol exists on a class before doing the
-        // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
-        // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
-        // when absolutely necessary is that this function is used in a very hot path (name resolution
-        // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
-        else if module_type_symbols(db)
-            .iter()
-            .any(|module_type_member| &**module_type_member == name)
-        {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
-        } else {
-            Place::Unbound.into()
+        match name {
+            // We special-case `__file__` here because we know that for an internal implicit global
+            // lookup in a Python module, it is always a string, even though typeshed says `str |
+            // None`.
+            "__file__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+
+            "__builtins__" => Place::bound(Type::any()).into(),
+
+            "__debug__" => Place::bound(KnownClass::Bool.to_instance(db)).into(),
+
+            // Created lazily by the warnings machinery; may be absent.
+            // Model as possibly-unbound to avoid false negatives.
+            "__warningregistry__" => Place::Type(
+                KnownClass::Dict
+                    .to_specialized_instance(db, [Type::any(), KnownClass::Int.to_instance(db)]),
+                Boundness::PossiblyUnbound,
+            )
+            .into(),
+
+            // Marked as possibly-unbound as it is only present in the module namespace
+            // if at least one global symbol is annotated in the module.
+            "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
+                let signature = Signature::new(
+                    Parameters::new(
+                        [Parameter::positional_only(Some(Name::new_static("format")))
+                            .with_annotated_type(KnownClass::Int.to_instance(db))],
+                    ),
+                    Some(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        [KnownClass::Str.to_instance(db), Type::any()],
+                    )),
+                );
+                Place::Type(
+                    CallableType::function_like(db, signature),
+                    Boundness::PossiblyUnbound,
+                )
+                .into()
+            }
+
+            // In general we wouldn't check to see whether a symbol exists on a class before doing the
+            // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
+            // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
+            // when absolutely necessary is that this function is used in a very hot path (name resolution
+            // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
+            _ if module_type_symbols(db)
+                .iter()
+                .any(|module_type_member| &**module_type_member == name) =>
+            {
+                KnownClass::ModuleType.to_instance(db).member(db, name)
+            }
+
+            _ => Place::Unbound.into(),
         }
     }
 

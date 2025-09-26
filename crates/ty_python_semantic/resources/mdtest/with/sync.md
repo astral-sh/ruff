@@ -113,7 +113,7 @@ def _(flag: bool):
     class NotAContextManager: ...
     context_expr = Manager1() if flag else NotAContextManager()
 
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
     with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
@@ -129,7 +129,7 @@ def _(flag: bool):
 
         def __exit__(self, *args): ...
 
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` may be missing"
     with Manager() as f:
         reveal_type(f)  # revealed: str
 ```

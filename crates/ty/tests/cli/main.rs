@@ -632,7 +632,8 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
     settings.add_filter(r#"("fingerprint": ")[a-z0-9]+(",)"#, "$1[FINGERPRINT]$2");
     let _s = settings.bind_to_scope();
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab").arg("--warn").arg("unresolved-reference"), @r#"
+    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab").arg("--warn").arg("unresolved-reference")
+        .env("CI_PROJECT_DIR", case.project_dir), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -697,8 +698,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
-    ::error title=ty (non-subscriptable),file=test.py,line=3,col=7,endLine=3,endColumn=8::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (non-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=8::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.

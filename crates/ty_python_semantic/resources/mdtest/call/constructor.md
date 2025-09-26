@@ -158,15 +158,15 @@ def _(flag: bool) -> None:
             def __new__(cls):
                 return object.__new__(cls)
 
-    # error: [possibly-unbound-implicit-call]
+    # error: [possibly-missing-implicit-call]
     reveal_type(Foo())  # revealed: Foo
 
-    # error: [possibly-unbound-implicit-call]
+    # error: [possibly-missing-implicit-call]
     # error: [too-many-positional-arguments]
     reveal_type(Foo(1))  # revealed: Foo
 ```
 
-#### Possibly unbound `__call__` on `__new__` callable
+#### Possibly missing `__call__` on `__new__` callable
 
 ```py
 def _(flag: bool) -> None:
@@ -178,11 +178,11 @@ def _(flag: bool) -> None:
     class Foo:
         __new__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -294,11 +294,11 @@ def _(flag: bool) -> None:
     class Foo:
         __init__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 

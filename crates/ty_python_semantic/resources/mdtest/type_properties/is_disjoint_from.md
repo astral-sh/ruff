@@ -616,6 +616,31 @@ class BarNone(Protocol):
 static_assert(is_disjoint_from(type[Foo], BarNone))
 ```
 
+### `NamedTuple`
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, final
+from ty_extensions import is_disjoint_from, static_assert
+
+@final
+class Path(NamedTuple):
+    prev: Path | None
+    key: str
+
+@final
+class Path2(NamedTuple):
+    prev: Path2 | None
+    key: str
+
+static_assert(not is_disjoint_from(Path, Path))
+static_assert(not is_disjoint_from(Path, tuple[Path | None, str]))
+static_assert(is_disjoint_from(Path, tuple[Path | None]))
+static_assert(is_disjoint_from(Path, tuple[Path | None, str, int]))
+static_assert(is_disjoint_from(Path, Path2))
+```
+
 ## Callables
 
 No two callable types are disjoint because there exists a non-empty callable type

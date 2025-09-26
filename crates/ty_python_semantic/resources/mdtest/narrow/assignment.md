@@ -135,9 +135,9 @@ a.b = B()
 reveal_type(a.b)  # revealed: B
 reveal_type(a.b.c1)  # revealed: C | None
 reveal_type(a.b.c2)  # revealed: C | None
-# error: [possibly-unbound-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(a.b.c1.d)  # revealed: D | None
-# error: [possibly-unbound-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
@@ -206,8 +206,7 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-# TODO: should be ChainMap[int, int]
-reveal_type(cm)  # revealed: ChainMap[@Todo(dict literal key type), @Todo(dict literal value type)]
+reveal_type(cm)  # revealed: ChainMap[Unknown | int, Unknown | int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
@@ -295,9 +294,9 @@ class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
 
 def _():
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(b.a.x[0])  # revealed: Unknown | int | None
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
     reveal_type(b.a)  # revealed: Unknown | A | None
 ```

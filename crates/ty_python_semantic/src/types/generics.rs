@@ -491,6 +491,18 @@ fn is_subtype_in_invariant_position<'db>(
     let base_bottom = base_type.bottom_materialization(db);
 
     let is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
+        // TODO:
+        // This should be removed and properly handled in the respective
+        // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
+        // `Type::has_relation_to_impl`. Right now, we can not generally
+        // return `ConstraintSet::from(true)` from that branch, as that
+        // leads to union simplification, which means that we lose track
+        // of type variables without recording the constraints under which
+        // the relation holds.
+        if matches!(base, Type::TypeVar(_)) || matches!(derived, Type::TypeVar(_)) {
+            return ConstraintSet::from(true);
+        }
+
         derived.has_relation_to_impl(db, base, TypeRelation::Subtyping, visitor)
     };
     match (derived_materialization, base_materialization) {
@@ -829,18 +841,6 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            // As an optimization, we can return early if either type is dynamic, unless
-            // we're dealing with a top or bottom materialization.
-            if other_materialization_kind.is_none()
-                && self_materialization_kind.is_none()
-                && (self_type.is_dynamic() || other_type.is_dynamic())
-            {
-                match relation {
-                    TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return ConstraintSet::from(false),
-                }
-            }
-
             // Subtyping/assignability of each type in the specialization depends on the variance
             // of the corresponding typevar:
             //   - covariant: verify that self_type <: other_type
@@ -865,7 +865,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, &compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied() {
                 return result;
             }
         }
@@ -906,7 +906,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, &compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied() {
                 return result;
             }
         }
@@ -916,7 +916,7 @@ impl<'db> Specialization<'db> {
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, &compatible).is_never_satisfied() {
+                if result.intersect(db, compatible).is_never_satisfied() {
                     return result;
                 }
             }

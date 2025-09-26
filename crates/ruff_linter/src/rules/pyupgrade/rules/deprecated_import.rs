@@ -755,6 +755,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
             },
             import_from_stmt.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         if let Some(content) = fix {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,

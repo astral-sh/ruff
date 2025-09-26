@@ -88,7 +88,7 @@ async def foo():
         reveal_type(x)  # revealed: Unknown
 ```
 
-### Possibly unbound `__anext__` method
+### Possibly missing `__anext__` method
 
 ```py
 from typing_extensions import reveal_type
@@ -108,7 +108,7 @@ async def foo(flag: bool):
         reveal_type(x)  # revealed: int
 ```
 
-### Possibly unbound `__aiter__` method
+### Possibly missing `__aiter__` method
 
 ```py
 from typing_extensions import reveal_type

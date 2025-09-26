@@ -366,6 +366,31 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Passing generic functions to generic functions
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+
+def invoke(fn: Callable[[A], B], value: A) -> B:
+    return fn(value)
+
+def identity(x: T) -> T:
+    return x
+
+def head(xs: list[T]) -> T:
+    return xs[0]
+
+# TODO: this should be `Literal[1]`
+reveal_type(invoke(identity, 1))  # revealed: Unknown
+
+# TODO: this should be `Unknown | int`
+reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that

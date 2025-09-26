@@ -28,7 +28,7 @@ get from the sequence is a valid `int`.
 
 ```py
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
-from typing import Any
+from typing import Any, Never
 
 class A: ...
 class B(A): ...
@@ -60,6 +60,8 @@ static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+static_assert(is_subtype_of(C[Any], C[object]))
+static_assert(is_subtype_of(C[Never], C[Any]))
 
 static_assert(is_subtype_of(D[B], C[A]))
 static_assert(not is_subtype_of(D[A], C[B]))
@@ -104,7 +106,7 @@ that you pass into the consumer is a valid `int`.
 
 ```py
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
-from typing import Any
+from typing import Any, Never
 
 class A: ...
 class B(A): ...
@@ -135,6 +137,8 @@ static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+static_assert(is_subtype_of(C[object], C[Any]))
+static_assert(is_subtype_of(C[Any], C[Never]))
 
 static_assert(not is_subtype_of(D[B], C[A]))
 static_assert(is_subtype_of(D[A], C[B]))
@@ -192,7 +196,7 @@ since we can't know in advance which of the allowed methods you'll want to use.
 
 ```py
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
-from typing import Any
+from typing import Any, Never
 
 class A: ...
 class B(A): ...
@@ -225,6 +229,8 @@ static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+static_assert(not is_subtype_of(C[object], C[Any]))
+static_assert(not is_subtype_of(C[Any], C[Never]))
 
 static_assert(not is_subtype_of(D[B], C[A]))
 static_assert(not is_subtype_of(D[A], C[B]))
@@ -261,8 +267,8 @@ static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ## Bivariance
 
 With a bivariant typevar, _all_ specializations of the generic class are assignable to (and in fact,
-gradually equivalent to) each other, and all fully static specializations are subtypes of (and
-equivalent to) each other.
+gradually equivalent to) each other, and all specializations are subtypes of (and equivalent to)
+each other.
 
 This is a bit of pathological case, which really only happens when the class doesn't use the typevar
 at all. (If it did, it would have to be covariant, contravariant, or invariant, depending on _how_
@@ -270,7 +276,7 @@ the typevar was used.)
 
 ```py
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
-from typing import Any
+from typing import Any, Never
 
 class A: ...
 class B(A): ...
@@ -298,18 +304,20 @@ static_assert(is_assignable_to(D[Any], C[B]))
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(is_subtype_of(C[A], C[B]))
-static_assert(not is_subtype_of(C[A], C[Any]))
-static_assert(not is_subtype_of(C[B], C[Any]))
-static_assert(not is_subtype_of(C[Any], C[A]))
-static_assert(not is_subtype_of(C[Any], C[B]))
-static_assert(not is_subtype_of(C[Any], C[Any]))
+static_assert(is_subtype_of(C[A], C[Any]))
+static_assert(is_subtype_of(C[B], C[Any]))
+static_assert(is_subtype_of(C[Any], C[A]))
+static_assert(is_subtype_of(C[Any], C[B]))
+static_assert(is_subtype_of(C[Any], C[Any]))
+static_assert(is_subtype_of(C[object], C[Any]))
+static_assert(is_subtype_of(C[Any], C[Never]))
 
 static_assert(is_subtype_of(D[B], C[A]))
 static_assert(is_subtype_of(D[A], C[B]))
-static_assert(not is_subtype_of(D[A], C[Any]))
-static_assert(not is_subtype_of(D[B], C[Any]))
-static_assert(not is_subtype_of(D[Any], C[A]))
-static_assert(not is_subtype_of(D[Any], C[B]))
+static_assert(is_subtype_of(D[A], C[Any]))
+static_assert(is_subtype_of(D[B], C[Any]))
+static_assert(is_subtype_of(D[Any], C[A]))
+static_assert(is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))

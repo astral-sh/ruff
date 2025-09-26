@@ -1120,6 +1120,70 @@ fn is_instance_truthiness<'db>(
     }
 }
 
+/// Return true, if the type passed as `mode` would require us to pick a non-trivial overload of
+/// `builtins.open` / `os.fdopen` / `Path.open`.
+fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) -> bool {
+    // Return true for any mode that doesn't match typeshed's
+    // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
+    mode.into_string_literal().is_none_or(|mode| {
+        !matches!(
+            mode.value(db),
+            "r+" | "+r"
+                | "rt+"
+                | "r+t"
+                | "+rt"
+                | "tr+"
+                | "t+r"
+                | "+tr"
+                | "w+"
+                | "+w"
+                | "wt+"
+                | "w+t"
+                | "+wt"
+                | "tw+"
+                | "t+w"
+                | "+tw"
+                | "a+"
+                | "+a"
+                | "at+"
+                | "a+t"
+                | "+at"
+                | "ta+"
+                | "t+a"
+                | "+ta"
+                | "x+"
+                | "+x"
+                | "xt+"
+                | "x+t"
+                | "+xt"
+                | "tx+"
+                | "t+x"
+                | "+tx"
+                | "w"
+                | "wt"
+                | "tw"
+                | "a"
+                | "at"
+                | "ta"
+                | "x"
+                | "xt"
+                | "tx"
+                | "r"
+                | "rt"
+                | "tr"
+                | "U"
+                | "rU"
+                | "Ur"
+                | "rtU"
+                | "rUt"
+                | "Urt"
+                | "trU"
+                | "tUr"
+                | "Utr"
+        )
+    })
+}
+
 fn signature_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &CallableSignature<'db>,
@@ -1188,7 +1252,15 @@ pub enum KnownFunction {
     DunderImport,
     /// `importlib.import_module`, which returns the submodule.
     ImportModule,
+    /// `builtins.open`
     Open,
+
+    /// `os.fdopen`
+    Fdopen,
+
+    /// `tempfile.NamedTemporaryFile`
+    #[strum(serialize = "NamedTemporaryFile")]
+    NamedTemporaryFile,
 
     /// `typing(_extensions).final`
     Final,
@@ -1307,6 +1379,12 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
+            }
+            Self::Fdopen => {
+                matches!(module, KnownModule::Os)
+            }
+            Self::NamedTemporaryFile => {
+                matches!(module, KnownModule::Tempfile)
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
@@ -1656,72 +1734,33 @@ impl KnownFunction {
             }
 
             KnownFunction::Open => {
-                // Temporary special-casing for `builtins.open` to avoid an excessive number of false positives
-                // in lieu of proper support for PEP-614 type aliases.
-                if let [_, Some(mode), ..] = parameter_types {
-                    // Infer `Todo` for any argument that doesn't match typeshed's
-                    // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
-                    // Without this special-casing, we'd just always select the first overload in our current state,
-                    // which leads to lots of false positives.
-                    if mode.into_string_literal().is_none_or(|mode| {
-                        !matches!(
-                            mode.value(db),
-                            "r+" | "+r"
-                                | "rt+"
-                                | "r+t"
-                                | "+rt"
-                                | "tr+"
-                                | "t+r"
-                                | "+tr"
-                                | "w+"
-                                | "+w"
-                                | "wt+"
-                                | "w+t"
-                                | "+wt"
-                                | "tw+"
-                                | "t+w"
-                                | "+tw"
-                                | "a+"
-                                | "+a"
-                                | "at+"
-                                | "a+t"
-                                | "+at"
-                                | "ta+"
-                                | "t+a"
-                                | "+ta"
-                                | "x+"
-                                | "+x"
-                                | "xt+"
-                                | "x+t"
-                                | "+xt"
-                                | "tx+"
-                                | "t+x"
-                                | "+tx"
-                                | "w"
-                                | "wt"
-                                | "tw"
-                                | "a"
-                                | "at"
-                                | "ta"
-                                | "x"
-                                | "xt"
-                                | "tx"
-                                | "r"
-                                | "rt"
-                                | "tr"
-                                | "U"
-                                | "rU"
-                                | "Ur"
-                                | "rtU"
-                                | "rUt"
-                                | "Urt"
-                                | "trU"
-                                | "tUr"
-                                | "Utr"
-                        )
-                    }) {
-                        overload.set_return_type(todo_type!("`builtins.open` return type"));
-                    }
+                // TODO: Temporary special-casing for `builtins.open` to avoid an excessive number of
+                // false positives in lieu of proper support for PEP-613 type aliases.
+                if let [_, Some(mode), ..] = parameter_types
+                    && is_mode_with_nontrivial_return_type(db, *mode)
+                {
+                    overload.set_return_type(todo_type!("`builtins.open` return type"));
+                }
+            }
+
+            KnownFunction::Fdopen => {
+                // TODO: Temporary special-casing for `os.fdopen` to avoid an excessive number of
+                // false positives in lieu of proper support for PEP-613 type aliases.
+                if let [_, Some(mode), ..] = parameter_types
+                    && is_mode_with_nontrivial_return_type(db, *mode)
+                {
+                    overload.set_return_type(todo_type!("`os.fdopen` return type"));
+                }
+            }
+
+            KnownFunction::NamedTemporaryFile => {
+                // TODO: Temporary special-casing for `tempfile.NamedTemporaryFile` to avoid an excessive number of
+                // false positives in lieu of proper support for PEP-613 type aliases.
+                if let [Some(mode), ..] = parameter_types
+                    && is_mode_with_nontrivial_return_type(db, *mode)
+                {
+                    overload
+                        .set_return_type(todo_type!("`tempfile.NamedTemporaryFile` return type"));
                 }
             }
 
@@ -1755,6 +1794,10 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::Fdopen => KnownModule::Os,
+
+                KnownFunction::NamedTemporaryFile => KnownModule::Tempfile,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 

@@ -45,11 +45,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
                 // SAFETY:
                 // * The `value < u32::MAX` guarantees that the add doesn't overflow.
                 // * The `+ 1` guarantees that the index is not zero
-                //
-                // N.B. We have to use the unchecked variant here because we're
-                // in a const context and Option::unwrap isn't const yet.
-                #[expect(unsafe_code)]
-                Self(unsafe { std::num::NonZeroU32::new_unchecked((value as u32) + 1) })
+                Self(std::num::NonZeroU32::new((value as u32) + 1).unwrap())
             }
 
             #vis const fn from_u32(value: u32) -> Self {
@@ -58,11 +54,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
                 // SAFETY:
                 // * The `value < u32::MAX` guarantees that the add doesn't overflow.
                 // * The `+ 1` guarantees that the index is larger than zero.
-                //
-                // N.B. We have to use the unchecked variant here because we're
-                // in a const context and Option::unwrap isn't const yet.
-                #[expect(unsafe_code)]
-                Self(unsafe { std::num::NonZeroU32::new_unchecked(value + 1) })
+                Self(std::num::NonZeroU32::new(value + 1).unwrap())
             }
 
             /// Returns the index as a `u32` value

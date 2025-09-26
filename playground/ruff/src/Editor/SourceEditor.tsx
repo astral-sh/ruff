@@ -124,7 +124,18 @@ class RuffCodeActionProvider implements CodeActionProvider {
     range: Range,
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions = this.diagnostics
-      .filter((check) => range.startLineNumber === check.start_location.row)
+      // Show fixes for any diagnostic whose range intersects the requested range
+      .filter((check) =>
+        Range.areIntersecting(
+          new Range(
+            check.start_location.row,
+            check.start_location.column,
+            check.end_location.row,
+            check.end_location.column,
+          ),
+          range,
+        ),
+      )
       .filter(({ fix }) => fix)
       .map((check) => ({
         title: check.fix
@@ -173,6 +184,7 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
     model,
     "owner",
     diagnostics.map((diagnostic) => ({
+      code: diagnostic.code ?? undefined,
       startLineNumber: diagnostic.start_location.row,
       startColumn: diagnostic.start_location.column,
       endLineNumber: diagnostic.end_location.row,

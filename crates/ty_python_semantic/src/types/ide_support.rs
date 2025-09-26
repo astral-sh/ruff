@@ -874,7 +874,7 @@ pub fn call_signature_details<'db>(
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
         let call_arguments =
-            CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
+            CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
                 splatted_value.inferred_type(model)
             });
         let bindings = callable_type

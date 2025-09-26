@@ -192,4 +192,17 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Path::new("PYI021_1.pyi"))]
+    fn pyi021_pie790_isolation_check(path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings::for_rules([
+                Rule::DocstringInStub,
+                Rule::UnnecessaryPlaceholder,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

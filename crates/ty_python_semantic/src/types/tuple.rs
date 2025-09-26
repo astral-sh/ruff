@@ -44,7 +44,7 @@ impl TupleLength {
         TupleLength::Variable(0, 0)
     }
 
-    pub(crate) fn is_variable(self) -> bool {
+    pub(crate) const fn is_variable(self) -> bool {
         matches!(self, TupleLength::Variable(_, _))
     }
 
@@ -439,7 +439,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
                     if result
-                        .intersect(db, &element_constraints)
+                        .intersect(db, element_constraints)
                         .is_never_satisfied()
                     {
                         return result;
@@ -452,7 +452,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
                     if result
-                        .intersect(db, &element_constraints)
+                        .intersect(db, element_constraints)
                         .is_never_satisfied()
                     {
                         return result;
@@ -774,7 +774,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
                     if result
-                        .intersect(db, &element_constraints)
+                        .intersect(db, element_constraints)
                         .is_never_satisfied()
                     {
                         return result;
@@ -788,7 +788,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
                     if result
-                        .intersect(db, &element_constraints)
+                        .intersect(db, element_constraints)
                         .is_never_satisfied()
                     {
                         return result;
@@ -832,7 +832,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return ConstraintSet::from(false);
                         }
                     };
-                    if result.intersect(db, &pair_constraints).is_never_satisfied() {
+                    if result.intersect(db, pair_constraints).is_never_satisfied() {
                         return result;
                     }
                 }
@@ -858,7 +858,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return ConstraintSet::from(false);
                         }
                     };
-                    if result.intersect(db, &pair_constraints).is_never_satisfied() {
+                    if result.intersect(db, pair_constraints).is_never_satisfied() {
                         return result;
                     }
                 }
@@ -968,6 +968,14 @@ impl<T> Tuple<T> {
 
     pub(crate) fn heterogeneous(elements: impl IntoIterator<Item = T>) -> Self {
         FixedLengthTuple::from_elements(elements).into()
+    }
+
+    /// Returns the variable-length element of this tuple, if it has one.
+    pub(crate) fn variable_element(&self) -> Option<&T> {
+        match self {
+            Tuple::Fixed(_) => None,
+            Tuple::Variable(tuple) => Some(&tuple.variable),
+        }
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.

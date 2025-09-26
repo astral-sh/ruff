@@ -3721,6 +3721,8 @@ pub enum KnownClass {
     TypedDictFallback,
     // string.templatelib
     Template,
+    // pathlib
+    Path,
     // ty_extensions
     ConstraintSet,
 }
@@ -3767,7 +3769,8 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
-            | Self::Template => Some(Truthiness::AlwaysTrue),
+            | Self::Template
+            | Self::Path => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -3909,7 +3912,8 @@ impl KnownClass {
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
-            | KnownClass::Template => false,
+            | KnownClass::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -3990,7 +3994,8 @@ impl KnownClass {
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
-            | KnownClass::Template => false,
+            | KnownClass::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -4070,7 +4075,8 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
-            | KnownClass::Template => false,
+            | KnownClass::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -4163,7 +4169,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
-            | Self::Template => false,
+            | Self::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -4263,6 +4270,7 @@ impl KnownClass {
             Self::ConstraintSet => "ConstraintSet",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
+            Self::Path => "Path",
             Self::ProtocolMeta => "_ProtocolMeta",
         }
     }
@@ -4534,6 +4542,7 @@ impl KnownClass {
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
+            Self::Path => KnownModule::Pathlib,
         }
     }
 
@@ -4616,7 +4625,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
-            | Self::Template => Some(false),
+            | Self::Template
+            | Self::Path => Some(false),
 
             Self::Tuple => None,
         }
@@ -4702,7 +4712,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
-            | Self::Template => false,
+            | Self::Template
+            | Self::Path => false,
         }
     }
 
@@ -4798,6 +4809,7 @@ impl KnownClass {
             "ConstraintSet" => Self::ConstraintSet,
             "TypedDictFallback" => Self::TypedDictFallback,
             "Template" => Self::Template,
+            "Path" => Self::Path,
             "_ProtocolMeta" => Self::ProtocolMeta,
             _ => return None,
         };
@@ -4869,7 +4881,8 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::Awaitable
             | Self::Generator
-            | Self::Template => module == self.canonical_module(db),
+            | Self::Template
+            | Self::Path => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar

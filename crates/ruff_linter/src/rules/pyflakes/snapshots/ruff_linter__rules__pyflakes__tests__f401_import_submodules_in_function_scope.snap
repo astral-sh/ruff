@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `a` imported but unused
+ --> f401_preview_submodule.py:3:8
+  |
+2 | # refined logic only applied _within_ scope
+3 | import a
+  |        ^
+4 | def foo():
+5 |     import a.b
+  |
+help: Remove unused import: `a`
+1 | 
+2 | # refined logic only applied _within_ scope
+  - import a
+3 | def foo():
+4 |     import a.b
+5 |     a.foo()
