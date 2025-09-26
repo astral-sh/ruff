@@ -13,6 +13,18 @@ use crate::{FixAvailability, Violation};
 /// Directly comparing floats can produce unreliable results due to the
 /// inherent imprecision of floating-point arithmetic.
 ///
+/// ## When to use `math.isclose()` vs `numpy.isclose()`
+///
+/// **Use `math.isclose()` for scalar values:**
+/// - Comparing individual float numbers
+/// - Working with regular Python variables (not arrays)
+/// - When you need a single `True`/`False` result
+///
+/// **Use `numpy.isclose()` for array-like objects:**
+/// - Comparing pandas Series, numpy arrays, or other vectorized objects
+/// - When you need element-wise comparison of arrays
+/// - Working in data science contexts with vectorized operations
+///
 /// ## Example
 /// ```python
 /// assert 0.1 + 0.2 == 0.3  # AssertionError
@@ -21,6 +33,7 @@ use crate::{FixAvailability, Violation};
 /// ```python
 /// import math
 ///
+/// # Scalar comparison
 /// assert math.isclose(0.1 + 0.2, 0.3, rel_tol=1e-9, abs_tol=1e-9)
 /// ```
 #[derive(ViolationMetadata)]
@@ -36,8 +49,8 @@ impl Violation for FloatComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Comparison `{} {} {}` should be replaced by `math.isclose({}, {}, rel_tol=1e-09, abs_tol=1e-09)`",
-            self.left, self.operand, self.right, self.left, self.right,
+            "Comparison `{} {} {}` should be replaced by `math.isclose()` or `numpy.isclose()`",
+            self.left, self.operand, self.right,
         )
     }
 }
