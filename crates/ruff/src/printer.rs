@@ -15,7 +15,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter, TextEmitter};
+use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
@@ -455,11 +455,22 @@ impl Printer {
             }
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
-            TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(preview)
-                .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                .emit(writer, &diagnostics.inner, &context)?;
+            let format = if preview {
+                DiagnosticFormat::Full
+            } else {
+                DiagnosticFormat::Concise
+            };
+            let config = DisplayDiagnosticConfig::default()
+                .hide_severity(true)
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
+                .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                .format(format)
+                .fix_applicability(self.unsafe_fixes.required_applicability());
+            write!(
+                writer,
+                "{}",
+                DisplayDiagnostics::new(&context, &config, &diagnostics.inner)
+            )?;
         }
         writer.flush()?;
 
