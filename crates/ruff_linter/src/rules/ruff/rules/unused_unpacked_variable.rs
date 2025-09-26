@@ -101,7 +101,5 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
         diagnostic.set_fix(fix);
     }
     // Add Unnecessary tag for unused unpacked variables
-    if let Some(annotation) = diagnostic.primary_annotation_mut() {
-        annotation.push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
-    }
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

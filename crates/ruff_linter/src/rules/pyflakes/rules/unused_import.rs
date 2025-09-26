@@ -435,10 +435,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     diagnostic.set_fix(fix.clone());
                 }
             }
-            // Add Unnecessary tag for unused imports
-            if let Some(annotation) = diagnostic.primary_annotation_mut() {
-                annotation.push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
-            }
+
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
         }
     }
 
@@ -459,10 +457,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());
         }
-        // Add Unnecessary tag for unused imports
-        if let Some(annotation) = diagnostic.primary_annotation_mut() {
-            annotation.push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
-        }
+
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 }
 
