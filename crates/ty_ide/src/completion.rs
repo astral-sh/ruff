@@ -688,7 +688,7 @@ fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
 /// This also handles cases like `import foo, c<CURSOR>, bar`.
 ///
 /// If found, a token corresponding to the `import` or `from` keyword
-/// and the the closest point of the `<CURSOR>` is returned.
+/// and the closest point of the `<CURSOR>` is returned.
 ///
 /// It is assumed that callers will call `from_import_tokens` first to
 /// try and recognize a `from ... import ...` statement before using
