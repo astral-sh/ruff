@@ -904,10 +904,8 @@ impl From<&FormatCommandError> for Diagnostic {
                 FormatModuleError::FormatError(format_error) => {
                     Diagnostic::new(DiagnosticId::FormatError, Severity::Error, format_error)
                 }
-                // TODO(brent) this might need a new DiagnosticId, or we could reuse
-                // `FormatError`, which also has an InvalidDocument variant, like PrintError
                 FormatModuleError::PrintError(print_error) => {
-                    Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, print_error)
+                    Diagnostic::new(DiagnosticId::FormatError, Severity::Error, print_error)
                 }
             },
             FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
