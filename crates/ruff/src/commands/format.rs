@@ -861,7 +861,6 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
-    Diff(Option<PathBuf>, io::Error),
     RangeFormatNotebook(Option<PathBuf>),
 }
 
@@ -880,7 +879,6 @@ impl FormatCommandError {
             | Self::Read(path, _)
             | Self::Format(path, _)
             | Self::Write(path, _)
-            | Self::Diff(path, _)
             | Self::RangeFormatNotebook(path) => path.as_deref(),
         }
     }
@@ -908,16 +906,10 @@ impl From<&FormatCommandError> for Diagnostic {
             FormatCommandError::Panic(path, panic_error) => {
                 return create_panic_diagnostic(panic_error, path.as_deref());
             }
-
-            // I/O errors
             FormatCommandError::Read(_, source_error)
             | FormatCommandError::Write(_, source_error) => {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
             }
-            FormatCommandError::Diff(_, error) => {
-                Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
-            }
-
             FormatCommandError::Format(_, format_module_error) => match format_module_error {
                 FormatModuleError::ParseError(parse_error) => Diagnostic::new(
                     DiagnosticId::InvalidSyntax,
@@ -1011,23 +1003,6 @@ impl Display for FormatCommandError {
                     )
                 } else {
                     write!(f, "{header} {err}", header = "Failed to format:".bold())
-                }
-            }
-            Self::Diff(path, err) => {
-                if let Some(path) = path {
-                    write!(
-                        f,
-                        "{}{}{} {err}",
-                        "Failed to generate diff for ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    )
-                } else {
-                    write!(
-                        f,
-                        "{header} {err}",
-                        header = "Failed to generate diff:".bold(),
-                    )
                 }
             }
             Self::RangeFormatNotebook(path) => {
@@ -1308,10 +1283,6 @@ mod tests {
                     "Cannot write to file",
                 )),
             ),
-            FormatCommandError::Diff(
-                Some(path.clone()),
-                io::Error::other("Failed to generate diff"),
-            ),
             FormatCommandError::RangeFormatNotebook(Some(path)),
         ];
 
@@ -1341,9 +1312,6 @@ mod tests {
         --> test.py:1:1
 
         io: Cannot write to file
-        --> test.py:1:1
-
-        io: Failed to generate diff
         --> test.py:1:1
 
         range-format-notebook: Range formatting isn't supported for notebooks.

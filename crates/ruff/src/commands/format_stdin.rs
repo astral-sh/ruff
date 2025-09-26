@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use log::error;
 
-use ruff_linter::source_kind::SourceKind;
+use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, python_file_at_path};
@@ -122,7 +122,9 @@ fn format_source_code(
                     "{}",
                     source_kind.diff(formatted, path).unwrap()
                 )
-                .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
+                .map_err(|err| {
+                    FormatCommandError::Write(path.map(Path::to_path_buf), SourceError::Io(err))
+                })?;
             }
         },
         FormattedSource::Unchanged => {
