@@ -58,6 +58,7 @@ impl Violation for FunctionUsesLoopVariable {
 struct LoadedNamesVisitor<'a> {
     loaded: Vec<&'a ast::ExprName>,
     stored: Vec<&'a ast::ExprName>,
+    lambda_parameters: Vec<&'a str>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -69,6 +70,15 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
                 ExprContext::Store => self.stored.push(name),
                 _ => {}
             },
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                if let Some(parameters) = parameters {
+                    for param in parameters {
+                        self.lambda_parameters.push(param.name().as_str());
+                    }
+                }
+                // Still visit the lambda body to collect any loaded variables
+                visitor::walk_expr(self, expr);
+            }
             _ => visitor::walk_expr(self, expr),
         }
     }
@@ -88,7 +98,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters, body, ..
             }) => {
-                // Collect all loaded variable names.
+                // Collect all loaded variable names and lambda parameters.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
 
@@ -100,6 +110,11 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                         }
 
                         if parameters.includes(&loaded.id) {
+                            return false;
+                        }
+
+                        // Check if the variable is a lambda parameter
+                        if visitor.lambda_parameters.contains(&loaded.id.as_str()) {
                             return false;
                         }
 
