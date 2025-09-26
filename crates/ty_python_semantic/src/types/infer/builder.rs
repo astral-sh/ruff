@@ -6947,7 +6947,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::UnaryOp::Invert,
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
             ) => {
-                let constraints = constraints.constraints(self.db()).clone();
+                let constraints = constraints.constraints(self.db());
                 let result = constraints.negate(self.db());
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
                     self.db(),
@@ -7311,9 +7311,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitAnd,
             ) => {
-                let left = left.constraints(self.db()).clone();
-                let right = right.constraints(self.db()).clone();
-                let result = left.and(self.db(), || right);
+                let left = left.constraints(self.db());
+                let right = right.constraints(self.db());
+                let result = left.and(self.db(), || *right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -7324,9 +7324,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitOr,
             ) => {
-                let left = left.constraints(self.db()).clone();
-                let right = right.constraints(self.db()).clone();
-                let result = left.or(self.db(), || right);
+                let left = left.constraints(self.db());
+                let right = right.constraints(self.db());
+                let result = left.or(self.db(), || *right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
