@@ -924,7 +924,7 @@ impl From<&FormatCommandError> for Diagnostic {
                 }
             },
             FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
-                DiagnosticId::RangeFormatNotebook,
+                DiagnosticId::InvalidCliOption,
                 Severity::Error,
                 "Range formatting isn't supported for notebooks.",
             ),
@@ -1314,7 +1314,7 @@ mod tests {
         io: Cannot write to file
         --> test.py:1:1
 
-        range-format-notebook: Range formatting isn't supported for notebooks.
+        invalid-cli-option: Range formatting isn't supported for notebooks.
         --> test.py:1:1
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`

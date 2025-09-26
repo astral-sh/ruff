@@ -445,7 +445,7 @@ impl Diagnostic {
             | DiagnosticId::UselessOverridesSection
             | DiagnosticId::DeprecatedSetting
             | DiagnosticId::Unformatted
-            | DiagnosticId::RangeFormatNotebook
+            | DiagnosticId::InvalidCliOption
             | DiagnosticId::FormatError => None,
             DiagnosticId::Lint(lint_name) => {
                 Some(format!("{}/rules/{lint_name}", env!("CARGO_PKG_HOMEPAGE")))
@@ -1036,8 +1036,8 @@ pub enum DiagnosticId {
     /// The code needs to be formatted.
     Unformatted,
 
-    /// Range formatting isn't supported for notebooks.
-    RangeFormatNotebook,
+    /// Use of an invalid command-line option.
+    InvalidCliOption,
 
     /// Something went wrong while formatting.
     ///
@@ -1083,7 +1083,7 @@ impl DiagnosticId {
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
             DiagnosticId::Unformatted => "unformatted",
-            DiagnosticId::RangeFormatNotebook => "range-format-notebook",
+            DiagnosticId::InvalidCliOption => "invalid-cli-option",
             DiagnosticId::FormatError => "format-error",
         }
     }
