@@ -240,3 +240,8 @@ pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
 pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/20020
+pub(crate) const fn is_separate_unused_import_diag_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
