@@ -459,6 +459,12 @@ impl File {
         self.source_type(db).is_stub()
     }
 
+    /// Returns `true` if the file is an `__init__.py(i)`
+    pub fn is_init(self, db: &dyn Db) -> bool {
+        let path = self.path(db).as_str();
+        path.ends_with("__init__.py") || path.ends_with("__init__.pyi")
+    }
+
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
         match self.path(db) {
             FilePath::System(path) => path
