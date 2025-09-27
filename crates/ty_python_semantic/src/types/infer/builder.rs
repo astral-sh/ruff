@@ -3,7 +3,7 @@ use std::iter;
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -2354,6 +2354,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+            } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
+                ty
             } else {
                 Type::unknown()
             };
@@ -2393,6 +2395,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::homogeneous_tuple(self.db(), Type::unknown()),
             );
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_parameter_type(
+        &mut self,
+        parameter: &ast::Parameter,
+    ) -> Option<Type<'db>> {
+        let current_scope = self.scope().scope(self.db());
+        let method = current_scope.node().as_function()?;
+
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.index.scope(parent_scope_id);
+        parent_scope.node().as_class()?;
+
+        let method_definition = self.index.expect_single_definition(method);
+        let DefinitionKind::Function(func_def) = method_definition.kind(self.db()) else {
+            return None;
+        };
+
+        let func_type = infer_definition_types(self.db(), method_definition)
+            .declaration_type(method_definition)
+            .inner_type()
+            .into_function_literal()?;
+
+        let module = parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
+        if func_def
+            .node(&module)
+            .parameters
+            .index(parameter.name())
+            .is_some_and(|index| index != 0)
+        {
+            return None;
+        }
+
+        if func_type.is_classmethod(self.db()) {
+            // TODO: set the type for `cls` argument
+            return None;
+        } else if func_type.is_staticmethod(self.db()) {
+            return None;
+        }
+
+        Type::SpecialForm(SpecialFormType::TypingSelf)
+            .in_type_expression(self.db(), self.scope(), Some(method_definition))
+            .ok()
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
