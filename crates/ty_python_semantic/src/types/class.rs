@@ -29,9 +29,9 @@ use crate::types::{
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    infer_definition_types,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarInstance, TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable,
+    declaration_type, determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -4908,7 +4908,6 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload: &mut Binding<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) {
         let db = context.db();
@@ -5113,26 +5112,9 @@ impl KnownClass {
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
-                    (Some(bound), None) => {
-                        Some(TypeVarBoundOrConstraints::UpperBound(*bound).into())
-                    }
+                    (Some(_), None) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
 
-                    (None, Some(_constraints)) => {
-                        // We don't use UnionType::from_elements or UnionBuilder here,
-                        // because we don't want to simplify the list of constraints like
-                        // we do with the elements of an actual union type.
-                        // TODO: Consider using a new `OneOfType` connective here instead,
-                        // since that more accurately represents the actual semantics of
-                        // typevar constraints.
-                        let elements = UnionType::new(
-                            db,
-                            overload
-                                .arguments_for_parameter(call_arguments, 1)
-                                .map(|(_, ty)| ty)
-                                .collect::<Box<_>>(),
-                        );
-                        Some(TypeVarBoundOrConstraints::Constraints(elements).into())
-                    }
+                    (None, Some(_)) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
                     // constrained
@@ -5149,7 +5131,7 @@ impl KnownClass {
                         Some(containing_assignment),
                         bound_or_constraint,
                         Some(variance),
-                        default.map(Into::into),
+                        default.map(|_| TypeVarDefaultEvaluation::Lazy),
                         TypeVarKind::Legacy,
                     ),
                 )));

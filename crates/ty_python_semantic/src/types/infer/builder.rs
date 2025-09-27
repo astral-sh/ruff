@@ -16,6 +16,7 @@ use super::{
     infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, infer_unpack_types,
 };
+use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
     KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
@@ -211,9 +212,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per declaration at most.
     declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
-    /// The definitions that are deferred.
+    /// The definitions with deferred sub-parts.
     ///
-    /// The list should only contain one entry per deferred.
+    /// The list should only contain one entry per definition.
     deferred: VecSet<Definition<'db>>,
 
     /// The returned types and their corresponding ranges of the region, if it is a function body.
@@ -266,6 +267,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
+
+    /// Deferred expression nodes within a definition.
+    deferred_expressions: VecSet<AstNodeRef<ast::Expr>>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -300,6 +304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: None,
             cycle_recovery: None,
             all_definitely_bound: true,
+            deferred_expressions: VecSet::default(),
         }
     }
 
@@ -329,6 +334,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
             self.deferred.extend(extra.deferred.iter().copied());
+            self.deferred_expressions
+                .extend(extra.deferred_expressions.iter().cloned());
         }
     }
 
@@ -366,6 +373,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn scope(&self) -> ScopeId<'db> {
         self.scope
+    }
+
+    fn definition(&self) -> Option<Definition<'db>> {
+        match self.region {
+            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
+                Some(definition)
+            }
+            _ => None,
+        }
     }
 
     /// Are we currently inferring types in file with deferred types?
@@ -493,8 +509,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Infer the deferred types for the definitions here to consider the end-of-scope
-        // semantics.
+        // Infer deferred types for all definitions.
         for definition in std::mem::take(&mut self.deferred) {
             self.extend_definition(infer_deferred_types(self.db(), definition));
         }
@@ -1228,6 +1243,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVar(typevar) => {
                 self.infer_typevar_deferred(typevar.node(self.module()));
+            }
+            DefinitionKind::Assignment(assignment) => {
+                self.infer_assignment_deferred(assignment.value(self.module()));
             }
             _ => {}
         }
@@ -3980,6 +3998,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_binding(target.into(), definition, target_ty);
     }
 
+    fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
+        // infer deferred bounds/constraints/defaults of a legacy TypeVar
+        let Some(call_expr) = value.as_call_expr() else {
+            return;
+        };
+        let arguments = &call_expr.arguments;
+        for arg in arguments.args.iter().skip(1) {
+            self.infer_type_expression(arg);
+        }
+        if let Some(bound) = arguments.find_keyword("bound") {
+            self.infer_type_expression(&bound.value);
+        }
+        if let Some(default) = arguments.find_keyword("default") {
+            self.infer_type_expression(&default.value);
+        }
+    }
+
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         if assignment.target.is_name_expr() {
             self.infer_definition(assignment);
@@ -4951,6 +4986,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match form {
             None | Some(ParameterForm::Value) => self.infer_expression(ast_argument, tcx),
             Some(ParameterForm::Type) => self.infer_type_expression(ast_argument),
+            Some(ParameterForm::TypeDeferred) => {
+                if let Some(definition) = self.definition() {
+                    self.deferred.insert(definition);
+                }
+                Type::unknown()
+            }
         }
     }
 
@@ -6027,7 +6068,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 self.index,
                                 overload,
-                                &call_arguments,
                                 call_expression,
                             );
                         }
@@ -9097,6 +9137,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            deferred_expressions: _,
 
             // builder only state
             typevar_binding_context: _,
@@ -9116,7 +9157,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         assert!(
             deferred.is_empty(),
-            "Expression region can't have deferred types"
+            "Expression region can't have deferred definitions"
         );
 
         let extra =
@@ -9159,6 +9200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
+            deferred_expressions,
             all_definitely_bound: _,
             // builder only state
             typevar_binding_context: _,
@@ -9175,11 +9217,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra = (!diagnostics.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
-            || !deferred.is_empty())
+            || !deferred.is_empty()
+            || !deferred_expressions.is_empty())
         .then(|| {
             Box::new(DefinitionInferenceExtra {
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
+                deferred_expressions: deferred_expressions.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
             })
@@ -9230,6 +9274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            deferred_expressions: _,
 
             // Builder only state
             typevar_binding_context: _,

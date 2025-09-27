@@ -1032,7 +1032,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             self.parameters
                 .iter()
                 .filter_map(|parameter| match parameter.form {
-                    ParameterForm::Type => None,
+                    ParameterForm::Type | ParameterForm::TypeDeferred => None,
                     ParameterForm::Value => parameter.annotated_type().map(|ty| {
                         ty.with_polarity(TypeVarVariance::Contravariant)
                             .variance_of(db, typevar)
@@ -1472,6 +1472,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn deferred_type_form(mut self) -> Self {
+        self.form = ParameterForm::TypeDeferred;
+        self
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -1723,6 +1728,7 @@ impl<'db> ParameterKind<'db> {
 pub(crate) enum ParameterForm {
     Value,
     Type,
+    TypeDeferred,
 }
 
 #[cfg(test)]

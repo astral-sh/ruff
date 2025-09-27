@@ -138,6 +138,16 @@ S = TypeVar("S")
 reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
+Constraints are not simplified relative to each other, even if one is a subtype of the other:
+
+```py
+T = TypeVar("T", int, bool)
+reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
+
+S = TypeVar("S", float)
+reveal_type(S.__constraints__)  # revealed: tuple[int | float]
+```
+
 ### Cannot have only one constraint
 
 > `TypeVar` supports constraining parametric types to a fixed set of possible types...There should
@@ -229,6 +239,71 @@ T_constrained = TypeVar("T_constrained", int, str)
 
 def constrained(x: T_constrained):
     reveal_type(type(x))  # revealed: type[int] | type[str]
+```
+
+## Cycles
+
+### Bounds and constraints
+
+A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
+
+```py
+from typing import Any, TypeVar
+
+S = TypeVar("S")
+
+# TODO: error
+T = TypeVar("T", bound=list[S])
+
+# TODO: error
+U = TypeVar("U", list["T"])
+
+# TODO: error
+V = TypeVar("V", list[S], str)
+
+# TODO: error
+W = TypeVar("W", list["W"], str)
+```
+
+However, they are lazily evaluated and can cyclically refer to their own type:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", bound=list["G"])
+
+class G(Generic[T]):
+    x: T
+
+reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+```
+
+### Defaults
+
+Defaults can be generic, but can only refer to earlier typevars:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+
+class C(Generic[T, U]):
+    x: T
+    y: U
+
+reveal_type(C[int, str]().x)  # revealed: int
+reveal_type(C[int, str]().y)  # revealed: str
+reveal_type(C[int]().x)  # revealed: int
+reveal_type(C[int]().y)  # revealed: int
+
+# TODO: error
+V = TypeVar("V", default="V")
+
+class D(Generic[V]):
+    x: V
+
+reveal_type(D().x)  # revealed: V@D
 ```
 
 [generics]: https://typing.python.org/en/latest/spec/generics.html

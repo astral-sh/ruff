@@ -30,7 +30,7 @@ use ruff_text_size::Ranged;
 /// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
 /// us some form of scope-stable identity for expressions. Only queries accessing the node field
 /// run on every AST change. All other queries only run when the expression's identity changes.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct AstNodeRef<T> {
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -40,14 +40,13 @@ pub struct AstNodeRef<T> {
     kind: ruff_python_ast::NodeKind,
     #[cfg(debug_assertions)]
     range: ruff_text_size::TextRange,
-    // Note that because the module address is not stored in release builds, `AstNodeRef`
-    // cannot implement `Eq`, as indices are only unique within a given instance of the
-    // AST.
     #[cfg(debug_assertions)]
     module_addr: usize,
 
     _node: PhantomData<T>,
 }
+
+impl<T> Eq for AstNodeRef<T> where T: PartialEq {}
 
 impl<T> AstNodeRef<T> {
     pub(crate) fn index(&self) -> NodeIndex {
