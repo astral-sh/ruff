@@ -620,22 +620,26 @@ fn has_relation_in_invariant_position<'db>(
                 base_type.has_relation_to_impl(db, *derived_type, relation, visitor)
             }),
         // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-        (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            MaterializationKind::Top,
-            base_type,
-            base_mat,
-            visitor,
-        ),
-        (Some(derived_mat), None, TypeRelation::Subtyping) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            derived_mat,
-            base_type,
-            MaterializationKind::Bottom,
-            visitor,
-        ),
+        (None, Some(base_mat), TypeRelation::Subtyping | TypeRelation::UnionSimplification) => {
+            is_subtype_in_invariant_position(
+                db,
+                derived_type,
+                MaterializationKind::Top,
+                base_type,
+                base_mat,
+                visitor,
+            )
+        }
+        (Some(derived_mat), None, TypeRelation::Subtyping | TypeRelation::UnionSimplification) => {
+            is_subtype_in_invariant_position(
+                db,
+                derived_type,
+                derived_mat,
+                base_type,
+                MaterializationKind::Bottom,
+                visitor,
+            )
+        }
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
         (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
             db,

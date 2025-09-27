@@ -1050,13 +1050,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn into_intersection(self) -> Option<IntersectionType<'db>> {
-        match self {
-            Type::Intersection(intersection_type) => Some(intersection_type),
-            _ => None,
-        }
-    }
-
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_union(self) -> UnionType<'db> {
@@ -1476,6 +1469,11 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
 
+    pub(crate) fn is_redundant_in_union_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        self.has_relation_to(db, other, TypeRelation::UnionSimplification)
+            .is_always_satisfied()
+    }
+
     fn has_relation_to(
         self,
         db: &'db dyn Db,
@@ -1497,7 +1495,7 @@ impl<'db> Type<'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
+        if (!relation.is_subtyping() || self.subtyping_is_always_reflexive()) && self == target {
             return ConstraintSet::from(true);
         }
 
@@ -1514,9 +1512,10 @@ impl<'db> Type<'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => ConstraintSet::from(true),
 
-            // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
-            // handled above. It's always assignable, though.
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
+            // In some specific situations, `Any` can be simplified out of unions and intersections,
+            // but this is not true for divergent types.
+            (Type::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
                 ConstraintSet::from(relation.is_assignability())
             }
 
@@ -1541,10 +1540,27 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(db, right, relation, visitor)
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                ConstraintSet::from(relation.is_assignability())
-            }
+            (Type::Dynamic(_), _) => ConstraintSet::from(match relation {
+                TypeRelation::Subtyping => false,
+                TypeRelation::Assignability => true,
+                TypeRelation::UnionSimplification => match target {
+                    Type::Dynamic(_) => true,
+                    Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                    _ => false,
+                },
+            }),
+
+            (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
+                TypeRelation::Subtyping => false,
+                TypeRelation::Assignability => true,
+                TypeRelation::UnionSimplification => match self {
+                    Type::Dynamic(_) => true,
+                    Type::Intersection(intersection) => {
+                        intersection.positive(db).iter().any(Type::is_dynamic)
+                    }
+                    _ => false,
+                },
+            }),
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -1691,6 +1707,11 @@ impl<'db> Type<'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement assignability and subtyping for TypedDict
+                ConstraintSet::from(relation.is_assignability())
+            }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -8996,12 +9017,17 @@ impl<'db> ConstructorCallError<'db> {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
     Subtyping,
+    UnionSimplification,
     Assignability,
 }
 
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
+    }
+
+    pub(crate) const fn is_subtyping(self) -> bool {
+        matches!(self, TypeRelation::Subtyping)
     }
 }
 
