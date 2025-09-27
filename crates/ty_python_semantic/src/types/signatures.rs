@@ -62,6 +62,17 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn with_inherited_generic_context(
+        &self,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        Self::from_overloads(self.overloads.iter().map(|signature| {
+            signature
+                .clone()
+                .with_inherited_generic_context(inherited_generic_context)
+        }))
+    }
+
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -449,14 +460,6 @@ impl<'db> Signature<'db> {
                 .return_ty
                 .map(|return_ty| return_ty.normalized_impl(db, visitor)),
         }
-    }
-
-    pub(crate) fn apply_type_mapping<'a>(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
