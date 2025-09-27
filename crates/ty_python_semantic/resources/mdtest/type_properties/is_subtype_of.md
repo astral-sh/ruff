@@ -1948,8 +1948,6 @@ static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
 static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
-# TODO: This assertion should be true
-# error: [static-assert-error] "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 

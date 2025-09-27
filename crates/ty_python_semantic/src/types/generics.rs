@@ -3,13 +3,13 @@ use std::borrow::Cow;
 use crate::types::constraints::ConstraintSet;
 
 use itertools::Itertools;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
+use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
@@ -17,10 +17,10 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, binding_type, declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
+    NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -101,6 +101,45 @@ pub(crate) fn bind_typevar<'db>(
                 typevar.with_binding_context(db, typevar_binding_context)
             })
         })
+}
+
+/// Create a `typing.Self` type variable for a given class.
+pub(crate) fn typing_self<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId,
+    typevar_binding_context: Option<Definition<'db>>,
+    class: ClassLiteral<'db>,
+) -> Option<BoundTypeVarInstance<'db>> {
+    let module = parsed_module(db, scope_id.file(db)).load(db);
+    let index = semantic_index(db, scope_id.file(db));
+
+    let typevar = TypeVarInstance::new(
+        db,
+        ast::name::Name::new_static("Self"),
+        Some(class.definition(db)),
+        Some(
+            TypeVarBoundOrConstraints::UpperBound(Type::instance(
+                db,
+                class.identity_specialization(db, Type::NonInferableTypeVar),
+            ))
+            .into(),
+        ),
+        // According to the [spec], we can consider `Self`
+        // equivalent to an invariant type variable
+        // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
+        Some(TypeVarVariance::Invariant),
+        None,
+        TypeVarKind::TypingSelf,
+    );
+
+    bind_typevar(
+        db,
+        &module,
+        index,
+        scope_id.file_scope_id(db),
+        typevar_binding_context,
+        typevar,
+    )
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.
@@ -291,14 +330,17 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
-    /// (And in particular, to an _inferable_ version of itself, since this will be used in our
-    /// class constructor invocation machinery to infer a specialization for the class from the
-    /// arguments passed to its constructor.)
-    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+    /// The second parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on
+    /// the use case.
+    pub(crate) fn identity_specialization(
+        self,
+        db: &'db dyn Db,
+        typevar_to_type: impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+    ) -> Specialization<'db> {
         let types = self
             .variables(db)
             .iter()
-            .map(|typevar| Type::TypeVar(*typevar))
+            .map(|typevar| typevar_to_type(*typevar))
             .collect();
         self.specialize(db, types)
     }
