@@ -476,13 +476,45 @@ fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedNam
 /// ```
 fn parse_entries_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    for potential in content.lines() {
-        let Some(colon_idx) = potential.find(':') else {
-            continue;
-        };
-        let entry = potential[..colon_idx].trim();
-        entries.push(QualifiedName::user_defined(entry));
+
+    // Determine the indentation of the entries from the first non-empty line.
+    // Google-style entries are indented relative to the "Raises:" header, e.g.:
+    // "    ValueError: explanation".
+    let lines = content.lines();
+    let mut expected_indent: Option<&str> = None;
+
+    for raw in lines {
+        let line = raw.trim_end_matches('\r');
+
+        // Stop if we encounter an unindented line or a Sphinx directive starting with ".. ".
+        if !line.trim().is_empty() {
+            // Compute indentation of current line
+            let indent_len = line.len() - line.trim_start().len();
+            let indent = &line[..indent_len];
+
+            // If this looks like a Sphinx directive or any unindented content, the section ends
+            if indent_len == 0 || line.trim_start().starts_with(".. ") {
+                break;
+            }
+
+            // Establish expected indentation based on the first valid entry line
+            if expected_indent.is_none() {
+                expected_indent = Some(indent);
+            } else if Some(indent) != expected_indent {
+                // Different indentation likely starts a new sub-block; stop collecting
+                break;
+            }
+
+            // Parse only lines that contain a colon and where the token before the colon is non-empty
+            if let Some(colon_idx) = line.find(':') {
+                let entry = line[..colon_idx].trim();
+                if !entry.is_empty() {
+                    entries.push(QualifiedName::user_defined(entry));
+                }
+            }
+        }
     }
+
     entries
 }
 
