@@ -138,6 +138,11 @@ static_assert(is_equivalent_to(Any, Any | Intersection[Any, str]))
 static_assert(is_equivalent_to(Any, Intersection[str, Any] | Any))
 static_assert(is_equivalent_to(Any, Any | Intersection[Any, Not[None]]))
 static_assert(is_equivalent_to(Any, Intersection[Not[None], Any] | Any))
+
+static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, str]))
+static_assert(is_equivalent_to(Any, Intersection[str, Unknown] | Unknown))
+static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, Not[None]]))
+static_assert(is_equivalent_to(Any, Intersection[Not[None], Unknown] | Unknown))
 ```
 
 ## Tuples
