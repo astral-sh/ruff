@@ -27,14 +27,27 @@ impl FormatNodeRule<ModModule> for FormatModModule {
                 Ok(())
             }
         } else {
-            write!(
-                f,
-                [
-                    body.format().with_options(SuiteKind::TopLevel),
-                    // Trailing newline at the end of the file
-                    hard_line_break()
-                ]
-            )
+            // Check if the original source ends without a newline and has fmt: off
+            let should_add_trailing_newline = {
+                let source = f.context().source();
+                let source_ends_without_newline = !source.ends_with('\n');
+                let has_fmt_off = source.contains("# fmt: off");
+                !(source_ends_without_newline && has_fmt_off)
+            };
+
+            if should_add_trailing_newline {
+                write!(
+                    f,
+                    [
+                        body.format().with_options(SuiteKind::TopLevel),
+                        // Trailing newline at the end of the file
+                        hard_line_break()
+                    ]
+                )
+            } else {
+                // Don't add trailing newline if we're in a suppressed region
+                body.format().with_options(SuiteKind::TopLevel).fmt(f)
+            }
         }
     }
 }
