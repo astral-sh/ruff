@@ -228,7 +228,7 @@ class Person(TypedDict):
     name: bytes
 ```
 
-## Generic specializations
+## Tuple specializations
 
 `module.py`:
 
