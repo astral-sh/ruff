@@ -1694,27 +1694,28 @@ class T(TypedDict):
   x: int
 
 @overload
-def f(a: list[T], b: int):
+def f(a: list[T], b: int) -> int:
   ...
 
 @overload
-def f(a: list[dict[str, int]], b: str):
+def f(a: list[dict[str, int]], b: str) -> str:
   ...
 
-def f(a: list[dict[str, int]] | list[T], b: int | str):
-  ...
+def f(a: list[dict[str, int]] | list[T], b: int | str) -> int | str:
+  return 1
 
 def int_or_str() -> int | str:
   return 1
 
-f([{ "x": 1 }], int_or_str())
+x = f([{ "x": 1 }], int_or_str())
+reveal_type(x)  # revealed: int | str
 
-# error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `T` constructor"
-# error: [invalid-key] "Invalid key access on TypedDict `T`: Unknown key "y""
+# we currently incorrectly consider `list[dict[str, int]]` a subtype of `list[T]`
+# TODO: error: [no-matching-overload] "No overload of function `f` matches arguments"
 f([{ "y": 1 }], int_or_str())
 ```
 
-Non-matching overloads do not produce errors:
+Non-matching overloads do not produce diagnostics:
 
 ```py
 from typing import TypedDict, overload
@@ -1723,16 +1724,16 @@ class T(TypedDict):
   x: int
 
 @overload
-def f(a: T, b: int):
+def f(a: T, b: int) -> int:
   ...
 
 @overload
-def f(a: dict[str, int], b: str):
+def f(a: dict[str, int], b: str) -> str:
   ...
 
-def f(a: T | dict[str, int], b: int | str):
-  ...
+def f(a: T | dict[str, int], b: int | str) -> int | str:
+  return 1
 
-# TODO
-f({ "y": 1 }, "a")
+x = f({ "y": 1 }, "a")
+reveal_type(x)  # revealed: str
 ```

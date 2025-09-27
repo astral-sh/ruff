@@ -330,7 +330,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.annotation().is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             // Drop the empty `TypeContext` to avoid the interning cost.
@@ -370,23 +370,51 @@ struct ExpressionWithContext<'db> {
 /// Knowing the outer type context when inferring an expression can enable
 /// more precise inference results, aka "bidirectional type inference".
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) struct TypeContext<'db> {
-    pub(crate) annotation: Option<Type<'db>>,
+pub(crate) enum TypeContext<'db> {
+    /// No type context.
+    #[default]
+    None,
+
+    /// The type of an annotated assignment, used as context for the RHS.
+    AnnotatedAssignment(Type<'db>),
+
+    /// The type of an annotated parameter, used as context for arguments that are
+    /// matched against it in function call expressions.
+    AnnotatedParameter(Type<'db>),
+
+    /// The unique type of annotated parameter, with no overloads.
+    UniqueAnnotatedParameter(Type<'db>),
 }
 
 impl<'db> TypeContext<'db> {
-    pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+    pub(crate) fn annotation(self) -> Option<Type<'db>> {
+        match self {
+            TypeContext::None => None,
+            TypeContext::AnnotatedAssignment(annotation) => Some(annotation),
+            TypeContext::AnnotatedParameter(annotation) => Some(annotation),
+            TypeContext::UniqueAnnotatedParameter(annotation) => Some(annotation),
+        }
+    }
+
+    pub(crate) fn with_annotation(self, annotation: Type<'db>) -> TypeContext<'db> {
+        match self {
+            TypeContext::None => panic!("no annotation to modify"),
+            TypeContext::AnnotatedAssignment(_) => TypeContext::AnnotatedAssignment(annotation),
+            TypeContext::AnnotatedParameter(_) => TypeContext::AnnotatedParameter(annotation),
+            TypeContext::UniqueAnnotatedParameter(_) => {
+                TypeContext::UniqueAnnotatedParameter(annotation)
+            }
+        }
     }
 
     // If the type annotation is a specialized instance of the given `KnownClass`, returns the
     // specialization.
     fn known_specialization(
-        &self,
+        self,
         known_class: KnownClass,
         db: &'db dyn Db,
     ) -> Option<Specialization<'db>> {
-        self.annotation
+        self.annotation()
             .and_then(|ty| ty.known_specialization(known_class, db))
     }
 }

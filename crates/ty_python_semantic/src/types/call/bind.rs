@@ -2467,7 +2467,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // an annotated assignment, to closer match the order of any unions written in the type
         // annotation.
         if let Some(return_ty) = self.signature.return_ty
-            && let Some(call_expression_tcx) = self.call_expression_tcx.annotation
+            && let Some(call_expression_tcx) = self.call_expression_tcx.annotation()
         {
             match call_expression_tcx {
                 // A type variable is not a useful type-context for expression inference, and applying it

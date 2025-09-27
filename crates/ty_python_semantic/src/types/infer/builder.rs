@@ -3263,6 +3263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         key,
                                         assigned_ty,
                                         value.as_ref(),
+                                        true,
                                         slice.as_ref(),
                                         rhs,
                                         TypedDictAssignmentKind::Subscript,
@@ -4019,7 +4020,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(value) = value {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::new(Some(annotated.inner_type())),
+                    TypeContext::AnnotatedAssignment(annotated.inner_type()),
                 );
             }
 
@@ -4114,7 +4115,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(value) = value {
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::new(Some(declared.inner_type())),
+                TypeContext::AnnotatedAssignment(declared.inner_type()),
             );
             let inferred_ty = if target
                 .as_name_expr()
@@ -4973,6 +4974,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast_arguments.arguments_source_order()
         );
 
+        // If there is only a single binding and overload, there is a unique parameter type annotation for each argument.
+        let unique_parameter_type = bindings
+            .into_iter()
+            .map(|binding| match binding.matching_overload_index() {
+                MatchingOverloadIndex::Single(_) => 1,
+                MatchingOverloadIndex::Multiple(items) => items.len(),
+                MatchingOverloadIndex::None => {
+                    // If there is a single overload that does not match, we still infer the
+                    // arguments against it for better diagnostics.
+                    if binding.overloads().len() == 1 { 1 } else { 0 }
+                }
+            })
+            .sum::<usize>()
+            == 1;
+
         for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
                 // Splatted arguments are inferred before parameter matching to
@@ -4995,13 +5011,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Otherwise, we infer the type of each argument once for each matching overload signature,
             // with the given annotated type as type context.
             for binding in bindings {
+                // TODO: What if there are multiple bindings?
                 let overloads = match binding.matching_overload_index() {
                     MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
                         Either::Right(binding.matching_overloads())
                     }
 
                     // If there is a single overload that does not match, we still infer the
-                    // argument types for better diagnostics.
+                    // arguments against it for better diagnostics.
                     MatchingOverloadIndex::None => match binding.overloads() {
                         [overload] => Either::Left([(0, overload)].into_iter()),
                         _ => continue,
@@ -5027,7 +5044,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let parameter_type =
                         overload.signature.parameters()[*parameter_index].annotated_type();
 
-                    self.infer_expression_impl(ast_argument, TypeContext::new(parameter_type));
+                    let tcx = parameter_type
+                        .map(|ty| {
+                            if unique_parameter_type {
+                                TypeContext::UniqueAnnotatedParameter(ty)
+                            } else {
+                                TypeContext::AnnotatedParameter(ty)
+                            }
+                        })
+                        .unwrap_or_default();
+
+                    self.infer_expression_impl(ast_argument, tcx);
                 }
 
                 *argument_type = self.try_expression_type(ast_argument);
@@ -5374,7 +5401,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let divergent = Type::divergent(self.scope());
         let element_types = elts.iter().map(|element| {
             let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
-            let element_type = self.infer_expression(element, TypeContext::new(annotated_elt_ty));
+            let elt_tcx = annotated_elt_ty
+                .map(|ty| tcx.with_annotation(ty))
+                .unwrap_or_default();
+            let element_type = self.infer_expression(element, elt_tcx);
 
             if element_type.has_divergent_type(self.db(), divergent) {
                 divergent
@@ -5423,7 +5453,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dict;
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict) {
+        if let Some(typed_dict) = tcx.annotation().and_then(Type::into_typed_dict) {
             let typed_dict_items = typed_dict.items(self.db());
 
             for item in items {
@@ -5433,28 +5463,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && let Some(key) = key.as_single_part_string()
                     && let Some(field) = typed_dict_items.get(key.as_str())
                 {
-                    self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
+                    self.infer_expression(&item.value, tcx.with_annotation(field.declared_ty));
                 } else {
                     self.infer_expression(&item.value, TypeContext::default());
                 }
             }
 
-            // TODO: Fall-back to `Unknown` so that we don't eagerly error when matching against a
-            // potential overload.
-            validate_typed_dict_dict_literal(
+            let report_diagnostics = match tcx {
+                // Do not eagerly report diagnostics when performing overload evaluation
+                // with multiple potential overloads.
+                TypeContext::AnnotatedParameter(_) => false,
+                _ => true,
+            };
+
+            let result = validate_typed_dict_dict_literal(
                 &self.context,
                 typed_dict,
                 dict,
                 dict.into(),
+                report_diagnostics,
                 |expr| self.expression_type(expr),
             );
 
-            return Type::TypedDict(typed_dict);
+            match result {
+                // Successfully validated the dictionary literal.
+                Ok(_) => return Type::TypedDict(typed_dict),
+
+                // The dictionary is not valid, but we are eagerly reporting diagnostics.
+                Err(_) if report_diagnostics => return Type::TypedDict(typed_dict),
+
+                // Otherwise, fallback to an untyped dictionary literal.
+                Err(_) => {}
+            }
         }
 
         // Avoid false positives for the functional `TypedDict` form, which is currently
         // unsupported.
-        if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation {
+        if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation() {
             return KnownClass::Dict
                 .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()]);
         }
@@ -5526,7 +5571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let elt_tcxs = match annotated_elt_tys {
             None => Either::Left(iter::repeat(TypeContext::default())),
-            Some(tys) => Either::Right(tys.iter().map(|ty| TypeContext::new(Some(*ty)))),
+            Some(tys) => Either::Right(tys.iter().map(|ty| tcx.with_annotation(*ty))),
         };
 
         for elts in elts {
