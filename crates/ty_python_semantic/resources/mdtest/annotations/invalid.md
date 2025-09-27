@@ -79,7 +79,9 @@ def outer_sync():  # `yield` from is only valid syntax inside a synchronous func
         a: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
     ): ...
 
-async def baz(): ...
+async def baz():
+    yield
+
 async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
     def _(
         a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
