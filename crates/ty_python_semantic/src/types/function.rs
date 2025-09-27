@@ -80,8 +80,8 @@ use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
-    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    binding_type, todo_type, walk_type_mapping,
+    Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, ValidSpecializationsConstraintSet,
+    all_members, binding_type, todo_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1702,34 +1702,34 @@ impl KnownFunction {
             KnownFunction::RangeConstraint => {
                 let [
                     Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
+                    Some(Type::NonInferableTypeVar(bound_typevar)),
                     Some(upper),
                 ] = parameter_types
                 else {
                     return;
                 };
 
-                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
+                let constraints = ConstraintSet::range(db, *lower, *bound_typevar, *upper);
+                let result = ValidSpecializationsConstraintSet::new(db, None, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
+                    result,
                 )));
             }
 
             KnownFunction::NegatedRangeConstraint => {
                 let [
                     Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
+                    Some(Type::NonInferableTypeVar(bound_typevar)),
                     Some(upper),
                 ] = parameter_types
                 else {
                     return;
                 };
 
-                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
+                let constraints = ConstraintSet::negated_range(db, *lower, *bound_typevar, *upper);
+                let result = ValidSpecializationsConstraintSet::new(db, None, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
+                    result,
                 )));
             }
 

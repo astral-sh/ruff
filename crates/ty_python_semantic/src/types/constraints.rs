@@ -53,14 +53,32 @@
 //!
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use crate::Db;
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
+use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::{
+    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
+    UnionType,
+};
+use crate::{Db, FxIndexSet};
+
+fn simplify_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Node<'db>,
+    _count: u32,
+    _self: InteriorNode<'db>,
+) -> salsa::CycleRecoveryAction<Node<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn simplify_cycle_initial<'db>(_db: &'db dyn Db, this: InteriorNode<'db>) -> Node<'db> {
+    Node::Interior(this)
+}
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -171,6 +189,28 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+        relation: TypeRelation,
+    ) -> Self {
+        let (lower, upper) = match relation {
+            TypeRelation::Subtyping => (
+                lower.top_materialization(db),
+                upper.bottom_materialization(db),
+            ),
+            TypeRelation::Assignability => (
+                lower.bottom_materialization(db),
+                upper.top_materialization(db),
+            ),
+        };
+        let node = ConstrainedTypeVar::new_node(db, lower, typevar, upper);
+        Self { node }
+    }
+
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self) -> bool {
         self.node.is_never_satisfied()
@@ -218,6 +258,15 @@ impl<'db> ConstraintSet<'db> {
             self.union(db, other());
         }
         self
+    }
+
+    /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In Boolean logic, `p → q` is usually translated into `¬p ∨ q`. However, we translate it
+    /// into the equivalent `¬p ∨ (p ∧ q)`. This ensures that the constraints under which `q` is
+    /// true are compatible with the assumptions introduced by `p`.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.negate(db).or(db, || self.and(db, other))
     }
 
     pub(crate) fn range(
@@ -904,7 +953,11 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_fn=simplify_cycle_recover,
+        cycle_initial=simplify_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
@@ -1346,5 +1399,79 @@ impl<'db> SatisfiedClauses<'db> {
         }
 
         DisplaySatisfiedClauses { clauses: self, db }
+    }
+}
+
+/// Returns a constraint set describing the valid specializations of a typevar.
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => ConstraintSet::from(true),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
+                db,
+                self,
+                Type::Never,
+                bound,
+                TypeRelation::Assignability,
+            ),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().when_any(db, |constraint| {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        self,
+                        *constraint,
+                        *constraint,
+                        TypeRelation::Assignability,
+                    )
+                })
+            }
+        }
+    }
+}
+
+/// Returns a constraint set describing the valid specializations of any typevar mentioned in a
+/// type.
+impl<'db> Type<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        struct ValidSpecializationsVisitor<'db> {
+            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            result: RefCell<ConstraintSet<'db>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for ValidSpecializationsVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                match ty {
+                    Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
+                        let valid_specializations = bound_typevar.valid_specializations(db);
+                        self.result
+                            .borrow_mut()
+                            .intersect(db, valid_specializations);
+                    }
+                    _ => {}
+                }
+
+                match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
+                            // If we have already seen this type, we can skip it.
+                            return;
+                        }
+                        walk_non_atomic_type(db, non_atomic_type, self);
+                    }
+                }
+            }
+        }
+
+        let visitor = ValidSpecializationsVisitor {
+            seen_types: RefCell::new(FxIndexSet::default()),
+            result: RefCell::new(ConstraintSet::from(true)),
+        };
+        visitor.visit_type(db, self);
+        visitor.result.into_inner()
     }
 }
