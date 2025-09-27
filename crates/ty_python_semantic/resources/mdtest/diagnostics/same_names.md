@@ -43,7 +43,7 @@ import b
 df: a.DataFrame = b.DataFrame()  # error: [invalid-assignment] "Object of type `b.DataFrame` is not assignable to `a.DataFrame`"
 
 def _(dfs: list[b.DataFrame]):
-    # error: [invalid-assignment] "Object of type `builtins.list[b.DataFrame]` is not assignable to `builtins.list[a.DataFrame]`"
+    # error: [invalid-assignment] "Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`"
     dataframes: list[a.DataFrame] = dfs
 ```
 

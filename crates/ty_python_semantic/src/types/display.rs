@@ -26,15 +26,15 @@ use crate::types::{
 use ruff_db::parsed::parsed_module;
 
 /// Settings for displaying types and signatures
-#[derive(Debug, Copy, Clone, Default)]
-pub struct DisplaySettings {
+#[derive(Debug, Clone, Default)]
+pub struct DisplaySettings<'db> {
     /// Whether rendering can be multiline
     pub multiline: bool,
     /// Class names that should be displayed fully qualified
-    pub qualified: bool,
+    pub qualified: FxHashSet<&'db str>,
 }
 
-impl DisplaySettings {
+impl<'db> DisplaySettings<'db> {
     #[must_use]
     pub fn multiline(self) -> Self {
         Self {
@@ -52,36 +52,24 @@ impl DisplaySettings {
     }
 
     #[must_use]
-    pub fn qualified(self) -> Self {
-        Self {
-            qualified: true,
-            ..self
-        }
-    }
-
-    #[must_use]
-    pub fn from_possibly_ambiguous_type_pair<'db>(
+    pub fn from_possibly_ambiguous_type_pair(
         db: &'db dyn Db,
         type_1: Type<'db>,
         type_2: Type<'db>,
     ) -> Self {
-        let result = Self::default();
-
         let collector = AmbiguousClassCollector::default();
-
         collector.visit_type(db, type_1);
-
-        if collector.ambiguous_type_pair_found() {
-            return result.qualified();
-        }
-
         collector.visit_type(db, type_2);
 
-        if collector.ambiguous_type_pair_found() {
-            return result.qualified();
+        Self {
+            qualified: collector
+                .class_names
+                .borrow()
+                .iter()
+                .filter_map(|(name, classes)| (classes.len() > 1).then_some(*name))
+                .collect(),
+            ..Self::default()
         }
-
-        result
     }
 }
 
@@ -98,10 +86,6 @@ impl<'db> AmbiguousClassCollector<'db> {
             .entry(class.name(db))
             .or_default()
             .insert(class);
-    }
-
-    fn ambiguous_type_pair_found(&self) -> bool {
-        self.class_names.borrow().values().any(|set| set.len() > 1)
     }
 }
 
@@ -129,24 +113,26 @@ impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub fn display(&self, db: &'db dyn Db) -> DisplayType<'_> {
+    pub fn display(self, db: &'db dyn Db) -> DisplayType<'db> {
         DisplayType {
             ty: self,
             settings: DisplaySettings::default(),
             db,
         }
     }
-    pub fn display_with(&self, db: &'db dyn Db, settings: DisplaySettings) -> DisplayType<'_> {
+
+    pub fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> DisplayType<'db> {
         DisplayType {
             ty: self,
             db,
             settings,
         }
     }
+
     fn representation(
         self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayRepresentation<'db> {
         DisplayRepresentation {
             db,
@@ -156,16 +142,15 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Copy, Clone)]
 pub struct DisplayType<'db> {
-    ty: &'db Type<'db>,
+    ty: Type<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let representation = self.ty.representation(self.db, self.settings);
+        let representation = self.ty.representation(self.db, self.settings.clone());
         match self.ty {
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -186,7 +171,7 @@ impl fmt::Debug for DisplayType<'_> {
 }
 
 impl<'db> ClassLiteral<'db> {
-    fn display_with(self, db: &'db dyn Db, settings: DisplaySettings) -> ClassDisplay<'db> {
+    fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> ClassDisplay<'db> {
         ClassDisplay {
             db,
             class: self,
@@ -198,7 +183,7 @@ impl<'db> ClassLiteral<'db> {
 struct ClassDisplay<'db> {
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl ClassDisplay<'_> {
@@ -245,7 +230,11 @@ impl ClassDisplay<'_> {
 
 impl Display for ClassDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.settings.qualified {
+        if self
+            .settings
+            .qualified
+            .contains(&**self.class.name(self.db))
+        {
             for parent in self.class_parents() {
                 f.write_str(&parent)?;
                 f.write_char('.')?;
@@ -261,7 +250,7 @@ impl Display for ClassDisplay<'_> {
 struct DisplayRepresentation<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayRepresentation<'_> {
@@ -279,20 +268,20 @@ impl Display for DisplayRepresentation<'_> {
                         .specialization(self.db)
                         .tuple(self.db)
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
-                        .display_with(self.db, self.settings)
+                        .display_with(self.db, self.settings.clone())
                         .fmt(f),
                     (ClassType::NonGeneric(class), _) => {
-                        class.display_with(self.db, self.settings).fmt(f)
+                        class.display_with(self.db, self.settings.clone()).fmt(f)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
+                    (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    class.display_with(self.db, self.settings).fmt(f)
+                    class.display_with(self.db, self.settings.clone()).fmt(f)
                 }
                 Protocol::FromClass(ClassType::Generic(alias)) => {
-                    alias.display_with(self.db, self.settings).fmt(f)
+                    alias.display_with(self.db, self.settings.clone()).fmt(f)
                 }
                 Protocol::Synthesized(synthetic) => {
                     f.write_str("<Protocol with members ")?;
@@ -316,30 +305,38 @@ impl Display for DisplayRepresentation<'_> {
             Type::ClassLiteral(class) => write!(
                 f,
                 "<class '{}'>",
-                class.display_with(self.db, self.settings)
+                class.display_with(self.db, self.settings.clone())
             ),
             Type::GenericAlias(generic) => write!(
                 f,
                 "<class '{}'>",
-                generic.display_with(self.db, self.settings.singleline())
+                generic.display_with(self.db, self.settings.clone().singleline())
             ),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    write!(f, "type[{}]", class.display_with(self.db, self.settings))
+                    write!(
+                        f,
+                        "type[{}]",
+                        class.display_with(self.db, self.settings.clone())
+                    )
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
                     write!(
                         f,
                         "type[{}]",
-                        alias.display_with(self.db, self.settings.singleline())
+                        alias.display_with(self.db, self.settings.clone().singleline())
                     )
                 }
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::SpecialForm(special_form) => special_form.fmt(f),
             Type::KnownInstance(known_instance) => known_instance.repr(self.db).fmt(f),
-            Type::FunctionLiteral(function) => function.display_with(self.db, self.settings).fmt(f),
-            Type::Callable(callable) => callable.display_with(self.db, self.settings).fmt(f),
+            Type::FunctionLiteral(function) => {
+                function.display_with(self.db, self.settings.clone()).fmt(f)
+            }
+            Type::Callable(callable) => {
+                callable.display_with(self.db, self.settings.clone()).fmt(f)
+            }
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
@@ -350,18 +347,19 @@ impl Display for DisplayRepresentation<'_> {
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: signature.generic_context.as_ref(),
                             db: self.db,
-                            settings: self.settings,
+                            settings: self.settings.clone(),
                         };
 
                         write!(
                             f,
                             "bound method {instance}.{method}{type_parameters}{signature}",
                             method = function.name(self.db),
-                            instance = self_ty.display_with(self.db, self.settings.singleline()),
+                            instance =
+                                self_ty.display_with(self.db, self.settings.clone().singleline()),
                             type_parameters = type_parameters,
                             signature = signature
                                 .bind_self(self.db, Some(typing_self_ty))
-                                .display_with(self.db, self.settings)
+                                .display_with(self.db, self.settings.clone())
                         )
                     }
                     signatures => {
@@ -375,7 +373,7 @@ impl Display for DisplayRepresentation<'_> {
                             join.entry(
                                 &signature
                                     .bind_self(self.db, Some(typing_self_ty))
-                                    .display_with(self.db, self.settings),
+                                    .display_with(self.db, self.settings.clone()),
                             );
                         }
                         if !self.settings.multiline {
@@ -425,13 +423,15 @@ impl Display for DisplayRepresentation<'_> {
             Type::DataclassTransformer(_) => {
                 f.write_str("<decorator produced by typing.dataclass_transform>")
             }
-            Type::Union(union) => union.display_with(self.db, self.settings).fmt(f),
-            Type::Intersection(intersection) => {
-                intersection.display_with(self.db, self.settings).fmt(f)
-            }
+            Type::Union(union) => union.display_with(self.db, self.settings.clone()).fmt(f),
+            Type::Intersection(intersection) => intersection
+                .display_with(self.db, self.settings.clone())
+                .fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
             Type::BooleanLiteral(boolean) => f.write_str(if boolean { "True" } else { "False" }),
-            Type::StringLiteral(string) => string.display_with(self.db, self.settings).fmt(f),
+            Type::StringLiteral(string) => {
+                string.display_with(self.db, self.settings.clone()).fmt(f)
+            }
             Type::LiteralString => f.write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
@@ -443,7 +443,7 @@ impl Display for DisplayRepresentation<'_> {
                 "{enum_class}.{literal_name}",
                 enum_class = enum_literal
                     .enum_class(self.db)
-                    .display_with(self.db, self.settings),
+                    .display_with(self.db, self.settings.clone()),
                 literal_name = enum_literal.name(self.db)
             ),
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
@@ -456,18 +456,18 @@ impl Display for DisplayRepresentation<'_> {
                     f,
                     "<super: {pivot}, {owner}>",
                     pivot = Type::from(bound_super.pivot_class(self.db))
-                        .display_with(self.db, self.settings.singleline()),
+                        .display_with(self.db, self.settings.clone().singleline()),
                     owner = bound_super
                         .owner(self.db)
                         .into_type()
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, self.settings.clone().singleline())
                 )
             }
             Type::TypeIs(type_is) => {
                 f.write_str("TypeIs[")?;
                 type_is
                     .return_type(self.db)
-                    .display_with(self.db, self.settings.singleline())
+                    .display_with(self.db, self.settings.clone().singleline())
                     .fmt(f)?;
                 if let Some(name) = type_is.place_name(self.db) {
                     f.write_str(" @ ")?;
@@ -479,7 +479,7 @@ impl Display for DisplayRepresentation<'_> {
                 .defining_class()
                 .class_literal(self.db)
                 .0
-                .display_with(self.db, self.settings)
+                .display_with(self.db, self.settings.clone())
                 .fmt(f),
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
@@ -514,7 +514,7 @@ impl<'db> TupleSpec<'db> {
     pub(crate) fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayTuple<'db> {
         DisplayTuple {
             tuple: self,
@@ -527,7 +527,7 @@ impl<'db> TupleSpec<'db> {
 pub(crate) struct DisplayTuple<'db> {
     tuple: &'db TupleSpec<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayTuple<'_> {
@@ -540,7 +540,7 @@ impl Display for DisplayTuple<'_> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, self.settings.clone().singleline())
                         .fmt(f)?;
                 }
             }
@@ -563,7 +563,7 @@ impl Display for DisplayTuple<'_> {
                 if !tuple.prefix.is_empty() {
                     tuple
                         .prefix
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, self.settings.clone().singleline())
                         .fmt(f)?;
                     f.write_str(", ")?;
                 }
@@ -572,7 +572,7 @@ impl Display for DisplayTuple<'_> {
                 }
                 tuple
                     .variable
-                    .display_with(self.db, self.settings.singleline())
+                    .display_with(self.db, self.settings.clone().singleline())
                     .fmt(f)?;
                 f.write_str(", ...")?;
                 if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
@@ -582,7 +582,7 @@ impl Display for DisplayTuple<'_> {
                     f.write_str(", ")?;
                     tuple
                         .suffix
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, self.settings.clone().singleline())
                         .fmt(f)?;
                 }
             }
@@ -601,7 +601,7 @@ impl<'db> OverloadLiteral<'db> {
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayOverloadLiteral<'db> {
         DisplayOverloadLiteral {
             literal: self,
@@ -614,7 +614,7 @@ impl<'db> OverloadLiteral<'db> {
 pub(crate) struct DisplayOverloadLiteral<'db> {
     literal: OverloadLiteral<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayOverloadLiteral<'_> {
@@ -623,7 +623,7 @@ impl Display for DisplayOverloadLiteral<'_> {
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
-            settings: self.settings,
+            settings: self.settings.clone(),
         };
 
         write!(
@@ -631,7 +631,7 @@ impl Display for DisplayOverloadLiteral<'_> {
             "def {name}{type_parameters}{signature}",
             name = self.literal.name(self.db),
             type_parameters = type_parameters,
-            signature = signature.display_with(self.db, self.settings)
+            signature = signature.display_with(self.db, self.settings.clone())
         )
     }
 }
@@ -640,7 +640,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayFunctionType<'db> {
         DisplayFunctionType {
             ty: self,
@@ -653,7 +653,7 @@ impl<'db> FunctionType<'db> {
 pub(crate) struct DisplayFunctionType<'db> {
     ty: FunctionType<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayFunctionType<'_> {
@@ -665,7 +665,7 @@ impl Display for DisplayFunctionType<'_> {
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
-                    settings: self.settings,
+                    settings: self.settings.clone(),
                 };
 
                 write!(
@@ -673,7 +673,7 @@ impl Display for DisplayFunctionType<'_> {
                     "def {name}{type_parameters}{signature}",
                     name = self.ty.name(self.db),
                     type_parameters = type_parameters,
-                    signature = signature.display_with(self.db, self.settings)
+                    signature = signature.display_with(self.db, self.settings.clone())
                 )
             }
             signatures => {
@@ -684,7 +684,7 @@ impl Display for DisplayFunctionType<'_> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings));
+                    join.entry(&signature.display_with(self.db, self.settings.clone()));
                 }
                 if !self.settings.multiline {
                     f.write_str("]")?;
@@ -699,7 +699,7 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'db> {
         DisplayGenericAlias {
             origin: self.origin(db),
@@ -714,13 +714,13 @@ pub(crate) struct DisplayGenericAlias<'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(tuple) = self.specialization.tuple(self.db) {
-            tuple.display_with(self.db, self.settings).fmt(f)
+            tuple.display_with(self.db, self.settings.clone()).fmt(f)
         } else {
             let prefix = match self.specialization.materialization_kind(self.db) {
                 None => "",
@@ -735,11 +735,11 @@ impl Display for DisplayGenericAlias<'_> {
                 f,
                 "{prefix}{origin}{specialization}{suffix}",
                 prefix = prefix,
-                origin = self.origin.display_with(self.db, self.settings),
+                origin = self.origin.display_with(self.db, self.settings.clone()),
                 specialization = self.specialization.display_short(
                     self.db,
                     TupleSpecialization::from_class(self.db, self.origin),
-                    self.settings
+                    self.settings.clone()
                 ),
                 suffix = suffix,
             )
@@ -754,7 +754,7 @@ impl<'db> GenericContext<'db> {
     pub fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayGenericContext<'db> {
         DisplayGenericContext {
             generic_context: self,
@@ -767,7 +767,7 @@ impl<'db> GenericContext<'db> {
 struct DisplayOptionalGenericContext<'db> {
     generic_context: Option<&'db GenericContext<'db>>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayOptionalGenericContext<'_> {
@@ -776,7 +776,7 @@ impl Display for DisplayOptionalGenericContext<'_> {
             DisplayGenericContext {
                 generic_context,
                 db: self.db,
-                settings: self.settings,
+                settings: self.settings.clone(),
             }
             .fmt(f)
         } else {
@@ -789,7 +789,7 @@ pub struct DisplayGenericContext<'db> {
     generic_context: &'db GenericContext<'db>,
     db: &'db dyn Db,
     #[expect(dead_code)]
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayGenericContext<'_> {
@@ -822,7 +822,7 @@ impl<'db> Specialization<'db> {
         &'db self,
         db: &'db dyn Db,
         tuple_specialization: TupleSpecialization,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             types: self.types(db),
@@ -837,7 +837,7 @@ pub struct DisplaySpecialization<'db> {
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplaySpecialization<'_> {
@@ -847,7 +847,7 @@ impl Display for DisplaySpecialization<'_> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            ty.display_with(self.db, self.settings).fmt(f)?;
+            ty.display_with(self.db, self.settings.clone()).fmt(f)?;
         }
         if self.tuple_specialization.is_yes() {
             f.write_str(", ...")?;
@@ -884,7 +884,7 @@ impl<'db> CallableType<'db> {
     pub(crate) fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayCallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
@@ -897,13 +897,15 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'db> {
     signatures: &'db CallableSignature<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayCallableType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.signatures.overloads.as_slice() {
-            [signature] => signature.display_with(self.db, self.settings).fmt(f),
+            [signature] => signature
+                .display_with(self.db, self.settings.clone())
+                .fmt(f),
             signatures => {
                 // TODO: How to display overloads?
                 if !self.settings.multiline {
@@ -912,7 +914,7 @@ impl Display for DisplayCallableType<'_> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings));
+                    join.entry(&signature.display_with(self.db, self.settings.clone()));
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -932,7 +934,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplaySignature<'db> {
         DisplaySignature {
             parameters: self.parameters(),
@@ -947,7 +949,7 @@ pub(crate) struct DisplaySignature<'db> {
     parameters: &'db Parameters<'db>,
     return_ty: Option<Type<'db>>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl DisplaySignature<'_> {
@@ -1009,7 +1011,7 @@ impl DisplaySignature<'_> {
                 // Write parameter with range tracking
                 let param_name = parameter.display_name();
                 writer.write_parameter(
-                    &parameter.display_with(self.db, self.settings.singleline()),
+                    &parameter.display_with(self.db, self.settings.clone().singleline()),
                     param_name.as_deref(),
                 )?;
 
@@ -1032,7 +1034,9 @@ impl DisplaySignature<'_> {
 
         // Return type
         let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
-        writer.write_return_type(&return_ty.display_with(self.db, self.settings.singleline()))?;
+        writer.write_return_type(
+            &return_ty.display_with(self.db, self.settings.clone().singleline()),
+        )?;
 
         Ok(())
     }
@@ -1151,7 +1155,7 @@ impl<'db> Parameter<'db> {
     fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayParameter<'db> {
         DisplayParameter {
             param: self,
@@ -1164,7 +1168,7 @@ impl<'db> Parameter<'db> {
 struct DisplayParameter<'db> {
     param: &'db Parameter<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayParameter<'_> {
@@ -1175,21 +1179,29 @@ impl Display for DisplayParameter<'_> {
                 write!(
                     f,
                     ": {}",
-                    annotated_type.display_with(self.db, self.settings)
+                    annotated_type.display_with(self.db, self.settings.clone())
                 )?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_ty) = self.param.default_type() {
                 if self.param.annotated_type().is_some() {
-                    write!(f, " = {}", default_ty.display_with(self.db, self.settings))?;
+                    write!(
+                        f,
+                        " = {}",
+                        default_ty.display_with(self.db, self.settings.clone())
+                    )?;
                 } else {
-                    write!(f, "={}", default_ty.display_with(self.db, self.settings))?;
+                    write!(
+                        f,
+                        "={}",
+                        default_ty.display_with(self.db, self.settings.clone())
+                    )?;
                 }
             }
         } else if let Some(ty) = self.param.annotated_type() {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided.
-            ty.display_with(self.db, self.settings).fmt(f)?;
+            ty.display_with(self.db, self.settings.clone()).fmt(f)?;
         }
         Ok(())
     }
@@ -1199,7 +1211,7 @@ impl<'db> UnionType<'db> {
     fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayUnionType<'db> {
         DisplayUnionType {
             db,
@@ -1212,7 +1224,7 @@ impl<'db> UnionType<'db> {
 struct DisplayUnionType<'db> {
     ty: &'db UnionType<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayUnionType<'_> {
@@ -1245,14 +1257,14 @@ impl Display for DisplayUnionType<'_> {
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
                         db: self.db,
-                        settings: self.settings.singleline(),
+                        settings: self.settings.clone().singleline(),
                     });
                 }
             } else {
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
-                    settings: self.settings.singleline(),
+                    settings: self.settings.clone().singleline(),
                 });
             }
         }
@@ -1272,7 +1284,7 @@ impl fmt::Debug for DisplayUnionType<'_> {
 struct DisplayLiteralGroup<'db> {
     literals: Vec<Type<'db>>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayLiteralGroup<'_> {
@@ -1282,7 +1294,7 @@ impl Display for DisplayLiteralGroup<'_> {
             .entries(
                 self.literals
                     .iter()
-                    .map(|ty| ty.representation(self.db, self.settings.singleline())),
+                    .map(|ty| ty.representation(self.db, self.settings.clone().singleline())),
             )
             .finish()?;
         f.write_str("]")
@@ -1293,7 +1305,7 @@ impl<'db> IntersectionType<'db> {
     fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayIntersectionType<'db> {
         DisplayIntersectionType {
             db,
@@ -1306,7 +1318,7 @@ impl<'db> IntersectionType<'db> {
 struct DisplayIntersectionType<'db> {
     ty: &'db IntersectionType<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayIntersectionType<'_> {
@@ -1318,7 +1330,7 @@ impl Display for DisplayIntersectionType<'_> {
             .map(|&ty| DisplayMaybeNegatedType {
                 ty,
                 db: self.db,
-                settings: self.settings.singleline(),
+                settings: self.settings.clone().singleline(),
                 negated: false,
             })
             .chain(
@@ -1328,7 +1340,7 @@ impl Display for DisplayIntersectionType<'_> {
                     .map(|&ty| DisplayMaybeNegatedType {
                         ty,
                         db: self.db,
-                        settings: self.settings.singleline(),
+                        settings: self.settings.clone().singleline(),
                         negated: true,
                     }),
             );
@@ -1346,7 +1358,7 @@ struct DisplayMaybeNegatedType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
     negated: bool,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayMaybeNegatedType<'_> {
@@ -1357,7 +1369,7 @@ impl Display for DisplayMaybeNegatedType<'_> {
         DisplayMaybeParenthesizedType {
             ty: self.ty,
             db: self.db,
-            settings: self.settings,
+            settings: self.settings.clone(),
         }
         .fmt(f)
     }
@@ -1366,13 +1378,18 @@ impl Display for DisplayMaybeNegatedType<'_> {
 struct DisplayMaybeParenthesizedType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let write_parentheses =
-            |f: &mut Formatter<'_>| write!(f, "({})", self.ty.display_with(self.db, self.settings));
+        let write_parentheses = |f: &mut Formatter<'_>| {
+            write!(
+                f,
+                "({})",
+                self.ty.display_with(self.db, self.settings.clone())
+            )
+        };
         match self.ty {
             Type::Callable(_)
             | Type::KnownBoundMethod(_)
@@ -1382,21 +1399,24 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
             Type::Intersection(intersection) if !intersection.has_one_element(self.db) => {
                 write_parentheses(f)
             }
-            _ => self.ty.display_with(self.db, self.settings).fmt(f),
+            _ => self.ty.display_with(self.db, self.settings.clone()).fmt(f),
         }
     }
 }
 
 pub(crate) trait TypeArrayDisplay<'db> {
-    fn display_with(&self, db: &'db dyn Db, settings: DisplaySettings)
-    -> DisplayTypeArray<'_, 'db>;
+    fn display_with(
+        &self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> DisplayTypeArray<'_, 'db>;
 }
 
 impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
     fn display_with(
         &self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray {
             types: self,
@@ -1410,7 +1430,7 @@ impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
     fn display_with(
         &self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray {
             types: self,
@@ -1424,7 +1444,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     fn display_with(
         &self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray {
             types: self,
@@ -1437,7 +1457,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
 pub(crate) struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
     db: &'db dyn Db,
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayTypeArray<'_, '_> {
@@ -1446,7 +1466,7 @@ impl Display for DisplayTypeArray<'_, '_> {
             .entries(
                 self.types
                     .iter()
-                    .map(|ty| ty.display_with(self.db, self.settings.singleline())),
+                    .map(|ty| ty.display_with(self.db, self.settings.clone().singleline())),
             )
             .finish()
     }
@@ -1456,20 +1476,26 @@ impl<'db> StringLiteralType<'db> {
     fn display_with(
         &'db self,
         db: &'db dyn Db,
-        settings: DisplaySettings,
+        settings: DisplaySettings<'db>,
     ) -> DisplayStringLiteralType<'db> {
         display_quoted_string(self.value(db), settings)
     }
 }
 
-fn display_quoted_string(string: &str, settings: DisplaySettings) -> DisplayStringLiteralType<'_> {
+fn display_quoted_string<'a, 'db>(
+    string: &'a str,
+    settings: DisplaySettings<'db>,
+) -> DisplayStringLiteralType<'db>
+where
+    'a: 'db,
+{
     DisplayStringLiteralType { string, settings }
 }
 
 struct DisplayStringLiteralType<'db> {
     string: &'db str,
     #[expect(dead_code)]
-    settings: DisplaySettings,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayStringLiteralType<'_> {
