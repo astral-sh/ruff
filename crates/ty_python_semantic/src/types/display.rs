@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::fmt::{self, Display, Formatter, Write};
+use std::rc::Rc;
 
 use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
@@ -31,7 +32,7 @@ pub struct DisplaySettings<'db> {
     /// Whether rendering can be multiline
     pub multiline: bool,
     /// Class names that should be displayed fully qualified
-    pub qualified: FxHashSet<&'db str>,
+    pub qualified: Rc<FxHashSet<&'db str>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -62,12 +63,14 @@ impl<'db> DisplaySettings<'db> {
         collector.visit_type(db, type_2);
 
         Self {
-            qualified: collector
-                .class_names
-                .borrow()
-                .iter()
-                .filter_map(|(name, classes)| (classes.len() > 1).then_some(*name))
-                .collect(),
+            qualified: Rc::new(
+                collector
+                    .class_names
+                    .borrow()
+                    .iter()
+                    .filter_map(|(name, classes)| (classes.len() > 1).then_some(*name))
+                    .collect(),
+            ),
             ..Self::default()
         }
     }
