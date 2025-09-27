@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 ///         return rec
 ///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
+///         raise
 /// ```
 ///
 /// Use instead:
