@@ -6272,6 +6272,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
         filters => vec![
             (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
             (r"\\", r"/"),
+            (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {
     assert_cmd_snapshot!(
@@ -6288,7 +6289,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     [TMP]/normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     [TMP]/normal.py:1:1: RUF911 Hey this is a preview test rule.
     [TMP]/normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    [TMP]/panic.py: panic: Fatal error while linting: This is a fake panic for testing.
+    [TMP]/panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -6317,6 +6318,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
         filters => vec![
             (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
             (r"\\", r"/"),
+            (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>"),
         ]
     }, {
     assert_cmd_snapshot!(
@@ -6347,12 +6349,11 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     RUF950 Hey this is a test rule that was redirected from another.
     --> [TMP]/normal.py:1:1
 
-    panic: Fatal error while linting: This is a fake panic for testing.
+    panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> [TMP]/panic.py:1:1
-    info: panicked at crates/ruff_linter/src/rules/ruff/rules/test_rules.rs:511:9:
-    This is a fake panic for testing.
-    run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
+    info: This indicates a bug in Ruff.
+    info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
+    info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
 
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

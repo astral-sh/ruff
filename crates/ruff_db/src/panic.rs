@@ -31,6 +31,29 @@ impl Payload {
     }
 }
 
+impl PanicError {
+    pub fn to_diagnostic_message(&self, path: Option<impl std::fmt::Display>) -> String {
+        use std::fmt::Write;
+
+        let mut message = String::new();
+        message.push_str("Panicked");
+
+        if let Some(location) = &self.location {
+            let _ = write!(&mut message, " at {location}");
+        }
+
+        if let Some(path) = path {
+            let _ = write!(&mut message, " when checking `{path}`");
+        }
+
+        if let Some(payload) = self.payload.as_str() {
+            let _ = write!(&mut message, ": `{payload}`");
+        }
+
+        message
+    }
+}
+
 impl std::fmt::Display for PanicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "panicked at")?;

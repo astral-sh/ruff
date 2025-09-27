@@ -366,6 +366,7 @@ mod tests {
     fn hide_severity_output() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
         env.hide_severity(true);
+        env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
@@ -572,7 +573,7 @@ print()
         let mut diagnostic = env.err().build();
         let span = env.path("example.py").with_range(TextRange::default());
         let mut annotation = Annotation::primary(span);
-        annotation.set_file_level(true);
+        annotation.hide_snippet(true);
         diagnostic.annotate(annotation);
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
@@ -584,7 +585,8 @@ print()
     /// Check that ranges in notebooks are remapped relative to the cells.
     #[test]
     fn notebook_output() {
-        let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        env.show_fix_status(true);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
         error[unused-import][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
@@ -698,6 +700,7 @@ print()
     fn notebook_output_with_diff() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
@@ -752,6 +755,7 @@ print()
     fn notebook_output_with_diff_spanning_cells() {
         let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
         // Move all of the edits from the later diagnostics to the first diagnostic to simulate a
@@ -928,6 +932,7 @@ line 10
         env.add("example.py", contents);
         env.format(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
         let mut diagnostic = env.err().primary("example.py", "3", "3", "label").build();

@@ -208,6 +208,7 @@ struct ResolvedDiagnostic<'a> {
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
+    header_offset: usize,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
@@ -258,7 +259,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             id,
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag.has_applicable_fix(config),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            header_offset: diag.inner.header_offset,
         }
     }
 
@@ -288,6 +290,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: false,
+            header_offset: 0,
         }
     }
 
@@ -385,6 +388,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
+            header_offset: self.header_offset,
         }
     }
 }
@@ -404,7 +408,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
-    is_file_level: bool,
+    hide_snippet: bool,
     notebook_index: Option<NotebookIndex>,
 }
 
@@ -452,7 +456,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
             notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
@@ -492,6 +496,11 @@ struct RenderableDiagnostic<'r> {
     ///
     /// This is rendered as a `[*]` indicator after the diagnostic ID.
     is_fixable: bool,
+    /// Offset to align the header sigil (`-->`) with the subsequent line number separators.
+    ///
+    /// This is only needed for formatter diagnostics where we don't render a snippet via
+    /// `annotate-snippets` and thus the alignment isn't computed automatically.
+    header_offset: usize,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -504,7 +513,11 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
+        let mut message = self
+            .level
+            .title(self.message)
+            .is_fixable(self.is_fixable)
+            .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -709,8 +722,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
-    /// Whether this annotation applies to an entire file, rather than a snippet within it.
-    is_file_level: bool,
+    /// Whether the snippet for this annotation should be hidden instead of rendered.
+    hide_snippet: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -732,7 +745,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
         }
     }
 
@@ -758,7 +771,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann.is_file_level(self.is_file_level)
+        ann.hide_snippet(self.hide_snippet)
     }
 }
 
