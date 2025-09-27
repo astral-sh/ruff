@@ -1,0 +1,26 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - grouped
+    - "--select"
+    - F401
+    - "--fix"
+    - "--show-fixes"
+    - input.py
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+Fixed 1 error:
+- input.py:
+    1 × F401 (unused-import)
+
+Found 1 error (1 fixed, 0 remaining).
+
+----- stderr -----

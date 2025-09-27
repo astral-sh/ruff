@@ -2618,7 +2618,7 @@ watermelon
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_status(yes);
+            config = config.with_show_fix_status(yes);
             self.config = config;
         }
 
@@ -2632,7 +2632,7 @@ watermelon
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.fix_applicability(applicability);
+            config = config.with_fix_applicability(applicability);
             self.config = config;
         }
 

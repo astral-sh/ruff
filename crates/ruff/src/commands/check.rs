@@ -227,7 +227,8 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
+    use ruff_linter::message::EmitterContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
@@ -280,19 +281,16 @@ mod test {
             UnsafeFixes::Enabled,
         )
         .unwrap();
-        let mut output = Vec::new();
 
-        TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_color(false)
-            .emit(
-                &mut output,
-                &diagnostics.inner,
-                &EmitterContext::new(&FxHashMap::default()),
-            )
-            .unwrap();
-
-        let messages = String::from_utf8(output).unwrap();
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .hide_severity(true);
+        let messages = DisplayDiagnostics::new(
+            &EmitterContext::new(&FxHashMap::default()),
+            &config,
+            &diagnostics.inner,
+        )
+        .to_string();
 
         insta::with_settings!({
             omit_expression => true,

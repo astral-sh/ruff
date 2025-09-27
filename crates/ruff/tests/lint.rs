@@ -6199,6 +6199,36 @@ match 42:  # invalid-syntax
     Ok(())
 }
 
+#[test_case::test_case("concise"; "concise_show_fixes")]
+#[test_case::test_case("full"; "full_show_fixes")]
+#[test_case::test_case("grouped"; "grouped_show_fixes")]
+fn output_format_show_fixes(output_format: &str) -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, "import os  # F401")?;
+
+    let snapshot = format!("output_format_show_fixes_{output_format}");
+
+    assert_cmd_snapshot!(
+        snapshot,
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "check",
+                "--no-cache",
+                "--output-format",
+                output_format,
+                "--select",
+                "F401",
+                "--fix",
+                "--show-fixes",
+                "input.py",
+            ])
+            .current_dir(&tempdir),
+    );
+
+    Ok(())
+}
+
 #[test]
 fn up045_nested_optional_flatten_all() {
     let contents = "\
