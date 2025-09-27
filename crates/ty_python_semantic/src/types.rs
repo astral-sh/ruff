@@ -1469,6 +1469,13 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
 
+    /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
+    ///
+    /// The `UnionSimplification` relation sits in between [`TypeRelation::Subtyping`] and [`TypeRelation::Assignability`].
+    /// In most respects it behaves like subtyping, but it also allows three simplifications that are unsound for subtyping:
+    /// - `Any <: Any` under the `UnionSimplification` relation, but not under subtyping.
+    /// - `Any <: (Any | T)` under the `UnionSimplification` relation, but not under subtyping.
+    /// - `(Any & T) <: Any` under the `UnionSimplification` relation, but not under subtyping.
     pub(crate) fn is_redundant_in_union_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, TypeRelation::UnionSimplification)
             .is_always_satisfied()
@@ -1512,8 +1519,9 @@ impl<'db> Type<'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => ConstraintSet::from(true),
 
-            // In some specific situations, `Any` can be simplified out of unions and intersections,
-            // but this is not true for divergent types.
+            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
+            // but this is not true for divergent types (and moving this case any lower down appears to cause
+            // "too many cycle iterations" panics).
             (Type::Dynamic(DynamicType::Divergent(_)), _)
             | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
                 ConstraintSet::from(relation.is_assignability())
@@ -1540,6 +1548,13 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(db, right, relation, visitor)
             }
 
+            // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
+            // handled above. It's always assignable, though.
+            //
+            // Union simplification sits in between subtyping and assignability. `Any <: T` only
+            // holds true if `T` is also a dynamic type or a union that contains a dynamic type.
+            // Similarly, `T <: Any` only holds true if `T` is a dynamic type or an intersection
+            // that contains a dynamic type.
             (Type::Dynamic(_), _) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping => false,
                 TypeRelation::Assignability => true,
@@ -1549,7 +1564,6 @@ impl<'db> Type<'db> {
                     _ => false,
                 },
             }),
-
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping => false,
                 TypeRelation::Assignability => true,
