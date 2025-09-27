@@ -216,6 +216,29 @@ impl<'db> GenericContext<'db> {
         Some(Self::new(db, variables))
     }
 
+    pub(crate) fn merge_pep695_and_legacy(
+        db: &'db dyn Db,
+        pep695_generic_context: Option<Self>,
+        legacy_generic_context: Option<Self>,
+    ) -> Option<Self> {
+        match (legacy_generic_context, pep695_generic_context) {
+            (Some(legacy_ctx), Some(ctx)) => {
+                if legacy_ctx
+                    .variables(db)
+                    .iter()
+                    .exactly_one()
+                    .is_ok_and(|bound_typevar| bound_typevar.typevar(db).is_self(db))
+                {
+                    Some(legacy_ctx.merge(db, ctx))
+                } else {
+                    // TODO: Raise a diagnostic — mixing PEP 695 and legacy typevars is not allowed
+                    Some(ctx)
+                }
+            }
+            (left, right) => left.or(right),
+        }
+    }
+
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
     /// list.
     pub(crate) fn from_base_classes(
@@ -1038,7 +1061,7 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
-        actual: Type<'db>,
+        mut actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -1067,7 +1090,20 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
+        if let Type::Union(union) = actual {
+            // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
+            // So, here we remove the union elements that are not related to `formal`.
+            actual = union.filter(self.db, |actual_elem| {
+                !actual_elem.is_disjoint_from(self.db, formal)
+            });
+        }
+
         match (formal, actual) {
+            (Type::Union(_), Type::Union(_)) => {
+                // TODO: We need to infer specializations appropriately.
+                // e.g.
+                // `formal: list[T] | T | U, actual: V | int | list[V]` => `T = V, U = int`
+            }
             (Type::Union(formal), _) => {
                 // TODO: We haven't implemented a full unification solver yet. If typevars appear
                 // in multiple union elements, we ideally want to express that _only one_ of them
