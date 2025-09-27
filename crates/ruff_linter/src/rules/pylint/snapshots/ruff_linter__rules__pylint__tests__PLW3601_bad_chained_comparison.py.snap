@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLW3601 Suspicious 2-part chained comparison using semantically incompatible operators ('<' and 'is not')
+  --> bad_chained_comparison.py:10:12
+   |
+ 8 | def invalid_mixed_comparison_identity() -> bool:
+ 9 |     b = 10
+10 |     return 5 < b is not None
+   |            ^^^^^^^^^^^^^^^^^
+   |
+
+PLW3601 Suspicious 2-part chained comparison using semantically incompatible operators ('<' and 'in')
+  --> bad_chained_comparison.py:16:12
+   |
+14 |     c = 7
+15 |     lst = [1, 2, 3, True]
+16 |     return 1 < c in lst
+   |            ^^^^^^^^^^^^
+   |
+
+PLW3601 Suspicious 3-part chained comparison using semantically incompatible operators ('<', 'in' and 'is not')
+  --> bad_chained_comparison.py:22:12
+   |
+20 |     d = 10
+21 |     lst = [1, 2, 3, None]
+22 |     return 5 < d is not None in lst
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
