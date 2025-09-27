@@ -17,12 +17,12 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
+    use crate::assert_diagnostics;
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -120,7 +120,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -167,7 +167,7 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings::for_rule(Rule::ImplicitOptional)
+            &LinterSettings::for_rule(Rule::ImplicitOptional)
                 .with_target_version(PythonVersion::PY39),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -232,9 +232,9 @@ mod tests {
     fn confusables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
-                ..settings::LinterSettings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
                     Rule::AmbiguousUnicodeCharacterDocstring,
                     Rule::AmbiguousUnicodeCharacterComment,
@@ -249,10 +249,10 @@ mod tests {
     fn preview_confusables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 preview: PreviewMode::Enabled,
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
-                ..settings::LinterSettings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
                     Rule::AmbiguousUnicodeCharacterDocstring,
                     Rule::AmbiguousUnicodeCharacterComment,
@@ -267,10 +267,7 @@ mod tests {
     fn noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/noqa.py"),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedVariable,
-                Rule::AmbiguousVariableName,
-            ]),
+            &LinterSettings::for_rules(vec![Rule::UnusedVariable, Rule::AmbiguousVariableName]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -280,9 +277,9 @@ mod tests {
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 external: vec!["V101".to_string()],
-                ..settings::LinterSettings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,
                     Rule::UnusedImport,
@@ -301,9 +298,9 @@ mod tests {
     fn ruf100_0_prefix() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 external: vec!["V".to_string()],
-                ..settings::LinterSettings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,
                     Rule::UnusedImport,
@@ -322,7 +319,7 @@ mod tests {
     fn ruf100_1() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_1.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+            &LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -330,15 +327,13 @@ mod tests {
 
     #[test]
     fn ruf100_2() -> Result<()> {
-        let mut settings =
-            settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
+        let mut settings = LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
 
         settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
             "RUF100_2.py".to_string(),
-            &["F401".parse().unwrap()],
+            &["F401".parse()?],
             None,
-        )])
-        .unwrap();
+        )])?;
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
         assert_diagnostics!(diagnostics);
@@ -349,7 +344,7 @@ mod tests {
     fn ruf100_3() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_3.py"),
-            &settings::LinterSettings::for_rules(vec![
+            &LinterSettings::for_rules(vec![
                 Rule::UnusedNOQA,
                 Rule::LineTooLong,
                 Rule::UndefinedName,
@@ -363,7 +358,7 @@ mod tests {
     fn ruf100_4() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_4.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+            &LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -373,8 +368,8 @@ mod tests {
     fn ruf100_5() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_5.py"),
-            &settings::LinterSettings {
-                ..settings::LinterSettings::for_rules(vec![
+            &LinterSettings {
+                ..LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,
                     Rule::CommentedOutCode,
@@ -389,7 +384,7 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
+            &LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -399,7 +394,7 @@ mod tests {
     fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_7.py"),
-            &settings::LinterSettings::for_rules(vec![
+            &LinterSettings::for_rules(vec![
                 Rule::UnusedNOQA,
                 Rule::FStringMissingPlaceholders,
                 Rule::LineTooLong,
@@ -414,9 +409,9 @@ mod tests {
     fn invalid_rule_code_external_rules() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF102.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 external: vec!["V".to_string()],
-                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
+                ..LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -427,14 +422,14 @@ mod tests {
     fn ruff_per_file_ignores() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
                     "ruff_per_file_ignores.py".to_string(),
                     &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
                     None,
                 )])
                 .unwrap(),
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
+                ..LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -445,14 +440,14 @@ mod tests {
     fn ruff_per_file_ignores_empty() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
-            &settings::LinterSettings {
+            &LinterSettings {
                 per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
                     "ruff_per_file_ignores.py".to_string(),
                     &["RUF100".parse().unwrap()],
                     None,
                 )])
                 .unwrap(),
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
+                ..LinterSettings::for_rules(vec![Rule::UnusedNOQA])
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -463,7 +458,7 @@ mod tests {
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/flake8_noqa.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+            &LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -473,7 +468,7 @@ mod tests {
     fn ruff_noqa_all() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa_all.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+            &LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -483,7 +478,7 @@ mod tests {
     fn ruff_noqa_codes() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa_codes.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+            &LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -493,7 +488,7 @@ mod tests {
     fn ruff_noqa_invalid() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa_invalid.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+            &LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -503,7 +498,7 @@ mod tests {
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
-            &settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion),
+            &LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -525,7 +520,7 @@ mod tests {
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
         let messages = lint_pyproject_toml(
             &source_file,
-            &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
+            &LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
         assert_diagnostics!(snapshot, messages);
         Ok(())
@@ -539,6 +534,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::FloatComparison, Path::new("RUF067.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -547,9 +543,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
+            &LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -565,10 +561,10 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
+            &LinterSettings {
                 preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY37.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -584,10 +580,10 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
+            &LinterSettings {
                 preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -603,7 +599,7 @@ mod tests {
         id: u8,
     ) -> Result<()> {
         // Compile the regex from the pattern string
-        let regex = Regex::new(regex_pattern).unwrap();
+        let regex = Regex::new(regex_pattern)?;
 
         let snapshot = format!(
             "custom_dummy_var_regexp_preset__{}_{}_{}",
@@ -613,9 +609,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
+            &LinterSettings {
                 dummy_variable_rgx: regex,
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -631,9 +627,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
+            &LinterSettings {
                 unresolved_target_version: PythonVersion::PY314.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -649,10 +645,10 @@ mod tests {
         let snapshot = format!("add_future_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
+            &LinterSettings {
                 future_annotations: true,
                 unresolved_target_version: PythonVersion::PY39.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
