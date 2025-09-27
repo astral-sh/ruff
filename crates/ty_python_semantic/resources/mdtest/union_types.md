@@ -306,3 +306,28 @@ def _(c: BC, d: BD):
     reveal_type(c)  # revealed: Literal[b""]
     reveal_type(d)  # revealed: Literal[b""]
 ```
+
+## Unions of tuples
+
+A union of a fixed-length tuple and a variable-length tuple must be collapsed to the variable-length
+element, never to the fixed-length element (`tuple[()] | tuple[Any, ...]` -> `tuple[Any, ...]`, not
+`tuple[()]`).
+
+```py
+from typing import Any
+
+def f(
+    a: tuple[()] | tuple[int, ...],
+    b: tuple[int, ...] | tuple[()],
+    c: tuple[int] | tuple[str, ...],
+    d: tuple[str, ...] | tuple[int],
+    e: tuple[()] | tuple[Any, ...],
+    f: tuple[Any, ...] | tuple[()],
+):
+    reveal_type(a)  # revealed: tuple[int, ...]
+    reveal_type(b)  # revealed: tuple[int, ...]
+    reveal_type(c)  # revealed: tuple[int] | tuple[str, ...]
+    reveal_type(d)  # revealed: tuple[str, ...] | tuple[int]
+    reveal_type(e)  # revealed: tuple[Any, ...]
+    reveal_type(f)  # revealed: tuple[Any, ...]
+```

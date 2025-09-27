@@ -138,7 +138,7 @@ impl<'db> SubclassOfType<'db> {
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(relation.is_assignability())
+                ConstraintSet::from(!relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
                 ConstraintSet::from(other_class.is_object(db) || relation.is_assignability())
