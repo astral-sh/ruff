@@ -7065,7 +7065,11 @@ impl<'db> KnownInstanceType<'db> {
                         if let Some(specialization) = alias.specialization(self.db) {
                             f.write_str(alias.name(self.db))?;
                             specialization
-                                .display_short(self.db, TupleSpecialization::No)
+                                .display_short(
+                                    self.db,
+                                    TupleSpecialization::No,
+                                    DisplaySettings::default(),
+                                )
                                 .fmt(f)
                         } else {
                             f.write_str("typing.TypeAliasType")

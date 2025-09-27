@@ -119,10 +119,10 @@ error[invalid-return-type]: Return type does not match returned value
 20 | class A[T]: ...
 21 |
 22 | def f() -> A[int]:
-   |            ------ Expected `mdtest_snippet.A[int]` because of return type
+   |            ------ Expected `mdtest_snippet.A[builtins.int]` because of return type
 23 |     class A[T]: ...
 24 |     return A[int]()  # error: [invalid-return-type]
-   |            ^^^^^^^^ expected `mdtest_snippet.A[int]`, found `mdtest_snippet.<locals of function 'f'>.A[int]`
+   |            ^^^^^^^^ expected `mdtest_snippet.A[builtins.int]`, found `mdtest_snippet.<locals of function 'f'>.A[builtins.int]`
 25 |
 26 | class B: ...
    |

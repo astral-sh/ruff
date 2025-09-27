@@ -1,11 +1,13 @@
 //! Display implementations for types.
 
+use std::cell::RefCell;
 use std::fmt::{self, Display, Formatter, Write};
 
 use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
 use crate::module_resolver::file_to_module;
@@ -15,10 +17,11 @@ use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
+use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
-    UnionType, WrapperDescriptorKind,
+    MaterializationKind, Protocol, StringLiteralType, SubclassOfInner, Type, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -27,7 +30,7 @@ use ruff_db::parsed::parsed_module;
 pub struct DisplaySettings {
     /// Whether rendering can be multiline
     pub multiline: bool,
-    /// Whether rendering will show qualified display (e.g., module.class)
+    /// Class names that should be displayed fully qualified
     pub qualified: bool,
 }
 
@@ -64,46 +67,64 @@ impl DisplaySettings {
     ) -> Self {
         let result = Self::default();
 
-        let Some(class_1) = type_to_class_literal(db, type_1) else {
-            return result;
-        };
+        let collector = AmbiguousClassCollector::default();
 
-        let Some(class_2) = type_to_class_literal(db, type_2) else {
-            return result;
-        };
+        collector.visit_type(db, type_1);
 
-        if class_1 == class_2 {
-            return result;
+        if collector.ambiguous_type_pair_found() {
+            return result.qualified();
         }
 
-        if class_1.name(db) == class_2.name(db) {
-            result.qualified()
-        } else {
-            result
+        collector.visit_type(db, type_2);
+
+        if collector.ambiguous_type_pair_found() {
+            return result.qualified();
         }
+
+        result
     }
 }
 
-// TODO: generalize this to a method that takes any two types, walks them recursively, and returns
-// a set of types with ambiguous names whose display should be qualified. Then we can use this in
-// any diagnostic that displays two types.
-fn type_to_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
-    match ty {
-        Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-        Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
-        Type::GenericAlias(alias) => Some(alias.origin(db)),
-        Type::ProtocolInstance(ProtocolInstanceType {
-            inner: Protocol::FromClass(class),
-            ..
-        }) => type_to_class_literal(db, Type::from(class)),
-        Type::TypedDict(typed_dict) => {
-            type_to_class_literal(db, Type::from(typed_dict.defining_class()))
+#[derive(Debug, Default)]
+struct AmbiguousClassCollector<'db> {
+    visited_types: RefCell<FxHashSet<Type<'db>>>,
+    class_names: RefCell<FxHashMap<&'db str, FxHashSet<ClassLiteral<'db>>>>,
+}
+
+impl<'db> AmbiguousClassCollector<'db> {
+    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
+        self.class_names
+            .borrow_mut()
+            .entry(class.name(db))
+            .or_default()
+            .insert(class);
+    }
+
+    fn ambiguous_type_pair_found(&self) -> bool {
+        self.class_names.borrow().values().any(|set| set.len() > 1)
+    }
+}
+
+impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::ClassLiteral(class) => self.record_class(db, class),
+            Type::EnumLiteral(literal) => self.record_class(db, literal.enum_class(db)),
+            Type::GenericAlias(alias) => self.record_class(db, alias.origin(db)),
+            _ => {}
         }
-        Type::SubclassOf(subclass_of) => {
-            type_to_class_literal(db, Type::from(subclass_of.subclass_of().into_class()?))
+
+        if let visitor::TypeKind::NonAtomic(t) = visitor::TypeKind::from(ty) {
+            if !self.visited_types.borrow_mut().insert(ty) {
+                // If we have already seen this type, we can skip it.
+                return;
+            }
+            visitor::walk_non_atomic_type(db, t, self);
         }
-        _ => None,
     }
 }
 
@@ -717,7 +738,8 @@ impl Display for DisplayGenericAlias<'_> {
                 origin = self.origin.display_with(self.db, self.settings),
                 specialization = self.specialization.display_short(
                     self.db,
-                    TupleSpecialization::from_class(self.db, self.origin)
+                    TupleSpecialization::from_class(self.db, self.origin),
+                    self.settings
                 ),
                 suffix = suffix,
             )
@@ -800,12 +822,13 @@ impl<'db> Specialization<'db> {
         &'db self,
         db: &'db dyn Db,
         tuple_specialization: TupleSpecialization,
+        settings: DisplaySettings,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             types: self.types(db),
             db,
             tuple_specialization,
-            settings: DisplaySettings::default(),
+            settings,
         }
     }
 }
