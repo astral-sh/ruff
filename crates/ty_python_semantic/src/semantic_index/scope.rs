@@ -33,11 +33,11 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_annotation()
     }
 
-    pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
+    pub(crate) fn node(self, db: &'db dyn Db) -> &'db NodeWithScopeKind {
         self.scope(db).node()
     }
 
-    pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
+    pub(crate) fn scope(self, db: &'db dyn Db) -> &'db Scope<'db> {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
@@ -85,7 +85,7 @@ impl FileScopeId {
 
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
         let index = semantic_index(db, file);
-        index.scope_ids_by_scope[self]
+        index.scopes[self].id
     }
 
     pub(crate) fn is_generator_function(self, index: &SemanticIndex) -> bool {
@@ -94,7 +94,7 @@ impl FileScopeId {
 }
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Scope {
+pub(crate) struct Scope<'db> {
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
 
@@ -110,10 +110,13 @@ pub(crate) struct Scope {
     /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
     in_type_checking_block: bool,
 
+    /// The salsa-ingredient [`ScopeId`] for this scope
+    id: ScopeId<'db>,
+
     pub(super) place_table: Arc<PlaceTable>,
 }
 
-impl Scope {
+impl<'db> Scope<'db> {
     pub(crate) fn node(&self) -> &NodeWithScopeKind {
         &self.node
     }
@@ -137,9 +140,13 @@ impl Scope {
     pub(crate) fn in_type_checking_block(&self) -> bool {
         self.in_type_checking_block
     }
+
+    pub(crate) fn id(&self) -> ScopeId<'db> {
+        self.id
+    }
 }
 
-pub(super) struct ScopeBuilder {
+pub(super) struct ScopeBuilder<'db> {
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
 
@@ -154,15 +161,18 @@ pub(super) struct ScopeBuilder {
 
     /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
     in_type_checking_block: bool,
+
+    id: ScopeId<'db>,
 }
 
-impl ScopeBuilder {
+impl<'db> ScopeBuilder<'db> {
     pub(super) fn new(
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
         reachability: ScopedReachabilityConstraintId,
         in_type_checking_block: bool,
+        id: ScopeId<'db>,
     ) -> Self {
         ScopeBuilder {
             parent,
@@ -170,6 +180,7 @@ impl ScopeBuilder {
             descendants,
             reachability,
             in_type_checking_block,
+            id,
         }
     }
 
@@ -193,7 +204,7 @@ impl ScopeBuilder {
         self.reachability
     }
 
-    pub(super) fn into_scope(self, place_table_builder: PlaceTableBuilder) -> Scope {
+    pub(super) fn into_scope(self, place_table_builder: PlaceTableBuilder) -> Scope<'db> {
         Scope {
             parent: self.parent,
             node: self.node,
@@ -201,6 +212,7 @@ impl ScopeBuilder {
             reachability: self.reachability,
             in_type_checking_block: self.in_type_checking_block,
             place_table: Arc::new(place_table_builder.finish()),
+            id: self.id,
         }
     }
 }
@@ -210,7 +222,7 @@ pub(crate) trait ScopeLike {
     fn parent(&self) -> Option<FileScopeId>;
 }
 
-impl ScopeLike for Scope {
+impl ScopeLike for Scope<'_> {
     fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
     }
@@ -220,7 +232,7 @@ impl ScopeLike for Scope {
     }
 }
 
-impl ScopeLike for ScopeBuilder {
+impl ScopeLike for ScopeBuilder<'_> {
     fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
     }

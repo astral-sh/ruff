@@ -101,8 +101,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     semantic_checker: SemanticSyntaxChecker,
 
     // Semantic Index fields
-    scopes: IndexVec<FileScopeId, ScopeBuilder>,
-    scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
+    scopes: IndexVec<FileScopeId, ScopeBuilder<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
@@ -140,7 +139,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
-            scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
@@ -249,12 +247,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
+        let file_scope_id = self.scopes.next_index();
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
+
         let scope = ScopeBuilder::new(
             parent,
             node_with_kind,
             children_start..children_start,
             reachability,
             self.in_type_checking_block,
+            scope_id,
         );
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -265,9 +267,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
-
-        self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
         debug_assert_eq!(previous, None);
 
@@ -1250,19 +1249,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .map(super::ast_ids::AstIdsBuilder::finish)
             .collect();
 
-        let mut scopes: IndexVec<FileScopeId, Scope> = self
-            .scopes
-            .into_iter()
-            .zip(self.place_tables)
-            .map(|(scope_builder, table_builder)| scope_builder.into_scope(table_builder))
-            .collect();
+        let mut scopes: IndexVec<FileScopeId, Scope<'db>> =
+            itertools::izip!(self.scopes, self.place_tables)
+                .map(|(scope_builder, place_table)| scope_builder.into_scope(place_table))
+                .collect();
 
         scopes.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
-        self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
@@ -1271,7 +1267,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
-            scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
