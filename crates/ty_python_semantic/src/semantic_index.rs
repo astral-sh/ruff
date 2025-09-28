@@ -212,12 +212,6 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
-    /// Lookup table to map between node ids and ast nodes.
-    ///
-    /// Note: We should not depend on this map when analysing other files or
-    /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
-
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FxHashSet<ModuleName>>,
 
@@ -255,7 +249,7 @@ impl<'db> SemanticIndex<'db> {
 
     #[track_caller]
     pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
-        &self.ast_ids[scope_id]
+        self.scopes[scope_id].ast_ids()
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.

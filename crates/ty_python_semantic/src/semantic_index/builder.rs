@@ -103,7 +103,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, ScopeBuilder<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
@@ -138,7 +137,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
-            ast_ids: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
@@ -265,12 +263,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(UseDefMapBuilder::new(is_class_scope));
-        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
         debug_assert_eq!(previous, None);
-
-        debug_assert_eq!(ast_id_scope, file_scope_id);
 
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
@@ -551,7 +546,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
-        &mut self.ast_ids[scope_id]
+        self.scopes[scope_id].ast_ids()
     }
 
     fn flow_snapshot(&self) -> FlowSnapshot {
@@ -1237,12 +1232,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        let mut ast_ids: IndexVec<_, _> = self
-            .ast_ids
-            .into_iter()
-            .map(super::ast_ids::AstIdsBuilder::finish)
-            .collect();
-
         let mut scopes: IndexVec<FileScopeId, Scope<'db>> =
             itertools::izip!(self.scopes, self.place_tables, self.use_def_maps)
                 .map(|(scope_builder, place_table, use_def_builder)| {
@@ -1251,7 +1240,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .collect();
 
         scopes.shrink_to_fit();
-        ast_ids.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
         self.scopes_by_node.shrink_to_fit();
@@ -1262,7 +1250,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
-            ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             imported_modules: Arc::new(self.imported_modules),

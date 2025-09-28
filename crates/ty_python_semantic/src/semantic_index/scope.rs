@@ -10,6 +10,7 @@ use crate::{
     node_key::NodeKey,
     semantic_index::{
         SemanticIndex,
+        ast_ids::{AstIds, AstIdsBuilder},
         place::{PlaceTable, PlaceTableBuilder},
         reachability_constraints::ScopedReachabilityConstraintId,
         semantic_index,
@@ -114,6 +115,12 @@ pub(crate) struct Scope<'db> {
     /// The salsa-ingredient [`ScopeId`] for this scope
     id: ScopeId<'db>,
 
+    /// Lookup table to map between node ids and ast nodes.
+    ///
+    /// Note: We should not depend on this map when analysing other files or
+    /// changing a file invalidates all dependents.
+    ast_ids: AstIds,
+
     pub(super) use_def_map: Arc<UseDefMap<'db>>,
 
     pub(super) place_table: Arc<PlaceTable>,
@@ -147,6 +154,10 @@ impl<'db> Scope<'db> {
     pub(crate) fn id(&self) -> ScopeId<'db> {
         self.id
     }
+
+    pub(crate) fn ast_ids(&self) -> &AstIds {
+        &self.ast_ids
+    }
 }
 
 pub(super) struct ScopeBuilder<'db> {
@@ -166,6 +177,8 @@ pub(super) struct ScopeBuilder<'db> {
     in_type_checking_block: bool,
 
     id: ScopeId<'db>,
+
+    ast_ids: AstIdsBuilder,
 }
 
 impl<'db> ScopeBuilder<'db> {
@@ -184,6 +197,7 @@ impl<'db> ScopeBuilder<'db> {
             reachability,
             in_type_checking_block,
             id,
+            ast_ids: AstIdsBuilder::default(),
         }
     }
 
@@ -207,6 +221,10 @@ impl<'db> ScopeBuilder<'db> {
         self.reachability
     }
 
+    pub(super) fn ast_ids(&mut self) -> &mut AstIdsBuilder {
+        &mut self.ast_ids
+    }
+
     pub(super) fn into_scope(
         self,
         place_table_builder: PlaceTableBuilder,
@@ -218,6 +236,7 @@ impl<'db> ScopeBuilder<'db> {
             descendants: self.descendants,
             reachability: self.reachability,
             in_type_checking_block: self.in_type_checking_block,
+            ast_ids: self.ast_ids.finish(),
             place_table: Arc::new(place_table_builder.finish()),
             use_def_map: Arc::new(use_def_map_builder.finish()),
             id: self.id,
