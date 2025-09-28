@@ -1562,7 +1562,7 @@ impl<'db> Type<'db> {
             (Type::Intersection(intersection), Type::NonInferableTypeVar(_))
                 if intersection.negative(db).contains(&target) =>
             {
-                ConstraintSet::from(true)
+                ConstraintSet::from(false)
             }
 
             // Two identical typevars must always solve to the same type, so they are always

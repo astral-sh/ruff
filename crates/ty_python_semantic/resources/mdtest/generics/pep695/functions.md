@@ -537,3 +537,14 @@ def _(x: int):
     # TODO: this should be `tuple[C, int]` as well, once we support implicit `self`
     reveal_type(C().implicit_self(x))  # revealed: tuple[Unknown, int]
 ```
+
+## `~T` is never assignable to `T`
+
+```py
+from ty_extensions import Not
+
+def f[T](x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
+```
