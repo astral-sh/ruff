@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
@@ -9,7 +9,10 @@ use crate::{
     ast_node_ref::AstNodeRef,
     node_key::NodeKey,
     semantic_index::{
-        SemanticIndex, reachability_constraints::ScopedReachabilityConstraintId, semantic_index,
+        SemanticIndex,
+        place::{PlaceTable, PlaceTableBuilder},
+        reachability_constraints::ScopedReachabilityConstraintId,
+        semantic_index,
     },
 };
 
@@ -106,35 +109,13 @@ pub(crate) struct Scope {
 
     /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
     in_type_checking_block: bool,
+
+    pub(super) place_table: Arc<PlaceTable>,
 }
 
 impl Scope {
-    pub(super) fn new(
-        parent: Option<FileScopeId>,
-        node: NodeWithScopeKind,
-        descendants: Range<FileScopeId>,
-        reachability: ScopedReachabilityConstraintId,
-        in_type_checking_block: bool,
-    ) -> Self {
-        Scope {
-            parent,
-            node,
-            descendants,
-            reachability,
-            in_type_checking_block,
-        }
-    }
-
-    pub(crate) fn parent(&self) -> Option<FileScopeId> {
-        self.parent
-    }
-
     pub(crate) fn node(&self) -> &NodeWithScopeKind {
         &self.node
-    }
-
-    pub(crate) fn kind(&self) -> ScopeKind {
-        self.node().scope_kind()
     }
 
     pub(crate) fn visibility(&self) -> ScopeVisibility {
@@ -143,10 +124,6 @@ impl Scope {
 
     pub(crate) fn descendants(&self) -> Range<FileScopeId> {
         self.descendants.clone()
-    }
-
-    pub(super) fn extend_descendants(&mut self, children_end: FileScopeId) {
-        self.descendants = self.descendants.start..children_end;
     }
 
     pub(crate) fn is_eager(&self) -> bool {
@@ -159,6 +136,97 @@ impl Scope {
 
     pub(crate) fn in_type_checking_block(&self) -> bool {
         self.in_type_checking_block
+    }
+}
+
+pub(super) struct ScopeBuilder {
+    /// The parent scope, if any.
+    parent: Option<FileScopeId>,
+
+    /// The node that introduces this scope.
+    node: NodeWithScopeKind,
+
+    /// The range of [`FileScopeId`]s that are descendants of this scope.
+    descendants: Range<FileScopeId>,
+
+    /// The constraint that determines the reachability of this scope.
+    reachability: ScopedReachabilityConstraintId,
+
+    /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
+    in_type_checking_block: bool,
+}
+
+impl ScopeBuilder {
+    pub(super) fn new(
+        parent: Option<FileScopeId>,
+        node: NodeWithScopeKind,
+        descendants: Range<FileScopeId>,
+        reachability: ScopedReachabilityConstraintId,
+        in_type_checking_block: bool,
+    ) -> Self {
+        ScopeBuilder {
+            parent,
+            node,
+            descendants,
+            reachability,
+            in_type_checking_block,
+        }
+    }
+
+    pub(super) fn node(&self) -> &NodeWithScopeKind {
+        &self.node
+    }
+
+    pub(super) fn visibility(&self) -> ScopeVisibility {
+        self.kind().visibility()
+    }
+
+    pub(super) fn extend_descendants(&mut self, children_end: FileScopeId) {
+        self.descendants = self.descendants.start..children_end;
+    }
+
+    pub(super) fn is_eager(&self) -> bool {
+        self.kind().is_eager()
+    }
+
+    pub(super) fn reachability(&self) -> ScopedReachabilityConstraintId {
+        self.reachability
+    }
+
+    pub(super) fn into_scope(self, place_table_builder: PlaceTableBuilder) -> Scope {
+        Scope {
+            parent: self.parent,
+            node: self.node,
+            descendants: self.descendants,
+            reachability: self.reachability,
+            in_type_checking_block: self.in_type_checking_block,
+            place_table: Arc::new(place_table_builder.finish()),
+        }
+    }
+}
+
+pub(crate) trait ScopeLike {
+    fn kind(&self) -> ScopeKind;
+    fn parent(&self) -> Option<FileScopeId>;
+}
+
+impl ScopeLike for Scope {
+    fn kind(&self) -> ScopeKind {
+        self.node().scope_kind()
+    }
+
+    fn parent(&self) -> Option<FileScopeId> {
+        self.parent
+    }
+}
+
+impl ScopeLike for ScopeBuilder {
+    fn kind(&self) -> ScopeKind {
+        self.node().scope_kind()
+    }
+
+    fn parent(&self) -> Option<FileScopeId> {
+        self.parent
     }
 }
 

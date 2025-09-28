@@ -23,7 +23,7 @@ use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, PlaceTable};
 pub use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::scope::{
-    NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
+    NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness, ScopeLike,
 };
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
@@ -70,7 +70,7 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-    Arc::clone(&index.place_tables[scope.file_scope_id(db)])
+    Arc::clone(&index.scopes[scope.file_scope_id(db)].place_table)
 }
 
 /// Returns the set of modules that are imported anywhere in `file`.
@@ -197,9 +197,6 @@ pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub(crate) struct SemanticIndex<'db> {
-    /// List of all place tables in this file, indexed by scope.
-    place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
-
     /// List of all scopes in this file.
     scopes: IndexVec<FileScopeId, Scope>,
 
@@ -250,7 +247,7 @@ impl<'db> SemanticIndex<'db> {
     /// place table for a single scope.
     #[track_caller]
     pub(super) fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
-        &self.place_tables[scope_id]
+        &self.scopes[scope_id].place_table
     }
 
     /// Returns the use-def map for a specific scope.
@@ -412,7 +409,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_> {
+    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_, Scope> {
         AncestorsIter::new(&self.scopes, scope)
     }
 
@@ -430,7 +427,10 @@ impl<'db> SemanticIndex<'db> {
     ///         print(x)  # Refers to global x=1, not class x=2
     /// ```
     /// The `method` function can see the global scope but not the class scope.
-    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
+    pub(crate) fn visible_ancestor_scopes(
+        &self,
+        scope: FileScopeId,
+    ) -> VisibleAncestorsIter<'_, Scope> {
         VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
@@ -529,7 +529,7 @@ impl<'db> SemanticIndex<'db> {
             if !ancestor_scope.is_eager() {
                 if let PlaceExprRef::Symbol(symbol) = expr {
                     if let Some(place_id) =
-                        self.place_tables[enclosing_scope].symbol_id(symbol.name())
+                        self.place_table(enclosing_scope).symbol_id(symbol.name())
                     {
                         let key = EnclosingSnapshotKey {
                             enclosing_scope,
@@ -546,7 +546,7 @@ impl<'db> SemanticIndex<'db> {
                 return EnclosingSnapshotResult::NoLongerInEagerContext;
             }
         }
-        let Some(place_id) = self.place_tables[enclosing_scope].place_id(expr) else {
+        let Some(place_id) = self.place_table(enclosing_scope).place_id(expr) else {
             return EnclosingSnapshotResult::NotFound;
         };
         let key = EnclosingSnapshotKey {
@@ -566,13 +566,13 @@ impl<'db> SemanticIndex<'db> {
     }
 }
 
-pub(crate) struct AncestorsIter<'a> {
-    scopes: &'a IndexSlice<FileScopeId, Scope>,
+pub(crate) struct AncestorsIter<'a, T> {
+    scopes: &'a IndexSlice<FileScopeId, T>,
     next_id: Option<FileScopeId>,
 }
 
-impl<'a> AncestorsIter<'a> {
-    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
+impl<'a, T> AncestorsIter<'a, T> {
+    fn new(scopes: &'a IndexSlice<FileScopeId, T>, start: FileScopeId) -> Self {
         Self {
             scopes,
             next_id: Some(start),
@@ -580,8 +580,8 @@ impl<'a> AncestorsIter<'a> {
     }
 }
 
-impl<'a> Iterator for AncestorsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
+impl<'a, T: ScopeLike> Iterator for AncestorsIter<'a, T> {
+    type Item = (FileScopeId, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         let current_id = self.next_id?;
@@ -592,16 +592,16 @@ impl<'a> Iterator for AncestorsIter<'a> {
     }
 }
 
-impl FusedIterator for AncestorsIter<'_> {}
+impl<T: ScopeLike> FusedIterator for AncestorsIter<'_, T> {}
 
-pub(crate) struct VisibleAncestorsIter<'a> {
-    inner: AncestorsIter<'a>,
+pub(crate) struct VisibleAncestorsIter<'a, T> {
+    inner: AncestorsIter<'a, T>,
     starting_scope_kind: ScopeKind,
     yielded_count: usize,
 }
 
-impl<'a> VisibleAncestorsIter<'a> {
-    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
+impl<'a, T: ScopeLike> VisibleAncestorsIter<'a, T> {
+    fn new(scopes: &'a IndexSlice<FileScopeId, T>, start: FileScopeId) -> Self {
         let starting_scope = &scopes[start];
         Self {
             inner: AncestorsIter::new(scopes, start),
@@ -611,8 +611,8 @@ impl<'a> VisibleAncestorsIter<'a> {
     }
 }
 
-impl<'a> Iterator for VisibleAncestorsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
+impl<'a, T: ScopeLike> Iterator for VisibleAncestorsIter<'a, T> {
+    type Item = (FileScopeId, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -639,7 +639,7 @@ impl<'a> Iterator for VisibleAncestorsIter<'a> {
     }
 }
 
-impl FusedIterator for VisibleAncestorsIter<'_> {}
+impl<T: ScopeLike> FusedIterator for VisibleAncestorsIter<'_, T> {}
 
 pub(crate) struct DescendantsIter<'a> {
     next_id: FileScopeId,
@@ -749,7 +749,7 @@ mod tests {
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::place::PlaceTable;
-    use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind};
+    use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind, ScopeLike};
     use crate::semantic_index::symbol::ScopedSymbolId;
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};

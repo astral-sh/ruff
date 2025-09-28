@@ -13,6 +13,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
 use crate::module_resolver::file_to_module;
+use crate::semantic_index::scope::ScopeLike;
 use crate::semantic_index::{scope::ScopeKind, semantic_index};
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};

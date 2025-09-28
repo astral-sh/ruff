@@ -40,7 +40,7 @@ use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::scope::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, ScopeBuilder, ScopeLike,
 };
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
@@ -101,7 +101,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     semantic_checker: SemanticSyntaxChecker,
 
     // Semantic Index fields
-    scopes: IndexVec<FileScopeId, Scope>,
+    scopes: IndexVec<FileScopeId, ScopeBuilder>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
@@ -249,7 +249,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(
+        let scope = ScopeBuilder::new(
             parent,
             node_with_kind,
             children_start..children_start,
@@ -1238,12 +1238,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        let mut place_tables: IndexVec<_, _> = self
-            .place_tables
-            .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
@@ -1256,8 +1250,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .map(super::ast_ids::AstIdsBuilder::finish)
             .collect();
 
-        self.scopes.shrink_to_fit();
-        place_tables.shrink_to_fit();
+        let mut scopes: IndexVec<FileScopeId, Scope> = self
+            .scopes
+            .into_iter()
+            .zip(self.place_tables)
+            .map(|(scope_builder, table_builder)| scope_builder.into_scope(table_builder))
+            .collect();
+
+        scopes.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
@@ -1268,8 +1268,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.enclosing_snapshots.shrink_to_fit();
 
         SemanticIndex {
-            place_tables,
-            scopes: self.scopes,
+            scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
