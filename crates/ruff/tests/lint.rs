@@ -2462,6 +2462,7 @@ requires-python = ">= 3.11"
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -2776,6 +2777,7 @@ requires-python = ">= 3.11"
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -3089,6 +3091,7 @@ requires-python = ">= 3.11"
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -3454,6 +3457,7 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -3835,6 +3839,7 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -4164,6 +4169,7 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -4493,6 +4499,7 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -4779,6 +4786,7 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []
@@ -5118,6 +5126,7 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.blank_lines_around_controls = disabled
 
         # Analyze Settings
         analyze.exclude = []

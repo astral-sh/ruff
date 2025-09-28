@@ -388,6 +388,7 @@ formatter.quote_style = double
 formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
+formatter.blank_lines_around_controls = disabled
 
 # Analyze Settings
 analyze.exclude = []

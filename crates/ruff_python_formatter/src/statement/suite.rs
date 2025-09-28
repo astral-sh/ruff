@@ -1070,4 +1070,55 @@ def trailing_func():
 "
         );
     }
+
+    #[test]
+    fn blank_lines_around_controls() {
+        let source = r"
+a = 1
+if True:
+    pass
+b = 2
+while False:
+    pass
+c = 3
+";
+
+        let parsed = parse_module(source).unwrap();
+        let comment_ranges = CommentRanges::from(parsed.tokens());
+
+        let options = PyFormatOptions::default()
+            .with_blank_lines_around_controls(crate::options::BlankLinesAroundControls::Enabled);
+        let context = PyFormatContext::new(
+            options,
+            source,
+            Comments::from_ranges(&comment_ranges),
+            parsed.tokens(),
+        );
+
+        let test_formatter = format_with(|f: &mut PyFormatter| {
+            parsed
+                .suite()
+                .format()
+                .with_options(SuiteKind::TopLevel)
+                .fmt(f)
+        });
+
+        let formatted = format!(context, [test_formatter]).unwrap();
+        let printed = formatted.print().unwrap();
+
+        assert_eq!(
+            printed.as_code(),
+            r"a = 1
+
+if True:
+    pass
+
+b = 2
+
+while False:
+    pass
+
+c = 3"
+        );
+    }
 }
