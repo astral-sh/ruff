@@ -1789,6 +1789,68 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for class variable definitions with default values for names that are defined in `__slots__`.
+    ///
+    /// ## Why is this bad?
+    /// When a name is defined in `__slots__`, it cannot have a class-level default value.
+    /// This would raise an error at class definition time.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class C:
+    ///     __slots__ = ("foo",)
+    ///     foo: int = 1  # error: 'foo' in __slots__ conflicts with class variable
+    /// ```
+    pub(crate) static INVALID_SLOTS_DEFAULT = {
+        summary: "detects class variables with defaults for names in __slots__",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for instance attribute annotations for names that are not defined in `__slots__`.
+    ///
+    /// ## Why is this bad?
+    /// When a class defines `__slots__`, only the attributes listed in `__slots__` are allowed.
+    /// Annotating other attributes is misleading.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class C:
+    ///     __slots__ = ("foo",)
+    ///     bar: int  # error: 'bar' is not in __slots__
+    /// ```
+    pub(crate) static INVALID_SLOTS_ANNOTATION = {
+        summary: "detects instance attribute annotations not in __slots__",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for non-empty `__slots__` definitions on classes that inherit from variable-length built-in types.
+    ///
+    /// ## Why is this bad?
+    /// Variable-length built-in types like `int`, `bytes`, and `tuple` have special memory layouts
+    /// that are incompatible with non-empty `__slots__`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class C(int):
+    ///     __slots__ = ("foo",)  # error: nonempty __slots__ not supported for subtype of 'int'
+    /// ```
+    pub(crate) static INVALID_SLOTS_ON_BUILTIN = {
+        summary: "detects invalid __slots__ on variable-length built-in subtypes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {

@@ -3210,6 +3210,21 @@ impl<'db> ClassLiteral<'db> {
         // - `typing.Final`
         // - Proper diagnostics
 
+        // Handle __dict__ and __weakref__ special cases for __slots__
+        if name == "__dict__" {
+            // If this class has __slots__ without __dict__, __dict__ is not available
+            if !self.has_dict_in_slots(db) && self.all_slots_from_mro(db).is_some() {
+                return Place::Unbound.into();
+            }
+        }
+
+        if name == "__weakref__" {
+            // If this class has __slots__ without __weakref__, __weakref__ is not available
+            if !self.has_weakref_in_slots(db) && self.all_slots_from_mro(db).is_some() {
+                return Place::Unbound.into();
+            }
+        }
+
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
 
@@ -3315,14 +3330,58 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+                    
+                    // Check __slots__ constraints for implicit attributes
+                    if let Some(all_slots) = self.all_slots_from_mro(db) {
+                        // This class (or a parent) defines __slots__
+                        if self.has_dict_in_slots(db) {
+                            // __dict__ is in __slots__, so all attributes are allowed
+                            return result;
+                        }
+                        
+                        if all_slots.contains(name) {
+                            // Attribute is in __slots__, so it's allowed even if not found elsewhere
+                            // Return a type that indicates the attribute exists but we don't know its type
+                            if result.place.is_unbound() {
+                                return Place::bound(Type::unknown()).into();
+                            }
+                        } else {
+                            // Attribute is not in __slots__ and this class defines __slots__
+                            return Place::Unbound.into();
+                        }
+                    }
+                    
+                    result
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+            
+            // Check __slots__ constraints for implicit attributes
+            if let Some(all_slots) = self.all_slots_from_mro(db) {
+                // This class (or a parent) defines __slots__
+                if self.has_dict_in_slots(db) {
+                    // __dict__ is in __slots__, so all attributes are allowed
+                    return result;
+                }
+                
+                if all_slots.contains(name) {
+                    // Attribute is in __slots__, so it's allowed even if not found elsewhere
+                    // Return a type that indicates the attribute exists but we don't know its type
+                    if result.place.is_unbound() {
+                        return Place::bound(Type::unknown()).into();
+                    }
+                } else {
+                    // Attribute is not in __slots__ and this class defines __slots__
+                    return Place::Unbound.into();
+                }
+            }
+            
+            result
         }
     }
 
@@ -5294,6 +5353,150 @@ impl SlotsKind {
 
             _ => Self::Dynamic,
         }
+    }
+}
+
+/// Helper functions for __slots__ support
+impl<'db> ClassLiteral<'db> {
+    /// Extract the names of attributes defined in __slots__ as a set of strings.
+    /// Returns None if __slots__ is not defined, empty, or dynamic.
+    pub(super) fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
+        let Place::Type(slots_ty, bound) = self
+            .own_class_member(db, self.generic_context(db), None, "__slots__")
+            .place
+        else {
+            return None;
+        };
+
+        if matches!(bound, Boundness::PossiblyUnbound) {
+            return None;
+        }
+
+        match slots_ty {
+            // __slots__ = ("a", "b")
+            Type::NominalInstance(nominal) => {
+                if let Some(tuple_spec) = nominal.tuple_spec(db) {
+                    let mut slots = FxHashSet::default();
+                    for element in tuple_spec.all_elements() {
+                        if let Type::StringLiteral(string_literal) = element {
+                            slots.insert(string_literal.value(db).to_string());
+                        } else {
+                            // Non-string element, consider it dynamic
+                            return None;
+                        }
+                    }
+                    Some(slots)
+                } else {
+                    None
+                }
+            }
+
+            // __slots__ = "abc"  # Same as `("abc",)`
+            Type::StringLiteral(string_literal) => {
+                let mut slots = FxHashSet::default();
+                // A single string is treated as a sequence of characters
+                for char in string_literal.value(db).chars() {
+                    slots.insert(char.to_string());
+                }
+                Some(slots)
+            }
+
+            _ => None,
+        }
+    }
+
+    /// Check if this class or any of its parents has __dict__ in __slots__
+    pub(super) fn has_dict_in_slots(self, db: &'db dyn Db) -> bool {
+        self.slots_members(db)
+            .is_some_and(|slots| slots.contains("__dict__"))
+            || self
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .any(|class| {
+                    let (class_literal, _) = class.class_literal(db);
+                    class_literal
+                        .slots_members(db)
+                        .is_some_and(|slots| slots.contains("__dict__"))
+                })
+    }
+
+    /// Check if this class or any of its parents has __weakref__ in __slots__
+    pub(super) fn has_weakref_in_slots(self, db: &'db dyn Db) -> bool {
+        self.slots_members(db)
+            .is_some_and(|slots| slots.contains("__weakref__"))
+            || self
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .any(|class| {
+                    let (class_literal, _) = class.class_literal(db);
+                    class_literal
+                        .slots_members(db)
+                        .is_some_and(|slots| slots.contains("__weakref__"))
+                })
+    }
+
+    /// Get all slot names from this class and its MRO
+    pub(super) fn all_slots_from_mro(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
+        let mut all_slots = FxHashSet::default();
+        let mut found_any_slots = false;
+
+        // Check this class and all its parents
+        for class_base in self.iter_mro(db, None) {
+            if let ClassBase::Class(class) = class_base {
+                let (class_literal, _) = class.class_literal(db);
+                if let Some(slots) = class_literal.slots_members(db) {
+                    all_slots.extend(slots);
+                    found_any_slots = true;
+                }
+            }
+        }
+
+        if found_any_slots {
+            Some(all_slots)
+        } else {
+            None
+        }
+    }
+
+    /// Check if an attribute is allowed based on __slots__ definitions in the MRO
+    pub(super) fn is_attribute_allowed_by_slots(
+        self,
+        db: &'db dyn Db,
+        attribute_name: &str,
+    ) -> bool {
+        // If any class in the MRO has __dict__ in __slots__, all attributes are allowed
+        if self.has_dict_in_slots(db) {
+            return true;
+        }
+
+        // If no class in the MRO defines __slots__, all attributes are allowed
+        let Some(all_slots) = self.all_slots_from_mro(db) else {
+            return true;
+        };
+
+        // Check if the attribute is in the combined __slots__
+        all_slots.contains(attribute_name)
+    }
+
+    /// Check if this class inherits from a variable-length built-in type
+    pub(super) fn inherits_from_variable_length_builtin(self, db: &'db dyn Db) -> bool {
+        for class_base in self.iter_mro(db, None) {
+            if let ClassBase::Class(class) = class_base {
+                let (class_literal, _) = class.class_literal(db);
+                if let Some(known_class) = class_literal.known(db) {
+                    match known_class {
+                        KnownClass::Int
+                        | KnownClass::Bytes
+                        | KnownClass::Tuple
+                        | KnownClass::Str
+                        | KnownClass::Float
+                        | KnownClass::Complex => return true,
+                        _ => {}
+                    }
+                }
+            }
+        }
+        false
     }
 }
 
