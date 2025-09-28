@@ -3799,6 +3799,17 @@ pub struct FormatOptions {
         "#
     )]
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
+
+    /// Whether to insert blank lines around control blocks (if/for/while/with/try)
+    #[option(
+        default = r#"false"#,
+        value_type = r#"bool"#,
+        example = r#"
+            # Insert blank lines around control blocks
+            blank-lines-around-controls = true
+        "#
+    )]
+    pub blank_lines_around_controls: Option<bool>,
 }
 
 /// Configures Ruff's `analyze` command.

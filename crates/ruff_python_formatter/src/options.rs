@@ -62,6 +62,10 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// Whether to enforce a blank line before and after control blocks
+    /// (if/for/while/with/try) inside suites.
+    blank_lines_around_controls: BlankLinesAroundControls,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +95,7 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            blank_lines_around_controls: BlankLinesAroundControls::Disabled,
         }
     }
 }
@@ -142,6 +147,10 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn blank_lines_around_controls(&self) -> BlankLinesAroundControls {
+        self.blank_lines_around_controls
     }
 
     #[must_use]
@@ -207,6 +216,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_source_map_generation(mut self, source_map: SourceMapGeneration) -> Self {
         self.source_map_generation = source_map;
+        self
+    }
+
+    #[must_use]
+    pub fn with_blank_lines_around_controls(mut self, value: BlankLinesAroundControls) -> Self {
+        self.blank_lines_around_controls = value;
         self
     }
 }
@@ -344,6 +359,32 @@ impl PreviewMode {
 }
 
 impl fmt::Display for PreviewMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum BlankLinesAroundControls {
+    #[default]
+    Disabled,
+
+    Enabled,
+}
+
+impl BlankLinesAroundControls {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, BlankLinesAroundControls::Enabled)
+    }
+}
+
+impl fmt::Display for BlankLinesAroundControls {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Disabled => write!(f, "disabled"),

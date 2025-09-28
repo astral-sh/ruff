@@ -203,10 +203,38 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 trailing_function_or_class_def(Some(preceding), &comments).is_some()
             };
 
+            // Optional: enforce blank lines around control statements when enabled
+            let mut handled_spacing = false;
+            if f.options().blank_lines_around_controls().is_enabled() {
+                // Insert a blank line BEFORE a control statement if not already separated
+                if is_control_statement(following) {
+                    let start = if let Some(first_leading) = following_comments.leading.first() {
+                        first_leading.start()
+                    } else {
+                        following.start()
+                    };
+                    if lines_before(start, source) < 2 {
+                        empty_line().fmt(f)?;
+                        handled_spacing = true;
+                    }
+                // Insert a blank line AFTER a control statement if not already separated
+                } else if is_control_statement(preceding) {
+                    let start = if let Some(first_leading) = following_comments.leading.first() {
+                        first_leading.start()
+                    } else {
+                        following.start()
+                    };
+                    if lines_before(start, source) < 2 {
+                        empty_line().fmt(f)?;
+                        handled_spacing = true;
+                    }
+                }
+            }
+
             // Add empty lines before and after a function or class definition. If the preceding
             // node is a function or class, and contains trailing comments, then the statement
             // itself will add the requisite empty lines when formatting its comments.
-            if needs_empty_lines {
+            if !handled_spacing && needs_empty_lines {
                 if source_type.is_stub() {
                     stub_file_empty_lines(
                         self.kind,
@@ -245,7 +273,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     }
                 }
-            } else if is_import_definition(preceding)
+            } else if !handled_spacing
+                && is_import_definition(preceding)
                 && (!is_import_definition(following) || following_comments.has_leading())
             {
                 // Enforce _at least_ one empty line after an import statement (but allow up to
@@ -275,7 +304,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         empty_line().fmt(f)?;
                     }
                 }
-            } else if is_compound_statement(preceding) {
+            } else if !handled_spacing && is_compound_statement(preceding) {
                 // Handles the case where a body has trailing comments. The issue is that RustPython does not include
                 // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
                 // ```python
@@ -315,7 +344,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     },
                 }
-            } else if empty_line_after_docstring {
+            } else if !handled_spacing && empty_line_after_docstring {
                 // Enforce an empty line after a class docstring, e.g., these are both stable
                 // formatting:
                 // ```python
@@ -332,7 +361,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 //     ...
                 // ```
                 empty_line().fmt(f)?;
-            } else {
+            } else if !handled_spacing {
                 // Insert the appropriate number of empty lines based on the node level, e.g.:
                 // * [`NodeLevel::Module`]: Up to two empty lines
                 // * [`NodeLevel::CompoundStatement`]: Up to one empty line
@@ -749,6 +778,14 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
 /// Returns `true` if a [`Stmt`] is an import.
 const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
+}
+
+/// Returns `true` if a [`Stmt`] is a control statement that begins a suite
+const fn is_control_statement(stmt: &Stmt) -> bool {
+    matches!(
+        stmt,
+        Stmt::If(_) | Stmt::For(_) | Stmt::While(_) | Stmt::With(_) | Stmt::Try(_)
+    )
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {

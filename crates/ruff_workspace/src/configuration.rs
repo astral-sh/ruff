@@ -41,7 +41,7 @@ use ruff_linter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+    BlankLinesAroundControls, DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
 
 use crate::options::{
@@ -210,6 +210,9 @@ impl Configuration {
             docstring_code_line_width: format
                 .docstring_code_line_width
                 .unwrap_or(format_defaults.docstring_code_line_width),
+            blank_lines_around_controls: format
+                .blank_lines_around_controls
+                .unwrap_or(format_defaults.blank_lines_around_controls),
         };
 
         let analyze = self.analyze;
@@ -1211,6 +1214,7 @@ pub struct FormatConfiguration {
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
     pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
+    pub blank_lines_around_controls: Option<BlankLinesAroundControls>,
 }
 
 impl FormatConfiguration {
@@ -1247,6 +1251,13 @@ impl FormatConfiguration {
                 }
             }),
             docstring_code_line_width: options.docstring_code_line_length,
+            blank_lines_around_controls: options.blank_lines_around_controls.map(|yes| {
+                if yes {
+                    BlankLinesAroundControls::Enabled
+                } else {
+                    BlankLinesAroundControls::Disabled
+                }
+            }),
         })
     }
 
@@ -1264,6 +1275,9 @@ impl FormatConfiguration {
             docstring_code_line_width: self
                 .docstring_code_line_width
                 .or(config.docstring_code_line_width),
+            blank_lines_around_controls: self
+                .blank_lines_around_controls
+                .or(config.blank_lines_around_controls),
         }
     }
 }

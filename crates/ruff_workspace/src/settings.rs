@@ -11,8 +11,8 @@ use ruff_linter::settings::types::{
 use ruff_macros::CacheKey;
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuoteStyle,
+    BlankLinesAroundControls, DocstringCode, DocstringCodeLineWidth, MagicTrailingComma,
+    PreviewMode, PyFormatOptions, QuoteStyle,
 };
 use ruff_source_file::find_newline;
 use std::fmt;
@@ -196,6 +196,10 @@ pub struct FormatterSettings {
 
     pub docstring_code_format: DocstringCode,
     pub docstring_code_line_width: DocstringCodeLineWidth,
+
+    /// Whether to enforce a blank line before and after control blocks
+    /// (if/for/while/with/try) inside suites.
+    pub blank_lines_around_controls: BlankLinesAroundControls,
 }
 
 impl FormatterSettings {
@@ -241,6 +245,7 @@ impl FormatterSettings {
             .with_line_width(self.line_width)
             .with_docstring_code(self.docstring_code_format)
             .with_docstring_code_line_width(self.docstring_code_line_width)
+            .with_blank_lines_around_controls(self.blank_lines_around_controls)
     }
 
     /// Resolve the [`PythonVersion`] to use for formatting.
@@ -273,6 +278,7 @@ impl Default for FormatterSettings {
             magic_trailing_comma: default_options.magic_trailing_comma(),
             docstring_code_format: default_options.docstring_code(),
             docstring_code_line_width: default_options.docstring_code_line_width(),
+            blank_lines_around_controls: default_options.blank_lines_around_controls(),
         }
     }
 }
@@ -295,7 +301,8 @@ impl fmt::Display for FormatterSettings {
                 self.quote_style,
                 self.magic_trailing_comma,
                 self.docstring_code_format,
-                self.docstring_code_line_width,
+                    self.docstring_code_line_width,
+                    self.blank_lines_around_controls,
             ]
         }
         Ok(())

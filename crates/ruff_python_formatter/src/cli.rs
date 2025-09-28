@@ -12,7 +12,9 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
-use crate::{MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_ast};
+use crate::{
+    BlankLinesAroundControls, MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_ast,
+};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {
@@ -60,7 +62,9 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
             MagicTrailingComma::Ignore
         } else {
             MagicTrailingComma::Respect
-        });
+        })
+        // Dev CLI uses default for new option; expose via workspace CLI if needed
+        .with_blank_lines_around_controls(BlankLinesAroundControls::Disabled);
 
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
