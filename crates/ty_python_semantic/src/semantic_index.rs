@@ -99,7 +99,7 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+    Arc::clone(&index.scopes[scope.file_scope_id(db)].use_def_map)
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
@@ -118,7 +118,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = &index.use_def_maps[function_scope_id];
+        let use_def = index.use_def_map(function_scope_id);
         Some((
             use_def.all_reachable_member_bindings(member),
             function_scope_id,
@@ -142,7 +142,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = &index.use_def_maps[function_scope_id];
+        let use_def = index.use_def_map(function_scope_id);
         Some((
             use_def.all_reachable_member_declarations(member),
             function_scope_id,
@@ -212,9 +212,6 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
-    /// Use-def map for each scope in this file.
-    use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
-
     /// Lookup table to map between node ids and ast nodes.
     ///
     /// Note: We should not depend on this map when analysing other files or
@@ -253,7 +250,7 @@ impl<'db> SemanticIndex<'db> {
     /// use-def map for a single scope.
     #[track_caller]
     pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
-        &self.use_def_maps[scope_id]
+        &self.scopes[scope_id].use_def_map
     }
 
     #[track_caller]
@@ -535,7 +532,8 @@ impl<'db> SemanticIndex<'db> {
                             nested_laziness: ScopeLaziness::Lazy,
                         };
                         if let Some(id) = self.enclosing_snapshots.get(&key) {
-                            return self.use_def_maps[enclosing_scope]
+                            return self
+                                .use_def_map(enclosing_scope)
                                 .enclosing_snapshot(*id, key.nested_laziness);
                         }
                     }
@@ -555,7 +553,8 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.enclosing_snapshots.get(&key) else {
             return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
+        self.use_def_map(enclosing_scope)
+            .enclosing_snapshot(*id, key.nested_laziness)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {

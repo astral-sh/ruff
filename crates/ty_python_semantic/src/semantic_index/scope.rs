@@ -13,6 +13,7 @@ use crate::{
         place::{PlaceTable, PlaceTableBuilder},
         reachability_constraints::ScopedReachabilityConstraintId,
         semantic_index,
+        use_def::{UseDefMap, UseDefMapBuilder},
     },
 };
 
@@ -113,6 +114,8 @@ pub(crate) struct Scope<'db> {
     /// The salsa-ingredient [`ScopeId`] for this scope
     id: ScopeId<'db>,
 
+    pub(super) use_def_map: Arc<UseDefMap<'db>>,
+
     pub(super) place_table: Arc<PlaceTable>,
 }
 
@@ -204,7 +207,11 @@ impl<'db> ScopeBuilder<'db> {
         self.reachability
     }
 
-    pub(super) fn into_scope(self, place_table_builder: PlaceTableBuilder) -> Scope<'db> {
+    pub(super) fn into_scope(
+        self,
+        place_table_builder: PlaceTableBuilder,
+        use_def_map_builder: UseDefMapBuilder<'db>,
+    ) -> Scope<'db> {
         Scope {
             parent: self.parent,
             node: self.node,
@@ -212,6 +219,7 @@ impl<'db> ScopeBuilder<'db> {
             reachability: self.reachability,
             in_type_checking_block: self.in_type_checking_block,
             place_table: Arc::new(place_table_builder.finish()),
+            use_def_map: Arc::new(use_def_map_builder.finish()),
             id: self.id,
         }
     }

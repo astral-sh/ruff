@@ -1237,12 +1237,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        let mut use_def_maps: IndexVec<_, _> = self
-            .use_def_maps
-            .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
         let mut ast_ids: IndexVec<_, _> = self
             .ast_ids
             .into_iter()
@@ -1250,12 +1244,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .collect();
 
         let mut scopes: IndexVec<FileScopeId, Scope<'db>> =
-            itertools::izip!(self.scopes, self.place_tables)
-                .map(|(scope_builder, place_table)| scope_builder.into_scope(place_table))
+            itertools::izip!(self.scopes, self.place_tables, self.use_def_maps)
+                .map(|(scope_builder, place_table, use_def_builder)| {
+                    scope_builder.into_scope(place_table, use_def_builder)
+                })
                 .collect();
 
         scopes.shrink_to_fit();
-        use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
@@ -1270,7 +1265,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
