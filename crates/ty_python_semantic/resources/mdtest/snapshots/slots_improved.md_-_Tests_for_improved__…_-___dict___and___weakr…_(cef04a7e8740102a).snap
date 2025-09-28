@@ -1,0 +1,53 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: slots_improved.md - Tests for improved __slots__ support - __dict__ and __weakref__ removal
+mdtest path: crates/ty_python_semantic/resources/mdtest/slots_improved.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class F:
+2 |     __slots__ = ("foo",)
+3 | 
+4 | f = F()
+5 | f.foo = 1  # ok
+6 | f.bar = 2  # error: [unresolved-attribute]
+7 | f.__dict__  # error: [unresolved-attribute]
+8 | f.__weakref__  # error: [unresolved-attribute]
+```
+
+# Diagnostics
+
+```
+error[unresolved-attribute]: Unresolved attribute `bar` on type `F`.
+ --> src/mdtest_snippet.py:6:1
+  |
+4 | f = F()
+5 | f.foo = 1  # ok
+6 | f.bar = 2  # error: [unresolved-attribute]
+  | ^^^^^
+7 | f.__dict__  # error: [unresolved-attribute]
+8 | f.__weakref__  # error: [unresolved-attribute]
+  |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Type `F` has no attribute `__weakref__`
+ --> src/mdtest_snippet.py:8:1
+  |
+6 | f.bar = 2  # error: [unresolved-attribute]
+7 | f.__dict__  # error: [unresolved-attribute]
+8 | f.__weakref__  # error: [unresolved-attribute]
+  | ^^^^^^^^^^^^^
+  |
+info: rule `unresolved-attribute` is enabled by default
+
+```
