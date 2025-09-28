@@ -1255,7 +1255,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
-            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
+            semantic_syntax_errors: self.semantic_syntax_errors.into_inner().into_boxed_slice(),
             generator_functions: self.generator_functions,
         }
     }

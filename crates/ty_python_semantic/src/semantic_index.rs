@@ -222,7 +222,7 @@ pub(crate) struct SemanticIndex<'db> {
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
-    semantic_syntax_errors: Vec<SemanticSyntaxError>,
+    semantic_syntax_errors: Box<[SemanticSyntaxError]>,
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
