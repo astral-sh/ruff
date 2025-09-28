@@ -32,7 +32,9 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source, format_range};
+use ruff_python_formatter::{
+    FormatModuleError, QuoteStyle, expand_and_collapse_ranges, format_module_source, format_range,
+};
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
@@ -84,7 +86,7 @@ pub(crate) fn format(
         return Ok(ExitStatus::Success);
     }
 
-    if cli.range.is_some() && paths.len() > 1 {
+    if !cli.ranges.is_empty() && paths.len() > 1 {
         return Err(anyhow::anyhow!(
             "The `--range` option is only supported when formatting a single file but the specified paths resolve to {} files.",
             paths.len()
@@ -160,7 +162,7 @@ pub(crate) fn format(
                                 &settings.formatter,
                                 source_type,
                                 mode,
-                                cli.range,
+                                &cli.ranges,
                                 cache,
                             )
                         }) {
@@ -263,7 +265,7 @@ pub(crate) fn format_path(
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
-    range: Option<FormatRange>,
+    ranges: &[FormatRange],
     cache: Option<&Cache>,
 ) -> Result<FormatResult, FormatCommandError> {
     if let Some(cache) = cache {
@@ -289,20 +291,37 @@ pub(crate) fn format_path(
     };
 
     // Don't write back to the cache if formatting a range.
-    let cache = cache.filter(|_| range.is_none());
+    let cache = cache.filter(|_| ranges.is_empty());
 
     // Format the source.
-    let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
-    {
-        FormattedSource::Formatted(formatted) => match mode {
-            FormatMode::Write => {
-                let mut writer = File::create(path).map_err(|err| {
-                    FormatCommandError::Write(Some(path.to_path_buf()), err.into())
-                })?;
-                formatted
-                    .write(&mut writer)
-                    .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
+    let format_result =
+        match format_source(&unformatted, source_type, Some(path), settings, ranges)? {
+            FormattedSource::Formatted(formatted) => match mode {
+                FormatMode::Write => {
+                    let mut writer = File::create(path).map_err(|err| {
+                        FormatCommandError::Write(Some(path.to_path_buf()), err.into())
+                    })?;
+                    formatted
+                        .write(&mut writer)
+                        .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
 
+                    if let Some(cache) = cache {
+                        if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                            let relative_path = cache
+                                .relative_path(path)
+                                .expect("wrong package cache for file");
+                            cache.set_formatted(relative_path.to_path_buf(), &cache_key);
+                        }
+                    }
+
+                    FormatResult::Formatted
+                }
+                FormatMode::Check | FormatMode::Diff => FormatResult::Diff {
+                    unformatted,
+                    formatted,
+                },
+            },
+            FormattedSource::Unchanged => {
                 if let Some(cache) = cache {
                     if let Ok(cache_key) = FileCacheKey::from_path(path) {
                         let relative_path = cache
@@ -312,26 +331,9 @@ pub(crate) fn format_path(
                     }
                 }
 
-                FormatResult::Formatted
+                FormatResult::Unchanged
             }
-            FormatMode::Check | FormatMode::Diff => FormatResult::Diff {
-                unformatted,
-                formatted,
-            },
-        },
-        FormattedSource::Unchanged => {
-            if let Some(cache) = cache {
-                if let Ok(cache_key) = FileCacheKey::from_path(path) {
-                    let relative_path = cache
-                        .relative_path(path)
-                        .expect("wrong package cache for file");
-                    cache.set_formatted(relative_path.to_path_buf(), &cache_key);
-                }
-            }
-
-            FormatResult::Unchanged
-        }
-    };
+        };
 
     Ok(format_result)
 }
@@ -360,13 +362,14 @@ pub(crate) fn format_source(
     source_type: PySourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
-    range: Option<FormatRange>,
+    ranges: &[FormatRange],
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
             let options = settings.to_format_options(source_type, unformatted, path);
 
-            let formatted = if let Some(range) = range {
+            let formatted = if ranges.len() == 1 {
+                let range = &ranges[0];
                 let line_index = LineIndex::from_source_text(unformatted);
                 let byte_range = range.to_text_range(unformatted, &line_index);
                 format_range(unformatted, byte_range, options).map(|formatted_range| {
@@ -378,6 +381,55 @@ pub(crate) fn format_source(
 
                     formatted
                 })
+            } else if !ranges.is_empty() {
+                // Convert to text ranges, and expand and collapse.
+                let line_index = LineIndex::from_source_text(unformatted);
+                let byte_ranges: Vec<TextRange> = ranges
+                    .iter()
+                    .map(|range| range.to_text_range(unformatted, &line_index))
+                    .collect();
+                let treated_ranges: Vec<TextRange> =
+                    expand_and_collapse_ranges(unformatted, &byte_ranges, options.clone())
+                        .map_err(|err| {
+                            if let FormatModuleError::ParseError(err) = err {
+                                DisplayParseError::from_source_kind(
+                                    err,
+                                    path.map(Path::to_path_buf),
+                                    source_kind,
+                                )
+                                .into()
+                            } else {
+                                FormatCommandError::Format(path.map(Path::to_path_buf), err)
+                            }
+                        })?;
+
+                let mut result = Ok(String::new());
+
+                let mut unformatted = unformatted.clone();
+
+                // Format in each text range starting from the bottom towards the top.
+                for byte_range in treated_ranges.iter().rev() {
+                    result = format_range(&unformatted, *byte_range, options.clone()).map(
+                        |formatted_range| {
+                            let mut formatted = unformatted.to_string();
+                            formatted.replace_range(
+                                std::ops::Range::<usize>::from(formatted_range.source_range()),
+                                formatted_range.as_code(),
+                            );
+
+                            unformatted.clone_from(&formatted);
+
+                            formatted
+                        },
+                    );
+
+                    // Formatting will be halted on first error.
+                    if result.is_err() {
+                        break;
+                    }
+                }
+
+                result
             } else {
                 // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
                 #[expect(clippy::redundant_closure_for_method_calls)]
@@ -408,7 +460,7 @@ pub(crate) fn format_source(
                 return Ok(FormattedSource::Unchanged);
             }
 
-            if range.is_some() {
+            if !ranges.is_empty() {
                 return Err(FormatCommandError::RangeFormatNotebook(
                     path.map(Path::to_path_buf),
                 ));

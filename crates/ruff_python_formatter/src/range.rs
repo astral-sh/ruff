@@ -117,6 +117,83 @@ pub fn format_range(
     Ok(printed.slice_range(narrowed_range, source))
 }
 
+/// Expands the text ranges into their enclosing nodes, and collapses those that overlap or touch.
+pub fn expand_and_collapse_ranges(
+    source: &str,
+    ranges: &[TextRange],
+    options: PyFormatOptions,
+) -> Result<Vec<TextRange>, FormatModuleError> {
+    for range in ranges {
+        // Error if the specified range lies outside of the source file.
+        if source.text_len() < range.end() {
+            return Err(FormatModuleError::FormatError(FormatError::RangeError {
+                input: *range,
+                tree: TextRange::up_to(source.text_len()),
+            }));
+        }
+
+        // If any range covers the entire file, that becomes the only range and no processing is
+        // required.
+        if *range == TextRange::up_to(source.text_len()) {
+            return Ok(vec![*range]);
+        }
+    }
+
+    let parsed = parse(source, ParseOptions::from(options.source_type()))?;
+    let source_code = SourceCode::new(source);
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+
+    let context = PyFormatContext::new(
+        options.with_source_map_generation(SourceMapGeneration::Enabled),
+        source,
+        comments,
+        parsed.tokens(),
+    );
+
+    let mut expanded_ranges: Vec<TextRange> = Vec::new();
+    for range in ranges {
+        if range.is_empty() {
+            continue;
+        }
+
+        let enclosing_node =
+            match find_enclosing_node(*range, AnyNodeRef::from(parsed.syntax()), &context) {
+                EnclosingNode::Node {
+                    node,
+                    indent_level: _,
+                } => node,
+                EnclosingNode::Suppressed => {
+                    // The entire range falls into a suppressed range. There's nothing to format.
+                    continue;
+                }
+            };
+
+        let narrowed_range = narrow_range(*range, enclosing_node, &context);
+        assert_valid_char_boundaries(narrowed_range, source);
+
+        expanded_ranges.push(narrowed_range);
+    }
+    if expanded_ranges.is_empty() {
+        return Ok(expanded_ranges);
+    }
+    expanded_ranges.sort();
+
+    let mut collapsed_ranges: Vec<TextRange> = Vec::new();
+    collapsed_ranges.push(expanded_ranges[0]);
+    for range in expanded_ranges {
+        let back_range_index = collapsed_ranges.len() - 1;
+        let back_range = &collapsed_ranges[back_range_index];
+        if back_range.overlap_or_touch(&range) {
+            collapsed_ranges[back_range_index] = back_range.joined(&range);
+        } else {
+            collapsed_ranges.push(range);
+        }
+    }
+
+    Ok(collapsed_ranges)
+}
+
 /// Finds the node with the minimum covering range of `range`.
 ///
 /// It traverses the tree and returns the deepest node that fully encloses `range`.
