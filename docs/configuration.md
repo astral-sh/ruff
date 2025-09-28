@@ -172,6 +172,9 @@ If left unspecified, Ruff's default configuration is equivalent to:
     # This only has an effect when the `docstring-code-format` setting is
     # enabled.
     docstring-code-line-length = "dynamic"
+
+    # Enable inserting blank lines around controlis like if/for/while/with
+    blank-lines-around-controls = false
     ```
 
 As an example, the following would configure Ruff to:
