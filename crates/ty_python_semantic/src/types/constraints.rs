@@ -441,19 +441,6 @@ impl<'db> Node<'db> {
         matches!(self, Node::AlwaysFalse)
     }
 
-    /// Returns the `and` or intersection of two BDDs.
-    fn and(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
-            (Node::Interior(a), Node::Interior(b)) => {
-                // AND is commutative, which lets us halve the cache requirements
-                let (a, b) = if b < a { (b, a) } else { (a, b) };
-                a.and(db, b)
-            }
-        }
-    }
-
     /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
     /// result.
     fn iff(self, db: &'db dyn Db, other: Self) -> Self {
@@ -561,32 +548,6 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
-            Ordering::Equal => Node::new(
-                db,
-                self_constraint,
-                self.if_true(db).and(db, other.if_true(db)),
-                self.if_false(db).and(db, other.if_false(db)),
-            ),
-            Ordering::Less => Node::new(
-                db,
-                self_constraint,
-                self.if_true(db).and(db, Node::Interior(other)),
-                self.if_false(db).and(db, Node::Interior(other)),
-            ),
-            Ordering::Greater => Node::new(
-                db,
-                other_constraint,
-                Node::Interior(self).and(db, other.if_true(db)),
-                Node::Interior(self).and(db, other.if_false(db)),
-            ),
-        }
-    }
-
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
@@ -796,7 +757,6 @@ impl<'db> UnderspecifiedNode<'db> {
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            // both(ish) operands terminal
             (UnderspecifiedNode::Impossible, _) | (_, UnderspecifiedNode::Impossible) => {
                 UnderspecifiedNode::Impossible
             }
@@ -807,31 +767,26 @@ impl<'db> UnderspecifiedNode<'db> {
                 UnderspecifiedNode::AlwaysFalse
             }
 
-            // both operands fully specified
-            (UnderspecifiedNode::AlwaysFalse, UnderspecifiedNode::FullySpecified(other))
-            | (UnderspecifiedNode::FullySpecified(other), UnderspecifiedNode::AlwaysFalse) => {
-                Node::new(
-                    db,
-                    other.constraint(db),
-                    Node::AlwaysFalse.and(db, other.if_true(db)),
-                    Node::AlwaysFalse.and(db, other.if_false(db)),
-                )
-                .into()
-            }
+            // at least one operand underspecified
             (UnderspecifiedNode::FullySpecified(a), UnderspecifiedNode::FullySpecified(b)) => {
                 // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b < a { (b, a) } else { (a, b) };
-                a.and(db, b).into()
+                PossiblySpecifiedInteriorNode::from(a)
+                    .and(db, UnderspecifiedNode::FullySpecified(b))
             }
-
-            // at least one operand underspecified
             (UnderspecifiedNode::Interior(a), UnderspecifiedNode::Interior(b)) => {
                 // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b < a { (b, a) } else { (a, b) };
-                a.and(db, UnderspecifiedNode::Interior(b))
+                PossiblySpecifiedInteriorNode::from(a).and(db, UnderspecifiedNode::Interior(b))
+            }
+            (other, UnderspecifiedNode::FullySpecified(interior))
+            | (UnderspecifiedNode::FullySpecified(interior), other) => {
+                PossiblySpecifiedInteriorNode::from(interior).and(db, other)
             }
             (other, UnderspecifiedNode::Interior(interior))
-            | (UnderspecifiedNode::Interior(interior), other) => interior.and(db, other),
+            | (UnderspecifiedNode::Interior(interior), other) => {
+                PossiblySpecifiedInteriorNode::from(interior).and(db, other)
+            }
         }
     }
 
@@ -1126,30 +1081,6 @@ impl<'db> UnderspecifiedInteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn and(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
-        match self.cmp_constraints(db, other) {
-            NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
-                db,
-                constraint,
-                self.if_true(db).and(db, other.if_true(db)),
-                self.if_false(db).and(db, other.if_false(db)),
-            ),
-            NodeOrdering::Less(constraint) => UnderspecifiedNode::new(
-                db,
-                constraint,
-                self.if_true(db).and(db, other),
-                self.if_false(db).and(db, other),
-            ),
-            NodeOrdering::Greater(constraint, other) => UnderspecifiedNode::new(
-                db,
-                constraint,
-                self.and(db, other.if_true(db)),
-                self.and(db, other.if_false(db)),
-            ),
-        }
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn iff(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
         match self.cmp_constraints(db, other) {
             NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
@@ -1273,6 +1204,30 @@ impl<'db> PossiblySpecifiedInteriorNode<'db> {
                 constraint,
                 self.or(db, other.if_true(db)),
                 self.or(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn and(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).and(db, other.if_true(db)),
+                self.if_false(db).and(db, other.if_false(db)),
+            ),
+            NodeOrdering::Less(constraint) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).and(db, other),
+                self.if_false(db).and(db, other),
+            ),
+            NodeOrdering::Greater(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.and(db, other.if_true(db)),
+                self.and(db, other.if_false(db)),
             ),
         }
     }
