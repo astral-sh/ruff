@@ -35,6 +35,9 @@ use crate::{FixAvailability, Violation};
 ///
 /// # Scalar comparison
 /// assert math.isclose(0.1 + 0.2, 0.3, abs_tol=1e-9)
+///
+/// Comparison with zero requires abs_tol
+/// assert math.isclose(1e-10, 0.0, abs_tol=1e-9)
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct FloatComparison {
