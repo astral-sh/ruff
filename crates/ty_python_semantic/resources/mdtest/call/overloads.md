@@ -1255,26 +1255,22 @@ def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_an
     # All materializations of both argument types are assignable to the first overload, so the
     # second and third overloads are filtered out
     reveal_type(f(list_int, int_str))  # revealed: A
-    # TODO: revealed: A
-    reveal_type(f(*(list_int, int_str)))  # revealed: Unknown
+    reveal_type(f(*(list_int, int_str)))  # revealed: A
 
     # All materialization of first argument is assignable to first overload and for the second
     # argument, they're assignable to the second overload, so the third overload is filtered out
     reveal_type(f(list_int, int_any))  # revealed: A
-    # TODO: revealed: A
-    reveal_type(f(*(list_int, int_any)))  # revealed: Unknown
+    reveal_type(f(*(list_int, int_any)))  # revealed: A
 
     # All materialization of first argument is assignable to second overload and for the second
     # argument, they're assignable to the first overload, so the third overload is filtered out
     reveal_type(f(list_any, int_str))  # revealed: A
-    # TODO: revealed: A
-    reveal_type(f(*(list_any, int_str)))  # revealed: Unknown
+    reveal_type(f(*(list_any, int_str)))  # revealed: A
 
     # All materializations of both arguments are assignable to the second overload, so the third
     # overload is filtered out
     reveal_type(f(list_any, int_any))  # revealed: A
-    # TODO: revealed: A
-    reveal_type(f(*(list_any, int_any)))  # revealed: Unknown
+    reveal_type(f(*(list_any, int_any)))  # revealed: A
 
     # All materializations of first argument is assignable to the second overload and for the second
     # argument, they're assignable to the third overload, so no overloads are filtered out; the
