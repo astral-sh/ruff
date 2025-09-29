@@ -56,7 +56,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use crate::Db;
@@ -401,6 +401,36 @@ enum Node<'db> {
 }
 
 impl<'db> Node<'db> {
+    /// Creates a new underspecified BDD node, ensuring that it is fully reduced.
+    fn new(
+        db: &'db dyn Db,
+        constraint: ConstrainedTypeVar<'db>,
+        if_true: Node<'db>,
+        if_false: Node<'db>,
+    ) -> Self {
+        debug_assert!(
+            (if_true.root_constraint(db))
+                .is_none_or(|root_constraint| root_constraint > constraint)
+        );
+        debug_assert!(
+            (if_false.root_constraint(db))
+                .is_none_or(|root_constraint| root_constraint > constraint)
+        );
+        if if_true == if_false {
+            return if_true;
+        }
+        Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
+    }
+
+    /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
+    /// node.
+    fn root_constraint(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
+        match self {
+            Node::Interior(interior) => Some(interior.constraint(db)),
+            _ => None,
+        }
+    }
+
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
     /// to `true`. (This translates the boolean function that this BDD represents into DNF form.)
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
@@ -906,30 +936,23 @@ impl<'db> UnderspecifiedNode<'db> {
     }
 
     fn minimize(self, db: &'db dyn Db) -> Node<'db> {
-        self.smallest_minimizations(db)
-            .next()
-            .expect("should always be able to minimize BDD")
+        self.smallest_minimizations(db).take_one()
     }
 
-    fn smallest_minimizations(self, db: &'db dyn Db) -> impl Iterator<Item = Node<'db>> {
+    fn smallest_minimizations(self, db: &'db dyn Db) -> MinimizedNode<'db> {
         match self {
-            UnderspecifiedNode::AlwaysTrue => {
-                Either::Left(Either::Left([Node::AlwaysTrue].into_iter()))
+            UnderspecifiedNode::AlwaysTrue => MinimizedNode::One(Node::AlwaysTrue),
+            UnderspecifiedNode::AlwaysFalse => MinimizedNode::One(Node::AlwaysFalse),
+            UnderspecifiedNode::Impossible => {
+                MinimizedNode::Two([Node::AlwaysTrue, Node::AlwaysFalse])
             }
-            UnderspecifiedNode::AlwaysFalse => {
-                Either::Left(Either::Left([Node::AlwaysFalse].into_iter()))
-            }
-            UnderspecifiedNode::Impossible => Either::Left(Either::Right(
-                [Node::AlwaysTrue, Node::AlwaysFalse].into_iter(),
-            )),
             UnderspecifiedNode::FullySpecified(interior) => {
-                Either::Left(Either::Left([Node::Interior(interior)].into_iter()))
+                MinimizedNode::One(Node::Interior(interior))
             }
-            UnderspecifiedNode::Interior(interior) => Either::Right(
+            UnderspecifiedNode::Interior(interior) => MinimizedNode::Many(
                 PossiblySpecifiedInteriorNode::from(interior)
                     .smallest_minimizations(db)
-                    .iter()
-                    .copied(),
+                    .as_ref(),
             ),
         }
     }
@@ -961,6 +984,32 @@ impl<'db> From<PossiblySpecifiedInteriorNode<'db>> for UnderspecifiedNode<'db> {
 impl<'db> From<UnderspecifiedInteriorNode<'db>> for UnderspecifiedNode<'db> {
     fn from(interior: UnderspecifiedInteriorNode<'db>) -> Self {
         UnderspecifiedNode::Interior(interior)
+    }
+}
+
+enum MinimizedNode<'db> {
+    One(Node<'db>),
+    Two([Node<'db>; 2]),
+    Many(&'db [Node<'db>]),
+}
+
+impl<'db> MinimizedNode<'db> {
+    fn take_one(self) -> Node<'db> {
+        match self {
+            MinimizedNode::One(node) | MinimizedNode::Two([node, _]) => node,
+            MinimizedNode::Many(nodes) => nodes
+                .first()
+                .copied()
+                .expect("should always be able to minimize BDD"),
+        }
+    }
+
+    fn as_slice(&'db self) -> &'db [Node<'db>] {
+        match self {
+            MinimizedNode::One(node) => std::slice::from_ref(node),
+            MinimizedNode::Two(nodes) => nodes.as_slice(),
+            MinimizedNode::Many(nodes) => nodes,
+        }
     }
 }
 
@@ -1409,7 +1458,18 @@ impl<'db> PossiblySpecifiedInteriorNode<'db> {
 
     #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
     fn smallest_minimizations(self, db: &'db dyn Db) -> Box<[Node<'db>]> {
-        Box::from([])
+        let constraint = self.constraint(db);
+        let if_true = self.if_true(db).smallest_minimizations(db);
+        let if_false = self.if_false(db).smallest_minimizations(db);
+        let mut minimizations =
+            Vec::with_capacity(if_true.as_slice().len() * if_false.as_slice().len());
+        for if_true in if_true.as_slice() {
+            for if_false in if_false.as_slice() {
+                minimizations.push(Node::new(db, constraint, *if_true, *if_false));
+            }
+        }
+        // XXX: keep smallest
+        minimizations.into_boxed_slice()
     }
 }
 
