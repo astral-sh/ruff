@@ -81,7 +81,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
     SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, all_members, binding_type, todo_type,
+    UnionBuilder, all_members, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -692,6 +692,14 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
     visitor: &V,
 ) {
     walk_function_literal(db, function.literal(db), visitor);
+    if let Some(callable_signature) = function.updated_signature(db) {
+        for signature in &callable_signature.overloads {
+            walk_signature(db, signature, visitor);
+        }
+    }
+    if let Some(signature) = function.updated_last_definition_signature(db) {
+        walk_signature(db, signature, visitor);
+    }
 }
 
 #[salsa::tracked]
