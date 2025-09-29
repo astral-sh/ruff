@@ -745,6 +745,13 @@ impl<'a> FormatResults<'a> {
         &self,
         notebook_index: &mut FxHashMap<String, NotebookIndex>,
     ) -> impl Iterator<Item = Diagnostic> {
+        /// The number of unmodified context lines rendered in diffs.
+        ///
+        /// Note that this should be kept in sync with the argument to `TextDiff::grouped_ops` in
+        /// the diff rendering in `ruff_db` (currently 3). The `similar` crate uses two times that
+        /// argument as a cutoff for rendering unmodified lines.
+        const CONTEXT_LINES: u32 = 6;
+
         self.results.iter().filter_map(|result| {
             let (unformatted, formatted) = match &result.result {
                 FormatResult::Skipped | FormatResult::Unchanged => return None,
@@ -864,6 +871,11 @@ impl<'a> FormatResults<'a> {
             // `ruff_db::diagnostic::render::full` into `annotate-snippets`, likely as another
             // `DisplayLine` variant and update the `lineno_width` calculation in
             // `DisplayList::fmt`. That would handle this offset "automatically."
+            let line_count = (line_count + CONTEXT_LINES).min(
+                formatted
+                    .source_code()
+                    .count_lines(TextRange::up_to(formatted.source_code().text_len())),
+            );
             let lines = OneIndexed::new(line_count as usize).unwrap_or_default();
             diagnostic.set_header_offset(lines.digits().get());
 
