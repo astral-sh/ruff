@@ -53,7 +53,6 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
@@ -3152,7 +3151,7 @@ impl<'db> Type<'db> {
         );
         match self {
             Type::Callable(callable) if callable.is_function_like(db) => {
-                // For "function-like" callables, model the the behavior of `FunctionType.__get__`.
+                // For "function-like" callables, model the behavior of `FunctionType.__get__`.
                 //
                 // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
                 // we should instead return a new method-wrapper type variant for the synthesized `__get__`
@@ -5633,11 +5632,9 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::TypeVar(typevar) => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
-                        &module,
                         index,
                         scope_id.file_scope_id(db),
                         typevar_binding_context,
@@ -5710,7 +5707,6 @@ impl<'db> Type<'db> {
                     .build()),
 
                 SpecialFormType::TypingSelf => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -5748,7 +5744,6 @@ impl<'db> Type<'db> {
                     );
                     Ok(bind_typevar(
                         db,
-                        &module,
                         index,
                         scope_id.file_scope_id(db),
                         typevar_binding_context,
@@ -6109,7 +6104,7 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                let function = Type::FunctionLiteral(function.with_type_mapping(db, type_mapping));
+                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, visitor));
 
                 match type_mapping {
                     TypeMapping::PromoteLiterals => function.literal_promotion_type(db)
@@ -6120,8 +6115,8 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).with_type_mapping(db, type_mapping),
-                method.self_instance(db).apply_type_mapping(db, type_mapping),
+                method.function(db).apply_type_mapping_impl(db, type_mapping, visitor),
+                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, visitor),
             )),
 
             Type::NominalInstance(instance) =>
@@ -6140,13 +6135,13 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.with_type_mapping(db, type_mapping),
+                    function.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.with_type_mapping(db, type_mapping),
+                    function.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
@@ -6782,84 +6777,7 @@ pub enum TypeMapping<'a, 'db> {
     Materialize(MaterializationKind),
 }
 
-fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    mapping: &TypeMapping<'_, 'db>,
-    visitor: &V,
-) {
-    match mapping {
-        TypeMapping::Specialization(specialization) => {
-            walk_specialization(db, *specialization, visitor);
-        }
-        TypeMapping::PartialSpecialization(specialization) => {
-            walk_partial_specialization(db, specialization, visitor);
-        }
-        TypeMapping::BindSelf(self_type) => {
-            visitor.visit_type(db, *self_type);
-        }
-        TypeMapping::ReplaceSelf { new_upper_bound } => {
-            visitor.visit_type(db, *new_upper_bound);
-        }
-        TypeMapping::PromoteLiterals
-        | TypeMapping::BindLegacyTypevars(_)
-        | TypeMapping::MarkTypeVarsInferable(_)
-        | TypeMapping::Materialize(_) => {}
-    }
-}
-
 impl<'db> TypeMapping<'_, 'db> {
-    fn to_owned(&self) -> TypeMapping<'db, 'db> {
-        match self {
-            TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(*specialization)
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.to_owned())
-            }
-            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
-            TypeMapping::BindLegacyTypevars(binding_context) => {
-                TypeMapping::BindLegacyTypevars(*binding_context)
-            }
-            TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
-            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
-                new_upper_bound: *new_upper_bound,
-            },
-            TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                TypeMapping::MarkTypeVarsInferable(*binding_context)
-            }
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(*materialization_kind)
-            }
-        }
-    }
-
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(specialization.normalized_impl(db, visitor))
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
-            }
-            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
-            TypeMapping::BindLegacyTypevars(binding_context) => {
-                TypeMapping::BindLegacyTypevars(*binding_context)
-            }
-            TypeMapping::BindSelf(self_type) => {
-                TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
-            }
-            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
-                new_upper_bound: new_upper_bound.normalized_impl(db, visitor),
-            },
-            TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                TypeMapping::MarkTypeVarsInferable(*binding_context)
-            }
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(*materialization_kind)
-            }
-        }
-    }
-
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
@@ -7065,7 +6983,11 @@ impl<'db> KnownInstanceType<'db> {
                         if let Some(specialization) = alias.specialization(self.db) {
                             f.write_str(alias.name(self.db))?;
                             specialization
-                                .display_short(self.db, TupleSpecialization::No)
+                                .display_short(
+                                    self.db,
+                                    TupleSpecialization::No,
+                                    DisplaySettings::default(),
+                                )
                                 .fmt(f)
                         } else {
                             f.write_str("typing.TypeAliasType")

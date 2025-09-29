@@ -2145,12 +2145,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_literal =
             FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
 
-        let type_mappings = Box::default();
-        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
-            self.db(),
-            function_literal,
-            type_mappings,
-        ));
+        let mut inferred_ty =
+            Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));
         self.undecorated_type = Some(inferred_ty);
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
@@ -9047,7 +9043,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
                     bind_typevar(
                         self.db(),
-                        self.module(),
                         self.index,
                         self.scope().file_scope_id(self.db()),
                         self.typevar_binding_context,

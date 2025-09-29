@@ -37,6 +37,8 @@ exploration of new features, we will often close these pull requests immediately
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
 team before it is appropriate to begin work on an implementation.
 
+## The Basics
+
 ### Prerequisites
 
 Ruff is written in Rust. You'll need to install the

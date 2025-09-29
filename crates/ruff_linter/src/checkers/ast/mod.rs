@@ -2360,7 +2360,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Visit an body of [`Stmt`] nodes within a type-checking block.
+    /// Visit a body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;

@@ -2048,7 +2048,7 @@ pub(super) fn report_invalid_assignment<'db>(
         target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            source_ty.display_with(context.db(), settings),
+            source_ty.display_with(context.db(), settings.clone()),
             target_ty.display_with(context.db(), settings)
         ),
     );
@@ -2130,8 +2130,8 @@ pub(super) fn report_invalid_return_type(
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display_with(context.db(), settings),
-        actual_ty = actual_ty.display_with(context.db(), settings),
+        expected_ty = expected_ty.display_with(context.db(), settings.clone()),
+        actual_ty = actual_ty.display_with(context.db(), settings.clone()),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
