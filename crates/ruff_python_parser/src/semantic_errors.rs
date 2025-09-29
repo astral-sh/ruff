@@ -134,25 +134,36 @@ impl SemanticSyntaxChecker {
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
 
-                let mut param_names = FxHashSet::default();
-                for param in parameters {
-                    let cur_name = param.name().as_str();
-                    param_names.insert(cur_name);
-                }
+                // let mut param_names = FxHashSet::default();
+                // for param in parameters {
+                //     let cur_name = param.name().as_str();
+                //     param_names.insert(cur_name);
+                // }
 
-                for stmt in body {
-                    if let Stmt::Global(global_stmt) = stmt {
-                        for name in &global_stmt.names {
-                            if param_names.contains(name.as_str()) {
-                                // test_err global_parameter
-                                // def f(a): global a
-                                Self::add_error(
-                                    ctx,
-                                    SemanticSyntaxErrorKind::GlobalParameter(name.to_string()),
-                                    name.range,
-                                );
-                            }
-                        }
+                // for stmt in body {
+                //     if let Stmt::Global(global_stmt) = stmt {
+                //         for name in &global_stmt.names {
+                //             if param_names.contains(name.as_str()) {
+                //                 // test_err global_parameter
+                //                 // def f(a): global a
+                //                 Self::add_error(
+                //                     ctx,
+                //                     SemanticSyntaxErrorKind::GlobalParameter(name.to_string()),
+                //                     name.range,
+                //                 );
+                //             }
+                //         }
+                //     }
+                // }
+            }
+            Stmt::Global(ast::StmtGlobal { names, .. }) => {
+                for name in names {
+                    if ctx.is_binded_parameter(name) {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::GlobalParameter(name.to_string()),
+                            name.range,
+                        );
                     }
                 }
             }
@@ -2031,7 +2042,7 @@ pub trait SemanticSyntaxContext {
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 
-    fn in_loop_context(&self) -> bool;
+    fn is_binded_parameter(&self, name: &str) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
