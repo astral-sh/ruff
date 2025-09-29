@@ -133,12 +133,7 @@ class RuffCodeActionProvider implements CodeActionProvider {
           check.end_location.column,
         );
 
-        // Handle empty ranges specially - they should be available when the cursor is at the exact position
-        if (diagnosticRange.isEmpty()) {
-          return range.containsPosition(diagnosticRange.getStartPosition());
-        }
-
-        return Range.areIntersecting(diagnosticRange, range);
+        return Range.areIntersectingOrTouching(diagnosticRange, range);
       })
       .filter(({ fix }) => fix)
       .map((check) => ({
