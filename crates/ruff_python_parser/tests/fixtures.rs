@@ -571,6 +571,9 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn in_generator_scope(&self) -> bool {
         true
     }
+    fn is_binded_parameter(&self, name: &str) -> bool {
+        false
+    }
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
