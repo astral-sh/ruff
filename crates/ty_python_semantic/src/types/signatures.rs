@@ -396,9 +396,10 @@ impl<'db> Signature<'db> {
 
     pub(super) fn mark_typevars_inferable(self, db: &'db dyn Db) -> Self {
         if let Some(definition) = self.definition {
-            self.apply_type_mapping(
+            self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(definition))),
+                &ApplyTypeMappingVisitor::default(),
             )
         } else {
             self
