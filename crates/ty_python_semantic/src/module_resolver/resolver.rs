@@ -9,6 +9,7 @@ specifies ty's implementation of Python's import resolution algorithm.
 */
 
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::fmt;
 use std::iter::FusedIterator;
 use std::str::Split;
@@ -244,9 +245,25 @@ impl SearchPaths {
             static_paths.push(SearchPath::extra(system, path)?);
         }
 
+        // Most search paths come from user configuration, so we should just trust that the user
+        // has specified their search paths in the correct order -- if not, that's on the user.
+        // First-party search paths can be implicitly inferred by ty, however (`./src` is a common case),
+        // so for first-party search paths it makes sense to sort them into a sensible order.
+        // We make sure here that child directories always take precedence over parent directories.
+        let mut src_roots: Vec<SystemPathBuf> = src_roots.to_owned();
+        src_roots.sort_by(|a, b| {
+            if a.strip_prefix(b).is_ok() {
+                Ordering::Less
+            } else if b.strip_prefix(a).is_ok() {
+                Ordering::Greater
+            } else {
+                // If neither path is relative to the other, preserve the original order
+                Ordering::Equal
+            }
+        });
         for src_root in src_roots {
             tracing::debug!("Adding first-party search path `{src_root}`");
-            static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+            static_paths.push(SearchPath::first_party(system, src_root)?);
         }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
