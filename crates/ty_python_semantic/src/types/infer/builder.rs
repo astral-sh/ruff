@@ -53,11 +53,11 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_SLOTS_ANNOTATION, INVALID_SLOTS_DEFAULT, INVALID_SLOTS_ON_BUILTIN,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
+    INVALID_SLOTS_ANNOTATION, INVALID_SLOTS_DEFAULT, INVALID_SLOTS_ON_BUILTIN, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
+    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
     report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
@@ -4150,7 +4150,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if current_scope.kind() == ScopeKind::Class {
             if let Some(name_expr) = target.as_name_expr() {
                 let attribute_name = &name_expr.id;
-                
+
                 // Get the class being defined
                 if let NodeWithScopeKind::Class(class_def) = current_scope.node() {
                     // For __slots__ validation in the current class being defined,
@@ -4158,43 +4158,68 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // For now, let's get the current __slots__ value directly.
                     let table = self.index.place_table(current_scope_id);
                     if let Some(slots_symbol_id) = table.symbol_id("__slots__") {
-                        let use_def = use_def_map(self.db(), ScopeId::new(self.db(), self.file(), current_scope_id));
-                        let slots_declarations = use_def.end_of_scope_symbol_declarations(slots_symbol_id);
+                        let use_def = use_def_map(
+                            self.db(),
+                            ScopeId::new(self.db(), self.file(), current_scope_id),
+                        );
+                        let slots_declarations =
+                            use_def.end_of_scope_symbol_declarations(slots_symbol_id);
                         let slots_place = place_from_declarations(self.db(), slots_declarations);
-                        
-                        if let Some(slots_ty) = slots_place.ignore_conflicting_declarations().place.ignore_possibly_unbound() {
+
+                        if let Some(slots_ty) = slots_place
+                            .ignore_conflicting_declarations()
+                            .place
+                            .ignore_possibly_unbound()
+                        {
                             let slots_members = self.extract_slots_from_type(slots_ty);
-                            
+
                             if let Some(slots) = slots_members {
                                 // Check if this is a class variable default for a __slots__ name
-                                if value.is_some() && !declared.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                                if value.is_some()
+                                    && !declared.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                                {
                                     // This is an instance variable with a default value
                                     if slots.contains(attribute_name.as_str()) {
-                                        if let Some(builder) = self.context.report_lint(&INVALID_SLOTS_DEFAULT, target) {
+                                        if let Some(builder) =
+                                            self.context.report_lint(&INVALID_SLOTS_DEFAULT, target)
+                                        {
                                             builder.into_diagnostic(format_args!(
                                                 "Attribute `{attribute_name}` in __slots__ conflicts with class variable",
                                             ));
                                         }
                                     }
                                 }
-                                
+
                                 // Check if this is an annotation for a name not in __slots__
-                                if value.is_none() && !declared.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                                if value.is_none()
+                                    && !declared.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                                {
                                     // This is an instance variable annotation without value
-                                    if !slots.contains(attribute_name.as_str()) && !slots.contains("__dict__") {
-                                        if let Some(builder) = self.context.report_lint(&INVALID_SLOTS_ANNOTATION, target) {
+                                    if !slots.contains(attribute_name.as_str())
+                                        && !slots.contains("__dict__")
+                                    {
+                                        if let Some(builder) = self
+                                            .context
+                                            .report_lint(&INVALID_SLOTS_ANNOTATION, target)
+                                        {
                                             builder.into_diagnostic(format_args!(
                                                 "Attribute `{attribute_name}` is not in __slots__",
                                             ));
                                         }
                                     }
                                 }
-                                
+
                                 // Check for __slots__ on variable-length built-in types
                                 if attribute_name == "__slots__" && value.is_some() {
                                     // Check if any base class is a variable-length built-in
-                                    if self.class_inherits_from_builtin(class_def.node(self.module())) && !slots.is_empty() {
-                                        if let Some(builder) = self.context.report_lint(&INVALID_SLOTS_ON_BUILTIN, target) {
+                                    if self
+                                        .class_inherits_from_builtin(class_def.node(self.module()))
+                                        && !slots.is_empty()
+                                    {
+                                        if let Some(builder) = self
+                                            .context
+                                            .report_lint(&INVALID_SLOTS_ON_BUILTIN, target)
+                                        {
                                             builder.into_diagnostic(format_args!(
                                                 "nonempty __slots__ not supported for subtype of built-in type",
                                             ));
@@ -9340,7 +9365,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::StringLiteral(string_literal) => {
                 let mut slots = FxHashSet::default();
                 let slot_value = string_literal.value(self.db());
-                
+
                 // Python treats a bare string as a sequence of slot names (one per character)
                 for ch in slot_value.chars() {
                     slots.insert(ch.to_string());
@@ -9359,16 +9384,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let base_ty = self.expression_type(base);
             if let Type::ClassLiteral(base_class) = base_ty {
                 // Check if the base is directly a builtin
-                if let Some(known_class) = base_class.known(self.db()) {
-                    match known_class {
-                        KnownClass::Int
-                        | KnownClass::Bytes
-                        | KnownClass::Tuple
-                        | KnownClass::Str
-                        | KnownClass::Float
-                        | KnownClass::Complex => return true,
-                        _ => {}
-                    }
+                if let Some(
+                    KnownClass::Int
+                    | KnownClass::Bytes
+                    | KnownClass::Tuple
+                    | KnownClass::Str
+                    | KnownClass::Float
+                    | KnownClass::Complex,
+                ) = base_class.known(self.db())
+                {
+                    return true;
                 }
                 // Also check the base's entire MRO
                 if base_class.inherits_from_variable_length_builtin(self.db()) {

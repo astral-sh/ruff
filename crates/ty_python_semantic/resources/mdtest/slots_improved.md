@@ -5,12 +5,12 @@
 ```py
 class C:
     __slots__ = ("foo", "bar")
-    
+
     def __init__(self, foo: int, bar: str):
         self.foo = foo  # OK
         self.bar = bar  # OK
 
-c = C(1, "hello") 
+c = C(1, "hello")
 c.foo = 2  # OK
 c.bar = "world"  # OK
 c.baz = 3  # error: [unresolved-attribute] "Unresolved attribute `baz` on type `C`."
@@ -67,7 +67,7 @@ class SingleChar:
     __slots__ = "x"
 
 sc = SingleChar()
-sc.other = 2   # error: [unresolved-attribute] "Unresolved attribute `other` on type `SingleChar`."
+sc.other = 2  # error: [unresolved-attribute] "Unresolved attribute `other` on type `SingleChar`."
 
 # Multi-character string expands to individual character slots
 class MultiChar:
@@ -82,8 +82,9 @@ mc.value = 3  # error: [unresolved-attribute] "Unresolved attribute `value` on t
 ```py
 class AttrsLike:
     """Simulates attrs-generated class"""
+
     __slots__ = ("name", "value")
-    
+
     def __init__(self, name: str, value: int):
         self.name = name
         self.value = value
@@ -91,8 +92,8 @@ class AttrsLike:
 # Valid usage
 obj = AttrsLike("test", 42)
 obj.name = "updated"  # OK
-obj.value = 100      # OK
+obj.value = 100  # OK
 
-# Invalid usage  
+# Invalid usage
 obj.invalid = 1  # error: [unresolved-attribute] "Unresolved attribute `invalid` on type `AttrsLike`."
 ```

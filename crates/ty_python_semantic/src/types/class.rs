@@ -3197,7 +3197,6 @@ impl<'db> ClassLiteral<'db> {
             Place::Unbound.with_qualifiers(qualifiers)
         }
     }
-    
 
     pub(crate) fn own_instance_member(
         self,
@@ -3259,7 +3258,7 @@ impl<'db> ClassLiteral<'db> {
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                     declaredness,
                                 )
-                                    .with_qualifiers(qualifiers)
+                                .with_qualifiers(qualifiers)
                             }
                         } else {
                             // Declared and bound in class body, but no assignments in methods:
@@ -3270,20 +3269,16 @@ impl<'db> ClassLiteral<'db> {
                         // Declared but not bound in the class body.
                         if declaredness == Boundness::Bound {
                             Place::Type(declared_ty, declaredness).with_qualifiers(qualifiers)
-                        } else if let Some(implicit_ty) = Self::implicit_attribute(
-                            db,
-                            body_scope,
-                            name,
-                            MethodDecorator::None,
-                        )
-                            .place
-                            .ignore_possibly_unbound()
+                        } else if let Some(implicit_ty) =
+                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                                .place
+                                .ignore_possibly_unbound()
                         {
                             Place::Type(
                                 UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                 declaredness,
                             )
-                                .with_qualifiers(qualifiers)
+                            .with_qualifiers(qualifiers)
                         } else {
                             Place::Type(declared_ty, declaredness).with_qualifiers(qualifiers)
                         }
@@ -3296,20 +3291,22 @@ impl<'db> ClassLiteral<'db> {
                     // Not declared in the class body; might still be declared/bound in a method.
                     let result =
                         Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-                    return self.apply_slots_constraints(db, name, result);
+                    self.apply_slots_constraints(db, name, result)
                 }
             }
         } else {
             // Neither declared nor bound in the class body; could be implicitly defined in a method.
             let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-            return self.apply_slots_constraints(db, name, result);
+            self.apply_slots_constraints(db, name, result)
         }
     }
 
     fn slots_special_attr_unavailable(self, db: &'db dyn Db, name: &str) -> bool {
         match name {
             "__dict__" => !self.has_dict_in_slots(db) && self.all_slots_from_mro(db).is_some(),
-            "__weakref__" => !self.has_weakref_in_slots(db) && self.all_slots_from_mro(db).is_some(),
+            "__weakref__" => {
+                !self.has_weakref_in_slots(db) && self.all_slots_from_mro(db).is_some()
+            }
             _ => false,
         }
     }
@@ -3334,10 +3331,9 @@ impl<'db> ClassLiteral<'db> {
                     return Place::Type(Type::unknown(), Boundness::PossiblyUnbound).into();
                 }
                 return result;
-            } else {
-                // Attribute is not in __slots__
-                return Place::Unbound.into();
             }
+            // Attribute is not in __slots__
+            return Place::Unbound.into();
         }
         result
     }
@@ -5388,7 +5384,7 @@ impl<'db> ClassLiteral<'db> {
             Type::StringLiteral(string_literal) => {
                 let mut slots = FxHashSet::default();
                 let slot_value = string_literal.value(db);
-                
+
                 // Python treats a bare string as a sequence of slot names (one per character)
                 for ch in slot_value.chars() {
                     slots.insert(ch.to_string());
@@ -5453,22 +5449,21 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-
     /// Check if this class inherits from a variable-length built-in type
     pub(super) fn inherits_from_variable_length_builtin(self, db: &'db dyn Db) -> bool {
         for class_base in self.iter_mro(db, None) {
             if let ClassBase::Class(class) = class_base {
                 let (class_literal, _) = class.class_literal(db);
-                if let Some(known_class) = class_literal.known(db) {
-                    match known_class {
-                        KnownClass::Int
-                        | KnownClass::Bytes
-                        | KnownClass::Tuple
-                        | KnownClass::Str
-                        | KnownClass::Float
-                        | KnownClass::Complex => return true,
-                        _ => {}
-                    }
+                if let Some(
+                    KnownClass::Int
+                    | KnownClass::Bytes
+                    | KnownClass::Tuple
+                    | KnownClass::Str
+                    | KnownClass::Float
+                    | KnownClass::Complex,
+                ) = class_literal.known(db)
+                {
+                    return true;
                 }
             }
         }
