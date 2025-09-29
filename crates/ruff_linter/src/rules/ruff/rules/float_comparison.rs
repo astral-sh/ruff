@@ -13,7 +13,7 @@ use crate::{FixAvailability, Violation};
 /// Directly comparing floats can produce unreliable results due to the
 /// inherent imprecision of floating-point arithmetic.
 ///
-/// ## When to use [`math.isclose()`][math_isclose] vs [`numpy.isclose()`][numpy_isclose]
+/// ## When to use [`math.isclose()`][mathisclose] vs [`numpy.isclose()`][numpyisclose]
 ///
 /// **Use `math.isclose()` for scalar values:**
 /// - Comparing individual float numbers
@@ -40,8 +40,8 @@ use crate::{FixAvailability, Violation};
 /// assert math.isclose(1e-10, 0.0, abs_tol=1e-9)
 /// ```
 ///
-/// [math_isclose]: https://docs.python.org/3/library/math.html#math.isclose
-/// [numpy_isclose]: https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose
+/// [mathisclose]: https://docs.python.org/3/library/math.html#math.isclose
+/// [numpyisclose]: https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose
 #[derive(ViolationMetadata)]
 pub(crate) struct FloatComparison {
     pub left: String,
