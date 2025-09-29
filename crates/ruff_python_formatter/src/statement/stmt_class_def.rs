@@ -8,7 +8,7 @@ use crate::comments::format::{
 };
 use crate::comments::{SourceComment, leading_comments, trailing_comments};
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -65,7 +65,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     decorators: decorator_list,
                     leading_definition_comments,
                 },
-                clause_header(
+                clause(
                     ClauseHeader::Class(item),
                     trailing_definition_comments,
                     &format_with(|f| {
@@ -132,8 +132,10 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
                         Ok(())
                     }),
+                    body,
+                    SuiteKind::Class,
+                    trailing_definition_comments
                 ),
-                clause_body(body, SuiteKind::Class, trailing_definition_comments),
             ]
         )?;
 

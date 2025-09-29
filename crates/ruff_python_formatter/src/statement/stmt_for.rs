@@ -6,7 +6,7 @@ use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, ElseClause, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Debug)]
@@ -50,27 +50,23 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::For(item),
-                    trailing_condition_comments,
-                    &format_args![
-                        is_async.then_some(format_args![token("async"), space()]),
-                        token("for"),
-                        space(),
-                        ExprTupleWithoutParentheses(target),
-                        space(),
-                        token("in"),
-                        space(),
-                        maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
-                    ],
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(orelse.is_empty()),
-                    trailing_condition_comments
-                ),
-            ]
+            [clause(
+                ClauseHeader::For(item),
+                trailing_condition_comments,
+                &format_args![
+                    is_async.then_some(format_args![token("async"), space()]),
+                    token("for"),
+                    space(),
+                    ExprTupleWithoutParentheses(target),
+                    space(),
+                    token("in"),
+                    space(),
+                    maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
+                ],
+                body,
+                SuiteKind::other(orelse.is_empty()),
+                trailing_condition_comments
+            ),]
         )?;
 
         if orelse.is_empty() {
@@ -84,15 +80,15 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
 
             write!(
                 f,
-                [
-                    clause_header(
-                        ClauseHeader::OrElse(ElseClause::For(item)),
-                        trailing,
-                        &token("else"),
-                    )
-                    .with_leading_comments(leading, body.last()),
-                    clause_body(orelse, SuiteKind::other(true), trailing),
-                ]
+                [clause(
+                    ClauseHeader::OrElse(ElseClause::For(item)),
+                    trailing,
+                    &token("else"),
+                    orelse,
+                    SuiteKind::other(true),
+                    trailing
+                )
+                .with_leading_comments(leading, body.last())]
             )?;
         }
 

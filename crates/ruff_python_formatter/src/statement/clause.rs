@@ -439,6 +439,24 @@ pub(crate) struct FormatClause<'a, 'ast> {
     format_body: FormatClauseBody<'a>,
 }
 
+impl<'a> FormatClause<'a, '_> {
+    /// Sets the leading comments that precede an alternate branch.
+    #[must_use]
+    pub(crate) fn with_leading_comments<N>(
+        mut self,
+        comments: &'a [SourceComment],
+        last_node: Option<N>,
+    ) -> Self
+    where
+        N: Into<AnyNodeRef<'a>>,
+    {
+        self.format_header = self
+            .format_header
+            .with_leading_comments(comments, last_node);
+        self
+    }
+}
+
 pub(crate) fn clause<'a, 'ast, Content>(
     header: ClauseHeader<'a>,
     trailing_colon_comment: &'a [SourceComment],
