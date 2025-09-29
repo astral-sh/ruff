@@ -707,7 +707,7 @@ impl<'a> FormatResults<'a> {
 
             // Locate the first and last characters that differ to use as the diagnostic
             // range and to narrow the `Edit` range.
-            let range = ModifiedRange::new(unformatted, formatted);
+            let modified_range = ModifiedRange::new(unformatted, formatted);
 
             let path = result.path.to_string_lossy();
             // For scripts, this is a single `Edit` using the `ModifiedRange` above, but notebook
@@ -740,7 +740,11 @@ impl<'a> FormatResults<'a> {
                         // ```
                         //
                         // The intersection will be `Some` for all three cells in this case.
-                        if range.unformatted.intersect(unformatted_range).is_some() {
+                        if modified_range
+                            .unformatted
+                            .intersect(unformatted_range)
+                            .is_some()
+                        {
                             let formatted = &formatted.source_code()[formatted_range];
                             let edit = if formatted.is_empty() {
                                 Edit::range_deletion(unformatted_range)
@@ -763,9 +767,9 @@ impl<'a> FormatResults<'a> {
                 let line_count = formatted
                     .cell_offsets()
                     .ranges()
-                    .filter_map(|r| {
-                        if range.formatted.contains_range(r) {
-                            Some(source.count_lines(r))
+                    .filter_map(|range| {
+                        if modified_range.formatted.contains_range(range) {
+                            Some(source.count_lines(range))
                         } else {
                             None
                         }
@@ -774,19 +778,21 @@ impl<'a> FormatResults<'a> {
                     .unwrap_or_default();
                 (fix, line_count)
             } else {
-                let formatted_code = &formatted.source_code()[range.formatted];
+                let formatted_code = &formatted.source_code()[modified_range.formatted];
                 let edit = if formatted_code.is_empty() {
-                    Edit::range_deletion(range.unformatted)
+                    Edit::range_deletion(modified_range.unformatted)
                 } else {
-                    Edit::range_replacement(formatted_code.to_string(), range.unformatted)
+                    Edit::range_replacement(formatted_code.to_string(), modified_range.unformatted)
                 };
                 let fix = Fix::safe_edit(edit);
-                let line_count = formatted.source_code().count_lines(range.formatted);
+                let line_count = formatted
+                    .source_code()
+                    .count_lines(modified_range.formatted);
                 (fix, line_count)
             };
 
             let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
-            let span = Span::from(source_file).with_range(range.unformatted);
+            let span = Span::from(source_file).with_range(modified_range.unformatted);
             let mut annotation = Annotation::primary(span);
             annotation.hide_snippet(true);
             diagnostic.annotate(annotation);
