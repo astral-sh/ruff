@@ -28,8 +28,8 @@ exit_code: 1
           "column": 1
         },
         "end": {
-          "line": 5,
-          "column": 35
+          "line": 2,
+          "column": 1
         }
       }
     }

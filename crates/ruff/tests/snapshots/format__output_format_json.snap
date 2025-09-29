@@ -19,18 +19,18 @@ exit_code: 1
     "cell": null,
     "code": "unformatted",
     "end_location": {
-      "column": 35,
-      "row": 5
+      "column": 1,
+      "row": 2
     },
     "filename": "[TMP]/input.py",
     "fix": {
       "applicability": "safe",
       "edits": [
         {
-          "content": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
+          "content": "",
           "end_location": {
             "column": 1,
-            "row": 6
+            "row": 2
           },
           "location": {
             "column": 1,

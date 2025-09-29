@@ -767,10 +767,13 @@ impl<'a> FormatResults<'a> {
                 "File would be reformatted",
             );
 
+            // Locate the first and last characters that differ to use as the diagnostic
+            // range and to narrow the `Edit` range.
+            let range = ModifiedRange::new(unformatted, formatted);
+
             let path = result.path.to_string_lossy();
-            // For now, report the edit as a replacement of the whole file's contents. For
-            // scripts, this is a single `Edit`, but notebook edits must be split by cell in
-            // order to render them as diffs.
+            // For scripts, this is a single `Edit` using the `ModifiedRange` above, but notebook
+            // edits must be split by cell in order to render them as diffs.
             //
             // We also attempt to estimate the line number width for aligning the
             // annotate-snippets header. This is only an estimate because we don't actually know
@@ -788,9 +791,28 @@ impl<'a> FormatResults<'a> {
                     .cell_offsets()
                     .ranges()
                     .zip(unformatted.cell_offsets().ranges())
-                    .map(|(formatted_range, unformatted_range)| {
-                        let formatted = &formatted.source_code()[formatted_range];
-                        Edit::range_replacement(formatted.to_string(), unformatted_range)
+                    .filter_map(|(formatted_range, unformatted_range)| {
+                        // Filter out cells that weren't modified. We use `intersect` instead of
+                        // `contains_range` because the full modified range might start or end in
+                        // the middle of a cell:
+                        //
+                        // ```
+                        // | cell 1 | cell 2 | cell 3 |
+                        //     |----------------| modified range
+                        // ```
+                        //
+                        // The intersection will be `Some` for all three cells in this case.
+                        if range.unformatted.intersect(unformatted_range).is_some() {
+                            let formatted = &formatted.source_code()[formatted_range];
+                            let edit = if formatted.is_empty() {
+                                Edit::range_deletion(unformatted_range)
+                            } else {
+                                Edit::range_replacement(formatted.to_string(), unformatted_range)
+                            };
+                            Some(edit)
+                        } else {
+                            None
+                        }
                     });
 
                 let fix = Fix::safe_edits(
@@ -803,49 +825,30 @@ impl<'a> FormatResults<'a> {
                 let line_count = formatted
                     .cell_offsets()
                     .ranges()
-                    .map(|range| source.count_lines(range))
+                    .filter_map(|r| {
+                        if range.formatted.contains_range(r) {
+                            Some(source.count_lines(r))
+                        } else {
+                            None
+                        }
+                    })
                     .max()
                     .unwrap_or_default();
                 (fix, line_count)
             } else {
-                let fix = Fix::safe_edit(Edit::range_replacement(
-                    formatted.source_code().to_string(),
-                    TextRange::up_to(unformatted.source_code().text_len()),
-                ));
-                let line_count = formatted
-                    .source_code()
-                    .count_lines(TextRange::up_to(formatted.source_code().text_len()));
+                let formatted_code = &formatted.source_code()[range.formatted];
+                let edit = if formatted_code.is_empty() {
+                    Edit::range_deletion(range.unformatted)
+                } else {
+                    Edit::range_replacement(formatted_code.to_string(), range.unformatted)
+                };
+                let fix = Fix::safe_edit(edit);
+                let line_count = formatted.source_code().count_lines(range.formatted);
                 (fix, line_count)
             };
 
-            // Locate the first and last characters that differ to use as the diagnostic
-            // range.
-            let range = {
-                let mut start = None;
-                let mut end = None;
-                for ((offset, old), new) in unformatted
-                    .source_code()
-                    .char_indices()
-                    .zip(formatted.source_code().chars())
-                {
-                    if old != new {
-                        if start.is_none() {
-                            start = Some(offset);
-                        } else {
-                            end = Some(offset);
-                        }
-                    }
-                }
-
-                let start =
-                    start.map_or(TextSize::ZERO, |start| TextSize::try_from(start).unwrap());
-                let end = end.map_or(start, |end| TextSize::try_from(end).unwrap());
-
-                TextRange::new(start, end)
-            };
-
             let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
-            let span = Span::from(source_file).with_range(range);
+            let span = Span::from(source_file).with_range(range.unformatted);
             let mut annotation = Annotation::primary(span);
             annotation.hide_snippet(true);
             diagnostic.annotate(annotation);
@@ -1066,6 +1069,54 @@ impl Display for FormatCommandError {
     }
 }
 
+struct ModifiedRange {
+    unformatted: TextRange,
+    formatted: TextRange,
+}
+
+impl ModifiedRange {
+    /// Determine the range that differs between `unformatted` and `formatted`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the there are no differences between the two inputs.
+    fn new(unformatted: &SourceKind, formatted: &SourceKind) -> Self {
+        let unformatted = unformatted.source_code();
+        let formatted = formatted.source_code();
+
+        let start = unformatted
+            .char_indices()
+            .zip(formatted.chars())
+            .find_map(|((offset, old), new)| (old != new).then_some(offset))
+            .expect("Expected at least one difference");
+
+        let start_size = TextSize::try_from(start).unwrap();
+
+        // This finds the position of the first character where the two suffixes differ in
+        // `unformatted`.
+        let mut offset = TextSize::ZERO;
+        for (old, new) in unformatted[start..]
+            .chars()
+            .rev()
+            .zip(formatted[start..].chars().rev())
+        {
+            if old == new {
+                offset += old.text_len();
+            } else {
+                break;
+            }
+        }
+
+        let unformatted_range = TextRange::new(start_size, unformatted.text_len() - offset);
+        let formatted_range = TextRange::new(start_size, formatted.text_len() - offset);
+
+        Self {
+            unformatted: unformatted_range,
+            formatted: formatted_range,
+        }
+    }
+}
+
 pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // First, collect all rules that are incompatible regardless of the linter-specific settings.
     let mut incompatible_rules = FxHashSet::default();
@@ -1241,6 +1292,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::ops::Range;
     use std::path::PathBuf;
 
     use ignore::Error;
@@ -1251,9 +1303,10 @@ mod tests {
     use ruff_linter::source_kind::{SourceError, SourceKind};
     use ruff_python_formatter::FormatModuleError;
     use ruff_python_parser::{ParseError, ParseErrorType};
-    use ruff_text_size::TextRange;
+    use ruff_text_size::{TextRange, TextSize};
+    use test_case::test_case;
 
-    use crate::commands::format::{FormatCommandError, FormatMode, FormatResults};
+    use crate::commands::format::{FormatCommandError, FormatMode, FormatResults, ModifiedRange};
 
     #[test]
     fn error_diagnostics() -> anyhow::Result<()> {
@@ -1342,5 +1395,34 @@ mod tests {
         ");
 
         Ok(())
+    }
+
+    #[test_case("abcdef", "abcXYdef", 3..3, 3..5; "insertion")]
+    #[test_case("abcXYdef", "abcdef", 3..5, 3..3; "deletion")]
+    #[test_case("abcXdef", "abcYdef", 3..4, 3..4; "modification")]
+    fn modified_range(
+        unformatted: &str,
+        formatted: &str,
+        expect_unformatted: Range<u32>,
+        expect_formatted: Range<u32>,
+    ) {
+        let mr = ModifiedRange::new(
+            &SourceKind::Python(unformatted.to_string()),
+            &SourceKind::Python(formatted.to_string()),
+        );
+        assert_eq!(
+            mr.unformatted,
+            TextRange::new(
+                TextSize::new(expect_unformatted.start),
+                TextSize::new(expect_unformatted.end)
+            )
+        );
+        assert_eq!(
+            mr.formatted,
+            TextRange::new(
+                TextSize::new(expect_formatted.start),
+                TextSize::new(expect_formatted.end)
+            )
+        );
     }
 }

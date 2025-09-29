@@ -24,8 +24,8 @@ exit_code: 1
         "path": "[TMP]/input.py",
         "range": {
           "end": {
-            "column": 35,
-            "line": 5
+            "column": 1,
+            "line": 2
           },
           "start": {
             "column": 1,
@@ -39,14 +39,14 @@ exit_code: 1
           "range": {
             "end": {
               "column": 1,
-              "line": 6
+              "line": 2
             },
             "start": {
               "column": 1,
               "line": 1
             }
           },
-          "text": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n"
+          "text": ""
         }
       ]
     }

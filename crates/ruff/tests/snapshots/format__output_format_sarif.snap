@@ -31,12 +31,9 @@ exit_code: 1
                     {
                       "deletedRegion": {
                         "endColumn": 1,
-                        "endLine": 6,
+                        "endLine": 2,
                         "startColumn": 1,
                         "startLine": 1
-                      },
-                      "insertedContent": {
-                        "text": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n"
                       }
                     }
                   ]
@@ -55,8 +52,8 @@ exit_code: 1
                   "uri": "[TMP]/input.py"
                 },
                 "region": {
-                  "endColumn": 35,
-                  "endLine": 5,
+                  "endColumn": 1,
+                  "endLine": 2,
                   "startColumn": 1,
                   "startLine": 1
                 }
