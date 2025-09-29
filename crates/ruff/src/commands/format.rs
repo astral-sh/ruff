@@ -12,12 +12,9 @@ use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DisplayGithubDiagnostics, GithubRenderer, Severity, Span,
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
-use ruff_linter::message::{
-    Emitter, EmitterContext, GroupedEmitter, SarifEmitter, create_panic_diagnostic,
-};
+use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
@@ -603,78 +600,12 @@ impl<'a> FormatResults<'a> {
             .collect();
 
         let context = EmitterContext::new(&notebook_index);
-        let config = DisplayDiagnosticConfig::default();
-        match output_format {
-            OutputFormat::Concise => {
-                let config = config
-                    .format(DiagnosticFormat::Concise)
-                    .hide_severity(true)
-                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Full => {
-                let config = config
-                    .format(DiagnosticFormat::Full)
-                    .hide_severity(true)
-                    .show_fix_diff(true)
-                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Json => {
-                let config = config.format(DiagnosticFormat::Json);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::JsonLines => {
-                let config = config.format(DiagnosticFormat::JsonLines);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Junit => {
-                let config = config.format(DiagnosticFormat::Junit);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Grouped => {
-                GroupedEmitter::default()
-                    .emit(f, &diagnostics, &context)
-                    .map_err(std::io::Error::other)?;
-            }
-            OutputFormat::Github => {
-                let renderer = GithubRenderer::new(&context, "Ruff");
-                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Gitlab => {
-                let config = config.format(DiagnosticFormat::Gitlab);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Pylint => {
-                let config = config.format(DiagnosticFormat::Pylint);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Rdjson => {
-                let config = config.format(DiagnosticFormat::Rdjson);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Azure => {
-                let config = config.format(DiagnosticFormat::Azure);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-                write!(f, "{value}")?;
-            }
-            OutputFormat::Sarif => {
-                SarifEmitter
-                    .emit(f, &diagnostics, &context)
-                    .map_err(std::io::Error::other)?;
-            }
-        }
+        let config = DisplayDiagnosticConfig::default()
+            .hide_severity(true)
+            .show_fix_diff(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
 
-        Ok(())
+        render_diagnostics(f, output_format, config, &context, &diagnostics)
     }
 
     /// Write a summary of the formatting results to the given writer.
