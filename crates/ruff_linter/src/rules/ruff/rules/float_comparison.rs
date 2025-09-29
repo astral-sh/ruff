@@ -35,13 +35,10 @@ use crate::{FixAvailability, Violation};
 ///
 /// # Scalar comparison
 /// assert math.isclose(0.1 + 0.2, 0.3, abs_tol=1e-9)
-///
-/// Comparison with zero requires abs_tol
-/// assert math.isclose(1e-10, 0.0, abs_tol=1e-9)
 /// ```
-///
-/// [mathisclose]: https://docs.python.org/3/library/math.html#math.isclose
-/// [numpyisclose]: https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose
+/// ## References
+/// - [Python documentation: `math.isclose`](https://docs.python.org/3/library/math.html#math.isclose)
+/// - [NumPY documentation: `math.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
 #[derive(ViolationMetadata)]
 pub(crate) struct FloatComparison {
     pub left: String,
