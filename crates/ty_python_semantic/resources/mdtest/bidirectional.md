@@ -44,7 +44,7 @@ def _(l: list[int] | None = None):
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
     l2: list[int] = l or list()
-    # TODO: it would be nice if this were `list[int]`
+    # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
     reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
