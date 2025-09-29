@@ -155,19 +155,19 @@ where
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct ConstraintSet<'db> {
     /// The BDD representing this constraint set
-    node: Node<'db>,
+    node: UnderspecifiedNode<'db>,
 }
 
 impl<'db> ConstraintSet<'db> {
     fn never() -> Self {
         Self {
-            node: Node::AlwaysFalse,
+            node: UnderspecifiedNode::AlwaysFalse,
         }
     }
 
     fn always() -> Self {
         Self {
-            node: Node::AlwaysTrue,
+            node: UnderspecifiedNode::AlwaysTrue,
         }
     }
 
@@ -229,7 +229,7 @@ impl<'db> ConstraintSet<'db> {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
         Self {
-            node: ConstrainedTypeVar::new_node(db, lower, typevar, upper),
+            node: ConstrainedTypeVar::new_node(db, lower, typevar, upper).into(),
         }
     }
 
@@ -276,24 +276,25 @@ impl<'db> ConstrainedTypeVar<'db> {
         lower: Type<'db>,
         typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
-    ) -> Node<'db> {
+    ) -> UnderspecifiedNode<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
         debug_assert_eq!(upper, upper.top_materialization(db));
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
         if !lower.is_subtype_of(db, upper) {
-            return Node::AlwaysFalse;
+            return UnderspecifiedNode::AlwaysFalse;
         }
 
         // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
         // to _any_ type, and the constraint does nothing.
         if lower.is_never() && upper.is_object() {
-            return Node::AlwaysTrue;
+            return UnderspecifiedNode::AlwaysTrue;
         }
 
-        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
+        UnderspecifiedNode::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
     }
+
     fn when_true(self) -> ConstraintAssignment<'db> {
         ConstraintAssignment::Positive(self)
     }
@@ -421,37 +422,6 @@ impl<'db> Node<'db> {
         Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
     }
 
-    /// Creates a new BDD node for an individual constraint. (The BDD will evaluate to `true` when
-    /// the constraint holds, and to `false` when it does not.)
-    fn new_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
-        Self::Interior(InteriorNode::new(
-            db,
-            constraint,
-            Node::AlwaysTrue,
-            Node::AlwaysFalse,
-        ))
-    }
-
-    /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
-    /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
-    /// a negative constraint, it returns the negation of that BDD node.)
-    fn new_satisfied_constraint(db: &'db dyn Db, constraint: ConstraintAssignment<'db>) -> Self {
-        match constraint {
-            ConstraintAssignment::Positive(constraint) => Self::Interior(InteriorNode::new(
-                db,
-                constraint,
-                Node::AlwaysTrue,
-                Node::AlwaysFalse,
-            )),
-            ConstraintAssignment::Negative(constraint) => Self::Interior(InteriorNode::new(
-                db,
-                constraint,
-                Node::AlwaysFalse,
-                Node::AlwaysTrue,
-            )),
-        }
-    }
-
     /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
     /// node.
     fn root_constraint(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
@@ -487,7 +457,7 @@ impl<'db> Node<'db> {
             (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
             (Node::Interior(a), Node::Interior(b)) => {
                 // OR is commutative, which lets us halve the cache requirements
-                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
                 a.or(db, b)
             }
         }
@@ -500,7 +470,7 @@ impl<'db> Node<'db> {
             (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
             (Node::Interior(a), Node::Interior(b)) => {
                 // AND is commutative, which lets us halve the cache requirements
-                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
                 a.and(db, b)
             }
         }
@@ -530,7 +500,7 @@ impl<'db> Node<'db> {
             ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // IFF is commutative, which lets us halve the cache requirements
-                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
                 a.iff(db, b)
             }
         }
@@ -541,173 +511,6 @@ impl<'db> Node<'db> {
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
-    }
-
-    /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
-    /// particular values. (Those variables will not be checked when evaluating the result, and
-    /// will not be present in the result.)
-    ///
-    /// Also returns whether _all_ of the restricted variables appeared in the BDD.
-    fn restrict(
-        self,
-        db: &'db dyn Db,
-        assignment: impl IntoIterator<Item = ConstraintAssignment<'db>>,
-    ) -> (Self, bool) {
-        assignment
-            .into_iter()
-            .fold((self, true), |(restricted, found), assignment| {
-                let (restricted, found_this) = restricted.restrict_one(db, assignment);
-                (restricted, found && found_this)
-            })
-    }
-
-    /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
-    /// particular value. (That variable will be not be checked when evaluating the result, and
-    /// will not be present in the result.)
-    ///
-    /// Also returns whether the restricted variable appeared in the BDD.
-    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> (Self, bool) {
-        match self {
-            Node::AlwaysTrue => (Node::AlwaysTrue, false),
-            Node::AlwaysFalse => (Node::AlwaysFalse, false),
-            Node::Interior(interior) => interior.restrict_one(db, assignment),
-        }
-    }
-
-    /// Returns a new BDD with any occurrence of `left ∧ right` replaced with `replacement`.
-    fn substitute_intersection(
-        self,
-        db: &'db dyn Db,
-        left: ConstraintAssignment<'db>,
-        right: ConstraintAssignment<'db>,
-        replacement: Node<'db>,
-    ) -> Self {
-        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
-        //   - left and right are both true
-        //   - left is false
-        //   - left is true and right is false
-        // This covers the entire truth table of `left ∧ right`.
-        let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
-        if !both_found {
-            // If left and right are not both present in the input BDD, we should not even attempt
-            // the substitution, since the Shannon expansion might introduce the missing variables!
-            // That confuses us below when we try to detect whether the substitution is consistent
-            // with the input.
-            return self;
-        }
-        let (when_not_left, _) = self.restrict(db, [left.negated()]);
-        let (when_left_but_not_right, _) = self.restrict(db, [left, right.negated()]);
-
-        // The result should test `replacement`, and when it's true, it should produce the same
-        // output that input would when `left ∧ right` is true. When replacement is false, it
-        // should fall back on testing left and right individually to make sure we produce the
-        // correct outputs in the `¬(left ∧ right)` case. So the result is
-        //
-        //   if replacement
-        //     when_left_and_right
-        //   else if not left
-        //     when_not_left
-        //   else if not right
-        //     when_left_but_not_right
-        //   else
-        //     false
-        //
-        //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
-        let left_node = Node::new_satisfied_constraint(db, left);
-        let right_node = Node::new_satisfied_constraint(db, right);
-        let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
-        let left_result = left_node.ite(db, right_result, when_not_left);
-        let result = replacement.ite(db, when_left_and_right, left_result);
-
-        // Lastly, verify that the result is consistent with the input. (It must produce the same
-        // results when `left ∧ right`.) If it doesn't, the substitution isn't valid, and we should
-        // return the original BDD unmodified.
-        let validity = replacement.iff(db, left_node.and(db, right_node));
-        let constrained_original = self.and(db, validity);
-        let constrained_replacement = result.and(db, validity);
-        if constrained_original == constrained_replacement {
-            result
-        } else {
-            self
-        }
-    }
-
-    /// Returns a new BDD with any occurrence of `left ∨ right` replaced with `replacement`.
-    fn substitute_union(
-        self,
-        db: &'db dyn Db,
-        left: ConstraintAssignment<'db>,
-        right: ConstraintAssignment<'db>,
-        replacement: Node<'db>,
-    ) -> Self {
-        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
-        //   - left and right are both true
-        //   - left is true and right is false
-        //   - left is false and right is true
-        //   - left and right are both false
-        // This covers the entire truth table of `left ∨ right`.
-        let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
-        if !both_found {
-            // If left and right are not both present in the input BDD, we should not even attempt
-            // the substitution, since the Shannon expansion might introduce the missing variables!
-            // That confuses us below when we try to detect whether the substitution is consistent
-            // with the input.
-            return self;
-        }
-        let (when_l0_r0, _) = self.restrict(db, [left.negated(), right.negated()]);
-        let (when_l1_r0, _) = self.restrict(db, [left, right.negated()]);
-        let (when_l0_r1, _) = self.restrict(db, [left.negated(), right]);
-
-        // The result should test `replacement`, and when it's true, it should produce the same
-        // output that input would when `left ∨ right` is true. For OR, this is the union of what
-        // the input produces for the three cases that comprise `left ∨ right`. When `replacement`
-        // is false, the result should produce the same output that input would when
-        // `¬(left ∨ right)`, i.e. when `left ∧ right`. So the result is
-        //
-        //   if replacement
-        //     or(when_l1_r1, when_l1_r0, when_r0_l1)
-        //   else
-        //     when_l0_r0
-        let result = replacement.ite(
-            db,
-            when_l1_r0.or(db, when_l0_r1.or(db, when_l1_r1)),
-            when_l0_r0,
-        );
-
-        // Lastly, verify that the result is consistent with the input. (It must produce the same
-        // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
-        // return the original BDD unmodified.
-        let left_node = Node::new_satisfied_constraint(db, left);
-        let right_node = Node::new_satisfied_constraint(db, right);
-        let validity = replacement.iff(db, left_node.or(db, right_node));
-        let constrained_original = self.and(db, validity);
-        let constrained_replacement = result.and(db, validity);
-        if constrained_original == constrained_replacement {
-            result
-        } else {
-            self
-        }
-    }
-
-    /// Invokes a closure for each constraint variable that appears anywhere in a BDD. (Any given
-    /// constraint can appear multiple times in different paths from the root; we do not
-    /// deduplicate those constraints, and will instead invoke the callback each time we encounter
-    /// the constraint.)
-    fn for_each_constraint(self, db: &'db dyn Db, f: &mut dyn FnMut(ConstrainedTypeVar<'db>)) {
-        let Node::Interior(interior) = self else {
-            return;
-        };
-        f(interior.constraint(db));
-        interior.if_true(db).for_each_constraint(db, f);
-        interior.if_false(db).for_each_constraint(db, f);
-    }
-
-    /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
-    fn simplify(self, db: &'db dyn Db) -> Self {
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
-            Node::Interior(interior) => interior.simplify(db),
-        }
     }
 
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
@@ -775,6 +578,7 @@ impl<'db> Node<'db> {
 
 /// An interior node of a BDD
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 struct InteriorNode<'db> {
     constraint: ConstrainedTypeVar<'db>,
     if_true: Node<'db>,
@@ -873,19 +677,672 @@ impl<'db> InteriorNode<'db> {
             ),
         }
     }
+}
+
+/// An "underspecified" BDD node.
+///
+/// This is just like a BDD [`Node`], but with an additional
+/// [`Impossible`][UnderspecifiedNode::Impossible] terminal, which is used to represent situations
+/// that are impossible. For instance, two constraints might be mutually incompatible, because they
+/// constrain the same typevar and their bounds are disjoint. (That is, there is no type that
+/// satisfies both constraints simultaneously.) Since that situation is not possible, it does not
+/// matter what value the BDD evaluates to for any input with both of the corresponding variables
+/// set to `true`. This is called _underspecified_ in the BDD literature, since we do not have a
+/// single concrete desired output for every possible input. (The opposite is a _fully specified_
+/// BDD, which we represent with a [`Node`].) The set of inputs where we don't care what output is
+/// produced is called the _don't care set_ or _impossible set_; the inputs where we do care are
+/// (unsurprisingly) called the _care set_ or _possible set_.
+///
+/// For any underspecified BDD, there are multiple fully specified BDDs that agree with it on all
+/// inputs in the care set. At some point, we have to convert an underspecified BDD into a fully
+/// specified one, but (a) we want to do that as late as possible, and (b) when we do, we want to
+/// choose the simplest fully specified BDD that is still consistent wrt the care set.
+///
+/// We use a separate type for underspecified BDDs so that we can always tell in the code when we
+/// are operating on a BDD that might be underspecified.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum UnderspecifiedNode<'db> {
+    AlwaysFalse,
+    AlwaysTrue,
+    Impossible,
+    /// An interior node that has at least one path to the [`Impossible`][Self::Impossible]
+    /// terminal.
+    Interior(UnderspecifiedInteriorNode<'db>),
+    /// An interior node that does not have any path to the [`Impossible`][Self::Impossible]
+    /// terminal. (This is an optimization that lets us short-circuit the conversion from
+    /// underspecified to fully specified in many cases.)
+    FullySpecified(InteriorNode<'db>),
+}
+
+impl<'db> UnderspecifiedNode<'db> {
+    /// Creates a new underspecified BDD node, ensuring that it is fully reduced.
+    fn new(
+        db: &'db dyn Db,
+        constraint: ConstrainedTypeVar<'db>,
+        if_true: UnderspecifiedNode<'db>,
+        if_false: UnderspecifiedNode<'db>,
+    ) -> Self {
+        debug_assert!(
+            (if_true.root_constraint(db))
+                .is_none_or(|root_constraint| root_constraint > constraint)
+        );
+        debug_assert!(
+            (if_false.root_constraint(db))
+                .is_none_or(|root_constraint| root_constraint > constraint)
+        );
+        if if_true == if_false {
+            return if_true;
+        }
+        match (
+            if_true.into_fully_specified(),
+            if_false.into_fully_specified(),
+        ) {
+            (Some(if_true), Some(if_false)) => Node::new(db, constraint, if_true, if_false).into(),
+            _ => Self::Interior(UnderspecifiedInteriorNode::new(
+                db, constraint, if_true, if_false,
+            )),
+        }
+    }
+
+    /// Creates a new BDD node for an individual constraint. (The BDD will evaluate to `true` when
+    /// the constraint holds, and to `false` when it does not.)
+    fn new_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
+        Self::FullySpecified(InteriorNode::new(
+            db,
+            constraint,
+            Node::AlwaysTrue,
+            Node::AlwaysFalse,
+        ))
+    }
+
+    /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
+    /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
+    /// a negative constraint, it returns the negation of that BDD node.)
+    fn new_satisfied_constraint(db: &'db dyn Db, constraint: ConstraintAssignment<'db>) -> Self {
+        match constraint {
+            ConstraintAssignment::Positive(constraint) => Self::FullySpecified(InteriorNode::new(
+                db,
+                constraint,
+                Node::AlwaysTrue,
+                Node::AlwaysFalse,
+            )),
+            ConstraintAssignment::Negative(constraint) => Self::FullySpecified(InteriorNode::new(
+                db,
+                constraint,
+                Node::AlwaysFalse,
+                Node::AlwaysTrue,
+            )),
+        }
+    }
+
+    /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
+    /// node.
+    fn root_constraint(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
+        match self {
+            UnderspecifiedNode::FullySpecified(interior) => Some(interior.constraint(db)),
+            UnderspecifiedNode::Interior(interior) => Some(interior.constraint(db)),
+            _ => None,
+        }
+    }
+
+    /// Returns whether this BDD represent the constant function `true`.
+    fn is_always_satisfied(self) -> bool {
+        matches!(self, UnderspecifiedNode::AlwaysTrue)
+    }
+
+    /// Returns whether this BDD represent the constant function `false`.
+    fn is_never_satisfied(self) -> bool {
+        matches!(self, UnderspecifiedNode::AlwaysFalse)
+    }
+
+    /// If this BDD node is fully specified, returns the corresponding [`Node`]. Otherwise returns
+    /// `None`.
+    fn into_fully_specified(self) -> Option<Node<'db>> {
+        // It might seem like this is only best-effort, since we're not doing a deep search of
+        // `Interior` nodes to see if they actually have any path to the `Impossible` terminal. But
+        // it's not — our constructor will always create `FullySpecified` variants whenever it can.
+        // In effect, we're doing that search bottom-up at construction time.
+        match self {
+            UnderspecifiedNode::AlwaysFalse => Some(Node::AlwaysFalse),
+            UnderspecifiedNode::AlwaysTrue => Some(Node::AlwaysTrue),
+            UnderspecifiedNode::FullySpecified(interior) => Some(Node::Interior(interior)),
+            _ => None,
+        }
+    }
+
+    /// Returns the negation of this BDD.
+    fn negate(self, db: &'db dyn Db) -> Self {
+        match self {
+            UnderspecifiedNode::AlwaysTrue => UnderspecifiedNode::AlwaysFalse,
+            UnderspecifiedNode::AlwaysFalse => UnderspecifiedNode::AlwaysTrue,
+            UnderspecifiedNode::Impossible => UnderspecifiedNode::Impossible,
+            UnderspecifiedNode::Interior(interior) => interior.negate(db),
+            UnderspecifiedNode::FullySpecified(interior) => interior.negate(db).into(),
+        }
+    }
+
+    /// Returns the `or` or union of two BDDs.
+    fn or(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            // both(ish) operands terminal
+            (UnderspecifiedNode::Impossible, _) | (_, UnderspecifiedNode::Impossible) => {
+                UnderspecifiedNode::Impossible
+            }
+            (UnderspecifiedNode::AlwaysFalse, other) | (other, UnderspecifiedNode::AlwaysFalse) => {
+                other
+            }
+            (UnderspecifiedNode::AlwaysTrue, UnderspecifiedNode::AlwaysTrue) => {
+                UnderspecifiedNode::AlwaysTrue
+            }
+
+            // both operands fully specified
+            (UnderspecifiedNode::AlwaysTrue, UnderspecifiedNode::FullySpecified(other))
+            | (UnderspecifiedNode::FullySpecified(other), UnderspecifiedNode::AlwaysTrue) => {
+                Node::new(
+                    db,
+                    other.constraint(db),
+                    Node::AlwaysTrue.or(db, other.if_true(db)),
+                    Node::AlwaysTrue.or(db, other.if_false(db)),
+                )
+                .into()
+            }
+            (UnderspecifiedNode::FullySpecified(a), UnderspecifiedNode::FullySpecified(b)) => {
+                // OR is commutative, which lets us halve the cache requirements
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
+                a.or(db, b).into()
+            }
+
+            // at least one operand underspecified
+            (UnderspecifiedNode::Interior(a), UnderspecifiedNode::Interior(b)) => {
+                // OR is commutative, which lets us halve the cache requirements
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
+                a.or(db, UnderspecifiedNode::Interior(b))
+            }
+            (other, UnderspecifiedNode::Interior(interior))
+            | (UnderspecifiedNode::Interior(interior), other) => interior.or(db, other),
+        }
+    }
+
+    /// Returns the `and` or intersection of two BDDs.
+    fn and(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            // both(ish) operands terminal
+            (UnderspecifiedNode::Impossible, _) | (_, UnderspecifiedNode::Impossible) => {
+                UnderspecifiedNode::Impossible
+            }
+            (UnderspecifiedNode::AlwaysTrue, other) | (other, UnderspecifiedNode::AlwaysTrue) => {
+                other
+            }
+            (UnderspecifiedNode::AlwaysFalse, UnderspecifiedNode::AlwaysFalse) => {
+                UnderspecifiedNode::AlwaysFalse
+            }
+
+            // both operands fully specified
+            (UnderspecifiedNode::AlwaysFalse, UnderspecifiedNode::FullySpecified(other))
+            | (UnderspecifiedNode::FullySpecified(other), UnderspecifiedNode::AlwaysFalse) => {
+                Node::new(
+                    db,
+                    other.constraint(db),
+                    Node::AlwaysFalse.and(db, other.if_true(db)),
+                    Node::AlwaysFalse.and(db, other.if_false(db)),
+                )
+                .into()
+            }
+            (UnderspecifiedNode::FullySpecified(a), UnderspecifiedNode::FullySpecified(b)) => {
+                // AND is commutative, which lets us halve the cache requirements
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
+                a.and(db, b).into()
+            }
+
+            // at least one operand underspecified
+            (UnderspecifiedNode::Interior(a), UnderspecifiedNode::Interior(b)) => {
+                // AND is commutative, which lets us halve the cache requirements
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
+                a.and(db, UnderspecifiedNode::Interior(b))
+            }
+            (other, UnderspecifiedNode::Interior(interior))
+            | (UnderspecifiedNode::Interior(interior), other) => interior.and(db, other),
+        }
+    }
+
+    /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
+    /// result.
+    fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            // both operands terminal
+            (UnderspecifiedNode::Impossible, _) | (_, UnderspecifiedNode::Impossible) => {
+                UnderspecifiedNode::Impossible
+            }
+            (UnderspecifiedNode::AlwaysFalse, UnderspecifiedNode::AlwaysFalse)
+            | (UnderspecifiedNode::AlwaysTrue, UnderspecifiedNode::AlwaysTrue) => {
+                UnderspecifiedNode::AlwaysTrue
+            }
+            (UnderspecifiedNode::AlwaysTrue, UnderspecifiedNode::AlwaysFalse)
+            | (UnderspecifiedNode::AlwaysFalse, UnderspecifiedNode::AlwaysTrue) => {
+                UnderspecifiedNode::AlwaysFalse
+            }
+
+            // both operands fully specified
+            (UnderspecifiedNode::AlwaysTrue, UnderspecifiedNode::FullySpecified(other))
+            | (UnderspecifiedNode::FullySpecified(other), UnderspecifiedNode::AlwaysTrue) => {
+                Node::new(
+                    db,
+                    other.constraint(db),
+                    Node::AlwaysTrue.iff(db, other.if_true(db)),
+                    Node::AlwaysTrue.iff(db, other.if_false(db)),
+                )
+                .into()
+            }
+            (UnderspecifiedNode::AlwaysFalse, UnderspecifiedNode::FullySpecified(other))
+            | (UnderspecifiedNode::FullySpecified(other), UnderspecifiedNode::AlwaysFalse) => {
+                Node::new(
+                    db,
+                    other.constraint(db),
+                    Node::AlwaysFalse.iff(db, other.if_true(db)),
+                    Node::AlwaysFalse.iff(db, other.if_false(db)),
+                )
+                .into()
+            }
+            (UnderspecifiedNode::FullySpecified(a), UnderspecifiedNode::FullySpecified(b)) => {
+                // IFF is commutative, which lets us halve the cache requirements
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
+                a.iff(db, b).into()
+            }
+
+            // at least one operand underspecified
+            (UnderspecifiedNode::Interior(a), UnderspecifiedNode::Interior(b)) => {
+                // IFF is commutative, which lets us halve the cache requirements
+                let (a, b) = if b < a { (b, a) } else { (a, b) };
+                a.iff(db, UnderspecifiedNode::Interior(b))
+            }
+            (other, UnderspecifiedNode::Interior(interior))
+            | (UnderspecifiedNode::Interior(interior), other) => interior.iff(db, other),
+        }
+    }
+
+    /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns what
+    /// `then_node` evaluates to; otherwise it returns what `else_node` evaluates to.
+    fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
+        self.and(db, then_node)
+            .or(db, self.negate(db).and(db, else_node))
+    }
+
+    /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
+    /// particular values. (Those variables will not be checked when evaluating the result, and
+    /// will not be present in the result.)
+    ///
+    /// Also returns whether _all_ of the restricted variables appeared in the BDD.
+    fn restrict(
+        self,
+        db: &'db dyn Db,
+        assignment: impl IntoIterator<Item = ConstraintAssignment<'db>>,
+    ) -> (Self, bool) {
+        assignment
+            .into_iter()
+            .fold((self, true), |(restricted, found), assignment| {
+                let (restricted, found_this) = restricted.restrict_one(db, assignment);
+                (restricted, found && found_this)
+            })
+    }
+
+    /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
+    /// particular value. (That variable will be not be checked when evaluating the result, and
+    /// will not be present in the result.)
+    ///
+    /// Also returns whether the restricted variable appeared in the BDD.
+    fn restrict_one(self, db: &'db dyn Db, assignment: ConstraintAssignment<'db>) -> (Self, bool) {
+        match self {
+            UnderspecifiedNode::AlwaysTrue => (UnderspecifiedNode::AlwaysTrue, false),
+            UnderspecifiedNode::AlwaysFalse => (UnderspecifiedNode::AlwaysFalse, false),
+            UnderspecifiedNode::Impossible => (UnderspecifiedNode::Impossible, false),
+            UnderspecifiedNode::FullySpecified(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).restrict_one(db, assignment)
+            }
+            UnderspecifiedNode::Interior(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).restrict_one(db, assignment)
+            }
+        }
+    }
+
+    /// Returns a new BDD with any occurrence of `left ∧ right` replaced with `replacement`.
+    fn substitute_intersection(
+        self,
+        db: &'db dyn Db,
+        left: ConstraintAssignment<'db>,
+        right: ConstraintAssignment<'db>,
+        replacement: UnderspecifiedNode<'db>,
+    ) -> Self {
+        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
+        //   - left and right are both true
+        //   - left is false
+        //   - left is true and right is false
+        // This covers the entire truth table of `left ∧ right`.
+        let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
+        if !both_found {
+            // If left and right are not both present in the input BDD, we should not even attempt
+            // the substitution, since the Shannon expansion might introduce the missing variables!
+            // That confuses us below when we try to detect whether the substitution is consistent
+            // with the input.
+            return self;
+        }
+        let (when_not_left, _) = self.restrict(db, [left.negated()]);
+        let (when_left_but_not_right, _) = self.restrict(db, [left, right.negated()]);
+
+        // The result should test `replacement`, and when it's true, it should produce the same
+        // output that input would when `left ∧ right` is true. When replacement is false, it
+        // should fall back on testing left and right individually to make sure we produce the
+        // correct outputs in the `¬(left ∧ right)` case. So the result is
+        //
+        //   if replacement
+        //     when_left_and_right
+        //   else if not left
+        //     when_not_left
+        //   else if not right
+        //     when_left_but_not_right
+        //   else
+        //     false
+        //
+        //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
+        let left_node = UnderspecifiedNode::new_satisfied_constraint(db, left);
+        let right_node = UnderspecifiedNode::new_satisfied_constraint(db, right);
+        let right_result =
+            right_node.ite(db, UnderspecifiedNode::AlwaysFalse, when_left_but_not_right);
+        let left_result = left_node.ite(db, right_result, when_not_left);
+        let result = replacement.ite(db, when_left_and_right, left_result);
+
+        // Lastly, verify that the result is consistent with the input. (It must produce the same
+        // results when `left ∧ right`.) If it doesn't, the substitution isn't valid, and we should
+        // return the original BDD unmodified.
+        let validity = replacement.iff(db, left_node.and(db, right_node));
+        let constrained_original = self.and(db, validity);
+        let constrained_replacement = result.and(db, validity);
+        if constrained_original == constrained_replacement {
+            result
+        } else {
+            self
+        }
+    }
+
+    /// Returns a new BDD with any occurrence of `left ∨ right` replaced with `replacement`.
+    fn substitute_union(
+        self,
+        db: &'db dyn Db,
+        left: ConstraintAssignment<'db>,
+        right: ConstraintAssignment<'db>,
+        replacement: UnderspecifiedNode<'db>,
+    ) -> Self {
+        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
+        //   - left and right are both true
+        //   - left is true and right is false
+        //   - left is false and right is true
+        //   - left and right are both false
+        // This covers the entire truth table of `left ∨ right`.
+        let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
+        if !both_found {
+            // If left and right are not both present in the input BDD, we should not even attempt
+            // the substitution, since the Shannon expansion might introduce the missing variables!
+            // That confuses us below when we try to detect whether the substitution is consistent
+            // with the input.
+            return self;
+        }
+        let (when_l0_r0, _) = self.restrict(db, [left.negated(), right.negated()]);
+        let (when_l1_r0, _) = self.restrict(db, [left, right.negated()]);
+        let (when_l0_r1, _) = self.restrict(db, [left.negated(), right]);
+
+        // The result should test `replacement`, and when it's true, it should produce the same
+        // output that input would when `left ∨ right` is true. For OR, this is the union of what
+        // the input produces for the three cases that comprise `left ∨ right`. When `replacement`
+        // is false, the result should produce the same output that input would when
+        // `¬(left ∨ right)`, i.e. when `left ∧ right`. So the result is
+        //
+        //   if replacement
+        //     or(when_l1_r1, when_l1_r0, when_r0_l1)
+        //   else
+        //     when_l0_r0
+        let result = replacement.ite(
+            db,
+            when_l1_r0.or(db, when_l0_r1.or(db, when_l1_r1)),
+            when_l0_r0,
+        );
+
+        // Lastly, verify that the result is consistent with the input. (It must produce the same
+        // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
+        // return the original BDD unmodified.
+        let left_node = UnderspecifiedNode::new_satisfied_constraint(db, left);
+        let right_node = UnderspecifiedNode::new_satisfied_constraint(db, right);
+        let validity = replacement.iff(db, left_node.or(db, right_node));
+        let constrained_original = self.and(db, validity);
+        let constrained_replacement = result.and(db, validity);
+        if constrained_original == constrained_replacement {
+            result
+        } else {
+            self
+        }
+    }
+
+    /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
+    fn simplify(self, db: &'db dyn Db) -> Self {
+        match self {
+            UnderspecifiedNode::AlwaysTrue
+            | UnderspecifiedNode::AlwaysFalse
+            | UnderspecifiedNode::Impossible => self,
+            UnderspecifiedNode::FullySpecified(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).simplify(db)
+            }
+            UnderspecifiedNode::Interior(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).simplify(db)
+            }
+        }
+    }
+}
+
+impl<'db> From<Node<'db>> for UnderspecifiedNode<'db> {
+    fn from(node: Node<'db>) -> Self {
+        match node {
+            Node::AlwaysFalse => UnderspecifiedNode::AlwaysFalse,
+            Node::AlwaysTrue => UnderspecifiedNode::AlwaysTrue,
+            Node::Interior(interior) => UnderspecifiedNode::FullySpecified(interior),
+        }
+    }
+}
+
+impl<'db> From<PossiblySpecifiedInteriorNode<'db>> for UnderspecifiedNode<'db> {
+    fn from(node: PossiblySpecifiedInteriorNode<'db>) -> Self {
+        match node {
+            PossiblySpecifiedInteriorNode::FullySpecified(interior) => {
+                UnderspecifiedNode::FullySpecified(interior)
+            }
+            PossiblySpecifiedInteriorNode::Underspecified(interior) => {
+                UnderspecifiedNode::Interior(interior)
+            }
+        }
+    }
+}
+
+impl<'db> From<UnderspecifiedInteriorNode<'db>> for UnderspecifiedNode<'db> {
+    fn from(interior: UnderspecifiedInteriorNode<'db>) -> Self {
+        UnderspecifiedNode::Interior(interior)
+    }
+}
+
+/// An interior node of an underspecified BDD
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
+struct UnderspecifiedInteriorNode<'db> {
+    constraint: ConstrainedTypeVar<'db>,
+    if_true: UnderspecifiedNode<'db>,
+    if_false: UnderspecifiedNode<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for UnderspecifiedInteriorNode<'_> {}
+
+#[salsa::tracked]
+impl<'db> UnderspecifiedInteriorNode<'db> {
+    fn cmp_constraints(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> NodeOrdering<'db> {
+        let self_constraint = self.constraint(db);
+        match other {
+            // Terminal nodes come after all interior nodes
+            UnderspecifiedNode::AlwaysTrue
+            | UnderspecifiedNode::AlwaysFalse
+            | UnderspecifiedNode::Impossible => NodeOrdering::Less(self_constraint),
+            UnderspecifiedNode::FullySpecified(other) => {
+                NodeOrdering::from_constraints(db, self_constraint, other.into())
+            }
+            UnderspecifiedNode::Interior(other) => {
+                NodeOrdering::from_constraints(db, self_constraint, other.into())
+            }
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn negate(self, db: &'db dyn Db) -> UnderspecifiedNode<'db> {
+        UnderspecifiedNode::new(
+            db,
+            self.constraint(db),
+            self.if_true(db).negate(db),
+            self.if_false(db).negate(db),
+        )
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn or(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).or(db, other.if_true(db)),
+                self.if_false(db).or(db, other.if_false(db)),
+            ),
+            NodeOrdering::Less(constraint) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).or(db, other),
+                self.if_false(db).or(db, other),
+            ),
+            NodeOrdering::Greater(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.or(db, other.if_true(db)),
+                self.or(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn and(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).and(db, other.if_true(db)),
+                self.if_false(db).and(db, other.if_false(db)),
+            ),
+            NodeOrdering::Less(constraint) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).and(db, other),
+                self.if_false(db).and(db, other),
+            ),
+            NodeOrdering::Greater(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.and(db, other.if_true(db)),
+                self.and(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn iff(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).iff(db, other.if_true(db)),
+                self.if_false(db).iff(db, other.if_false(db)),
+            ),
+            NodeOrdering::Less(constraint) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.if_true(db).iff(db, other),
+                self.if_false(db).iff(db, other),
+            ),
+            NodeOrdering::Greater(constraint, other) => UnderspecifiedNode::new(
+                db,
+                constraint,
+                self.iff(db, other.if_true(db)),
+                self.iff(db, other.if_false(db)),
+            ),
+        }
+    }
+}
+
+/// The ordering of an interior node with another node, along with the typevar of the smaller node.
+/// If the "left" interior node is greater than or equal to, then the right node must also be an
+/// interior node, and we include that in the result too.
+enum NodeOrdering<'db> {
+    Less(ConstrainedTypeVar<'db>),
+    Equal(ConstrainedTypeVar<'db>, PossiblySpecifiedInteriorNode<'db>),
+    Greater(ConstrainedTypeVar<'db>, PossiblySpecifiedInteriorNode<'db>),
+}
+
+impl<'db> NodeOrdering<'db> {
+    fn from_constraints(
+        db: &'db dyn Db,
+        left_constraint: ConstrainedTypeVar<'db>,
+        right: PossiblySpecifiedInteriorNode<'db>,
+    ) -> NodeOrdering<'db> {
+        let right_constraint = right.constraint(db);
+        match left_constraint.cmp(&right_constraint) {
+            Ordering::Less => NodeOrdering::Less(left_constraint),
+            Ordering::Equal => NodeOrdering::Equal(left_constraint, right),
+            Ordering::Greater => NodeOrdering::Greater(right_constraint, right),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Supertype)]
+enum PossiblySpecifiedInteriorNode<'db> {
+    Underspecified(UnderspecifiedInteriorNode<'db>),
+    FullySpecified(InteriorNode<'db>),
+}
+
+#[salsa::tracked]
+impl<'db> PossiblySpecifiedInteriorNode<'db> {
+    fn constraint(self, db: &'db dyn Db) -> ConstrainedTypeVar<'db> {
+        match self {
+            PossiblySpecifiedInteriorNode::Underspecified(interior) => interior.constraint(db),
+            PossiblySpecifiedInteriorNode::FullySpecified(interior) => interior.constraint(db),
+        }
+    }
+
+    fn if_true(self, db: &'db dyn Db) -> UnderspecifiedNode<'db> {
+        match self {
+            PossiblySpecifiedInteriorNode::Underspecified(interior) => interior.if_true(db),
+            PossiblySpecifiedInteriorNode::FullySpecified(interior) => interior.if_true(db).into(),
+        }
+    }
+
+    fn if_false(self, db: &'db dyn Db) -> UnderspecifiedNode<'db> {
+        match self {
+            PossiblySpecifiedInteriorNode::Underspecified(interior) => interior.if_false(db),
+            PossiblySpecifiedInteriorNode::FullySpecified(interior) => interior.if_false(db).into(),
+        }
+    }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
         db: &'db dyn Db,
         assignment: ConstraintAssignment<'db>,
-    ) -> (Node<'db>, bool) {
+    ) -> (UnderspecifiedNode<'db>, bool) {
         // If this node's variable is larger than the assignment's variable, then we have reached a
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_constraint = self.constraint(db);
         if assignment.constraint() < self_constraint {
-            return (Node::Interior(self), false);
+            return (UnderspecifiedNode::from(self), false);
         }
 
         // Otherwise, check if this node's variable is in the assignment. If so, substitute the
@@ -898,14 +1355,40 @@ impl<'db> InteriorNode<'db> {
             let (if_true, found_in_true) = self.if_true(db).restrict_one(db, assignment);
             let (if_false, found_in_false) = self.if_false(db).restrict_one(db, assignment);
             (
-                Node::new(db, self_constraint, if_true, if_false),
+                UnderspecifiedNode::new(db, self_constraint, if_true, if_false),
                 found_in_true || found_in_false,
             )
         }
     }
 
+    /// Invokes a closure for each constraint variable that appears anywhere in a BDD. (Any given
+    /// constraint can appear multiple times in different paths from the root; we do not
+    /// deduplicate those constraints, and will instead invoke the callback each time we encounter
+    /// the constraint.)
+    fn for_each_constraint(self, db: &'db dyn Db, f: &mut dyn FnMut(ConstrainedTypeVar<'db>)) {
+        f(self.constraint(db));
+        match self.if_true(db) {
+            UnderspecifiedNode::Interior(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).for_each_constraint(db, f)
+            }
+            UnderspecifiedNode::FullySpecified(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).for_each_constraint(db, f)
+            }
+            _ => {}
+        }
+        match self.if_false(db) {
+            UnderspecifiedNode::Interior(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).for_each_constraint(db, f)
+            }
+            UnderspecifiedNode::FullySpecified(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).for_each_constraint(db, f)
+            }
+            _ => {}
+        }
+    }
+
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify(self, db: &'db dyn Db) -> Node<'db> {
+    fn simplify(self, db: &'db dyn Db) -> UnderspecifiedNode<'db> {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
         // substitution to replace the pair with the simplification.
@@ -922,7 +1405,7 @@ impl<'db> InteriorNode<'db> {
         // visit queue with all pairs of those constraints. (We use "combinations" because we don't
         // need to compare a constraint against itself, and because ordering doesn't matter.)
         let mut seen_constraints = FxHashSet::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+        self.for_each_constraint(db, &mut |constraint| {
             seen_constraints.insert(constraint);
         });
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
@@ -931,7 +1414,7 @@ impl<'db> InteriorNode<'db> {
 
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
         // be simplified.
-        let mut simplified = Node::Interior(self);
+        let mut simplified = UnderspecifiedNode::from(self);
         while let Some((left_constraint, right_constraint)) = to_visit.pop() {
             // If the constraints refer to different typevars, they trivially cannot be compared.
             // TODO: We might need to consider when one constraint's upper or lower bound refers to
@@ -956,7 +1439,7 @@ impl<'db> InteriorNode<'db> {
                     db,
                     larger_constraint.when_true(),
                     smaller_constraint.when_true(),
-                    Node::new_satisfied_constraint(db, larger_constraint.when_true()),
+                    UnderspecifiedNode::new_satisfied_constraint(db, larger_constraint.when_true()),
                 );
 
                 // ¬larger ∧ ¬smaller = ¬larger
@@ -964,7 +1447,10 @@ impl<'db> InteriorNode<'db> {
                     db,
                     larger_constraint.when_false(),
                     smaller_constraint.when_false(),
-                    Node::new_satisfied_constraint(db, larger_constraint.when_false()),
+                    UnderspecifiedNode::new_satisfied_constraint(
+                        db,
+                        larger_constraint.when_false(),
+                    ),
                 );
 
                 // smaller ∧ ¬larger = false
@@ -973,7 +1459,7 @@ impl<'db> InteriorNode<'db> {
                     db,
                     larger_constraint.when_false(),
                     smaller_constraint.when_true(),
-                    Node::AlwaysFalse,
+                    UnderspecifiedNode::AlwaysFalse,
                 );
 
                 // larger ∨ ¬smaller = true
@@ -982,7 +1468,7 @@ impl<'db> InteriorNode<'db> {
                     db,
                     larger_constraint.when_true(),
                     smaller_constraint.when_false(),
-                    Node::AlwaysTrue,
+                    UnderspecifiedNode::AlwaysTrue,
                 );
             }
 
@@ -1001,10 +1487,14 @@ impl<'db> InteriorNode<'db> {
                                 .map(|seen| (seen, intersection_constraint)),
                         );
                     }
-                    let positive_intersection_node =
-                        Node::new_satisfied_constraint(db, intersection_constraint.when_true());
-                    let negative_intersection_node =
-                        Node::new_satisfied_constraint(db, intersection_constraint.when_false());
+                    let positive_intersection_node = UnderspecifiedNode::new_satisfied_constraint(
+                        db,
+                        intersection_constraint.when_true(),
+                    );
+                    let negative_intersection_node = UnderspecifiedNode::new_satisfied_constraint(
+                        db,
+                        intersection_constraint.when_false(),
+                    );
 
                     // left ∧ right = intersection
                     simplified = simplified.substitute_intersection(
@@ -1029,8 +1519,11 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_false(),
-                        Node::new_satisfied_constraint(db, left_constraint.when_true())
-                            .and(db, negative_intersection_node),
+                        UnderspecifiedNode::new_satisfied_constraint(
+                            db,
+                            left_constraint.when_true(),
+                        )
+                        .and(db, negative_intersection_node),
                     );
 
                     // ¬left ∧ right = ¬intersection ∧ right
@@ -1039,8 +1532,11 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_false(),
                         right_constraint.when_true(),
-                        Node::new_satisfied_constraint(db, right_constraint.when_true())
-                            .and(db, negative_intersection_node),
+                        UnderspecifiedNode::new_satisfied_constraint(
+                            db,
+                            right_constraint.when_true(),
+                        )
+                        .and(db, negative_intersection_node),
                     );
 
                     // left ∨ ¬right = intersection ∨ ¬right
@@ -1050,8 +1546,11 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_false(),
-                        Node::new_satisfied_constraint(db, right_constraint.when_false())
-                            .or(db, positive_intersection_node),
+                        UnderspecifiedNode::new_satisfied_constraint(
+                            db,
+                            right_constraint.when_false(),
+                        )
+                        .or(db, positive_intersection_node),
                     );
 
                     // ¬left ∨ right = ¬left ∨ intersection
@@ -1060,8 +1559,11 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_false(),
                         right_constraint.when_true(),
-                        Node::new_satisfied_constraint(db, left_constraint.when_false())
-                            .or(db, positive_intersection_node),
+                        UnderspecifiedNode::new_satisfied_constraint(
+                            db,
+                            left_constraint.when_false(),
+                        )
+                        .or(db, positive_intersection_node),
                     );
                 }
 
@@ -1074,7 +1576,7 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_true(),
-                        Node::AlwaysFalse,
+                        UnderspecifiedNode::AlwaysFalse,
                     );
 
                     // ¬left ∨ ¬right = true
@@ -1082,7 +1584,7 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_false(),
                         right_constraint.when_false(),
-                        Node::AlwaysTrue,
+                        UnderspecifiedNode::AlwaysTrue,
                     );
 
                     // left ∧ ¬right = left
@@ -1091,7 +1593,7 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_true(),
                         right_constraint.when_false(),
-                        Node::new_constraint(db, left_constraint),
+                        UnderspecifiedNode::new_constraint(db, left_constraint),
                     );
 
                     // ¬left ∧ right = right
@@ -1100,13 +1602,25 @@ impl<'db> InteriorNode<'db> {
                         db,
                         left_constraint.when_false(),
                         right_constraint.when_true(),
-                        Node::new_constraint(db, right_constraint),
+                        UnderspecifiedNode::new_constraint(db, right_constraint),
                     );
                 }
             }
         }
 
         simplified
+    }
+}
+
+impl<'db> From<UnderspecifiedInteriorNode<'db>> for PossiblySpecifiedInteriorNode<'db> {
+    fn from(interior: UnderspecifiedInteriorNode<'db>) -> Self {
+        PossiblySpecifiedInteriorNode::Underspecified(interior)
+    }
+}
+
+impl<'db> From<InteriorNode<'db>> for PossiblySpecifiedInteriorNode<'db> {
+    fn from(interior: InteriorNode<'db>) -> Self {
+        PossiblySpecifiedInteriorNode::FullySpecified(interior)
     }
 }
 
