@@ -1977,12 +1977,12 @@ from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
 class NewStyleClassScoped[T](Protocol):
-    def method(self: Self, input: T) -> None: ...
+    def method(self, input: T) -> None: ...
 
 S = TypeVar("S")
 
 class LegacyClassScoped(Protocol[S]):
-    def method(self: Self, input: S) -> None: ...
+    def method(self, input: S) -> None: ...
 
 # TODO: these should pass
 static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [static-assert-error]

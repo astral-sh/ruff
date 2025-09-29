@@ -3030,6 +3030,12 @@ impl Parameters {
             .find(|arg| arg.parameter.name.as_str() == name)
     }
 
+    /// Returns the index of the parameter with the given name
+    pub fn index(&self, name: &str) -> Option<usize> {
+        self.iter_non_variadic_params()
+            .position(|arg| arg.parameter.name.as_str() == name)
+    }
+
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
     pub fn iter(&self) -> ParametersIterator<'_> {
         ParametersIterator::new(self)

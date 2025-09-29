@@ -1209,11 +1209,13 @@ impl Display for DisplayParameter<'_> {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
             if let Some(annotated_type) = self.param.annotated_type() {
-                write!(
-                    f,
-                    ": {}",
-                    annotated_type.display_with(self.db, self.settings.clone())
-                )?;
+                if self.param.should_annotation_be_displayed() {
+                    write!(
+                        f,
+                        ": {}",
+                        annotated_type.display_with(self.db, self.settings.clone())
+                    )?;
+                }
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_ty) = self.param.default_type() {
