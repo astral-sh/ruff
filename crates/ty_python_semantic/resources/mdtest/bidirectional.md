@@ -67,10 +67,9 @@ d1 = {"x": 1}
 d2: TD = {"x": 1}
 d3: dict[str, int] = {"x": 1}
 
-reveal_type(d1)  # revealed: dict[@Todo(dict literal key type), @Todo(dict literal value type)]
+reveal_type(d1)  # revealed: dict[Unknown | str, Unknown | int]
 reveal_type(d2)  # revealed: TD
-# TODO: should be `dict[str, int]`
-reveal_type(d3)  # revealed: dict[@Todo(dict literal key type), @Todo(dict literal value type)]
+reveal_type(d3)  # revealed: dict[str, int]
 ```
 
 ## Propagating return type annotation
