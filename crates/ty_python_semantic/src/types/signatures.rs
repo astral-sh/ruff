@@ -1254,7 +1254,7 @@ impl<'db> Parameters<'db> {
 
                     Some(
                         typing_self(db, scope_id, typevar_binding_context, class, &Type::TypeVar)
-                            .unwrap(),
+                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
                     )
                 } else {
                     // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
