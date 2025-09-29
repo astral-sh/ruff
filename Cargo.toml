@@ -119,7 +119,7 @@ libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
-lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
+lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "ddc7dc8b374dedd947abf14bdb4a37f257a53e92", features = [
     "proposed",
 ] }
 matchit = { version = "0.8.1" }
