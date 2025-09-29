@@ -1532,7 +1532,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn identity_specialization(
         self,
         db: &'db dyn Db,
-        typevar_to_type: impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
     ) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
             generic_context.identity_specialization(db, typevar_to_type)

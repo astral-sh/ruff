@@ -1255,15 +1255,8 @@ impl<'db> Parameters<'db> {
                     let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                     Some(
-                        Type::NonInferableTypeVar(
-                            typing_self(db, scope_id, typevar_binding_context, class).unwrap(),
-                        )
-                        .apply_type_mapping(
-                            db,
-                            &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
-                                definition,
-                            ))),
-                        ),
+                        typing_self(db, scope_id, typevar_binding_context, class, &Type::TypeVar)
+                            .unwrap(),
                     )
                 } else {
                     // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or

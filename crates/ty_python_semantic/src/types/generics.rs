@@ -104,7 +104,8 @@ pub(crate) fn typing_self<'db>(
     scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
-) -> Option<BoundTypeVarInstance<'db>> {
+    typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+) -> Option<Type<'db>> {
     let index = semantic_index(db, scope_id.file(db));
 
     let typevar = TypeVarInstance::new(
@@ -114,7 +115,7 @@ pub(crate) fn typing_self<'db>(
         Some(
             TypeVarBoundOrConstraints::UpperBound(Type::instance(
                 db,
-                class.identity_specialization(db, Type::NonInferableTypeVar),
+                class.identity_specialization(db, typevar_to_type),
             ))
             .into(),
         ),
@@ -133,6 +134,7 @@ pub(crate) fn typing_self<'db>(
         typevar_binding_context,
         typevar,
     )
+    .map(typevar_to_type)
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.
@@ -328,7 +330,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn identity_specialization(
         self,
         db: &'db dyn Db,
-        typevar_to_type: impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
     ) -> Specialization<'db> {
         let types = self
             .variables(db)

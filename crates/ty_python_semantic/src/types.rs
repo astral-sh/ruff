@@ -5359,7 +5359,7 @@ impl<'db> Type<'db> {
                     // It is important that identity_specialization specializes the class with
                     // _inferable_ typevars, so that our specialization inference logic will
                     // try to find a specialization for them.
-                    Type::from(class.identity_specialization(db, Type::TypeVar)),
+                    Type::from(class.identity_specialization(db, &Type::TypeVar)),
                 ),
                 _ => (None, None, self),
             },
@@ -5715,8 +5715,15 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let self_type = typing_self(db, scope_id, typevar_binding_context, class);
-                    Ok(self_type.map(Type::NonInferableTypeVar).unwrap_or(*self))
+
+                    Ok(typing_self(
+                        db,
+                        scope_id,
+                        typevar_binding_context,
+                        class,
+                        &Type::NonInferableTypeVar,
+                    )
+                    .unwrap_or(*self))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
