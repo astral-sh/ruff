@@ -38,7 +38,7 @@ use crate::{FixAvailability, Violation};
 /// ```
 /// ## References
 /// - [Python documentation: `math.isclose`](https://docs.python.org/3/library/math.html#math.isclose)
-/// - [NumPy documentation: `math.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
+/// - [NumPy documentation: `numpy.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
 #[derive(ViolationMetadata)]
 pub(crate) struct FloatComparison {
     pub left: String,
