@@ -107,7 +107,7 @@ pub(crate) trait TypeVisitor<'db> {
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-enum NonAtomicType<'db> {
+pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
     FunctionLiteral(FunctionType<'db>),
@@ -128,7 +128,7 @@ enum NonAtomicType<'db> {
     TypeAlias(TypeAliasType<'db>),
 }
 
-enum TypeKind<'db> {
+pub(super) enum TypeKind<'db> {
     Atomic,
     NonAtomic(NonAtomicType<'db>),
 }
@@ -200,7 +200,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
     }
 }
 
-fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     non_atomic_type: NonAtomicType<'db>,
     visitor: &V,
