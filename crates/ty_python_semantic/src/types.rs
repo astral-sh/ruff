@@ -53,7 +53,6 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
@@ -6109,7 +6108,7 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                let function = Type::FunctionLiteral(function.with_type_mapping(db, type_mapping));
+                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, visitor));
 
                 match type_mapping {
                     TypeMapping::PromoteLiterals => function.literal_promotion_type(db)
@@ -6120,8 +6119,8 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).with_type_mapping(db, type_mapping),
-                method.self_instance(db).apply_type_mapping(db, type_mapping),
+                method.function(db).apply_type_mapping_impl(db, type_mapping, visitor),
+                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, visitor),
             )),
 
             Type::NominalInstance(instance) =>
@@ -6140,13 +6139,13 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.with_type_mapping(db, type_mapping),
+                    function.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.with_type_mapping(db, type_mapping),
+                    function.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
@@ -6782,84 +6781,7 @@ pub enum TypeMapping<'a, 'db> {
     Materialize(MaterializationKind),
 }
 
-fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    mapping: &TypeMapping<'_, 'db>,
-    visitor: &V,
-) {
-    match mapping {
-        TypeMapping::Specialization(specialization) => {
-            walk_specialization(db, *specialization, visitor);
-        }
-        TypeMapping::PartialSpecialization(specialization) => {
-            walk_partial_specialization(db, specialization, visitor);
-        }
-        TypeMapping::BindSelf(self_type) => {
-            visitor.visit_type(db, *self_type);
-        }
-        TypeMapping::ReplaceSelf { new_upper_bound } => {
-            visitor.visit_type(db, *new_upper_bound);
-        }
-        TypeMapping::PromoteLiterals
-        | TypeMapping::BindLegacyTypevars(_)
-        | TypeMapping::MarkTypeVarsInferable(_)
-        | TypeMapping::Materialize(_) => {}
-    }
-}
-
 impl<'db> TypeMapping<'_, 'db> {
-    fn to_owned(&self) -> TypeMapping<'db, 'db> {
-        match self {
-            TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(*specialization)
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.to_owned())
-            }
-            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
-            TypeMapping::BindLegacyTypevars(binding_context) => {
-                TypeMapping::BindLegacyTypevars(*binding_context)
-            }
-            TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
-            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
-                new_upper_bound: *new_upper_bound,
-            },
-            TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                TypeMapping::MarkTypeVarsInferable(*binding_context)
-            }
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(*materialization_kind)
-            }
-        }
-    }
-
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(specialization.normalized_impl(db, visitor))
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
-            }
-            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
-            TypeMapping::BindLegacyTypevars(binding_context) => {
-                TypeMapping::BindLegacyTypevars(*binding_context)
-            }
-            TypeMapping::BindSelf(self_type) => {
-                TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
-            }
-            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
-                new_upper_bound: new_upper_bound.normalized_impl(db, visitor),
-            },
-            TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                TypeMapping::MarkTypeVarsInferable(*binding_context)
-            }
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(*materialization_kind)
-            }
-        }
-    }
-
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
