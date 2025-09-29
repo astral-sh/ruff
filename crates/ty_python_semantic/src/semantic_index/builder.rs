@@ -100,10 +100,24 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
 
+    /// Builders (one for each scope) for the `place_table` field of the [`Scope`] struct.
+    ///
+    /// Conceptually, this could be a field on the [`ScopeBuilder`] struct itself,
+    /// but that leads to borrow checker issues that are hard to resolve
+    /// without hurting performance. (In some situations, we need to mutably borrow
+    /// the place table for a certain scope while also immutably borrowing `self.scopes`.)
+    place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
+
+    /// Builders (one for each scope) for the `use_def_map` field of the [`Scope`] struct.
+    ///
+    /// Conceptually, this could be a field on the [`ScopeBuilder`] struct itself,
+    /// but that leads to borrow checker issues that are hard to resolve
+    /// without hurting performance. (We quite often need to mutably borrow
+    /// the use-def map for a certain scope while also immutably borrowing `self.scopes`.)
+    use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
+
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, ScopeBuilder<'db>>,
-    place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,

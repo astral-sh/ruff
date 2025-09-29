@@ -127,8 +127,16 @@ pub(crate) struct Scope<'db> {
 }
 
 impl<'db> Scope<'db> {
+    pub(crate) fn parent(&self) -> Option<FileScopeId> {
+        self.parent
+    }
+
     pub(crate) fn node(&self) -> &NodeWithScopeKind {
         &self.node
+    }
+
+    pub(crate) fn kind(&self) -> ScopeKind {
+        self.node().scope_kind()
     }
 
     pub(crate) fn visibility(&self) -> ScopeVisibility {
@@ -244,18 +252,19 @@ impl<'db> ScopeBuilder<'db> {
     }
 }
 
-pub(crate) trait ScopeLike {
+/// Internal trait that unifies [`Scope`] and [`ScopeBuilder`]
+pub(super) trait ScopeLike {
     fn kind(&self) -> ScopeKind;
     fn parent(&self) -> Option<FileScopeId>;
 }
 
 impl ScopeLike for Scope<'_> {
     fn kind(&self) -> ScopeKind {
-        self.node().scope_kind()
+        Scope::kind(self)
     }
 
     fn parent(&self) -> Option<FileScopeId> {
-        self.parent
+        Scope::parent(self)
     }
 }
 

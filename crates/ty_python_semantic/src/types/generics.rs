@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeLike};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;

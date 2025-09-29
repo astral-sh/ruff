@@ -418,7 +418,7 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn visible_ancestor_scopes(
         &self,
         scope: FileScopeId,
-    ) -> VisibleAncestorsIter<'_, Scope<'db>> {
+    ) -> impl Iterator<Item = (FileScopeId, &Scope<'db>)> + '_ {
         VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
@@ -584,7 +584,7 @@ impl<'a, T: ScopeLike> Iterator for AncestorsIter<'a, T> {
 
 impl<T: ScopeLike> FusedIterator for AncestorsIter<'_, T> {}
 
-pub(crate) struct VisibleAncestorsIter<'a, T> {
+struct VisibleAncestorsIter<'a, T> {
     inner: AncestorsIter<'a, T>,
     starting_scope_kind: ScopeKind,
     yielded_count: usize,
@@ -739,7 +739,7 @@ mod tests {
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::place::PlaceTable;
-    use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind, ScopeLike};
+    use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind};
     use crate::semantic_index::symbol::ScopedSymbolId;
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
