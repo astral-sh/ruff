@@ -99,6 +99,18 @@ A.implicit_self(a)
 A.implicit_self(1)
 ```
 
+Passing `self` implicitly also verifies the type:
+
+```py
+from typing import Never
+
+class Strange:
+    def can_not_be_called(self: Never) -> None: ...
+
+# error: [invalid-argument-type] "Argument to bound method `can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
+Strange().can_not_be_called()
+```
+
 If the method is a class or static method then first argument is not self:
 
 ```py
