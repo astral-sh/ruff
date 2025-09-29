@@ -431,6 +431,15 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the number of internal nodes in this BDD. This is a decent proxy for the complexity
+    /// of the function that the BDD represents.
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => 0,
+            Node::Interior(interior) => interior.interior_node_count(db),
+        }
+    }
+
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
     /// to `true`. (This translates the boolean function that this BDD represents into DNF form.)
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
@@ -505,6 +514,14 @@ struct InteriorNode<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InteriorNode<'_> {}
+
+#[salsa::tracked]
+impl<'db> InteriorNode<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        1 + self.if_true(db).interior_node_count(db) + self.if_false(db).interior_node_count(db)
+    }
+}
 
 /// An "underspecified" BDD node.
 ///
@@ -1472,7 +1489,12 @@ impl<'db> PossiblySpecifiedInteriorNode<'db> {
                 minimizations.push(Node::new(db, constraint, *if_true, *if_false));
             }
         }
-        // XXX: keep smallest
+        let minimum_size = minimizations
+            .iter()
+            .map(|node| node.interior_node_count(db))
+            .min()
+            .unwrap_or_default();
+        minimizations.retain(|node| node.interior_node_count(db) == minimum_size);
         minimizations.into_boxed_slice()
     }
 }
