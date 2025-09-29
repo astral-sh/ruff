@@ -671,10 +671,20 @@ impl<'db> FunctionLiteral<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
+
+    /// Contains a potentially modified signature for this function literal, in case certain operations
+    /// (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::updated_signature`].
     #[returns(as_ref)]
-    pub(crate) updated_signature: Option<CallableSignature<'db>>,
+    updated_signature: Option<CallableSignature<'db>>,
+
+    /// Contains a potentially modified signature for the last overload or the implementation of this
+    /// function literal, in case certain operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::last_definition_signature`].
     #[returns(as_ref)]
-    pub(crate) updated_last_definition_signature: Option<Signature<'db>>,
+    updated_last_definition_signature: Option<Signature<'db>>,
 }
 
 // The Salsa heap is tracked separately.
