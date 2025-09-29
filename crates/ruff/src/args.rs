@@ -416,6 +416,7 @@ pub struct CheckCommand {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
         conflicts_with = "fix",
+        conflicts_with = "diff",
     )]
     pub add_noqa: bool,
     /// See the files Ruff will be run against with the current settings.
