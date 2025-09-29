@@ -1648,7 +1648,6 @@ impl<'db> CallableBinding<'db> {
 
         // These only contain the top materialized argument types for the corresponding
         // participating parameter indexes.
-        let mut unpacked_arguments_length = 0;
         let top_materialized_argument_type = Type::heterogeneous_tuple(
             db,
             union_argument_type_builders
@@ -1657,7 +1656,6 @@ impl<'db> CallableBinding<'db> {
                     if builder.is_empty() {
                         None
                     } else {
-                        unpacked_arguments_length += 1;
                         Some(builder.build())
                     }
                 }),
@@ -1674,7 +1672,7 @@ impl<'db> CallableBinding<'db> {
             }
 
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(unpacked_arguments_length)
+                .take(max_parameters)
                 .collect::<Vec<_>>();
 
             let mut skipped_parameters = 0;
