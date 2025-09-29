@@ -441,15 +441,6 @@ impl<'db> Node<'db> {
         matches!(self, Node::AlwaysFalse)
     }
 
-    /// Returns the negation of this BDD.
-    fn negate(self, db: &'db dyn Db) -> Self {
-        match self {
-            Node::AlwaysTrue => Node::AlwaysFalse,
-            Node::AlwaysFalse => Node::AlwaysTrue,
-            Node::Interior(interior) => interior.negate(db),
-        }
-    }
-
     /// Returns the `or` or union of two BDDs.
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
@@ -504,13 +495,6 @@ impl<'db> Node<'db> {
                 a.iff(db, b)
             }
         }
-    }
-
-    /// Returns the `if-then-else` of three BDDs: when `self` evaluates to `true`, it returns what
-    /// `then_node` evaluates to; otherwise it returns what `else_node` evaluates to.
-    fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
-        self.and(db, then_node)
-            .or(db, self.negate(db).and(db, else_node))
     }
 
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
@@ -590,16 +574,6 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn negate(self, db: &'db dyn Db) -> Node<'db> {
-        Node::new(
-            db,
-            self.constraint(db),
-            self.if_true(db).negate(db),
-            self.if_false(db).negate(db),
-        )
-    }
-
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
@@ -816,8 +790,12 @@ impl<'db> UnderspecifiedNode<'db> {
             UnderspecifiedNode::AlwaysTrue => UnderspecifiedNode::AlwaysFalse,
             UnderspecifiedNode::AlwaysFalse => UnderspecifiedNode::AlwaysTrue,
             UnderspecifiedNode::Impossible => UnderspecifiedNode::Impossible,
-            UnderspecifiedNode::Interior(interior) => interior.negate(db),
-            UnderspecifiedNode::FullySpecified(interior) => interior.negate(db).into(),
+            UnderspecifiedNode::FullySpecified(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).negate(db)
+            }
+            UnderspecifiedNode::Interior(interior) => {
+                PossiblySpecifiedInteriorNode::from(interior).negate(db)
+            }
         }
     }
 
@@ -1196,16 +1174,6 @@ impl<'db> UnderspecifiedInteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn negate(self, db: &'db dyn Db) -> UnderspecifiedNode<'db> {
-        UnderspecifiedNode::new(
-            db,
-            self.constraint(db),
-            self.if_true(db).negate(db),
-            self.if_false(db).negate(db),
-        )
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn or(self, db: &'db dyn Db, other: UnderspecifiedNode<'db>) -> UnderspecifiedNode<'db> {
         match self.cmp_constraints(db, other) {
             NodeOrdering::Equal(constraint, other) => UnderspecifiedNode::new(
@@ -1329,6 +1297,16 @@ impl<'db> PossiblySpecifiedInteriorNode<'db> {
             PossiblySpecifiedInteriorNode::Underspecified(interior) => interior.if_false(db),
             PossiblySpecifiedInteriorNode::FullySpecified(interior) => interior.if_false(db).into(),
         }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn negate(self, db: &'db dyn Db) -> UnderspecifiedNode<'db> {
+        UnderspecifiedNode::new(
+            db,
+            self.constraint(db),
+            self.if_true(db).negate(db),
+            self.if_false(db).negate(db),
+        )
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
