@@ -787,7 +787,7 @@ impl<'a> FormatResults<'a> {
                 let fix = Fix::safe_edit(edit);
                 let line_count = formatted
                     .source_code()
-                    .count_lines(modified_range.formatted);
+                    .count_lines(TextRange::up_to(modified_range.formatted.end()));
                 (fix, line_count)
             };
 
