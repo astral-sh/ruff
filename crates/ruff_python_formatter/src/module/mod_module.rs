@@ -1,6 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
+use ruff_text_size::Ranged;
 
 use crate::FormatNodeRule;
 use crate::prelude::*;
@@ -27,12 +28,34 @@ impl FormatNodeRule<ModModule> for FormatModModule {
                 Ok(())
             }
         } else {
-            // Check if the original source ends without a newline and has fmt: off
+            // Check if the original source ends without a newline and if we're in a suppressed region
             let should_add_trailing_newline = {
                 let source = f.context().source();
                 let source_ends_without_newline = !source.ends_with('\n');
-                let has_fmt_off = source.contains("# fmt: off");
-                !(source_ends_without_newline && has_fmt_off)
+
+                // Check if we're currently in a suppressed region by scanning all comments
+                let is_in_suppressed_region = {
+                    let comment_ranges = f.context().comments().ranges();
+                    let mut in_suppression = false;
+
+                    // Get all comments in the file and check suppression state
+                    for comment_range in comment_ranges.iter() {
+                        let comment_text = &source[comment_range.range()];
+                        if let Some(suppression_kind) =
+                            ruff_python_trivia::SuppressionKind::from_comment(comment_text)
+                        {
+                            match suppression_kind {
+                                ruff_python_trivia::SuppressionKind::Off => in_suppression = true,
+                                ruff_python_trivia::SuppressionKind::On => in_suppression = false,
+                                ruff_python_trivia::SuppressionKind::Skip => {} // Skip doesn't affect suppression state
+                            }
+                        }
+                    }
+
+                    in_suppression
+                };
+
+                !(source_ends_without_newline && is_in_suppressed_region)
             };
 
             if should_add_trailing_newline {

@@ -1,0 +1,12 @@
+# Test case 1: File ends without newline in fmt: off region - should NOT add newline
+# fmt: off
+print("hello")
+
+# Test case 2: File ends without newline but NOT in fmt: off region - should add newline
+print("world")
+
+# Test case 3: fmt: off followed by fmt: on - should add newline
+# fmt: off
+print("suppressed")
+# fmt: on
+print("formatted")
