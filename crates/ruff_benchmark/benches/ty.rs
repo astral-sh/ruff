@@ -444,7 +444,7 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
     criterion.bench_function("ty_micro[complex_constrained_attributes_2]", |b| {
         b.iter_batched_ref(
             || {
-                // This is is similar to the case above, but now the attributes are actually defined.
+                // This is similar to the case above, but now the attributes are actually defined.
                 // https://github.com/astral-sh/ty/issues/711
                 setup_micro_case(
                     r#"
