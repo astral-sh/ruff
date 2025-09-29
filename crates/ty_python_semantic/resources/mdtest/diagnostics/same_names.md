@@ -170,6 +170,36 @@ class Container(Generic[T]):
 
 ## Protocols
 
+### Differing members
+
+`bad.py`:
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Iterator(Protocol[T_co]):
+    def __nexxt__(self) -> T_co: ...
+
+def bad() -> Iterator[str]:
+    raise NotImplementedError
+```
+
+`main.py`:
+
+```py
+from typing import Iterator
+
+def f() -> Iterator[str]:
+    import bad
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `typing.Iterator[str]`, found `bad.Iterator[str]"
+    return bad.bad()
+```
+
+### Same members but with different types
+
 ```py
 from typing import Protocol
 import proto_a

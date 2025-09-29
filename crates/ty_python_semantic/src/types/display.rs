@@ -22,8 +22,8 @@ use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    MaterializationKind, Protocol, StringLiteralType, SubclassOfInner, Type, UnionType,
-    WrapperDescriptorKind, visitor,
+    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
+    UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -128,6 +128,13 @@ impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
             Type::ClassLiteral(class) => self.record_class(db, class),
             Type::EnumLiteral(literal) => self.record_class(db, literal.enum_class(db)),
             Type::GenericAlias(alias) => self.record_class(db, alias.origin(db)),
+            // Visit the class (as if it were a nominal-instance type)
+            // rather than the protocol members, if it is a class-based protocol.
+            // (For the purposes of displaying the type, we'll use the class name.)
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(class),
+                ..
+            }) => return self.visit_type(db, Type::from(class)),
             _ => {}
         }
 
