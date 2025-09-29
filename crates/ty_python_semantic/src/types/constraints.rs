@@ -56,7 +56,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use rustc_hash::FxHashSet;
 
 use crate::Db;
@@ -904,6 +904,35 @@ impl<'db> UnderspecifiedNode<'db> {
             }
         }
     }
+
+    fn minimize(self, db: &'db dyn Db) -> Node<'db> {
+        self.smallest_minimizations(db)
+            .next()
+            .expect("should always be able to minimize BDD")
+    }
+
+    fn smallest_minimizations(self, db: &'db dyn Db) -> impl Iterator<Item = Node<'db>> {
+        match self {
+            UnderspecifiedNode::AlwaysTrue => {
+                Either::Left(Either::Left([Node::AlwaysTrue].into_iter()))
+            }
+            UnderspecifiedNode::AlwaysFalse => {
+                Either::Left(Either::Left([Node::AlwaysFalse].into_iter()))
+            }
+            UnderspecifiedNode::Impossible => Either::Left(Either::Right(
+                [Node::AlwaysTrue, Node::AlwaysFalse].into_iter(),
+            )),
+            UnderspecifiedNode::FullySpecified(interior) => {
+                Either::Left(Either::Left([Node::Interior(interior)].into_iter()))
+            }
+            UnderspecifiedNode::Interior(interior) => Either::Right(
+                PossiblySpecifiedInteriorNode::from(interior)
+                    .smallest_minimizations(db)
+                    .iter()
+                    .copied(),
+            ),
+        }
+    }
 }
 
 impl<'db> From<Node<'db>> for UnderspecifiedNode<'db> {
@@ -1376,6 +1405,11 @@ impl<'db> PossiblySpecifiedInteriorNode<'db> {
         }
 
         simplified
+    }
+
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn smallest_minimizations(self, db: &'db dyn Db) -> Box<[Node<'db>]> {
+        Box::from([])
     }
 }
 
