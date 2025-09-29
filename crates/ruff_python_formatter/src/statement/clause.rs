@@ -434,6 +434,34 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
     }
 }
 
+pub(crate) struct FormatClause<'a, 'ast> {
+    format_header: FormatClauseHeader<'a, 'ast>,
+    format_body: FormatClauseBody<'a>,
+}
+
+pub(crate) fn clause<'a, 'ast, Content>(
+    header: ClauseHeader<'a>,
+    trailing_colon_comment: &'a [SourceComment],
+    header_formatter: &'a Content,
+    body: &'a Suite,
+    kind: SuiteKind,
+    trailing_comments: &'a [SourceComment],
+) -> FormatClause<'a, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatClause {
+        format_header: clause_header(header, trailing_colon_comment, header_formatter),
+        format_body: clause_body(body, kind, trailing_comments),
+    }
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        write!(f, [self.format_header, self.format_body])
+    }
+}
+
 /// Finds the range of `keyword` starting the search at `start_position`. Expects only comments and `(` between
 /// the `start_position` and the `keyword` token.
 fn find_keyword(
