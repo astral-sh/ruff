@@ -9,6 +9,7 @@ use anyhow::{Context, Result, bail};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
+use ruff_db::diagnostic::DiagnosticFormat;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use strum_macros::EnumIter;
@@ -563,6 +564,34 @@ impl Display for OutputFormat {
             Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
+        }
+    }
+}
+
+/// The subset of output formats only implemented in Ruff, not in `ruff_db` via `DisplayDiagnostics`.
+pub enum RuffOutputFormat {
+    Github,
+    Grouped,
+    Sarif,
+}
+
+impl TryFrom<OutputFormat> for DiagnosticFormat {
+    type Error = RuffOutputFormat;
+
+    fn try_from(format: OutputFormat) -> std::result::Result<Self, Self::Error> {
+        match format {
+            OutputFormat::Concise => Ok(DiagnosticFormat::Concise),
+            OutputFormat::Full => Ok(DiagnosticFormat::Full),
+            OutputFormat::Json => Ok(DiagnosticFormat::Json),
+            OutputFormat::JsonLines => Ok(DiagnosticFormat::JsonLines),
+            OutputFormat::Junit => Ok(DiagnosticFormat::Junit),
+            OutputFormat::Gitlab => Ok(DiagnosticFormat::Gitlab),
+            OutputFormat::Pylint => Ok(DiagnosticFormat::Pylint),
+            OutputFormat::Rdjson => Ok(DiagnosticFormat::Rdjson),
+            OutputFormat::Azure => Ok(DiagnosticFormat::Azure),
+            OutputFormat::Github => Err(RuffOutputFormat::Github),
+            OutputFormat::Grouped => Err(RuffOutputFormat::Grouped),
+            OutputFormat::Sarif => Err(RuffOutputFormat::Sarif),
         }
     }
 }

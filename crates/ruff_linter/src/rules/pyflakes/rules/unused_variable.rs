@@ -272,4 +272,6 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
+    // Add Unnecessary tag for unused variables
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

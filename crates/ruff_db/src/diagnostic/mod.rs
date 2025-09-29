@@ -1384,7 +1384,7 @@ impl DisplayDiagnosticConfig {
     }
 
     /// Whether to show a fix's availability or not.
-    pub fn show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
+    pub fn with_show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             show_fix_status: yes,
             ..self
@@ -1405,11 +1405,19 @@ impl DisplayDiagnosticConfig {
     /// availability for unsafe or display-only fixes.
     ///
     /// Note that this option is currently ignored when `hide_severity` is false.
-    pub fn fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
+    pub fn with_fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             fix_applicability: applicability,
             ..self
         }
+    }
+
+    pub fn show_fix_status(&self) -> bool {
+        self.show_fix_status
+    }
+
+    pub fn fix_applicability(&self) -> Applicability {
+        self.fix_applicability
     }
 }
 

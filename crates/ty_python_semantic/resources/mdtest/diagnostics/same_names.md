@@ -43,8 +43,7 @@ import b
 df: a.DataFrame = b.DataFrame()  # error: [invalid-assignment] "Object of type `b.DataFrame` is not assignable to `a.DataFrame`"
 
 def _(dfs: list[b.DataFrame]):
-    # TODO should be"Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`
-    # error: [invalid-assignment] "Object of type `list[DataFrame]` is not assignable to `list[DataFrame]`"
+    # error: [invalid-assignment] "Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`"
     dataframes: list[a.DataFrame] = dfs
 ```
 
@@ -171,6 +170,36 @@ class Container(Generic[T]):
 
 ## Protocols
 
+### Differing members
+
+`bad.py`:
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Iterator(Protocol[T_co]):
+    def __nexxt__(self) -> T_co: ...
+
+def bad() -> Iterator[str]:
+    raise NotImplementedError
+```
+
+`main.py`:
+
+```py
+from typing import Iterator
+
+def f() -> Iterator[str]:
+    import bad
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `typing.Iterator[str]`, found `bad.Iterator[str]"
+    return bad.bad()
+```
+
+### Same members but with different types
+
 ```py
 from typing import Protocol
 import proto_a
@@ -227,4 +256,22 @@ from typing import TypedDict
 
 class Person(TypedDict):
     name: bytes
+```
+
+## Tuple specializations
+
+`module.py`:
+
+```py
+class Model: ...
+```
+
+```py
+class Model: ...
+
+def get_models_tuple() -> tuple[Model]:
+    from module import Model
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[mdtest_snippet.Model]`, found `tuple[module.Model]`"
+    return (Model(),)
 ```

@@ -10,7 +10,9 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Diagnostic, Span};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
+};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -24,7 +26,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, TextEmitter, create_syntax_error_diagnostic};
+use crate::message::{EmitterContext, create_syntax_error_diagnostic};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -444,42 +446,38 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let mut output = Vec::new();
-
-    TextEmitter::default()
+    let config = DisplayDiagnosticConfig::default()
+        .format(DiagnosticFormat::Full)
+        .hide_severity(true)
         .with_show_fix_status(true)
-        .with_show_fix_diff(true)
-        .with_show_source(true)
-        .with_fix_applicability(Applicability::DisplayOnly)
-        .emit(
-            &mut output,
-            diagnostics,
-            &EmitterContext::new(&FxHashMap::from_iter([(
-                path.file_name().unwrap().to_string_lossy().to_string(),
-                notebook.index().clone(),
-            )])),
-        )
-        .unwrap();
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
-    String::from_utf8(output).unwrap()
+    DisplayDiagnostics::new(
+        &EmitterContext::new(&FxHashMap::from_iter([(
+            path.file_name().unwrap().to_string_lossy().to_string(),
+            notebook.index().clone(),
+        )])),
+        &config,
+        diagnostics,
+    )
+    .to_string()
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
-    let mut output = Vec::new();
-
-    TextEmitter::default()
+    let config = DisplayDiagnosticConfig::default()
+        .format(DiagnosticFormat::Full)
+        .hide_severity(true)
         .with_show_fix_status(true)
-        .with_show_fix_diff(true)
-        .with_show_source(true)
-        .with_fix_applicability(Applicability::DisplayOnly)
-        .emit(
-            &mut output,
-            diagnostics,
-            &EmitterContext::new(&FxHashMap::default()),
-        )
-        .unwrap();
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
-    String::from_utf8(output).unwrap()
+    DisplayDiagnostics::new(
+        &EmitterContext::new(&FxHashMap::default()),
+        &config,
+        diagnostics,
+    )
+    .to_string()
 }
 
 #[macro_export]

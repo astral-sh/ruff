@@ -28,7 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_db::diagnostic::{Annotation, Diagnostic, IntoDiagnosticMessage, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticTag, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
@@ -2360,7 +2360,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Visit an body of [`Stmt`] nodes within a type-checking block.
+    /// Visit a body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
@@ -3325,6 +3325,56 @@ impl DiagnosticGuard<'_, '_> {
     /// method can be used where this is unavoidable.
     pub(crate) fn defuse(mut self) {
         self.diagnostic = None;
+    }
+
+    /// Set the message on the primary annotation for this diagnostic.
+    ///
+    /// If a message already exists on the primary annotation, then this
+    /// overwrites the existing message.
+    ///
+    /// This message is associated with the primary annotation created
+    /// for every `Diagnostic` that uses the `DiagnosticGuard` API.
+    /// Specifically, the annotation is derived from the `TextRange` given to
+    /// the `LintContext::report_diagnostic` API.
+    ///
+    /// Callers can add additional primary or secondary annotations via the
+    /// `DerefMut` trait implementation to a `Diagnostic`.
+    pub(crate) fn set_primary_message(&mut self, message: impl IntoDiagnosticMessage) {
+        // N.B. It is normally bad juju to define `self` methods
+        // on types that implement `Deref`. Instead, it's idiomatic
+        // to do `fn foo(this: &mut LintDiagnosticGuard)`, which in
+        // turn forces callers to use
+        // `LintDiagnosticGuard(&mut guard, message)`. But this is
+        // supremely annoying for what is expected to be a common
+        // case.
+        //
+        // Moreover, most of the downside that comes from these sorts
+        // of methods is a semver hazard. Because the deref target type
+        // could also define a method by the same name, and that leads
+        // to confusion. But we own all the code involved here and
+        // there is no semver boundary. So... ¯\_(ツ)_/¯ ---AG
+
+        // OK because we know the diagnostic was constructed with a single
+        // primary annotation that will always come before any other annotation
+        // in the diagnostic. (This relies on the `Diagnostic` API not exposing
+        // any methods for removing annotations or re-ordering them, which is
+        // true as of 2025-04-11.)
+        let ann = self.primary_annotation_mut().unwrap();
+        ann.set_message(message);
+    }
+
+    /// Adds a tag on the primary annotation for this diagnostic.
+    ///
+    /// This tag is associated with the primary annotation created
+    /// for every `Diagnostic` that uses the `DiagnosticGuard` API.
+    /// Specifically, the annotation is derived from the `TextRange` given to
+    /// the `LintContext::report_diagnostic` API.
+    ///
+    /// Callers can add additional primary or secondary annotations via the
+    /// `DerefMut` trait implementation to a `Diagnostic`.
+    pub(crate) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
+        let ann = self.primary_annotation_mut().unwrap();
+        ann.push_tag(tag);
     }
 }
 

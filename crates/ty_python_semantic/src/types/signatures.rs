@@ -62,6 +62,17 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn with_inherited_generic_context(
+        &self,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        Self::from_overloads(self.overloads.iter().map(|signature| {
+            signature
+                .clone()
+                .with_inherited_generic_context(inherited_generic_context)
+        }))
+    }
+
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -451,14 +462,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
-    }
-
     pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -551,10 +554,7 @@ impl<'db> Signature<'db> {
             let self_type = self_type.unwrap_or(Type::unknown());
             let other_type = other_type.unwrap_or(Type::unknown());
             !result
-                .intersect(
-                    db,
-                    &self_type.is_equivalent_to_impl(db, other_type, visitor),
-                )
+                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
                 .is_never_satisfied()
         };
 
@@ -699,10 +699,7 @@ impl<'db> Signature<'db> {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
             !result
-                .intersect(
-                    db,
-                    &type1.has_relation_to_impl(db, type2, relation, visitor),
-                )
+                .intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
                 .is_never_satisfied()
         };
 
