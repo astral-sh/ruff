@@ -623,10 +623,7 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn signature<'a>(self, db: &'db dyn Db) -> CallableSignature<'db>
-    where
-        'db: 'a,
-    {
+    fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let inherited_generic_context = self.inherited_generic_context(db);
@@ -654,10 +651,7 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn last_definition_signature<'a>(self, db: &'db dyn Db) -> Signature<'db>
-    where
-        'db: 'a,
-    {
+    fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let inherited_generic_context = self.inherited_generic_context(db);
         self.last_definition(db)
             .signature(db, inherited_generic_context)
