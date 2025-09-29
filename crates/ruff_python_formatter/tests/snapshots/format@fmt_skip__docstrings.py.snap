@@ -35,23 +35,3 @@ def test():
 
     and_this + gets + formatted + too
 ```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,9 +1,9 @@
- def test():
--    # leading comment
-+        # leading comment
-     """ This docstring does not
-         get formatted
--    """  # fmt: skip
--    # trailing comment
-+    """ # fmt: skip
-+        # trailing comment
- 
- 
- def test():
-```

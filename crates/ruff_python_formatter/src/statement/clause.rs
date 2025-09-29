@@ -4,9 +4,7 @@ use ruff_python_ast::{
     ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
     StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
 };
-use ruff_python_trivia::{
-    SimpleToken, SimpleTokenKind, SimpleTokenizer, lines_after_ignoring_end_of_line_trivia,
-};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
@@ -522,10 +520,11 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
                 f.context().comments().trailing(last_child_in_body),
                 f.context().source(),
             )
-            && lines_after_ignoring_end_of_line_trivia(
+            && !source[TextRange::new(
                 self.format_header.header.range(source).unwrap().start(),
-                &source[..last_child_in_body.end().to_usize()],
-            ) == 0
+                last_child_in_body.end(),
+            )]
+            .contains('\n')
         {
             write_suppressed_clause(self, f)
         } else {
@@ -615,12 +614,7 @@ fn write_suppressed_clause(
     let comments = f.context().comments().clone();
 
     let last_child = AnyNodeRef::from(header).last_child_in_body().unwrap();
-    let range_end = comments
-        .trailing(last_child)
-        .iter()
-        .map(|e| e.range().end())
-        .max()
-        .unwrap();
+    let range_end = last_child.end();
 
     // Write the outer comments and format the node as verbatim
     write!(
@@ -628,7 +622,8 @@ fn write_suppressed_clause(
         [
             source_position(range_start),
             verbatim_text(TextRange::new(range_start, range_end)),
-            source_position(range_end)
+            source_position(range_end),
+            trailing_comments(comments.trailing(last_child))
         ]
     )?;
 
