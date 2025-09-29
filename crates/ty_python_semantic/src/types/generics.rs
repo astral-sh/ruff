@@ -841,18 +841,6 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            // As an optimization, we can return early if either type is dynamic, unless
-            // we're dealing with a top or bottom materialization.
-            if other_materialization_kind.is_none()
-                && self_materialization_kind.is_none()
-                && (self_type.is_dynamic() || other_type.is_dynamic())
-            {
-                match relation {
-                    TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return ConstraintSet::from(false),
-                }
-            }
-
             // Subtyping/assignability of each type in the specialization depends on the variance
             // of the corresponding typevar:
             //   - covariant: verify that self_type <: other_type

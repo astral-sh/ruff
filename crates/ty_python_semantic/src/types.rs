@@ -1050,6 +1050,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn into_intersection(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection_type) => Some(intersection_type),
+            _ => None,
+        }
+    }
+
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_union(self) -> UnionType<'db> {
