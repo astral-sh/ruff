@@ -5,8 +5,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
-    TypeRelation,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
+    SpecialFormType, Type, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -181,6 +181,16 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self {
+            subclass_of: self.subclass_of.recursive_type_normalized(db, visitor),
+        }
+    }
+
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::instance(db, class),
@@ -251,6 +261,17 @@ impl<'db> SubclassOfInner<'db> {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.recursive_type_normalized(db, visitor)),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.recursive_type_normalized()),
         }
     }
 

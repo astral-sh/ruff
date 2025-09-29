@@ -48,11 +48,14 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{SemanticIndex, semantic_index};
+use crate::semantic_index::{SemanticIndex, semantic_index, use_def_map};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
-use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers};
+use crate::types::{
+    ClassLiteral, KnownClass, RecursiveTypeNormalizedVisitor, Truthiness, Type, TypeAndQualifiers,
+    UnionBuilder,
+};
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 
@@ -83,10 +86,14 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Sc
 fn scope_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &ScopeInference<'db>,
-    _count: u32,
-    _scope: ScopeId<'db>,
+    count: u32,
+    scope: ScopeId<'db>,
 ) -> salsa::CycleRecoveryAction<ScopeInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    if count == ITERATIONS_BEFORE_FALLBACK {
+        salsa::CycleRecoveryAction::Fallback(ScopeInference::cycle_fallback(scope))
+    } else {
+        salsa::CycleRecoveryAction::Iterate
+    }
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
@@ -190,6 +197,7 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
+/// When using types ​​in [`ExpressionInference`], you must use [`ExpressionInference::cycle_recovery`].
 #[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
@@ -549,6 +557,8 @@ pub(crate) struct ScopeInference<'db> {
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
+
+    scope: ScopeId<'db>,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
@@ -558,15 +568,30 @@ struct ScopeInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// The returnees of this region (if this is a function body).
+    ///
+    /// These are stored in `Vec` to delay the creation of the union type as long as possible.
+    returnees: Vec<Option<ExpressionNodeKey>>,
 }
 
 impl<'db> ScopeInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>) -> Self {
-        let _ = scope;
-
         Self {
+            scope,
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_recovery: Some(CycleRecovery::Initial),
+                ..ScopeInferenceExtra::default()
+            })),
+            expressions: FxHashMap::default(),
+        }
+    }
+
+    fn cycle_fallback(scope: ScopeId<'db>) -> Self {
+        Self {
+            scope,
+            extra: Some(Box::new(ScopeInferenceExtra {
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -596,6 +621,84 @@ impl<'db> ScopeInference<'db> {
         self.extra
             .as_ref()
             .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
+    }
+
+    /// When using `ScopeInference` during type inference,
+    /// use this method to get the cycle recovery type so that divergent types are propagated.
+    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
+        self.fallback_type()
+    }
+
+    /// Returns the inferred return type of this function body (union of all possible return types),
+    /// or `None` if the region is not a function body.
+    /// In the case of methods, the return type of the superclass method is further unioned.
+    /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
+    pub(crate) fn infer_return_type(&self, db: &'db dyn Db, callee_ty: Type<'db>) -> Type<'db> {
+        // TODO: coroutine function type inference
+        // TODO: generator function type inference
+        if self.scope.is_coroutine_function(db) || self.scope.is_generator_function(db) {
+            return Type::unknown();
+        }
+
+        let mut union = UnionBuilder::new(db);
+        let div = Type::divergent(self.scope);
+        if let Some(cycle_recovery) = self.cycle_recovery() {
+            union = union.add(cycle_recovery);
+        }
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
+        // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
+        // For example, consider the following recursive function:
+        // ```py
+        // def div(n: int):
+        //     if n == 0:
+        //         return None
+        //     else:
+        //         return (div(n-1),)
+        // ```
+        // If we try to infer the return type of this function naively, we will get `tuple[tuple[tuple[...] | None] | None] | None`, which never converges.
+        // So, when we detect a cycle, we set the cycle initial type to `Divergent`. Then the type obtained in the first cycle is `tuple[Divergent] | None`.
+        // Let's call such a type containing `Divergent` a "recursive type".
+        // Next, if there is a type containing a recursive type (let's call this a nested recursive type), we replace the inner recursive type with the `Divergent` type.
+        // All recursive types are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
+        // 0th: Divergent
+        // 1st: tuple[Divergent] | None
+        // 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
+        if let Some(previous_cycle_value) = callee_ty.infer_return_type(db) {
+            // In fixed-point iteration of return type inference, the return type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            union = union.add(previous_cycle_value.recursive_type_normalized(db, &visitor));
+        }
+
+        let Some(extra) = &self.extra else {
+            unreachable!(
+                "infer_return_type should only be called on a function body scope inference"
+            );
+        };
+        for returnee in &extra.returnees {
+            let ty = returnee.map_or(Type::none(db), |expression| {
+                self.expression_type(expression)
+            });
+            union = union.add(ty.recursive_type_normalized(db, &visitor));
+        }
+        let use_def = use_def_map(db, self.scope);
+        if use_def.can_implicitly_return_none(db) {
+            union = union.add(Type::none(db));
+        }
+        if let Type::BoundMethod(method_ty) = callee_ty {
+            // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
+            // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
+            // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
+            if !method_ty.is_final(db) {
+                union = union.add(
+                    method_ty
+                        .base_return_type(db)
+                        .unwrap_or(Type::unknown())
+                        .recursive_type_normalized(db, &visitor),
+                );
+            }
+        }
+
+        union.build()
     }
 }
 
@@ -743,6 +846,13 @@ impl<'db> DefinitionInference<'db> {
             .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 
+    /// When using `DefinitionInference` during type inference,
+    /// use this method to get the cycle recovery type so that divergent types are propagated.
+    #[allow(unused)]
+    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
+        self.fallback_type()
+    }
+
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
@@ -829,6 +939,13 @@ impl<'db> ExpressionInference<'db> {
         self.extra
             .as_ref()
             .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
+    }
+
+    /// When using `ExpressionInference` during type inference,
+    /// use this method to get the cycle recovery type so that divergent types are propagated.
+    #[allow(unused)]
+    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
+        self.fallback_type()
     }
 
     /// Returns true if all places in this expression are definitely bound.

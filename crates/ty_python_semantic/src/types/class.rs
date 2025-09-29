@@ -4,7 +4,7 @@ use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    function::FunctionType, infer_expression_type, infer_unpack_types,
+    function::FunctionType,
 };
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
@@ -20,7 +20,7 @@ use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
-use crate::types::infer::nearest_enclosing_class;
+use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
@@ -28,10 +28,10 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    infer_definition_types,
+    NormalizedVisitor, PropertyInstanceType, RecursiveTypeNormalizedVisitor, StringLiteralType,
+    TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable,
+    declaration_type, determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -269,6 +269,19 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db)
+                .recursive_type_normalized(db, visitor),
+        )
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -391,6 +404,17 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.recursive_type_normalized(db, visitor)),
         }
     }
 
@@ -1208,7 +1232,6 @@ impl<'db> ClassType<'db> {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn into_callable_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Type<'db>,
@@ -1218,8 +1241,8 @@ fn into_callable_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn into_callable_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
-    Type::Never
+fn into_callable_cycle_initial<'db>(db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
+    Type::Callable(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
