@@ -3197,9 +3197,8 @@ impl<'db> ClassLiteral<'db> {
             Place::Unbound.with_qualifiers(qualifiers)
         }
     }
+    
 
-    /// A helper function for `instance_member` that looks up the `name` attribute only on
-    /// this class, not on its superclasses.
     pub(crate) fn own_instance_member(
         self,
         db: &'db dyn Db,
@@ -3210,44 +3209,28 @@ impl<'db> ClassLiteral<'db> {
         // - Proper diagnostics
 
         // Handle __dict__ and __weakref__ special cases for __slots__
-        if name == "__dict__" {
-            // If this class has __slots__ without __dict__, __dict__ is not available
-            if !self.has_dict_in_slots(db) && self.all_slots_from_mro(db).is_some() {
-                return Place::Unbound.into();
-            }
-        }
-
-        if name == "__weakref__" {
-            // If this class has __slots__ without __weakref__, __weakref__ is not available
-            if !self.has_weakref_in_slots(db) && self.all_slots_from_mro(db).is_some() {
-                return Place::Unbound.into();
-            }
+        if self.slots_special_attr_unavailable(db, name) {
+            return Place::Unbound.into();
         }
 
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
-
         if let Some(symbol_id) = table.symbol_id(name) {
             let use_def = use_def_map(db, body_scope);
-
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers =
+            let mut declared_and_qualifiers =
                 place_from_declarations(db, declarations).ignore_conflicting_declarations();
-
             match declared_and_qualifiers {
                 PlaceAndQualifiers {
-                    place: mut declared @ Place::Type(declared_ty, declaredness),
+                    place: ref mut declared @ Place::Type(declared_ty, declaredness),
                     qualifiers,
                 } => {
-                    // For the purpose of finding instance attributes, ignore `ClassVar`
-                    // declarations:
+                    // For the purpose of finding instance attributes, ignore `ClassVar` declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                        declared = Place::Unbound;
+                        *declared = Place::Unbound;
                     }
-
                     if qualifiers.contains(TypeQualifiers::INIT_VAR) {
-                        // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
-                        // by an implicit assignment in a method
+                        // Ignore `InitVar` unless overwritten by implicit assignment in a method
                         if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                             .place
                             .is_unbound()
@@ -3257,135 +3240,106 @@ impl<'db> ClassLiteral<'db> {
                     }
 
                     // The attribute is declared in the class body.
+                    let class_body_bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                    let inferred = place_from_bindings(db, class_body_bindings);
+                    let has_class_body_binding = !inferred.is_unbound();
 
-                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let inferred = place_from_bindings(db, bindings);
-                    let has_binding = !inferred.is_unbound();
-
-                    if has_binding {
-                        // The attribute is declared and bound in the class body.
-
+                    if has_class_body_binding {
+                        // Declared and bound in the class body.
                         if let Some(implicit_ty) =
                             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                                 .place
                                 .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
-                                // If a symbol is definitely declared, and we see
-                                // attribute assignments in methods of the class,
-                                // we trust the declared type.
-                                declared.with_qualifiers(qualifiers)
+                                // Trust the declared type.
+                                Place::Type(declared_ty, declaredness).with_qualifiers(qualifiers)
                             } else {
                                 Place::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                     declaredness,
                                 )
-                                .with_qualifiers(qualifiers)
+                                    .with_qualifiers(qualifiers)
                             }
                         } else {
-                            // The symbol is declared and bound in the class body,
-                            // but we did not find any attribute assignments in
-                            // methods of the class. This means that the attribute
-                            // has a class-level default value, but it would not be
-                            // found in a `__dict__` lookup.
-
+                            // Declared and bound in class body, but no assignments in methods:
+                            // class-level default, not found via `__dict__`.
                             Place::Unbound.into()
                         }
                     } else {
-                        // The attribute is declared but not bound in the class body.
-                        // We take this as a sign that this is intended to be a pure
-                        // instance attribute, and we trust the declared type, unless
-                        // it is possibly-undeclared. In the latter case, we also
-                        // union with the inferred type from attribute assignments.
-
+                        // Declared but not bound in the class body.
                         if declaredness == Boundness::Bound {
-                            declared.with_qualifiers(qualifiers)
-                        } else {
-                            if let Some(implicit_ty) = Self::implicit_attribute(
-                                db,
-                                body_scope,
-                                name,
-                                MethodDecorator::None,
-                            )
+                            Place::Type(declared_ty, declaredness).with_qualifiers(qualifiers)
+                        } else if let Some(implicit_ty) = Self::implicit_attribute(
+                            db,
+                            body_scope,
+                            name,
+                            MethodDecorator::None,
+                        )
                             .place
                             .ignore_possibly_unbound()
-                            {
-                                Place::Type(
-                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                    declaredness,
-                                )
+                        {
+                            Place::Type(
+                                UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                declaredness,
+                            )
                                 .with_qualifiers(qualifiers)
-                            } else {
-                                declared.with_qualifiers(qualifiers)
-                            }
+                        } else {
+                            Place::Type(declared_ty, declaredness).with_qualifiers(qualifiers)
                         }
                     }
                 }
-
                 PlaceAndQualifiers {
                     place: Place::Unbound,
                     qualifiers: _,
                 } => {
-                    // The attribute is not *declared* in the class body. It could still be declared/bound
-                    // in a method.
-
-                    let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-                    
-                    // Check __slots__ constraints for implicit attributes
-                    if let Some(all_slots) = self.all_slots_from_mro(db) {
-                        // This class (or a parent) defines __slots__
-                        if self.has_dict_in_slots(db) {
-                            // __dict__ is in __slots__, so all attributes are allowed
-                            return result;
-                        }
-                        
-                        if all_slots.contains(name) {
-                            // Attribute is in __slots__, so it's allowed even if not found elsewhere
-                            // Return a type that indicates the attribute exists but we don't know its type
-                            if result.place.is_unbound() {
-                                return Place::bound(Type::unknown()).into();
-                            }
-                        } else {
-                            // Attribute is not in __slots__ and this class defines __slots__
-                            return Place::Unbound.into();
-                        }
-                    }
-                    
-                    result
+                    // Not declared in the class body; might still be declared/bound in a method.
+                    let result =
+                        Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+                    return self.apply_slots_constraints(db, name, result);
                 }
             }
         } else {
-            // This attribute is neither declared nor bound in the class body.
-            // It could still be implicitly defined in a method.
-
+            // Neither declared nor bound in the class body; could be implicitly defined in a method.
             let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-            
-            // Check __slots__ constraints for implicit attributes
-            if let Some(all_slots) = self.all_slots_from_mro(db) {
-                // This class (or a parent) defines __slots__
-                if self.has_dict_in_slots(db) {
-                    // __dict__ is in __slots__, so all attributes are allowed
-                    return result;
-                }
-                
-                if all_slots.contains(name) {
-                    // Attribute is in __slots__, so it's allowed even if not found elsewhere
-                    // Return a type that indicates the attribute exists but we don't know its type
-                    if result.place.is_unbound() {
-                        return Place::bound(Type::unknown()).into();
-                    }
-                } else {
-                    // Attribute is not in __slots__ and this class defines __slots__
-                    return Place::Unbound.into();
-                }
-            }
-            
-            result
+            return self.apply_slots_constraints(db, name, result);
         }
     }
 
-    pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
-        Type::instance(db, ClassType::NonGeneric(self))
+    fn slots_special_attr_unavailable(self, db: &'db dyn Db, name: &str) -> bool {
+        match name {
+            "__dict__" => !self.has_dict_in_slots(db) && self.all_slots_from_mro(db).is_some(),
+            "__weakref__" => !self.has_weakref_in_slots(db) && self.all_slots_from_mro(db).is_some(),
+            _ => false,
+        }
+    }
+
+    fn apply_slots_constraints(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        result: PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        if let Some(all_slots) = self.all_slots_from_mro(db) {
+            // This class (or a parent) defines __slots__
+            if self.has_dict_in_slots(db) {
+                // __dict__ is in __slots__, so all attributes are allowed
+                return result;
+            }
+
+            if all_slots.contains(name) {
+                // Attribute is in __slots__, so it's allowed even if not found elsewhere
+                if result.place.is_unbound() {
+                    // Return as possibly unbound since it's declared but not necessarily initialized
+                    return Place::Type(Type::unknown(), Boundness::PossiblyUnbound).into();
+                }
+                return result;
+            } else {
+                // Attribute is not in __slots__
+                return Place::Unbound.into();
+            }
+        }
+        result
     }
 
     /// Return this class' involvement in an inheritance cycle, if any.
@@ -5430,12 +5384,14 @@ impl<'db> ClassLiteral<'db> {
                 }
             }
 
-            // __slots__ = "abc"  # Same as `("abc",)`
+            // __slots__ = "abc"  # Expands to slots "a", "b", "c"
             Type::StringLiteral(string_literal) => {
                 let mut slots = FxHashSet::default();
-                // A single string is treated as a sequence of characters
-                for char in string_literal.value(db).chars() {
-                    slots.insert(char.to_string());
+                let slot_value = string_literal.value(db);
+                
+                // Python treats a bare string as a sequence of slot names (one per character)
+                for ch in slot_value.chars() {
+                    slots.insert(ch.to_string());
                 }
                 Some(slots)
             }
@@ -5497,25 +5453,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Check if an attribute is allowed based on __slots__ definitions in the MRO
-    pub(super) fn is_attribute_allowed_by_slots(
-        self,
-        db: &'db dyn Db,
-        attribute_name: &str,
-    ) -> bool {
-        // If any class in the MRO has __dict__ in __slots__, all attributes are allowed
-        if self.has_dict_in_slots(db) {
-            return true;
-        }
-
-        // If no class in the MRO defines __slots__, all attributes are allowed
-        let Some(all_slots) = self.all_slots_from_mro(db) else {
-            return true;
-        };
-
-        // Check if the attribute is in the combined __slots__
-        all_slots.contains(attribute_name)
-    }
 
     /// Check if this class inherits from a variable-length built-in type
     pub(super) fn inherits_from_variable_length_builtin(self, db: &'db dyn Db) -> bool {

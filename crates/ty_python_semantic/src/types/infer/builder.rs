@@ -9341,12 +9341,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // __slots__ = "abc"  # Same as `("abc",)`
+            // __slots__ = "abc"  # Expands to slots "a", "b", "c"
             Type::StringLiteral(string_literal) => {
                 let mut slots = FxHashSet::default();
-                // A single string is treated as a sequence of characters
-                for char in string_literal.value(self.db()).chars() {
-                    slots.insert(char.to_string());
+                let slot_value = string_literal.value(self.db());
+                
+                // Python treats a bare string as a sequence of slot names (one per character)
+                for ch in slot_value.chars() {
+                    slots.insert(ch.to_string());
                 }
                 Some(slots)
             }
@@ -9357,9 +9359,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Check if a class inherits from a variable-length built-in type
     fn class_inherits_from_builtin(&self, class_def: &ast::StmtClassDef) -> bool {
+        // Check if any base class (direct or indirect) is a variable-length builtin
         for base in class_def.bases() {
             let base_ty = self.expression_type(base);
             if let Type::ClassLiteral(base_class) = base_ty {
+                // Check if the base is directly a builtin
                 if let Some(known_class) = base_class.known(self.db()) {
                     match known_class {
                         KnownClass::Int
@@ -9370,6 +9374,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Complex => return true,
                         _ => {}
                     }
+                }
+                // Also check the base's entire MRO
+                if base_class.inherits_from_variable_length_builtin(self.db()) {
+                    return true;
                 }
             }
         }

@@ -10723,7 +10723,7 @@ impl get_size2::GetSize for EnumLiteralType<'_> {}
 
 impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
-        self.enum_class(db).to_non_generic_instance(db)
+        Type::from(self.enum_class(db))
     }
 }
 
