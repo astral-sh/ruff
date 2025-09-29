@@ -44,7 +44,7 @@ def _(l: list[int] | None = None):
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
     l2: list[int] = l or list()
-    # TODO: should be `list[int]`
+    # TODO: it would be nice if this were `list[int]`
     reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
@@ -94,8 +94,8 @@ def wrap_data() -> list[dict]:
         return list1({})
     reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
     # `list[dict[Unknown, Unknown] & ~AlwaysFalsy]` and `list[dict[Unknown, Unknown]]` are incompatible,
-    # but the return type check passes here because the inferred return type is widened
-    # by bidirectional type inference.
+    # but the return type check passes here because the type of `list1(res)` is inferred
+    # by bidirectional type inference using the annotated return type, and the type of `res` is not used.
     return list1(res)
 
 def wrap_data2() -> list[dict] | None:
