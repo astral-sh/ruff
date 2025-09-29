@@ -956,6 +956,10 @@ impl<'db> UnderspecifiedNode<'db> {
             ),
         }
     }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        self.minimize(db).display(db)
+    }
 }
 
 impl<'db> From<Node<'db>> for UnderspecifiedNode<'db> {
