@@ -939,7 +939,7 @@ impl<'db> UnderspecifiedNode<'db> {
         self.smallest_minimizations(db).take_one()
     }
 
-    fn smallest_minimizations(self, db: &'db dyn Db) -> MinimizedNode<'db> {
+    fn smallest_minimizations(self, db: &'db dyn Db) -> MinimizedNode<'db, 'db> {
         match self {
             UnderspecifiedNode::AlwaysTrue => MinimizedNode::One(Node::AlwaysTrue),
             UnderspecifiedNode::AlwaysFalse => MinimizedNode::One(Node::AlwaysFalse),
@@ -987,13 +987,13 @@ impl<'db> From<UnderspecifiedInteriorNode<'db>> for UnderspecifiedNode<'db> {
     }
 }
 
-enum MinimizedNode<'db> {
+enum MinimizedNode<'a, 'db> {
     One(Node<'db>),
     Two([Node<'db>; 2]),
-    Many(&'db [Node<'db>]),
+    Many(&'a [Node<'db>]),
 }
 
-impl<'db> MinimizedNode<'db> {
+impl<'a, 'db> MinimizedNode<'a, 'db> {
     fn take_one(self) -> Node<'db> {
         match self {
             MinimizedNode::One(node) | MinimizedNode::Two([node, _]) => node,
@@ -1004,7 +1004,7 @@ impl<'db> MinimizedNode<'db> {
         }
     }
 
-    fn as_slice(&'db self) -> &'db [Node<'db>] {
+    fn as_slice(&'a self) -> &'a [Node<'db>] {
         match self {
             MinimizedNode::One(node) => std::slice::from_ref(node),
             MinimizedNode::Two(nodes) => nodes.as_slice(),
