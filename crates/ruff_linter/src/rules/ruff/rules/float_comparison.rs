@@ -13,7 +13,7 @@ use crate::{FixAvailability, Violation};
 /// Directly comparing floats can produce unreliable results due to the
 /// inherent imprecision of floating-point arithmetic.
 ///
-/// ## When to use [`math.isclose()`][mathisclose] vs [`numpy.isclose()`][numpyisclose]
+/// ## When to use `math.isclose()` vs `numpy.isclose()`
 ///
 /// **Use `math.isclose()` for scalar values:**
 /// - Comparing individual float numbers
@@ -21,7 +21,7 @@ use crate::{FixAvailability, Violation};
 /// - When you need a single `True`/`False` result
 ///
 /// **Use `numpy.isclose()` for array-like objects:**
-/// - Comparing pandas Series, numpy arrays, or other vectorized objects
+/// - Comparing `pandas` Series, `numpy` arrays, or other vectorized objects
 /// - When you need element-wise comparison of arrays
 /// - Working in data science contexts with vectorized operations
 ///
