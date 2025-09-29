@@ -123,7 +123,7 @@ impl<'a> Importer<'a> {
     /// then the existing style is always respected instead.
     ///
     /// `members` should be a map of symbols in scope at the position
-    /// where the the imported symbol should be available. This is used
+    /// where the imported symbol should be available. This is used
     /// to craft import statements in a way that doesn't conflict with
     /// symbols in scope. If it's not feasible to provide this map, then
     /// providing an empty map is generally fine. But it does mean that

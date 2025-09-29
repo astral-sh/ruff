@@ -3152,7 +3152,7 @@ impl<'db> Type<'db> {
         );
         match self {
             Type::Callable(callable) if callable.is_function_like(db) => {
-                // For "function-like" callables, model the the behavior of `FunctionType.__get__`.
+                // For "function-like" callables, model the behavior of `FunctionType.__get__`.
                 //
                 // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
                 // we should instead return a new method-wrapper type variant for the synthesized `__get__`
