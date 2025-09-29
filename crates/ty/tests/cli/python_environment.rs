@@ -1738,8 +1738,8 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1814,8 +1814,8 @@ fn default_root_python_package() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1861,8 +1861,8 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1902,8 +1902,8 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     3 | print(f"{baz.it}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1959,8 +1959,8 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     3 | import foo
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1975,8 +1975,8 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     5 | print(f"{baz.it}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
