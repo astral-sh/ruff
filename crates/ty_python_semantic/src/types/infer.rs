@@ -387,20 +387,8 @@ impl<'db> TypeContext<'db> {
         known_class: KnownClass,
         db: &'db dyn Db,
     ) -> Option<Specialization<'db>> {
-        let class_type = match self.annotation? {
-            Type::NominalInstance(instance) => instance,
-            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
-            _ => return None,
-        }
-        .class(db);
-
-        if !class_type.is_known(db, known_class) {
-            return None;
-        }
-
-        class_type
-            .into_generic_alias()
-            .map(|generic_alias| generic_alias.specialization(db))
+        self.annotation
+            .and_then(|ty| ty.known_specialization(known_class, db))
     }
 }
 

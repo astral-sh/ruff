@@ -6,17 +6,25 @@ use std::num::NonZeroUsize;
 use colored::Colorize;
 
 use ruff_db::diagnostic::Diagnostic;
+use ruff_diagnostics::Applicability;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext};
-use crate::settings::types::UnsafeFixes;
 
-#[derive(Default)]
 pub struct GroupedEmitter {
     show_fix_status: bool,
-    unsafe_fixes: UnsafeFixes,
+    applicability: Applicability,
+}
+
+impl Default for GroupedEmitter {
+    fn default() -> Self {
+        Self {
+            show_fix_status: false,
+            applicability: Applicability::Safe,
+        }
+    }
 }
 
 impl GroupedEmitter {
@@ -27,8 +35,8 @@ impl GroupedEmitter {
     }
 
     #[must_use]
-    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
-        self.unsafe_fixes = unsafe_fixes;
+    pub fn with_applicability(mut self, applicability: Applicability) -> Self {
+        self.applicability = applicability;
         self
     }
 }
@@ -67,7 +75,7 @@ impl Emitter for GroupedEmitter {
                         notebook_index: context.notebook_index(&message.expect_ruff_filename()),
                         message,
                         show_fix_status: self.show_fix_status,
-                        unsafe_fixes: self.unsafe_fixes,
+                        applicability: self.applicability,
                         row_length,
                         column_length,
                     }
@@ -114,7 +122,7 @@ fn group_diagnostics_by_filename(
 struct DisplayGroupedMessage<'a> {
     message: MessageWithLocation<'a>,
     show_fix_status: bool,
-    unsafe_fixes: UnsafeFixes,
+    applicability: Applicability,
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
     notebook_index: Option<&'a NotebookIndex>,
@@ -162,7 +170,7 @@ impl Display for DisplayGroupedMessage<'_> {
             code_and_body = RuleCodeAndBody {
                 message,
                 show_fix_status: self.show_fix_status,
-                unsafe_fixes: self.unsafe_fixes
+                applicability: self.applicability
             },
         )?;
 
@@ -173,7 +181,7 @@ impl Display for DisplayGroupedMessage<'_> {
 pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Diagnostic,
     pub(crate) show_fix_status: bool,
-    pub(crate) unsafe_fixes: UnsafeFixes,
+    pub(crate) applicability: Applicability,
 }
 
 impl Display for RuleCodeAndBody<'_> {
@@ -181,7 +189,7 @@ impl Display for RuleCodeAndBody<'_> {
         if self.show_fix_status {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
-                if fix.applies(self.unsafe_fixes.required_applicability()) {
+                if fix.applies(self.applicability) {
                     if let Some(code) = self.message.secondary_code() {
                         write!(f, "{} ", code.red().bold())?;
                     }
@@ -217,11 +225,12 @@ impl Display for RuleCodeAndBody<'_> {
 mod tests {
     use insta::assert_snapshot;
 
+    use ruff_diagnostics::Applicability;
+
     use crate::message::GroupedEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
-    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -251,7 +260,7 @@ mod tests {
     fn fix_status_unsafe() {
         let mut emitter = GroupedEmitter::default()
             .with_show_fix_status(true)
-            .with_unsafe_fixes(UnsafeFixes::Enabled);
+            .with_applicability(Applicability::Unsafe);
         let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);

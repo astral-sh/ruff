@@ -10,7 +10,7 @@ SIM105 [*] Use `contextlib.suppress(ImportError)` instead of `try`-`except`-`pas
 4 | | except ImportError:    pass
   | |___________________________^
   |
-help: Replace with `contextlib.suppress(ImportError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ImportError): ...`
 1 | ﻿#!/usr/bin/env python
   - try:
 2 + import contextlib

@@ -1,4 +1,6 @@
-use itertools::Itertools;
+use std::iter;
+
+use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -87,13 +89,13 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
-    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    BoundTypeVarInstance, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
+    UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -1732,7 +1734,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
-                CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
+                CallArguments::from_arguments(arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
                     if let Some(argument) = argument {
                         self.store_expression_type(argument, ty);
@@ -2143,12 +2145,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_literal =
             FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
 
-        let type_mappings = Box::default();
-        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
-            self.db(),
-            function_literal,
-            type_mappings,
-        ));
+        let mut inferred_ty =
+            Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));
         self.undecorated_type = Some(inferred_ty);
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
@@ -4111,7 +4109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
-            let mut inferred_ty = if target
+            let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
             {
@@ -4121,24 +4119,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
-
-            // Validate `TypedDict` dictionary literal assignments
-            if let Some(typed_dict) = declared.inner_type().into_typed_dict() {
-                if let Some(dict_expr) = value.as_dict_expr() {
-                    validate_typed_dict_dict_literal(
-                        &self.context,
-                        typed_dict,
-                        dict_expr,
-                        target.into(),
-                        |expr| self.expression_type(expr),
-                    );
-
-                    // Override the inferred type of the dict literal to be the `TypedDict` type
-                    // This ensures that the dict literal gets the correct type for key access
-                    let typed_dict_type = Type::TypedDict(typed_dict);
-                    inferred_ty = typed_dict_type;
-                }
-            }
 
             self.add_declaration_with_binding(
                 target.into(),
@@ -5303,6 +5283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
+        let elts = elts.iter().map(|elt| [Some(elt)]);
         self.infer_collection_literal(elts, tcx, KnownClass::List)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
@@ -5316,95 +5297,167 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
         } = set;
 
+        let elts = elts.iter().map(|elt| [Some(elt)]);
         self.infer_collection_literal(elts, tcx, KnownClass::Set)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), [Type::unknown()])
             })
     }
 
-    // Infer the type of a collection literal expression.
-    fn infer_collection_literal(
-        &mut self,
-        elts: &[ast::Expr],
-        tcx: TypeContext<'db>,
-        collection_class: KnownClass,
-    ) -> Option<Type<'db>> {
-        // Extract the type variable `T` from `list[T]` in typeshed.
-        fn elts_ty(
-            collection_class: KnownClass,
-            db: &dyn Db,
-        ) -> Option<(ClassLiteral<'_>, Type<'_>)> {
-            let class_literal = collection_class.try_to_class_literal(db)?;
-            let generic_context = class_literal.generic_context(db)?;
-            let variables = generic_context.variables(db);
-            let elts_ty = variables.iter().exactly_one().ok()?;
-            Some((class_literal, Type::TypeVar(*elts_ty)))
-        }
-
-        let annotated_elts_ty = tcx
-            .known_specialization(collection_class, self.db())
-            .and_then(|specialization| specialization.types(self.db()).iter().exactly_one().ok())
-            .copied();
-
-        let (class_literal, elts_ty) = elts_ty(collection_class, self.db()).unwrap_or_else(|| {
-            let name = collection_class.name(self.db());
-            panic!("Typeshed should always have a `{name}` class in `builtins.pyi` with a single type variable")
-        });
-
-        // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db());
-
-        match annotated_elts_ty {
-            // The annotated type acts as a constraint for `T`.
-            //
-            // Note that we infer the annotated type _before_ the elements, to closer match the order
-            // of any unions written in the type annotation.
-            Some(annotated_elts_ty) => {
-                builder.infer(elts_ty, annotated_elts_ty).ok()?;
-            }
-
-            // If a valid type annotation was not provided, avoid restricting the type of the collection
-            // by unioning the inferred type with `Unknown`.
-            None => builder.infer(elts_ty, Type::unknown()).ok()?,
-        }
-
-        // The inferred type of each element acts as an additional constraint on `T`.
-        for elt in elts {
-            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
-
-            // Convert any element literals to their promoted type form to avoid excessively large
-            // unions for large nested list literals, which the constraint solver struggles with.
-            let inferred_elt_ty =
-                inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals);
-            builder.infer(elts_ty, inferred_elt_ty).ok()?;
-        }
-
-        let class_type = class_literal
-            .apply_specialization(self.db(), |generic_context| builder.build(generic_context));
-
-        Type::from(class_type).to_instance(self.db())
-    }
-
-    fn infer_dict_expression(&mut self, dict: &ast::ExprDict, _tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_dict_expression(&mut self, dict: &ast::ExprDict, tcx: TypeContext<'db>) -> Type<'db> {
         let ast::ExprDict {
             range: _,
             node_index: _,
             items,
         } = dict;
 
-        // TODO: Use the type context for more precise inference.
-        for item in items {
-            self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
-            self.infer_expression(&item.value, TypeContext::default());
+        // Validate `TypedDict` dictionary literal assignments.
+        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict) {
+            let typed_dict_items = typed_dict.items(self.db());
+
+            for item in items {
+                self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+
+                if let Some(ast::Expr::StringLiteral(ref key)) = item.key
+                    && let Some(key) = key.as_single_part_string()
+                    && let Some(field) = typed_dict_items.get(key.as_str())
+                {
+                    self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
+                } else {
+                    self.infer_expression(&item.value, TypeContext::default());
+                }
+            }
+
+            validate_typed_dict_dict_literal(
+                &self.context,
+                typed_dict,
+                dict,
+                dict.into(),
+                |expr| self.expression_type(expr),
+            );
+
+            return Type::TypedDict(typed_dict);
         }
 
-        KnownClass::Dict.to_specialized_instance(
-            self.db(),
-            [
-                todo_type!("dict literal key type"),
-                todo_type!("dict literal value type"),
-            ],
-        )
+        // Avoid false positives for the functional `TypedDict` form, which is currently
+        // unsupported.
+        if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation {
+            return KnownClass::Dict
+                .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()]);
+        }
+
+        let items = items
+            .iter()
+            .map(|item| [item.key.as_ref(), Some(&item.value)]);
+
+        self.infer_collection_literal(items, tcx, KnownClass::Dict)
+            .unwrap_or_else(|| {
+                KnownClass::Dict
+                    .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()])
+            })
+    }
+
+    // Infer the type of a collection literal expression.
+    fn infer_collection_literal<'expr, const N: usize>(
+        &mut self,
+        elts: impl Iterator<Item = [Option<&'expr ast::Expr>; N]>,
+        tcx: TypeContext<'db>,
+        collection_class: KnownClass,
+    ) -> Option<Type<'db>> {
+        // Extract the type variable `T` from `list[T]` in typeshed.
+        fn elt_tys(
+            collection_class: KnownClass,
+            db: &dyn Db,
+        ) -> Option<(ClassLiteral<'_>, &FxOrderSet<BoundTypeVarInstance<'_>>)> {
+            let class_literal = collection_class.try_to_class_literal(db)?;
+            let generic_context = class_literal.generic_context(db)?;
+            Some((class_literal, generic_context.variables(db)))
+        }
+
+        let (class_literal, elt_tys) = elt_tys(collection_class, self.db()).unwrap_or_else(|| {
+            let name = collection_class.name(self.db());
+            panic!("Typeshed should always have a `{name}` class in `builtins.pyi`")
+        });
+
+        // Extract the annotated type of `T`, if provided.
+        let annotated_elt_tys = tcx
+            .known_specialization(collection_class, self.db())
+            .map(|specialization| specialization.types(self.db()));
+
+        // Create a set of constraints to infer a precise type for `T`.
+        let mut builder = SpecializationBuilder::new(self.db());
+
+        match annotated_elt_tys {
+            // The annotated type acts as a constraint for `T`.
+            //
+            // Note that we infer the annotated type _before_ the elements, to more closely match the
+            // order of any unions as written in the type annotation.
+            Some(annotated_elt_tys) => {
+                for (elt_ty, annotated_elt_ty) in iter::zip(elt_tys, annotated_elt_tys) {
+                    builder
+                        .infer(Type::TypeVar(*elt_ty), *annotated_elt_ty)
+                        .ok()?;
+                }
+            }
+
+            // If a valid type annotation was not provided, avoid restricting the type of the collection
+            // by unioning the inferred type with `Unknown`.
+            None => {
+                for elt_ty in elt_tys {
+                    builder
+                        .infer(Type::TypeVar(*elt_ty), Type::unknown())
+                        .ok()?;
+                }
+            }
+        }
+
+        let elt_tcxs = match annotated_elt_tys {
+            None => Either::Left(iter::repeat(TypeContext::default())),
+            Some(tys) => Either::Right(tys.iter().map(|ty| TypeContext::new(Some(*ty)))),
+        };
+
+        for elts in elts {
+            // An unpacking expression for a dictionary.
+            if let &[None, Some(value)] = elts.as_slice() {
+                let inferred_value_ty = self.infer_expression(value, TypeContext::default());
+
+                // Merge the inferred type of the nested dictionary.
+                if let Some(specialization) =
+                    inferred_value_ty.known_specialization(KnownClass::Dict, self.db())
+                {
+                    for (elt_ty, inferred_elt_ty) in
+                        iter::zip(elt_tys, specialization.types(self.db()))
+                    {
+                        builder
+                            .infer(Type::TypeVar(*elt_ty), *inferred_elt_ty)
+                            .ok()?;
+                    }
+                }
+
+                continue;
+            }
+
+            // The inferred type of each element acts as an additional constraint on `T`.
+            for (elt, elt_ty, elt_tcx) in itertools::izip!(elts, elt_tys, elt_tcxs.clone()) {
+                let Some(inferred_elt_ty) = self.infer_optional_expression(elt, elt_tcx) else {
+                    continue;
+                };
+
+                // Convert any element literals to their promoted type form to avoid excessively large
+                // unions for large nested list literals, which the constraint solver struggles with.
+                let inferred_elt_ty =
+                    inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals);
+
+                builder
+                    .infer(Type::TypeVar(*elt_ty), inferred_elt_ty)
+                    .ok()?;
+            }
+        }
+
+        let class_type = class_literal
+            .apply_specialization(self.db(), |generic_context| builder.build(generic_context));
+
+        Type::from(class_type).to_instance(self.db())
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -5787,7 +5840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments =
-            CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
+            CallArguments::from_arguments(arguments, |argument, splatted_value| {
                 let ty = self.infer_expression(splatted_value, TypeContext::default());
                 if let Some(argument) = argument {
                     self.store_expression_type(argument, ty);
@@ -6903,7 +6956,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::UnaryOp::Invert,
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
             ) => {
-                let constraints = constraints.constraints(self.db()).clone();
+                let constraints = constraints.constraints(self.db());
                 let result = constraints.negate(self.db());
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
                     self.db(),
@@ -7267,9 +7320,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitAnd,
             ) => {
-                let left = left.constraints(self.db()).clone();
-                let right = right.constraints(self.db()).clone();
-                let result = left.and(self.db(), || right);
+                let left = left.constraints(self.db());
+                let right = right.constraints(self.db());
+                let result = left.and(self.db(), || *right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -7280,9 +7333,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitOr,
             ) => {
-                let left = left.constraints(self.db()).clone();
-                let right = right.constraints(self.db()).clone();
-                let result = left.or(self.db(), || right);
+                let left = left.constraints(self.db());
+                let right = right.constraints(self.db());
+                let result = left.or(self.db(), || *right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -8938,7 +8991,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
                     bind_typevar(
                         self.db(),
-                        self.module(),
                         self.index,
                         self.scope().file_scope_id(self.db()),
                         self.typevar_binding_context,

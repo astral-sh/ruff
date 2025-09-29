@@ -15,7 +15,6 @@ use crate::{
     Db,
     files::File,
     source::{SourceText, line_index, source_text},
-    system::SystemPath,
 };
 
 use super::{
@@ -800,7 +799,7 @@ where
     T: Db,
 {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(self).as_str())
+        file.path(self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -836,7 +835,7 @@ where
 
 impl FileResolver for &dyn Db {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+        file.path(*self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -953,14 +952,6 @@ fn context_after(
     }
 
     line
-}
-
-/// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
-    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
-        return path.as_str();
-    }
-    path
 }
 
 /// Given some source code and annotation ranges, this routine replaces
@@ -2627,7 +2618,7 @@ watermelon
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_status(yes);
+            config = config.with_show_fix_status(yes);
             self.config = config;
         }
 
@@ -2641,7 +2632,7 @@ watermelon
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.fix_applicability(applicability);
+            config = config.with_fix_applicability(applicability);
             self.config = config;
         }
 

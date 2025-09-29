@@ -2101,7 +2101,7 @@ impl<'a> SemanticModel<'a> {
     /// Finds and returns the [`Scope`] corresponding to a given [`ast::StmtFunctionDef`].
     ///
     /// This method searches all scopes created by a function definition, comparing the
-    /// [`TextRange`] of the provided `function_def` with the the range of the function
+    /// [`TextRange`] of the provided `function_def` with the range of the function
     /// associated with the scope.
     pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
         self.scopes.iter().find(|scope| {

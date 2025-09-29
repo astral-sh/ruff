@@ -1,9 +1,6 @@
-use std::borrow::Cow;
-
 use crate::types::constraints::ConstraintSet;
 
 use itertools::Itertools;
-use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -28,7 +25,6 @@ use crate::{Db, FxOrderSet};
 /// scope.
 fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
-    module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
     scope: FileScopeId,
 ) -> impl Iterator<Item = GenericContext<'db>> {
@@ -36,13 +32,13 @@ fn enclosing_generic_contexts<'db>(
         .ancestor_scopes(scope)
         .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
             NodeWithScopeKind::Class(class) => {
-                let definition = index.expect_single_definition(class.node(module));
+                let definition = index.expect_single_definition(class);
                 binding_type(db, definition)
                     .into_class_literal()?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
-                let definition = index.expect_single_definition(function.node(module));
+                let definition = index.expect_single_definition(function);
                 infer_definition_types(db, definition)
                     .undecorated_type()
                     .expect("function should have undecorated type")
@@ -51,7 +47,7 @@ fn enclosing_generic_contexts<'db>(
                     .generic_context
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
-                let definition = index.expect_single_definition(type_alias.node(module));
+                let definition = index.expect_single_definition(type_alias);
                 binding_type(db, definition)
                     .into_type_alias()?
                     .into_pep_695_type_alias()?
@@ -77,7 +73,6 @@ fn enclosing_generic_contexts<'db>(
 /// bind the typevar with that new binding context.
 pub(crate) fn bind_typevar<'db>(
     db: &'db dyn Db,
-    module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
     containing_scope: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,
@@ -88,13 +83,13 @@ pub(crate) fn bind_typevar<'db>(
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
             if outer.kind().is_class() {
                 if let NodeWithScopeKind::Function(function) = inner.node() {
-                    let definition = index.expect_single_definition(function.node(module));
+                    let definition = index.expect_single_definition(function);
                     return Some(typevar.with_binding_context(db, definition));
                 }
             }
         }
     }
-    enclosing_generic_contexts(db, module, index, containing_scope)
+    enclosing_generic_contexts(db, index, containing_scope)
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
             typevar_binding_context.map(|typevar_binding_context| {
@@ -415,7 +410,7 @@ impl<'db> GenericContext<'db> {
             // requirement for legacy contexts.)
             let partial = PartialSpecialization {
                 generic_context: self,
-                types: Cow::Borrowed(&expanded[0..idx]),
+                types: &expanded[0..idx],
             };
             let default =
                 default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
@@ -864,18 +859,6 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            // As an optimization, we can return early if either type is dynamic, unless
-            // we're dealing with a top or bottom materialization.
-            if other_materialization_kind.is_none()
-                && self_materialization_kind.is_none()
-                && (self_type.is_dynamic() || other_type.is_dynamic())
-            {
-                match relation {
-                    TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return ConstraintSet::from(false),
-                }
-            }
-
             // Subtyping/assignability of each type in the specialization depends on the variance
             // of the corresponding typevar:
             //   - covariant: verify that self_type <: other_type
@@ -900,7 +883,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, &compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied() {
                 return result;
             }
         }
@@ -941,7 +924,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, &compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied() {
                 return result;
             }
         }
@@ -951,7 +934,7 @@ impl<'db> Specialization<'db> {
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, &compatible).is_never_satisfied() {
+                if result.intersect(db, compatible).is_never_satisfied() {
                     return result;
                 }
             }
@@ -982,18 +965,7 @@ impl<'db> Specialization<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
-    types: Cow<'a, [Type<'db>]>,
-}
-
-pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    specialization: &PartialSpecialization<'_, 'db>,
-    visitor: &V,
-) {
-    walk_generic_context(db, specialization.generic_context, visitor);
-    for ty in &*specialization.types {
-        visitor.visit_type(db, *ty);
-    }
+    types: &'a [Type<'db>],
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -1009,31 +981,6 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .variables(db)
             .get_index_of(&bound_typevar)?;
         self.types.get(index).copied()
-    }
-
-    pub(crate) fn to_owned(&self) -> PartialSpecialization<'db, 'db> {
-        PartialSpecialization {
-            generic_context: self.generic_context,
-            types: Cow::from(self.types.clone().into_owned()),
-        }
-    }
-
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> PartialSpecialization<'db, 'db> {
-        let generic_context = self.generic_context.normalized_impl(db, visitor);
-        let types: Cow<_> = self
-            .types
-            .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect();
-
-        PartialSpecialization {
-            generic_context,
-            types,
-        }
     }
 }
 
