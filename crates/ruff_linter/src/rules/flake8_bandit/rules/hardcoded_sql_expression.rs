@@ -72,7 +72,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
             if is_explicit_concatenation(expr) != Some(true) {
                 return;
             }
-            checker.generator().expr(expr)
+            concatenated_binary_string(expr)
         }
         // "select * from table where val = %s" % ...
         Expr::BinOp(ast::ExprBinOp {
@@ -133,6 +133,34 @@ fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
         .iter()
         .filter_map(|part| raw_contents(locator.slice(part)))
         .collect()
+}
+
+/// Concatenates the contents of a binary string expression.
+///
+/// ## Example
+///
+/// ```python
+/// "select * " "from table" + var + ";"
+/// ```
+///
+/// becomes `select * from table {} ;`.
+fn concatenated_binary_string(expr: &Expr) -> String {
+    match expr {
+        Expr::StringLiteral(string_literal) => string_literal.value.to_str().to_string(),
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: Operator::Add,
+            right,
+            ..
+        }) => {
+            format!(
+                "{}{}",
+                concatenated_binary_string(left),
+                concatenated_binary_string(right)
+            )
+        }
+        _ => " {} ".to_string(),
+    }
 }
 
 /// Returns `Some(true)` if an expression appears to be an explicit string concatenation,

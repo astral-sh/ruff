@@ -179,3 +179,10 @@ query63 = t"""
 """
 query64 = f"update {t"{table}"} set var = {t"{var}"}"
 query65 = t"update {f"{table}"} set var = {f"{var}"}"
+
+# Implicit string concatenation with binary operation
+def query66():
+    return (
+        "select * "
+        "from \"" + schema + "\""
+    )

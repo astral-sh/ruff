@@ -672,3 +672,14 @@ S608 Possible SQL injection vector through string-based query construction
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 181 | query65 = t"update {f"{table}"} set var = {f"{var}"}"
     |
+
+S608 Possible SQL injection vector through string-based query construction
+   --> S608.py:186:9
+    |
+184 |   def query66():
+185 |       return (
+186 | /         "select * "
+187 | |         "from \"" + schema + "\""
+    | |_________________________________^
+188 |       )
+    |
