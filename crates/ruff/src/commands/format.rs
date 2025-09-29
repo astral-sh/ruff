@@ -944,7 +944,7 @@ impl From<&FormatCommandError> for Diagnostic {
             }
             FormatCommandError::Format(_, format_module_error) => match format_module_error {
                 FormatModuleError::ParseError(parse_error) => Diagnostic::new(
-                    DiagnosticId::InvalidSyntax,
+                    DiagnosticId::InternalError,
                     Severity::Error,
                     &parse_error.error,
                 ),
@@ -1390,7 +1390,7 @@ mod tests {
         io: File not found
         --> test.py:1:1
 
-        invalid-syntax: Expected index or slice expression
+        internal-error: Expected index or slice expression
         --> test.py:1:1
 
         io: Cannot write to file
