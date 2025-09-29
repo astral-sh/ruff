@@ -1,6 +1,7 @@
 //! Display implementations for types.
 
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
@@ -69,7 +70,7 @@ impl<'db> DisplaySettings<'db> {
                     .class_names
                     .borrow()
                     .iter()
-                    .filter_map(|(name, classes)| (classes.len() > 1).then_some(*name))
+                    .filter_map(|(name, ambiguity)| ambiguity.is_ambiguous().then_some(*name))
                     .collect(),
             ),
             ..Self::default()
@@ -80,16 +81,40 @@ impl<'db> DisplaySettings<'db> {
 #[derive(Debug, Default)]
 struct AmbiguousClassCollector<'db> {
     visited_types: RefCell<FxHashSet<Type<'db>>>,
-    class_names: RefCell<FxHashMap<&'db str, FxHashSet<ClassLiteral<'db>>>>,
+    class_names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
 }
 
 impl<'db> AmbiguousClassCollector<'db> {
     fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
-        self.class_names
-            .borrow_mut()
-            .entry(class.name(db))
-            .or_default()
-            .insert(class);
+        match self.class_names.borrow_mut().entry(class.name(db)) {
+            Entry::Vacant(entry) => {
+                entry.insert(AmbiguityState::Unambiguous(class));
+            }
+            Entry::Occupied(mut entry) => {
+                let value = entry.get_mut();
+                if let AmbiguityState::Unambiguous(existing) = value
+                    && *existing != class
+                {
+                    *value = AmbiguityState::Ambiguous;
+                }
+            }
+        }
+    }
+}
+
+/// Whether or not a class can be unambiguously identified by its *unqualified* name
+/// given the other types that are present in the same context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AmbiguityState<'db> {
+    /// The class can be displayed unambiguously using its unqualified name
+    Unambiguous(ClassLiteral<'db>),
+    /// The class must be displayed using its fully qualified name to avoid ambiguity.
+    Ambiguous,
+}
+
+impl AmbiguityState<'_> {
+    const fn is_ambiguous(self) -> bool {
+        matches!(self, AmbiguityState::Ambiguous)
     }
 }
 
