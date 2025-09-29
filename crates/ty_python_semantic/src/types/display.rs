@@ -1236,9 +1236,7 @@ impl Display for DisplayParameter<'_> {
         } else if let Some(ty) = self.param.annotated_type() {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided.
-            if self.param.should_annotation_be_displayed() {
-                ty.display_with(self.db, self.settings.clone()).fmt(f)?;
-            }
+            ty.display_with(self.db, self.settings.clone()).fmt(f)?;
         }
         Ok(())
     }
