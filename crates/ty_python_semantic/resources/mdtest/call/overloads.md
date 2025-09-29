@@ -1675,10 +1675,8 @@ class T(TypedDict):
 
 @overload
 def f(a: list[T], b: int) -> int: ...
-
 @overload
 def f(a: list[dict[str, int]], b: str) -> str: ...
-
 def f(a: list[dict[str, int]] | list[T], b: int | str) -> int | str:
     return 1
 
@@ -1703,10 +1701,8 @@ class T(TypedDict):
 
 @overload
 def f(a: T, b: int) -> int: ...
-
 @overload
 def f(a: dict[str, int], b: str) -> str: ...
-
 def f(a: T | dict[str, int], b: int | str) -> int | str:
     return 1
 

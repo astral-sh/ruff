@@ -269,7 +269,6 @@ def _(flag: bool):
     else:
         def f(x: dict[str, int]) -> int:
             return 1
-
     x = f({"x": 1})
     reveal_type(x)  # revealed: int
 

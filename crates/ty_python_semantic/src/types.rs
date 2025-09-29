@@ -4194,20 +4194,26 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownFunction::AssertType) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("type")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(Type::none(db)),
-                    ),
-                )
-                .into(),
+                Some(KnownFunction::AssertType) => {
+                    let val_ty =
+                        BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Invariant);
+
+                    Binding::single(
+                        self,
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [val_ty])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::TypeVar(val_ty)),
+                                Parameter::positional_only(Some(Name::new_static("type")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::TypeVar(val_ty)),
+                        ),
+                    )
+                    .into()
+                }
 
                 Some(KnownFunction::AssertNever) => {
                     Binding::single(
