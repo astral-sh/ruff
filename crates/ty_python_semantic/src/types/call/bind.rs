@@ -1588,6 +1588,10 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
+        // Another approach:
+        // - Find the maximum number of parameters considering all the remaining overloads
+        // - Loop over the argument types, loop over all the overloads
+
         // These are the parameter indexes that will participate in the filtering process. The
         // parameter types at these indexes have at least one overload where the type isn't
         // equivalent to the parameter types at the same index for other overloads. For example, if
@@ -1640,24 +1644,28 @@ impl<'db> CallableBinding<'db> {
 
         for (argument_index, (argument, argument_type)) in arguments.iter().enumerate() {
             let argument_type = argument_type.unwrap_or_else(Type::unknown);
-            // TODO: Add support for `**kwargs`. Should we avoid doing any filtering if `**kwargs`
-            // is present to any incorrect filtering?
-            if matches!(argument, Argument::Variadic) {
-                for (index, &unpacked_argument_type) in
-                    argument_type.iterate(db).all_elements().enumerate()
-                {
-                    let adjusted_index = argument_index + index;
-                    if !participating_parameter_indexes.contains(&adjusted_index) {
+            match argument {
+                Argument::Variadic => {
+                    for (index, &unpacked_argument_type) in
+                        argument_type.iterate(db).all_elements().enumerate()
+                    {
+                        let adjusted_index = argument_index + index;
+                        if !participating_parameter_indexes.contains(&adjusted_index) {
+                            continue;
+                        }
+                        top_materialized_argument_types
+                            .push(unpacked_argument_type.top_materialization(db));
+                    }
+                }
+                Argument::Keywords => {
+                    todo!();
+                }
+                _ => {
+                    if !participating_parameter_indexes.contains(&argument_index) {
                         continue;
                     }
-                    top_materialized_argument_types
-                        .push(unpacked_argument_type.top_materialization(db));
+                    top_materialized_argument_types.push(argument_type.top_materialization(db));
                 }
-            } else {
-                if !participating_parameter_indexes.contains(&argument_index) {
-                    continue;
-                }
-                top_materialized_argument_types.push(argument_type.top_materialization(db));
             }
         }
 
