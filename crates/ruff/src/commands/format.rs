@@ -746,12 +746,19 @@ impl<'a> FormatResults<'a> {
         notebook_index: &mut FxHashMap<String, NotebookIndex>,
     ) -> impl Iterator<Item = Diagnostic> {
         self.results.iter().filter_map(|result| {
-            let FormatResult::Diff {
-                unformatted,
-                formatted,
-            } = &result.result
-            else {
-                return None;
+            let (unformatted, formatted) = match &result.result {
+                FormatResult::Skipped | FormatResult::Unchanged => return None,
+                FormatResult::Diff {
+                    unformatted,
+                    formatted,
+                } => (unformatted, formatted),
+                FormatResult::Formatted => {
+                    debug_assert!(
+                        false,
+                        "Expected `FormatResult::Diff` for changed files in check mode"
+                    );
+                    return None;
+                }
             };
 
             let mut diagnostic = Diagnostic::new(
