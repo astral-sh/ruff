@@ -401,46 +401,6 @@ enum Node<'db> {
 }
 
 impl<'db> Node<'db> {
-    /// Creates a new BDD node, ensuring that it is fully reduced.
-    fn new(
-        db: &'db dyn Db,
-        constraint: ConstrainedTypeVar<'db>,
-        if_true: Node<'db>,
-        if_false: Node<'db>,
-    ) -> Self {
-        debug_assert!(
-            (if_true.root_constraint(db))
-                .is_none_or(|root_constraint| root_constraint > constraint)
-        );
-        debug_assert!(
-            (if_false.root_constraint(db))
-                .is_none_or(|root_constraint| root_constraint > constraint)
-        );
-        if if_true == if_false {
-            return if_true;
-        }
-        Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
-    }
-
-    /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
-    /// node.
-    fn root_constraint(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
-        match self {
-            Node::Interior(interior) => Some(interior.constraint(db)),
-            _ => None,
-        }
-    }
-
-    /// Returns whether this BDD represent the constant function `true`.
-    fn is_always_satisfied(self) -> bool {
-        matches!(self, Node::AlwaysTrue)
-    }
-
-    /// Returns whether this BDD represent the constant function `false`.
-    fn is_never_satisfied(self) -> bool {
-        matches!(self, Node::AlwaysFalse)
-    }
-
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
     /// to `true`. (This translates the boolean function that this BDD represents into DNF form.)
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
@@ -574,7 +534,9 @@ impl<'db> UnderspecifiedNode<'db> {
             if_true.into_fully_specified(),
             if_false.into_fully_specified(),
         ) {
-            (Some(if_true), Some(if_false)) => Node::new(db, constraint, if_true, if_false).into(),
+            (Some(if_true), Some(if_false)) => {
+                Self::FullySpecified(InteriorNode::new(db, constraint, if_true, if_false))
+            }
             _ => Self::Interior(UnderspecifiedInteriorNode::new(
                 db, constraint, if_true, if_false,
             )),
