@@ -72,7 +72,7 @@ from typing import Protocol, TypeVar
 S = TypeVar("S")
 
 class CanIndex(Protocol[S]):
-    def __getitem__(self, index: int) -> S: ...
+    def __getitem__(self, index: int, /) -> S: ...
 
 class ExplicitlyImplements[T](CanIndex[T]): ...
 
@@ -323,6 +323,27 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Passing generic functions to generic functions
+
+```py
+from typing import Callable
+
+def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
+    return fn(value)
+
+def identity[T](x: T) -> T:
+    return x
+
+def head[T](xs: list[T]) -> T:
+    return xs[0]
+
+# TODO: this should be `Literal[1]`
+reveal_type(invoke(identity, 1))  # revealed: Unknown
+
+# TODO: this should be `Unknown | int`
+reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+```
+
 ## Protocols as TypeVar bounds
 
 Protocol types can be used as TypeVar bounds, just like nominal types.
@@ -493,4 +514,26 @@ reveal_type(team.employees)  # revealed: list[Employee]
 age, name = team.employees[0]
 reveal_type(age)  # revealed: Age
 reveal_type(name)  # revealed: Name
+```
+
+## `self` in PEP 695 generic methods
+
+When a generic method uses a PEP 695 generic context, an implict or explicit annotation of
+`self: Self` is still part of the full generic context:
+
+```py
+from typing import Self
+
+class C:
+    def explicit_self[T](self: Self, x: T) -> tuple[Self, T]:
+        return self, x
+
+    def implicit_self[T](self, x: T) -> tuple[Self, T]:
+        return self, x
+
+def _(x: int):
+    reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
+
+    # TODO: this should be `tuple[C, int]` as well, once we support implicit `self`
+    reveal_type(C().implicit_self(x))  # revealed: tuple[Unknown, int]
 ```

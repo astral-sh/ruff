@@ -17,9 +17,9 @@ use ruff_text_size::TextRange;
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
-/// and not worth to be maintained in Airflow.
+/// and not worth continued maintenance in Airflow.
 /// Even though these symbols still work fine on Airflow 3.0, they are expected to be removed in a future version.
-/// The user is suggested to replace the original usage with the new ones.
+/// Where available, users should replace the removed functionality with the new alternatives.
 ///
 /// ## Example
 /// ```python
@@ -157,6 +157,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         ["airflow", .., "DAG" | "dag"] => {
             diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
         }
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
+            diagnostic_for_argument(checker, arguments, "datasets", Some("assets"));
+        }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 diagnostic_for_argument(checker, arguments, "sla", None);
@@ -227,6 +230,19 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
+        [
+            "airflow",
+            "decorators",
+            "base",
+            rest @ ("DecoratedMappedOperator"
+            | "DecoratedOperator"
+            | "TaskDecorator"
+            | "get_unique_task_id"
+            | "task_decorator_factory"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk.bases.decorator",
+            name: (*rest).to_string(),
+        },
 
         // airflow.io
         ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
@@ -245,6 +261,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: (*rest).to_string(),
             }
         }
+        ["airflow", "models", "Param"] => Replacement::AutoImport {
+            module: "airflow.sdk.definitions.param",
+            name: "Param",
+        },
 
         // airflow.models.baseoperator
         [
@@ -260,16 +280,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: "BaseOperatorLink",
         },
+
         // airflow.model..DAG
         ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk",
             name: "DAG".to_string(),
         },
+
+        // airflow.sensors.base
+        [
+            "airflow",
+            "sensors",
+            "base",
+            rest @ ("BaseSensorOperator" | "PokeReturnValue" | "poke_mode_only"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
+
         // airflow.timetables
         ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::AutoImport {
             module: "airflow.timetables.assets",
             name: "AssetOrTimeSchedule",
         },
+
         // airflow.utils
         [
             "airflow",

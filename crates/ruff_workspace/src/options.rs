@@ -251,7 +251,7 @@ pub struct Options {
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -537,8 +537,6 @@ pub struct LintOptions {
     /// For example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks
     /// if `__future__` annotations are enabled.
     ///
-    /// This setting is currently in [preview](https://docs.astral.sh/ruff/preview/) and requires
-    /// preview mode to be enabled to have any effect.
     #[option(
         default = "false",
         value_type = "bool",
@@ -2298,6 +2296,9 @@ pub struct IsortOptions {
 
     /// Order imports by type, which is determined by case, in addition to
     /// alphabetically.
+    ///
+    /// Note that this option takes precedence over the
+    /// [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.
     #[option(
         default = r#"true"#,
         value_type = "bool",
@@ -2320,6 +2321,9 @@ pub struct IsortOptions {
     pub force_sort_within_sections: Option<bool>,
 
     /// Sort imports taking into account case sensitivity.
+    ///
+    /// Note that the [`order-by-type`](#lint_isort_order-by-type) setting will
+    /// take precedence over this one when enabled.
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -3856,6 +3860,13 @@ pub struct AnalyzeOptions {
     /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
     /// For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`)
     /// would be considered valid imports.
+    #[option(
+        default = "2",
+        value_type = "usize",
+        example = r#"
+            string-imports-min-dots = 2
+        "#
+    )]
     pub string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.

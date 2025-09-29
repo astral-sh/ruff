@@ -13,18 +13,16 @@ RUF031 [*] Use parentheses for tuples in subscripts
 11 |   d[(2,4)]
    |
 help: Parenthesize tuple
-
-ℹ Safe fix
-5  5  |     2
-6  6  | )]
-7  7  | d[
-8     |-    1,
-9     |-    2
-   8  |+    (1,
-   9  |+    2)
-10 10 | ]
-11 11 | d[(2,4)]
-12 12 | d[(5,6,7)]
+5  |     2
+6  | )]
+7  | d[
+   -     1,
+   -     2
+8  +     (1,
+9  +     2)
+10 | ]
+11 | d[(2,4)]
+12 | d[(5,6,7)]
 
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:16:3
@@ -37,16 +35,14 @@ RUF031 [*] Use parentheses for tuples in subscripts
 18 | d[5,6,7]
    |
 help: Parenthesize tuple
-
-ℹ Safe fix
-13 13 | d[(8,)]
-14 14 | d[tuple(1,2)]
-15 15 | d[tuple(8)]
-16    |-d[1,2]
-   16 |+d[(1,2)]
-17 17 | d[3,4]
-18 18 | d[5,6,7]
-19 19 | e = {((1,2),(3,4)):"a"}
+13 | d[(8,)]
+14 | d[tuple(1,2)]
+15 | d[tuple(8)]
+   - d[1,2]
+16 + d[(1,2)]
+17 | d[3,4]
+18 | d[5,6,7]
+19 | e = {((1,2),(3,4)):"a"}
 
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:17:3
@@ -59,16 +55,14 @@ RUF031 [*] Use parentheses for tuples in subscripts
 19 | e = {((1,2),(3,4)):"a"}
    |
 help: Parenthesize tuple
-
-ℹ Safe fix
-14 14 | d[tuple(1,2)]
-15 15 | d[tuple(8)]
-16 16 | d[1,2]
-17    |-d[3,4]
-   17 |+d[(3,4)]
-18 18 | d[5,6,7]
-19 19 | e = {((1,2),(3,4)):"a"}
-20 20 | e[((1,2),(3,4))]
+14 | d[tuple(1,2)]
+15 | d[tuple(8)]
+16 | d[1,2]
+   - d[3,4]
+17 + d[(3,4)]
+18 | d[5,6,7]
+19 | e = {((1,2),(3,4)):"a"}
+20 | e[((1,2),(3,4))]
 
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:18:3
@@ -81,16 +75,14 @@ RUF031 [*] Use parentheses for tuples in subscripts
 20 | e[((1,2),(3,4))]
    |
 help: Parenthesize tuple
-
-ℹ Safe fix
-15 15 | d[tuple(8)]
-16 16 | d[1,2]
-17 17 | d[3,4]
-18    |-d[5,6,7]
-   18 |+d[(5,6,7)]
-19 19 | e = {((1,2),(3,4)):"a"}
-20 20 | e[((1,2),(3,4))]
-21 21 | e[(1,2),(3,4)]
+15 | d[tuple(8)]
+16 | d[1,2]
+17 | d[3,4]
+   - d[5,6,7]
+18 + d[(5,6,7)]
+19 | e = {((1,2),(3,4)):"a"}
+20 | e[((1,2),(3,4))]
+21 | e[(1,2),(3,4)]
 
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:21:3
@@ -103,16 +95,14 @@ RUF031 [*] Use parentheses for tuples in subscripts
 23 | token_features[
    |
 help: Parenthesize tuple
-
-ℹ Safe fix
-18 18 | d[5,6,7]
-19 19 | e = {((1,2),(3,4)):"a"}
-20 20 | e[((1,2),(3,4))]
-21    |-e[(1,2),(3,4)]
-   21 |+e[((1,2),(3,4))]
-22 22 | 
-23 23 | token_features[
-24 24 |     (window_position, feature_name)
+18 | d[5,6,7]
+19 | e = {((1,2),(3,4)):"a"}
+20 | e[((1,2),(3,4))]
+   - e[(1,2),(3,4)]
+21 + e[((1,2),(3,4))]
+22 | 
+23 | token_features[
+24 |     (window_position, feature_name)
 
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:26:3
@@ -125,14 +115,12 @@ RUF031 [*] Use parentheses for tuples in subscripts
 28 | d[()] # empty tuples should be ignored
    |
 help: Parenthesize tuple
-
-ℹ Safe fix
-23 23 | token_features[
-24 24 |     (window_position, feature_name)
-25 25 | ] = self._extract_raw_features_from_token
-26    |-d[1,]
-27 26 | d[(1,)]
-   27 |+d[(1,)]
-28 28 | d[()] # empty tuples should be ignored
-29 29 | 
-30 30 | d[:,] # slices in the subscript lead to syntax error if parens are added
+23 | token_features[
+24 |     (window_position, feature_name)
+25 | ] = self._extract_raw_features_from_token
+   - d[1,]
+26 | d[(1,)]
+27 + d[(1,)]
+28 | d[()] # empty tuples should be ignored
+29 | 
+30 | d[:,] # slices in the subscript lead to syntax error if parens are added

@@ -10,8 +10,9 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
-    UnionType, binding_type, declaration_type, todo_type,
+    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, Truthiness, Type,
+    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
+    todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -134,6 +135,10 @@ impl<'db> Place<'db> {
 
             Place::Unbound => Place::Unbound,
         }
+    }
+
+    pub(crate) const fn is_definitely_bound(&self) -> bool {
+        matches!(self, Place::Type(_, Boundness::Bound))
     }
 }
 
@@ -481,6 +486,9 @@ type DeclaredTypeAndConflictingTypes<'db> = (
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     place_and_quals: PlaceAndQualifiers<'db>,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
+    /// Contains `Some(declaration)` if the declared type originates from exactly one declaration.
+    /// This field is used for backreferences in diagnostics.
+    pub(crate) single_declaration: Option<Definition<'db>>,
 }
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
@@ -491,6 +499,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         PlaceFromDeclarationsResult {
             place_and_quals,
             conflicting_types: Some(conflicting_types),
+            single_declaration: None,
         }
     }
 
@@ -505,21 +514,6 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         Option<Box<indexmap::set::Slice<Type<'db>>>>,
     ) {
         (self.place_and_quals, self.conflicting_types)
-    }
-}
-
-impl<'db> From<PlaceAndQualifiers<'db>> for PlaceFromDeclarationsResult<'db> {
-    fn from(place_and_quals: PlaceAndQualifiers<'db>) -> Self {
-        PlaceFromDeclarationsResult {
-            place_and_quals,
-            conflicting_types: None,
-        }
-    }
-}
-
-impl<'db> From<Place<'db>> for PlaceFromDeclarationsResult<'db> {
-    fn from(place: Place<'db>) -> Self {
-        PlaceFromDeclarationsResult::from(PlaceAndQualifiers::from(place))
     }
 }
 
@@ -584,6 +578,11 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
     }
 
+    /// Returns `true` if the place has a `ReadOnly` type qualifier.
+    pub(crate) fn is_read_only(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
+    }
+
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {
@@ -608,6 +607,15 @@ impl<'db> PlaceAndQualifiers<'db> {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
         }
+    }
+
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_type(|ty| ty.materialize(db, materialization_kind, visitor))
     }
 
     /// Transform place and qualifiers into a [`LookupResult`],
@@ -1197,6 +1205,8 @@ fn place_from_declarations_impl<'db>(
     let reachability_constraints = declarations.reachability_constraints;
     let boundness_analysis = declarations.boundness_analysis;
     let mut declarations = declarations.peekable();
+    let mut first_declaration = None;
+    let mut exactly_one_declaration = false;
 
     let is_non_exported = |declaration: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
@@ -1225,6 +1235,13 @@ fn place_from_declarations_impl<'db>(
 
             if is_non_exported(declaration) {
                 return None;
+            }
+
+            if first_declaration.is_none() {
+                first_declaration = Some(declaration);
+                exactly_one_declaration = true;
+            } else {
+                exactly_one_declaration = false;
             }
 
             let static_reachability =
@@ -1283,10 +1300,18 @@ fn place_from_declarations_impl<'db>(
         if let Some(conflicting) = conflicting {
             PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting)
         } else {
-            place_and_quals.into()
+            PlaceFromDeclarationsResult {
+                place_and_quals,
+                conflicting_types: None,
+                single_declaration: first_declaration.filter(|_| exactly_one_declaration),
+            }
         }
     } else {
-        Place::Unbound.into()
+        PlaceFromDeclarationsResult {
+            place_and_quals: Place::Unbound.into(),
+            conflicting_types: None,
+            single_declaration: None,
+        }
     }
 }
 
@@ -1314,12 +1339,15 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 
 mod implicit_globals {
     use ruff_python_ast as ast;
+    use ruff_python_ast::name::Name;
 
+    use crate::Program;
     use crate::db::Db;
-    use crate::place::PlaceAndQualifiers;
+    use crate::place::{Boundness, PlaceAndQualifiers};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{KnownClass, Type};
+    use crate::types::{CallableType, KnownClass, Parameter, Parameters, Signature, Type};
+    use ruff_python_ast::PythonVersion;
 
     use super::{Place, place_from_declarations};
 
@@ -1367,28 +1395,58 @@ mod implicit_globals {
         db: &'db dyn Db,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        // We special-case `__file__` here because we know that for an internal implicit global
-        // lookup in a Python module, it is always a string, even though typeshed says `str |
-        // None`.
-        if name == "__file__" {
-            Place::bound(KnownClass::Str.to_instance(db)).into()
-        } else if name == "__builtins__" {
-            Place::bound(Type::any()).into()
-        } else if name == "__debug__" {
-            Place::bound(KnownClass::Bool.to_instance(db)).into()
-        }
-        // In general we wouldn't check to see whether a symbol exists on a class before doing the
-        // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
-        // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
-        // when absolutely necessary is that this function is used in a very hot path (name resolution
-        // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
-        else if module_type_symbols(db)
-            .iter()
-            .any(|module_type_member| &**module_type_member == name)
-        {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
-        } else {
-            Place::Unbound.into()
+        match name {
+            // We special-case `__file__` here because we know that for an internal implicit global
+            // lookup in a Python module, it is always a string, even though typeshed says `str |
+            // None`.
+            "__file__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+
+            "__builtins__" => Place::bound(Type::any()).into(),
+
+            "__debug__" => Place::bound(KnownClass::Bool.to_instance(db)).into(),
+
+            // Created lazily by the warnings machinery; may be absent.
+            // Model as possibly-unbound to avoid false negatives.
+            "__warningregistry__" => Place::Type(
+                KnownClass::Dict
+                    .to_specialized_instance(db, [Type::any(), KnownClass::Int.to_instance(db)]),
+                Boundness::PossiblyUnbound,
+            )
+            .into(),
+
+            // Marked as possibly-unbound as it is only present in the module namespace
+            // if at least one global symbol is annotated in the module.
+            "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
+                let signature = Signature::new(
+                    Parameters::new(
+                        [Parameter::positional_only(Some(Name::new_static("format")))
+                            .with_annotated_type(KnownClass::Int.to_instance(db))],
+                    ),
+                    Some(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        [KnownClass::Str.to_instance(db), Type::any()],
+                    )),
+                );
+                Place::Type(
+                    CallableType::function_like(db, signature),
+                    Boundness::PossiblyUnbound,
+                )
+                .into()
+            }
+
+            // In general we wouldn't check to see whether a symbol exists on a class before doing the
+            // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
+            // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
+            // when absolutely necessary is that this function is used in a very hot path (name resolution
+            // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
+            _ if module_type_symbols(db)
+                .iter()
+                .any(|module_type_member| &**module_type_member == name) =>
+            {
+                KnownClass::ModuleType.to_instance(db).member(db, name)
+            }
+
+            _ => Place::Unbound.into(),
         }
     }
 

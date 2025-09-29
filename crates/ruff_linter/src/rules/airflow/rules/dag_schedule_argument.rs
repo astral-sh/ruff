@@ -46,7 +46,7 @@ pub(crate) struct AirflowDagNoScheduleArgument;
 impl Violation for AirflowDagNoScheduleArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "DAG should have an explicit `schedule` argument".to_string()
+        "`DAG` or `@dag` should have an explicit `schedule` argument".to_string()
     }
 }
 

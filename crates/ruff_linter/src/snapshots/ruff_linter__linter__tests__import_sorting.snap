@@ -10,14 +10,12 @@ I001 [*] Import block is un-sorted or un-formatted
   | |___________^
   |
 help: Organize imports
-
-ℹ Safe fix
-   ::: cell 1
-  1 |+import math
-  2 |+import random
-1 3 | from pathlib import Path
-2   |-import random
-3   |-import math
+ ::: cell 1
+1 + import math
+2 + import random
+3 | from pathlib import Path
+  - import random
+  - import math
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 2:1:1
@@ -29,17 +27,15 @@ I001 [*] Import block is un-sorted or un-formatted
 4 |   def foo():
   |
 help: Organize imports
-
-ℹ Safe fix
-   ::: cell 2
-  1 |+import collections
-1 2 | from typing import Any
-2   |-import collections
-  3 |+
-  4 |+
-3 5 | # Newline should be added here
-4 6 | def foo():
-5 7 |     pass
+ ::: cell 2
+1 + import collections
+2 | from typing import Any
+  - import collections
+3 + 
+4 + 
+5 | # Newline should be added here
+6 | def foo():
+7 |     pass
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 3:1:1
@@ -51,15 +47,13 @@ I001 [*] Import block is un-sorted or un-formatted
 4 |   %matplotlib \
   |
 help: Organize imports
-
-ℹ Safe fix
-   ::: cell 3
-  1 |+import sys
-1 2 | from pathlib import Path
-2   |-import sys
-3 3 | 
-4 4 | %matplotlib \
-5 5 |     --inline
+ ::: cell 3
+1 + import sys
+2 | from pathlib import Path
+  - import sys
+3 | 
+4 | %matplotlib \
+5 |     --inline
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 3:7:1
@@ -71,12 +65,10 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________^
   |
 help: Organize imports
-
-ℹ Safe fix
-   ::: cell 3
-4 4 | %matplotlib \
-5 5 |     --inline
-6 6 | 
-  7 |+import abc
-7 8 | import math
-8   |-import abc
+ ::: cell 3
+4 | %matplotlib \
+5 |     --inline
+6 | 
+7 + import abc
+8 | import math
+  - import abc

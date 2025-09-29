@@ -9,11 +9,9 @@ E303 [*] Too many blank lines (3)
 6 |     pass
   |
 help: Remove extraneous blank line(s)
-
-ℹ Safe fix
-1 1 | print("Test where the first line is a statement, and the rule violation follows it.")
-2 2 | 
-3 3 | 
-4   |-
-5 4 | def fn():
-6 5 |     pass
+1 | print("Test where the first line is a statement, and the rule violation follows it.")
+2 | 
+3 | 
+  - 
+4 | def fn():
+5 |     pass

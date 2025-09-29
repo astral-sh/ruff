@@ -1,5 +1,44 @@
 # Breaking Changes
 
+## 0.13.0
+
+- **Several rules can now add `from __future__ import annotations` automatically**
+
+    `TC001`, `TC002`, `TC003`, `RUF013`, and `UP037` now add `from __future__ import annotations` as part of their fixes when the
+    `lint.future-annotations` setting is enabled. This allows the rules to move
+    more imports into `TYPE_CHECKING` blocks (`TC001`, `TC002`, and `TC003`),
+    use PEP 604 union syntax on Python versions before 3.10 (`RUF013`), and
+    unquote more annotations (`UP037`).
+
+- **Full module paths are now used to verify first-party modules**
+
+    Ruff now checks that the full path to a module exists on disk before
+    categorizing it as a first-party import. This change makes first-party
+    import detection more accurate, helping to avoid false positives on local
+    directories with the same name as a third-party dependency, for example. See
+    the [FAQ
+    section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) on import categorization for more details.
+
+- **Deprecated rules must now be selected by exact rule code**
+
+    Ruff will no longer activate deprecated rules selected by their group name
+    or prefix. As noted below, the two remaining deprecated rules were also
+    removed in this release, so this won't affect any current rules, but it will
+    still affect any deprecations in the future.
+
+- **The deprecated macOS configuration directory fallback has been removed**
+
+    Ruff will no longer look for a user-level configuration file at
+    `~/Library/Application Support/ruff/ruff.toml` on macOS. This feature was
+    deprecated in v0.5 in favor of using the [XDG
+    specification](https://specifications.freedesktop.org/basedir-spec/latest/)
+    (usually resolving to `~/.config/ruff/ruff.toml`), like on Linux. The
+    fallback and accompanying deprecation warning have now been removed.
+
+- **[`pandas-df-variable-name`](https://docs.astral.sh/ruff/rules/pandas-df-variable-name) (`PD901`) has been removed**
+
+- **[`non-pep604-isinstance`](https://docs.astral.sh/ruff/rules/non-pep604-isinstance) (`UP038`) has been removed**
+
 ## 0.12.0
 
 - **Detection of more syntax errors**

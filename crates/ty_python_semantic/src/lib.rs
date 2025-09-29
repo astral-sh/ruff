@@ -4,23 +4,22 @@
 )]
 use std::hash::BuildHasherDefault;
 
-use rustc_hash::FxHasher;
-
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
 pub use db::Db;
-pub use module_name::ModuleName;
+pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
-    Module, SearchPath, SearchPathValidationError, SearchPaths, list_modules, resolve_module,
-    resolve_real_module, system_module_search_paths,
+    Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, list_modules,
+    resolve_module, resolve_real_module, system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
+use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, CompletionKind, HasDefinition, HasType, NameKind, SemanticModel,
+    Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
 pub use types::DisplaySettings;

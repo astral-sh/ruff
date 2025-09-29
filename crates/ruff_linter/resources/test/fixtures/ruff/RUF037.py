@@ -107,3 +107,12 @@ deque(f"{x}" "")  # OK
 deque(t"")
 deque(t""  t"")
 deque(t"{""}") # OK
+
+# https://github.com/astral-sh/ruff/issues/20050
+deque(f"{""}")  # RUF037
+
+deque(f"{b""}")
+deque(f"{""=}")
+deque(f"{""!a}")
+deque(f"{""!r}")
+deque(f"{"":1}")

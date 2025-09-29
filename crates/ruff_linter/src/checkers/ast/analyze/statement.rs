@@ -1,7 +1,6 @@
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -804,22 +803,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             for alias in names {
-                if let Some("__future__") = module {
-                    if checker.is_rule_enabled(Rule::FutureFeatureNotDefined) {
-                        pyflakes::rules::future_feature_not_defined(checker, alias);
-                    }
-                } else if &alias.name == "*" {
-                    // F406
-                    if checker.is_rule_enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                        if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
-                            checker.report_diagnostic(
-                                pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
-                                    name: helpers::format_import_from(level, module).to_string(),
-                                },
-                                stmt.range(),
-                            );
-                        }
-                    }
+                if module != Some("__future__") && &alias.name == "*" {
                     // F403
                     checker.report_diagnostic_if_enabled(
                         pyflakes::rules::UndefinedLocalWithImportStar {

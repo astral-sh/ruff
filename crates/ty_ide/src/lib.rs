@@ -2,6 +2,7 @@
     clippy::disallowed_methods,
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
+mod all_symbols;
 mod completion;
 mod doc_highlights;
 mod docstring;
@@ -13,6 +14,7 @@ mod goto_definition;
 mod goto_references;
 mod goto_type_definition;
 mod hover;
+mod importer;
 mod inlay_hints;
 mod markup;
 mod references;
@@ -24,13 +26,14 @@ mod stub_mapping;
 mod symbols;
 mod workspace_symbols;
 
-pub use completion::completion;
+pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;
 pub use hover::hover;
-pub use inlay_hints::{InlayHintContent, InlayHintSettings, inlay_hints};
+pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
@@ -286,11 +289,16 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
+    use camino::Utf8Component;
     use insta::internals::SettingsBindDropGuard;
+
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::files::{File, FileRootKind, system_path_to_file};
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
@@ -346,11 +354,17 @@ mod tests {
         }
     }
 
-    /// The file and offset into that file containing
-    /// a `<CURSOR>` marker.
+    /// The file and offset into that file where a `<CURSOR>` marker
+    /// is located.
+    ///
+    /// (Along with other information about that file, such as the
+    /// parsed AST.)
     pub(super) struct Cursor {
         pub(super) file: File,
         pub(super) offset: TextSize,
+        pub(super) parsed: ParsedModuleRef,
+        pub(super) source: SourceText,
+        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -367,31 +381,6 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            let mut cursor: Option<Cursor> = None;
-
-            for &Source {
-                ref path,
-                ref contents,
-                cursor_offset,
-            } in &self.sources
-            {
-                db.write_file(path, contents)
-                    .expect("write to memory file system to be successful");
-
-                let file = system_path_to_file(&db, path).expect("newly written file to existing");
-
-                if let Some(offset) = cursor_offset {
-                    // This assert should generally never trip, since
-                    // we have an assert on `CursorTestBuilder::source`
-                    // to ensure we never have more than one marker.
-                    assert!(
-                        cursor.is_none(),
-                        "found more than one source that contains `<CURSOR>`"
-                    );
-                    cursor = Some(Cursor { file, offset });
-                }
-            }
-
             let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
                 .to_search_paths(db.system(), db.vendored())
                 .expect("Valid search path settings");
@@ -405,8 +394,55 @@ mod tests {
                 },
             );
 
+            let mut cursor: Option<Cursor> = None;
+            for &Source {
+                ref path,
+                ref contents,
+                cursor_offset,
+            } in &self.sources
+            {
+                db.write_file(path, contents)
+                    .expect("write to memory file system to be successful");
+
+                // Add a root for the top-most component.
+                let top = path.components().find_map(|c| match c {
+                    Utf8Component::Normal(c) => Some(c),
+                    _ => None,
+                });
+                if let Some(top) = top {
+                    let top = SystemPath::new(top);
+                    if db.system().is_directory(top) {
+                        db.files()
+                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                    }
+                }
+
+                let file = system_path_to_file(&db, path).expect("newly written file to existing");
+
+                if let Some(offset) = cursor_offset {
+                    // This assert should generally never trip, since
+                    // we have an assert on `CursorTestBuilder::source`
+                    // to ensure we never have more than one marker.
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+                    let source = source_text(&db, file);
+                    let parsed = parsed_module(&db, file).load(&db);
+                    let stylist =
+                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                    cursor = Some(Cursor {
+                        file,
+                        offset,
+                        parsed,
+                        source,
+                        stylist,
+                    });
+                }
+            }
+
             let mut insta_settings = insta::Settings::clone_current();
-            insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+            insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
             // Filter out TODO types because they are different between debug and release builds.
             insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
 

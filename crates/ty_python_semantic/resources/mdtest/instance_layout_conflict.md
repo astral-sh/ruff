@@ -64,6 +64,30 @@ class AB(  # error: [instance-layout-conflict]
 ): ...
 ```
 
+## Synthesized `__slots__` from dataclasses
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class F: ...
+
+@dataclass(slots=True)
+class G: ...
+
+class H(F, G): ...  # fine because both classes have empty `__slots__`
+
+@dataclass(slots=True)
+class I:
+    x: int
+
+@dataclass(slots=True)
+class J:
+    y: int
+
+class K(I, J): ...  # error: [instance-layout-conflict]
+```
+
 ## Invalid `__slots__` definitions
 
 TODO: Emit diagnostics
@@ -103,7 +127,7 @@ class E(  # error: [instance-layout-conflict]
 ): ...
 ```
 
-## A single "solid base"
+## A single "disjoint base"
 
 ```py
 class A:
@@ -152,14 +176,15 @@ class Baz(Foo, Bar): ...  # fine
 <!-- snapshot-diagnostics -->
 
 Certain classes implemented in C extensions also have an extended instance memory layout, in the
-same way as classes that define non-empty `__slots__`. (CPython internally calls all such classes
-with a unique instance memory layout "solid bases", and we also borrow this term.) There is
-currently no generalized way for ty to detect such a C-extension class, as there is currently no way
-of expressing the fact that a class is a solid base in a stub file. However, ty special-cases
-certain builtin classes in order to detect that attempting to combine them in a single MRO would
-fail:
+same way as classes that define non-empty `__slots__`. CPython internally calls all such classes
+with a unique instance memory layout "solid bases", but [PEP 800](https://peps.python.org/pep-0800/)
+calls these classes "disjoint bases", and this is the term we generally use. The `@disjoint_base`
+decorator introduced by this PEP provides a generalised way for type checkers to identify such
+classes.
 
 ```py
+from typing_extensions import disjoint_base
+
 # fmt: off
 
 class A(  # error: [instance-layout-conflict]
@@ -183,6 +208,17 @@ class E(  # error: [instance-layout-conflict]
 
 class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
 
+@disjoint_base
+class G: ...
+
+@disjoint_base
+class H: ...
+
+class I(  # error: [instance-layout-conflict]
+    G,
+    H
+): ...
+
 # fmt: on
 ```
 
@@ -193,9 +229,9 @@ We avoid emitting an `instance-layout-conflict` diagnostic for this class defini
 class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
-## Multiple "solid bases" where one is a subclass of the other
+## Multiple "disjoint bases" where one is a subclass of the other
 
-A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the
+A class is permitted to multiple-inherit from multiple disjoint bases if one is a subclass of the
 other:
 
 ```py

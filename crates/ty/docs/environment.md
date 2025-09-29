@@ -42,6 +42,13 @@ Used to determine if an active Conda environment is the base environment or not.
 Used to detect an activated Conda environment location.
 If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
 
+### `PYTHONPATH`
+
+Adds additional directories to ty's search paths.
+The format is the same as the shell’s PATH:
+one or more directory pathnames separated by os appropriate pathsep
+(e.g. colons on Unix or semicolons on Windows).
+
 ### `RAYON_NUM_THREADS`
 
 Specifies an upper limit for the number of threads ty uses when performing work in parallel.

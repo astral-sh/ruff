@@ -15,7 +15,6 @@ use crate::{
     Db,
     files::File,
     source::{SourceText, line_index, source_text},
-    system::SystemPath,
 };
 
 use super::{
@@ -25,11 +24,15 @@ use super::{
 
 use azure::AzureRenderer;
 use concise::ConciseRenderer;
+use github::GithubRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod concise;
 mod full;
+pub mod github;
+#[cfg(feature = "serde")]
+mod gitlab;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -135,6 +138,13 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
                 junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Gitlab => {
+                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Github => {
+                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
             }
         }
 
@@ -248,9 +258,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id,
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag
-                .fix()
-                .is_some_and(|fix| fix.applies(config.fix_applicability)),
+            is_fixable: diag.has_applicable_fix(config),
         }
     }
 
@@ -791,7 +799,7 @@ where
     T: Db,
 {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(self).as_str())
+        file.path(self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -827,7 +835,7 @@ where
 
 impl FileResolver for &dyn Db {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+        file.path(*self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -944,14 +952,6 @@ fn context_after(
     }
 
     line
-}
-
-/// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
-    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
-        return path.as_str();
-    }
-    path
 }
 
 /// Given some source code and annotation ranges, this routine replaces

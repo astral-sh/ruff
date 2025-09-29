@@ -10,14 +10,12 @@ use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
+    DisplayGithubDiagnostics, GithubRenderer, SecondaryCode,
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{
-    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, SarifEmitter,
-    TextEmitter,
-};
+use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter, TextEmitter};
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
@@ -31,8 +29,6 @@ bitflags! {
         const SHOW_VIOLATIONS = 1 << 0;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 1 << 1;
-        /// Whether to show a diff of each fixed violation when emitting diagnostics.
-        const SHOW_FIX_DIFF = 1 << 2;
     }
 }
 
@@ -229,41 +225,35 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
+        let config = DisplayDiagnosticConfig::default().preview(preview);
+
         match self.format {
             OutputFormat::Json => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Json)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Json);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Rdjson => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Rdjson)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Rdjson);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::JsonLines => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::JsonLines)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::JsonLines);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Junit => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Junit)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Junit);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_fix_diff(self.format == OutputFormat::Full && preview)
                     .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_fix_applicability(self.unsafe_fixes.required_applicability())
                     .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
 
@@ -293,22 +283,22 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let renderer = GithubRenderer::new(&context, "Ruff");
+                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Gitlab => {
-                GitlabEmitter::default().emit(writer, &diagnostics.inner, &context)?;
+                let config = config.format(DiagnosticFormat::Gitlab);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Pylint => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Pylint)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Pylint);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Azure => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Azure)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Azure);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
@@ -461,7 +451,7 @@ impl Printer {
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_show_source(preview)
-                .with_unsafe_fixes(self.unsafe_fixes)
+                .with_fix_applicability(self.unsafe_fixes.required_applicability())
                 .emit(writer, &diagnostics.inner, &context)?;
         }
         writer.flush()?;

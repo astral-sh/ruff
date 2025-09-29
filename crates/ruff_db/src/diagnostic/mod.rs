@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, ceil_char_boundary,
+    github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::{Db, files::File};
 
@@ -349,6 +350,13 @@ impl Diagnostic {
         self.fix().is_some()
     }
 
+    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
+    /// configured applicability level.
+    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
+        self.fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    }
+
     /// Returns the offset of the parent statement for this diagnostic if it exists.
     ///
     /// This is primarily used for checking noqa/secondary code suppressions.
@@ -447,24 +455,26 @@ impl Diagnostic {
 
     /// Computes the start source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_start_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().start())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_start_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.start()),
+        )
     }
 
     /// Computes the end source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_end_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().end())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_end_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.end()),
+        )
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -485,22 +495,22 @@ impl Diagnostic {
         self.primary_span()?.range()
     }
 
-    /// Returns the [`TextRange`] for the diagnostic.
-    ///
-    /// Panics if the diagnostic has no primary span or if the span has no range.
-    pub fn expect_range(&self) -> TextRange {
-        self.range().expect("Expected a range for the primary span")
-    }
-
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.severity().is_fatal(),
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
+            other.severity().is_fatal(),
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
     }
 }
 
@@ -1435,6 +1445,16 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    #[cfg(feature = "serde")]
+    Gitlab,
+
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

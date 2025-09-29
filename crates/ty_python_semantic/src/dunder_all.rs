@@ -7,7 +7,7 @@ use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 
 use crate::semantic_index::{SemanticIndex, semantic_index};
-use crate::types::{Truthiness, Type, infer_expression_types};
+use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
 use crate::{Db, ModuleName, resolve_module};
 
 #[allow(clippy::ref_option)]
@@ -182,7 +182,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        infer_expression_types(self.db, self.index.expression(expr)).expression_type(expr)
+        infer_expression_types(self.db, self.index.expression(expr), TypeContext::default())
+            .expression_type(expr)
     }
 
     /// Evaluate the given expression and return its truthiness.

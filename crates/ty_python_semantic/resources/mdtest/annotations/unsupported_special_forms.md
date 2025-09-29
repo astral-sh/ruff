@@ -28,6 +28,23 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
 class Foo:
     def method(self, x: Self):
         reveal_type(x)  # revealed: Self@method
+
+def ex2(msg: str):
+    def wrapper(fn: Callable[P, R_co]) -> Callable[P, R_co]:
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R_co:
+            print(msg)
+            return fn(*args, **kwargs)
+        return wrapped
+    return wrapper
+
+def ex3(msg: str):
+    P = ParamSpec("P")
+    def wrapper(fn: Callable[P, R_co]) -> Callable[P, R_co]:
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R_co:
+            print(msg)
+            return fn(*args, **kwargs)
+        return wrapped
+    return wrapper
 ```
 
 ## Type expressions

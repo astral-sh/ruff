@@ -571,8 +571,8 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
+# TODO: this would ideally raise an `unresolved-attribute` error
+reveal_type(C().x)  # revealed: str
 ```
 
 ```py
@@ -600,9 +600,10 @@ class C:
         def set_e(self, e: str) -> None:
             self.e = e
 
-reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
-# error: [unresolved-attribute]
-reveal_type(C(True).b)  # revealed: Unknown
+# TODO: this would ideally be `Unknown | Literal[1]`
+reveal_type(C(True).a)  # revealed: Unknown | Literal[1, "a"]
+# TODO: this would ideally raise an `unresolved-attribute` error
+reveal_type(C(True).b)  # revealed: Unknown | Literal[2]
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
 # Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
 # attempt to analyze control flow within methods more closely. All reachable
@@ -913,7 +914,7 @@ def _(flag: bool):
     reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
 ```
 
-If the *metaclass* attribute is only partially defined, we emit a `possibly-unbound-attribute`
+If the *metaclass* attribute is only partially defined, we emit a `possibly-missing-attribute`
 diagnostic:
 
 ```py
@@ -923,12 +924,12 @@ def _(flag: bool):
             attr1: str = "metaclass value"
 
     class C4(metaclass=Meta4): ...
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C4.attr1)  # revealed: str
 ```
 
 Finally, if both the metaclass attribute and the class-level attribute are only partially defined,
-we union them and emit a `possibly-unbound-attribute` diagnostic:
+we union them and emit a `possibly-missing-attribute` diagnostic:
 
 ```py
 def _(flag1: bool, flag2: bool):
@@ -940,7 +941,7 @@ def _(flag1: bool, flag2: bool):
         if flag2:
             attr1 = "class value"
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
@@ -1179,13 +1180,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1211,18 +1212,18 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     C.x = 100
 
-    # Note: we might want to consider ignoring possibly-unbound diagnostics for instance attributes eventually,
+    # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     C().x = 100
 ```
 
@@ -1286,16 +1287,16 @@ def _(flag: bool):
         if flag:
             x = 2
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     Bar.x = 3
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     Bar().x = 3
 ```
 
@@ -1303,7 +1304,7 @@ def _(flag: bool):
 
 We currently treat implicit instance attributes to be bound, even if they are only conditionally
 defined within a method. If the class-level definition or the whole method is only conditionally
-available, we emit a `possibly-unbound-attribute` diagnostic.
+available, we emit a `possibly-missing-attribute` diagnostic.
 
 #### Possibly unbound and undeclared
 
@@ -1483,17 +1484,17 @@ def _(flag: bool):
     class B1: ...
 
     def inner1(a_and_b: Intersection[A1, B1]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
 
     class A2:
@@ -1508,7 +1509,7 @@ def _(flag: bool):
 
         # TODO: this should not be an error, we need better intersection
         # handling in `validate_attribute_assignment` for this
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
@@ -1523,17 +1524,17 @@ def _(flag: bool):
             x: Q = Q()
 
     def inner3(a_and_b: Intersection[A3, B3]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
 
     class A4: ...
@@ -1648,7 +1649,7 @@ If an attribute is defined on the class, it takes precedence over the `__getattr
 reveal_type(c.class_attr)  # revealed: int
 ```
 
-If the class attribute is possibly unbound, we union the type of the attribute with the fallback
+If the class attribute is possibly missing, we union the type of the attribute with the fallback
 type of the `__getattr__` method:
 
 ```py
@@ -2056,8 +2057,13 @@ reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 Some attributes are special-cased, however:
 
 ```py
+import types
+from ty_extensions import static_assert, TypeOf, is_subtype_of
+
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
 reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
+static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
+static_assert(is_subtype_of(TypeOf[f.__call__], types.MethodWrapperType))
 ```
 
 ### Int-literal attributes
@@ -2288,6 +2294,40 @@ class H:
         self.x = other.x or self.x
 ```
 
+An attribute definition can be guarded by a condition involving that attribute. This is a regression
+test for <https://github.com/astral-sh/ty/issues/692>:
+
+```py
+from typing import Literal
+
+def check(x) -> Literal[False]:
+    return False
+
+class Toggle:
+    def __init__(self: "Toggle"):
+        if not self.x:
+            self.x: Literal[True] = True
+        if check(self.y):
+            self.y = True
+
+reveal_type(Toggle().x)  # revealed: Literal[True]
+reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
+```
+
+Make sure that the growing union of literals `Literal[0, 1, 2, ...]` collapses to `int` during
+fixpoint iteration. This is a regression test for <https://github.com/astral-sh/ty/issues/660>.
+
+```py
+class Counter:
+    def __init__(self: "Counter"):
+        self.count = 0
+
+    def increment(self: "Counter"):
+        self.count = self.count + 1
+
+reveal_type(Counter().count)  # revealed: Unknown | int
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
@@ -2375,8 +2415,18 @@ class Answer(enum.Enum):
     YES = 1
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
-reveal_type(Answer.NO.value)  # revealed: Any
+reveal_type(Answer.NO.value)  # revealed: Literal[0]
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
+```
+
+## Divergent inferred implicit instance attribute types
+
+```py
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x, 1)
+
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## References

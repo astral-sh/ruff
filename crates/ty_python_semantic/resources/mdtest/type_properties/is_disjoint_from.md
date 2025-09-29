@@ -87,7 +87,7 @@ static_assert(is_disjoint_from(memoryview, Foo))
 static_assert(is_disjoint_from(type[memoryview], type[Foo]))
 ```
 
-## "Solid base" builtin types
+## "Disjoint base" builtin types
 
 Most other builtins can be subclassed and can even be used in multiple inheritance. However, builtin
 classes *cannot* generally be used in multiple inheritance with other builtin types. This is because
@@ -95,11 +95,14 @@ the CPython interpreter considers these classes "solid bases": due to the way th
 in C, they have atypical instance memory layouts. No class can ever have more than one "solid base"
 in its MRO.
 
-It's not currently possible for ty to detect in a generalized way whether a class is a "solid base"
-or not, but we special-case some commonly used builtin types:
+[PEP 800](https://peps.python.org/pep-0800/) provides a generalised way for type checkers to know
+whether a class has an atypical instance memory layout via the `@disjoint_base` decorator; we
+generally use the term "disjoint base" for these classes.
 
 ```py
+import asyncio
 from typing import Any
+from typing_extensions import disjoint_base
 from ty_extensions import static_assert, is_disjoint_from
 
 class Foo: ...
@@ -114,12 +117,23 @@ static_assert(is_disjoint_from(list, dict[Any, Any]))
 static_assert(is_disjoint_from(list[Foo], dict[Any, Any]))
 static_assert(is_disjoint_from(list[Any], dict[Any, Any]))
 static_assert(is_disjoint_from(type[list], type[dict]))
+
+static_assert(is_disjoint_from(asyncio.Task, dict))
+
+@disjoint_base
+class A: ...
+
+@disjoint_base
+class B: ...
+
+static_assert(is_disjoint_from(A, B))
 ```
 
-## Other solid bases
+## Other disjoint bases
 
 As well as certain classes that are implemented in C extensions, any class that declares non-empty
-`__slots__` is also considered a "solid base"; these types are also considered to be disjoint by ty:
+`__slots__` is also considered a "disjoint base"; these types are also considered to be disjoint by
+ty:
 
 ```py
 from ty_extensions import static_assert, is_disjoint_from
@@ -141,7 +155,7 @@ static_assert(not is_disjoint_from(B, C))
 static_assert(not is_disjoint_from(type[B], type[C]))
 ```
 
-Two solid bases are not disjoint if one inherits from the other, however:
+Two disjoint bases are not disjoint if one inherits from the other, however:
 
 ```py
 class D(A):
@@ -149,6 +163,37 @@ class D(A):
 
 static_assert(is_disjoint_from(D, B))
 static_assert(not is_disjoint_from(D, A))
+```
+
+## Dataclasses
+
+```py
+from dataclasses import dataclass
+from ty_extensions import is_disjoint_from, static_assert
+
+@dataclass(slots=True)
+class F: ...
+
+@dataclass(slots=True)
+class G: ...
+
+@dataclass(slots=True)
+class I:
+    x: int
+
+@dataclass(slots=True)
+class J:
+    y: int
+
+# A dataclass with empty `__slots__` is not disjoint from another dataclass with `__slots__`
+static_assert(not is_disjoint_from(F, G))
+static_assert(not is_disjoint_from(F, I))
+static_assert(not is_disjoint_from(G, I))
+static_assert(not is_disjoint_from(F, J))
+static_assert(not is_disjoint_from(G, J))
+
+# But two dataclasses with non-empty `__slots__` are disjoint
+static_assert(is_disjoint_from(I, J))
 ```
 
 ## Tuple types
@@ -569,6 +614,31 @@ class BarNone(Protocol):
     BAR: None
 
 static_assert(is_disjoint_from(type[Foo], BarNone))
+```
+
+### `NamedTuple`
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, final
+from ty_extensions import is_disjoint_from, static_assert
+
+@final
+class Path(NamedTuple):
+    prev: Path | None
+    key: str
+
+@final
+class Path2(NamedTuple):
+    prev: Path2 | None
+    key: str
+
+static_assert(not is_disjoint_from(Path, Path))
+static_assert(not is_disjoint_from(Path, tuple[Path | None, str]))
+static_assert(is_disjoint_from(Path, tuple[Path | None]))
+static_assert(is_disjoint_from(Path, tuple[Path | None, str, int]))
+static_assert(is_disjoint_from(Path, Path2))
 ```
 
 ## Callables

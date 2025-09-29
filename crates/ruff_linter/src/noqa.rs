@@ -886,7 +886,10 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(message.expect_range().start());
+        let noqa_offset = message
+            .range()
+            .map(|range| noqa_line_for.resolve(range.start()))
+            .unwrap_or_default();
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {

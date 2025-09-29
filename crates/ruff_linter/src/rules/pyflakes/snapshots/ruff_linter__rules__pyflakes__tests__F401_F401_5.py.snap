@@ -11,13 +11,11 @@ F401 [*] `a.b.c` imported but unused
 4 | import h.i
   |
 help: Remove unused import: `a.b.c`
-
-ℹ Safe fix
-1 1 | """Test: removal of multi-segment and aliases imports."""
-2   |-from a.b import c
-3 2 | from d.e import f as g
-4 3 | import h.i
-5 4 | import j.k as l
+1 | """Test: removal of multi-segment and aliases imports."""
+  - from a.b import c
+2 | from d.e import f as g
+3 | import h.i
+4 | import j.k as l
 
 F401 [*] `d.e.f` imported but unused
  --> F401_5.py:3:22
@@ -30,13 +28,11 @@ F401 [*] `d.e.f` imported but unused
 5 | import j.k as l
   |
 help: Remove unused import: `d.e.f`
-
-ℹ Safe fix
-1 1 | """Test: removal of multi-segment and aliases imports."""
-2 2 | from a.b import c
-3   |-from d.e import f as g
-4 3 | import h.i
-5 4 | import j.k as l
+1 | """Test: removal of multi-segment and aliases imports."""
+2 | from a.b import c
+  - from d.e import f as g
+3 | import h.i
+4 | import j.k as l
 
 F401 [*] `h.i` imported but unused
  --> F401_5.py:4:8
@@ -48,13 +44,11 @@ F401 [*] `h.i` imported but unused
 5 | import j.k as l
   |
 help: Remove unused import: `h.i`
-
-ℹ Safe fix
-1 1 | """Test: removal of multi-segment and aliases imports."""
-2 2 | from a.b import c
-3 3 | from d.e import f as g
-4   |-import h.i
-5 4 | import j.k as l
+1 | """Test: removal of multi-segment and aliases imports."""
+2 | from a.b import c
+3 | from d.e import f as g
+  - import h.i
+4 | import j.k as l
 
 F401 [*] `j.k` imported but unused
  --> F401_5.py:5:15
@@ -65,9 +59,7 @@ F401 [*] `j.k` imported but unused
   |               ^
   |
 help: Remove unused import: `j.k`
-
-ℹ Safe fix
-2 2 | from a.b import c
-3 3 | from d.e import f as g
-4 4 | import h.i
-5   |-import j.k as l
+2 | from a.b import c
+3 | from d.e import f as g
+4 | import h.i
+  - import j.k as l

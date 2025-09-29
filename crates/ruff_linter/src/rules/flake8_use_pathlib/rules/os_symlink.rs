@@ -44,7 +44,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `Path.symlink_to`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.symlink_to)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
@@ -104,14 +104,6 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         return;
     };
 
-    let target_is_directory_arg = call.arguments.find_argument_value("target_is_directory", 2);
-
-    if let Some(expr) = &target_is_directory_arg {
-        if expr.as_boolean_literal_expr().is_none() {
-            return;
-        }
-    }
-
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
@@ -129,7 +121,9 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         let src_code = locator.slice(src.range());
         let dst_code = locator.slice(dst.range());
 
-        let target_is_directory = target_is_directory_arg
+        let target_is_directory = call
+            .arguments
+            .find_argument_value("target_is_directory", 2)
             .and_then(|expr| {
                 let code = locator.slice(expr.range());
                 expr.as_boolean_literal_expr()
