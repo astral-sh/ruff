@@ -1012,6 +1012,7 @@ impl Display for FormatCommandError {
     }
 }
 
+#[derive(Debug)]
 struct ModifiedRange {
     unformatted: TextRange,
     formatted: TextRange,
@@ -1020,9 +1021,7 @@ struct ModifiedRange {
 impl ModifiedRange {
     /// Determine the range that differs between `unformatted` and `formatted`.
     ///
-    /// # Panics
-    ///
-    /// This function panics if the there are no differences between the two inputs.
+    /// If the two inputs are equal, the returned ranges will be empty.
     fn new(unformatted: &SourceKind, formatted: &SourceKind) -> Self {
         let unformatted = unformatted.source_code();
         let formatted = formatted.source_code();
@@ -1030,28 +1029,31 @@ impl ModifiedRange {
         let start = unformatted
             .char_indices()
             .zip(formatted.chars())
-            .find_map(|((offset, old), new)| (old != new).then_some(offset))
-            .expect("Expected at least one difference");
+            .find_map(|((offset, old), new)| {
+                (old != new).then_some(TextSize::try_from(offset).unwrap())
+            })
+            // Fall back on the shorter text length if one of the strings is a strict prefix of the
+            // other (i.e. the zip iterator ended before finding a difference).
+            .unwrap_or_else(|| unformatted.text_len().min(formatted.text_len()));
 
-        let start_size = TextSize::try_from(start).unwrap();
-
-        // This finds the position of the first character where the two suffixes differ in
-        // `unformatted`.
-        let mut offset = TextSize::ZERO;
-        for (old, new) in unformatted[start..]
+        // For the ends of the ranges, track the length of the common suffix and then subtract that
+        // from each total text length. Unlike for `start`, the character offsets are very unlikely
+        // to be equal, so they need to be treated separately.
+        let mut suffix_length = TextSize::ZERO;
+        for (old, new) in unformatted[start.to_usize()..]
             .chars()
             .rev()
-            .zip(formatted[start..].chars().rev())
+            .zip(formatted[start.to_usize()..].chars().rev())
         {
             if old == new {
-                offset += old.text_len();
+                suffix_length += old.text_len();
             } else {
                 break;
             }
         }
 
-        let unformatted_range = TextRange::new(start_size, unformatted.text_len() - offset);
-        let formatted_range = TextRange::new(start_size, formatted.text_len() - offset);
+        let unformatted_range = TextRange::new(start, unformatted.text_len() - suffix_length);
+        let formatted_range = TextRange::new(start, formatted.text_len() - suffix_length);
 
         Self {
             unformatted: unformatted_range,
@@ -1343,6 +1345,9 @@ mod tests {
     #[test_case("abcdef", "abcXYdef", 3..3, 3..5; "insertion")]
     #[test_case("abcXYdef", "abcdef", 3..5, 3..3; "deletion")]
     #[test_case("abcXdef", "abcYdef", 3..4, 3..4; "modification")]
+    #[test_case("abc", "abcX", 3..3, 3..4; "strict_prefix")]
+    #[test_case("", "", 0..0, 0..0; "empty")]
+    #[test_case("abc", "abc", 3..3, 3..3; "equal")]
     fn modified_range(
         unformatted: &str,
         formatted: &str,
