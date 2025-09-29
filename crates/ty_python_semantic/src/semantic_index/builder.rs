@@ -2789,6 +2789,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn in_loop_context(&self) -> bool {
         true
     }
+    fn is_binded_parameter(&self, name: &str) -> bool {
+        false
+    }
+
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
