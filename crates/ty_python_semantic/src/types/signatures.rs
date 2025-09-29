@@ -1235,14 +1235,12 @@ impl<'db> Parameters<'db> {
             {
                 let method_has_self_in_generic_context =
                     method.signature(db).overloads.iter().any(|s| {
-                        if let Some(context) = s.generic_context {
+                        s.generic_context.is_some_and(|context| {
                             context
                                 .variables(db)
                                 .iter()
                                 .any(|v| v.typevar(db).is_self(db))
-                        } else {
-                            false
-                        }
+                        })
                     });
 
                 if method_has_self_in_generic_context
