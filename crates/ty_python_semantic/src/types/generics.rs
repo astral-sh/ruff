@@ -1,7 +1,6 @@
 use crate::types::constraints::ConstraintSet;
 
 use itertools::Itertools;
-use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -26,7 +25,6 @@ use crate::{Db, FxOrderSet};
 /// scope.
 fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
-    module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
     scope: FileScopeId,
 ) -> impl Iterator<Item = GenericContext<'db>> {
@@ -34,13 +32,13 @@ fn enclosing_generic_contexts<'db>(
         .ancestor_scopes(scope)
         .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
             NodeWithScopeKind::Class(class) => {
-                let definition = index.expect_single_definition(class.node(module));
+                let definition = index.expect_single_definition(class);
                 binding_type(db, definition)
                     .into_class_literal()?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
-                let definition = index.expect_single_definition(function.node(module));
+                let definition = index.expect_single_definition(function);
                 infer_definition_types(db, definition)
                     .undecorated_type()
                     .expect("function should have undecorated type")
@@ -49,7 +47,7 @@ fn enclosing_generic_contexts<'db>(
                     .generic_context
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
-                let definition = index.expect_single_definition(type_alias.node(module));
+                let definition = index.expect_single_definition(type_alias);
                 binding_type(db, definition)
                     .into_type_alias()?
                     .into_pep_695_type_alias()?
@@ -75,7 +73,6 @@ fn enclosing_generic_contexts<'db>(
 /// bind the typevar with that new binding context.
 pub(crate) fn bind_typevar<'db>(
     db: &'db dyn Db,
-    module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
     containing_scope: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,
@@ -86,13 +83,13 @@ pub(crate) fn bind_typevar<'db>(
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
             if outer.kind().is_class() {
                 if let NodeWithScopeKind::Function(function) = inner.node() {
-                    let definition = index.expect_single_definition(function.node(module));
+                    let definition = index.expect_single_definition(function);
                     return Some(typevar.with_binding_context(db, definition));
                 }
             }
         }
     }
-    enclosing_generic_contexts(db, module, index, containing_scope)
+    enclosing_generic_contexts(db, index, containing_scope)
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
             typevar_binding_context.map(|typevar_binding_context| {

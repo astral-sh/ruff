@@ -8978,7 +8978,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
                     bind_typevar(
                         self.db(),
-                        self.module(),
                         self.index,
                         self.scope().file_scope_id(self.db()),
                         self.typevar_binding_context,

@@ -5632,11 +5632,9 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::TypeVar(typevar) => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
-                        &module,
                         index,
                         scope_id.file_scope_id(db),
                         typevar_binding_context,
@@ -5709,7 +5707,6 @@ impl<'db> Type<'db> {
                     .build()),
 
                 SpecialFormType::TypingSelf => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -5747,7 +5744,6 @@ impl<'db> Type<'db> {
                     );
                     Ok(bind_typevar(
                         db,
-                        &module,
                         index,
                         scope_id.file_scope_id(db),
                         typevar_binding_context,
