@@ -111,16 +111,13 @@ class Strange:
 Strange().can_not_be_called()
 ```
 
-If the method is a class or static method then first argument is not self:
+If the method is a class or static method then first argument is not inferred as `Self`:
 
 ```py
 A.a_classmethod()
-
 A.a_classmethod(a)  # error: [too-many-positional-arguments]
-
 A.a_staticmethod(1)
 a.a_staticmethod(1)
-
 A.a_staticmethod(a)  # error: [invalid-argument-type]
 ```
 
@@ -152,9 +149,7 @@ class B:
         return self
 
 reveal_type(B().name_does_not_matter())  # revealed: B
-
 reveal_type(B().positional_only(1))  # revealed: B
-
 reveal_type(B().keyword_only(x=1))  # revealed: B
 
 # TODO: this should be B
@@ -365,15 +360,20 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
+from typing import final
+
+@final
+class Disjoint: ...
+
 class Explicit:
     # TODO: We could emit a warning if the annotated type of `self` is disjoint from `Explicit`
-    def bad(self: int) -> None:
-        reveal_type(self)  # revealed: int
+    def bad(self: Disjoint) -> None:
+        reveal_type(self)  # revealed: Disjoint
 
     def forward(self: Explicit) -> None:
         reveal_type(self)  # revealed: Explicit
 
-# error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `int`, found `Explicit`"
+# error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `Disjoint`, found `Explicit`"
 Explicit().bad()
 
 Explicit().forward()
