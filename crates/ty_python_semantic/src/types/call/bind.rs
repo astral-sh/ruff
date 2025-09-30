@@ -2044,16 +2044,6 @@ pub(crate) enum MatchingOverloadIndex {
     Multiple(Vec<usize>),
 }
 
-impl MatchingOverloadIndex {
-    pub(crate) fn count(self) -> usize {
-        match self {
-            MatchingOverloadIndex::None => 0,
-            MatchingOverloadIndex::Single(_) => 1,
-            MatchingOverloadIndex::Multiple(items) => items.len(),
-        }
-    }
-}
-
 #[derive(Default, Debug)]
 struct ArgumentForms {
     values: Vec<Option<ParameterForm>>,
@@ -2527,8 +2517,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Type::TypeVar(_) => {}
 
                 _ => {
-                    // Ignore any specialization errors here, because the type context is only used to
-                    // optionally widen the return type.
+                    // Ignore any specialization errors here, because the type context is only used as a hint
+                    // to infer a more assignable return type.
                     let _ = builder.infer(return_ty, call_expression_tcx);
                 }
             }

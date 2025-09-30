@@ -94,7 +94,7 @@ use crate::types::{
     MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
     SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarInstance, TypeVarKind, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -3257,7 +3257,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         key,
                                         assigned_ty,
                                         value.as_ref(),
-                                        true,
                                         slice.as_ref(),
                                         rhs,
                                         TypedDictAssignmentKind::Subscript,
@@ -4968,7 +4967,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast_arguments.arguments_source_order()
         );
 
-        let bindings_count = bindings.into_iter().count();
+        let overloads_with_binding = bindings
+            .into_iter()
+            .filter_map(|binding| {
+                match binding.matching_overload_index() {
+                    MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
+                        let overloads = binding
+                            .matching_overloads()
+                            .map(move |(_, overload)| (overload, binding));
+
+                        Some(Either::Right(overloads))
+                    }
+
+                    // If there is a single overload that does not match, we still infer the argument
+                    // types for better diagnostics.
+                    MatchingOverloadIndex::None => match binding.overloads() {
+                        [overload] => Some(Either::Left([(overload, binding)].into_iter())),
+                        _ => None,
+                    },
+                }
+            })
+            .flatten();
+
+        let overloads_count = overloads_with_binding.clone().count();
 
         for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
@@ -4989,69 +5010,67 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            // Otherwise, we infer the type of each argument once for each matching overload signature,
-            // with the given annotated type as type context.
-            for binding in bindings {
+            let (old_multi_inference_state, was_in_multi_inference) = if overloads_count == 1 {
+                // If there is only a single binding and overload, there is a unique parameter type annotation
+                // for each argument.
+                let multi_inference_state = self.multi_inference_state;
+
+                // And we can emit any diagnostics directly for the unique type context.
+                let is_in_multi_inference = self.context.is_in_multi_inference();
+
+                (multi_inference_state, is_in_multi_inference)
+            } else {
+                // Otherwise, each type is a valid independent inference of the given argument, and we may
+                // require different permutations of argument types to correctly perform argument expansion
+                // during overload evaluation, so we take the intersection of all the types we inferred for
+                // each argument.
+                //
+                // Note that this applies to all nested expressions within each argument.
+                let old_multi_inference_state = mem::replace(
+                    &mut self.multi_inference_state,
+                    MultiInferenceState::Intersect,
+                );
+
+                // We perform inference once without any type context, emitting any diagnostics that are unrelated
+                // to bidirectional type inference.
+                self.infer_expression_impl(ast_argument, TypeContext::default());
+
+                // We then silence any diagnostics emitted during multi-inference, as the type context is only
+                // used as a hint to infer a more assignable argument type, and should not lead to diagnostics
+                // for non-matching overloads.
+                let was_in_multi_inference = self.context.set_multi_inference(true);
+
+                (old_multi_inference_state, was_in_multi_inference)
+            };
+
+            // Infer the type of each argument once for each matching overload signature, with the given annotated
+            // parameter type as type context.
+            //
+            // TODO: De-duplicate the type contexts to avoid inferring the same expression multiple times
+            // with the same type context.
+            for (overload, binding) in overloads_with_binding.clone() {
                 let argument_index = if binding.bound_type.is_some() {
                     argument_index + 1
                 } else {
                     argument_index
                 };
 
-                let (overloads, overloads_count) = match binding.matching_overload_index() {
-                    index @ (MatchingOverloadIndex::Single(_)
-                    | MatchingOverloadIndex::Multiple(_)) => (
-                        Either::Right(binding.matching_overloads().map(|(_, overload)| overload)),
-                        index.count(),
-                    ),
-
-                    // If there is a single overload that does not match, we still infer the argument
-                    // types for better diagnostics.
-                    MatchingOverloadIndex::None => match binding.overloads() {
-                        [overload] => (Either::Left([overload].into_iter()), 1),
-                        _ => continue,
-                    },
+                let argument_matches = &overload.argument_matches()[argument_index];
+                let [parameter_index] = argument_matches.parameters.as_slice() else {
+                    continue;
                 };
 
-                let multi_inference_state = if (bindings_count, overloads_count) == (1, 1) {
-                    // If there is only a single binding and overload, there is a unique parameter type annotation for
-                    // each argument.
-                    self.multi_inference_state
-                } else {
-                    // Otherwise, each type is a valid independent inference of the given argument, and we may
-                    // require different permutations of argument types to correctly perform argument expansion
-                    // during overload evaluation, so we take the intersection of all the types we inferred for
-                    // each argument.
-                    MultiInferenceState::Intersect {
-                        // Note that the argument must be assignable to its parameter type for every binding in the union.
-                        //
-                        // However, if there are multiple overloads for a given binding, type-checking should not fail
-                        // if the parameter type annotation of a given overload is not fulfilled.
-                        fallback: overloads_count > 1,
-                    }
-                };
+                let parameter_type =
+                    overload.signature.parameters()[*parameter_index].annotated_type();
 
-                // Update the state of the inference builder to apply intersections to all nested expressions.
-                let old_multi_inference_state =
-                    mem::replace(&mut self.multi_inference_state, multi_inference_state);
-
-                for overload in overloads {
-                    let argument_matches = &overload.argument_matches()[argument_index];
-                    let [parameter_index] = argument_matches.parameters.as_slice() else {
-                        continue;
-                    };
-
-                    let parameter_type =
-                        overload.signature.parameters()[*parameter_index].annotated_type();
-
-                    self.infer_expression_impl(ast_argument, TypeContext::new(parameter_type));
-                }
-
-                // Restore the multi-inference state.
-                self.multi_inference_state = old_multi_inference_state;
+                self.infer_expression_impl(ast_argument, TypeContext::new(parameter_type));
             }
 
             *argument_type = self.try_expression_type(ast_argument);
+
+            // Restore the multi-inference state.
+            self.multi_inference_state = old_multi_inference_state;
+            self.context.set_multi_inference(was_in_multi_inference);
         }
     }
 
@@ -5073,6 +5092,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         expression.map(|expr| self.infer_expression(expr, tcx))
+    }
+
+    fn get_or_infer_expression(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.try_expression_type(expression)
+            .unwrap_or_else(|| self.infer_expression(expression, tcx))
     }
 
     #[track_caller]
@@ -5205,7 +5233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assert_eq!(previous, None);
             }
 
-            MultiInferenceState::Intersect { .. } => {
+            MultiInferenceState::Intersect => {
                 self.expressions
                     .entry(expression.into())
                     .and_modify(|current| {
@@ -5434,49 +5462,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dict;
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict) {
-            let typed_dict_items = typed_dict.items(self.db());
-
-            for item in items {
-                self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
-
-                if let Some(ast::Expr::StringLiteral(ref key)) = item.key
-                    && let Some(key) = key.as_single_part_string()
-                    && let Some(field) = typed_dict_items.get(key.as_str())
-                {
-                    self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
-                } else {
-                    self.infer_expression(&item.value, TypeContext::default());
-                }
-            }
-
-            let report_diagnostics = match self.multi_inference_state {
-                // Do not eagerly report diagnostics when performing overload evaluation
-                // with multiple potential overloads, as we may fallback to an untyped
-                // dictionary literal.
-                MultiInferenceState::Intersect { fallback: true } => false,
-                _ => true,
-            };
-
-            let result = validate_typed_dict_dict_literal(
-                &self.context,
-                typed_dict,
-                dict,
-                dict.into(),
-                report_diagnostics,
-                |expr| self.expression_type(expr),
-            );
-
-            match result {
-                // Successfully validated the dictionary literal.
-                Ok(_) => return Type::TypedDict(typed_dict),
-
-                // The dictionary is not valid, but we are eagerly reporting diagnostics.
-                Err(_) if report_diagnostics => return Type::TypedDict(typed_dict),
-
-                // Otherwise, fallback to an untyped dictionary literal.
-                Err(_) => {}
-            }
+        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict)
+            && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict)
+        {
+            return ty;
         }
 
         // Avoid false positives for the functional `TypedDict` form, which is currently
@@ -5495,6 +5484,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()])
             })
+    }
+
+    fn infer_typed_dict_expression(
+        &mut self,
+        dict: &ast::ExprDict,
+        typed_dict: TypedDictType<'db>,
+    ) -> Option<Type<'db>> {
+        let ast::ExprDict {
+            range: _,
+            node_index: _,
+            items,
+        } = dict;
+
+        let typed_dict_items = typed_dict.items(self.db());
+
+        for item in items {
+            self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+
+            if let Some(ast::Expr::StringLiteral(ref key)) = item.key
+                && let Some(key) = key.as_single_part_string()
+                && let Some(field) = typed_dict_items.get(key.as_str())
+            {
+                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
+            } else {
+                self.infer_expression(&item.value, TypeContext::default());
+            }
+        }
+
+        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
+            self.expression_type(expr)
+        })
+        .ok()
+        .map(|_| Type::TypedDict(typed_dict))
     }
 
     // Infer the type of a collection literal expression.
@@ -5554,7 +5576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for elts in elts {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value)] = elts.as_slice() {
-                let inferred_value_ty = self.infer_expression(value, TypeContext::default());
+                let inferred_value_ty = self.get_or_infer_expression(value, TypeContext::default());
 
                 // Merge the inferred type of the nested dictionary.
                 if let Some(specialization) =
@@ -5575,9 +5597,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // The inferred type of each element acts as an additional constraint on `T`.
             for (elt, elt_ty, elt_tcx) in itertools::izip!(elts, elt_tys.clone(), elt_tcxs.clone())
             {
-                let Some(inferred_elt_ty) = self.infer_optional_expression(elt, elt_tcx) else {
-                    continue;
-                };
+                let Some(elt) = elt else { continue };
+
+                let inferred_elt_ty = self.get_or_infer_expression(elt, elt_tcx);
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
@@ -9431,12 +9453,16 @@ enum MultiInferenceState {
     Panic,
 
     /// Store the intersection of all types inferred for the expression.
-    Intersect {
-        // Determines whether or not a given expression is required to be assignable to its type context
-        // despite it being inferred multiple times, i.e. whether eager diagnostics are appropriate, or a
-        // fallback type should be assumed.
-        fallback: bool,
-    },
+    Intersect,
+}
+
+impl MultiInferenceState {
+    fn is_panic(self) -> bool {
+        match self {
+            MultiInferenceState::Panic => true,
+            MultiInferenceState::Intersect => false,
+        }
+    }
 }
 
 /// The deferred state of a specific expression in an inference region.

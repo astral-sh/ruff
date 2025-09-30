@@ -133,7 +133,7 @@ impl TypedDictAssignmentKind {
 
 /// Validates assignment of a value to a specific key on a `TypedDict`.
 ///
-/// Returns true if the assignment is valid, false otherwise.
+/// Returns true if the assignment is valid, or false otherwise.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
@@ -141,7 +141,6 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     key: &str,
     value_ty: Type<'db>,
     typed_dict_node: impl Into<AnyNodeRef<'ast>>,
-    report_diagnostics: bool,
     key_node: impl Into<AnyNodeRef<'ast>>,
     value_node: impl Into<AnyNodeRef<'ast>>,
     assignment_kind: TypedDictAssignmentKind,
@@ -151,16 +150,14 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 
     // Check if key exists in `TypedDict`
     let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
-        if report_diagnostics {
-            report_invalid_key_on_typed_dict(
-                context,
-                typed_dict_node.into(),
-                key_node.into(),
-                Type::TypedDict(typed_dict),
-                Type::string_literal(db, key),
-                &items,
-            );
-        }
+        report_invalid_key_on_typed_dict(
+            context,
+            typed_dict_node.into(),
+            key_node.into(),
+            Type::TypedDict(typed_dict),
+            Type::string_literal(db, key),
+            &items,
+        );
 
         return false;
     };
@@ -182,9 +179,8 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     };
 
     if assignment_kind.is_subscript() && item.is_read_only() {
-        if report_diagnostics
-            && let Some(builder) =
-                context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
+        if let Some(builder) =
+            context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
         {
             let typed_dict_ty = Type::TypedDict(typed_dict);
             let typed_dict_d = typed_dict_ty.display(db);
@@ -213,9 +209,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     }
 
     // Invalid assignment - emit diagnostic
-    if report_diagnostics
-        && let Some(builder) =
-            context.report_lint(assignment_kind.diagnostic_type(), value_node.into())
+    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node.into())
     {
         let typed_dict_ty = Type::TypedDict(typed_dict);
         let typed_dict_d = typed_dict_ty.display(db);
@@ -251,13 +245,12 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 ///
 /// Reports errors for any keys that are required but not provided.
 ///
-/// Returns true if the assignment is valid, false otherwise.
+/// Returns true if the assignment is valid, or false otherwise.
 pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     provided_keys: &OrderSet<&str>,
     error_node: AnyNodeRef<'ast>,
-    report_diagnostics: bool,
 ) -> bool {
     let db = context.db();
     let items = typed_dict.items(db);
@@ -273,14 +266,12 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     for missing_key in missing_keys {
         has_missing_key = true;
 
-        if report_diagnostics {
-            report_missing_typed_dict_key(
-                context,
-                error_node,
-                Type::TypedDict(typed_dict),
-                missing_key,
-            );
-        }
+        report_missing_typed_dict_key(
+            context,
+            error_node,
+            Type::TypedDict(typed_dict),
+            missing_key,
+        );
     }
 
     !has_missing_key
@@ -313,7 +304,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         )
     };
 
-    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node, true);
+    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 }
 
 /// Validates a `TypedDict` constructor call with a single positional dictionary argument
@@ -346,7 +337,6 @@ fn validate_from_dict_literal<'db, 'ast>(
                         key_str,
                         value_type,
                         error_node,
-                        true,
                         key_expr,
                         &dict_item.value,
                         TypedDictAssignmentKind::Constructor,
@@ -385,7 +375,6 @@ fn validate_from_keywords<'db, 'ast>(
                 arg_name.as_str(),
                 arg_type,
                 error_node,
-                true,
                 keyword,
                 &keyword.value,
                 TypedDictAssignmentKind::Constructor,
@@ -403,7 +392,6 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     dict_expr: &'ast ast::ExprDict,
     error_node: AnyNodeRef<'ast>,
-    report_diagnostics: bool,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> Result<OrderSet<&'ast str>, OrderSet<&'ast str>> {
     let mut valid = true;
@@ -424,7 +412,6 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
                     key_str,
                     value_type,
                     error_node,
-                    report_diagnostics,
                     key_expr,
                     &item.value,
                     TypedDictAssignmentKind::Constructor,
@@ -433,13 +420,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
         }
     }
 
-    valid &= validate_typed_dict_required_keys(
-        context,
-        typed_dict,
-        &provided_keys,
-        error_node,
-        report_diagnostics,
-    );
+    valid &= validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 
     if valid {
         Ok(provided_keys)

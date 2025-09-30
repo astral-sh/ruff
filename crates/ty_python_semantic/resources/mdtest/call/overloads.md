@@ -1663,7 +1663,12 @@ def _(arg: tuple[A | B, Any]):
     reveal_type(f(*(arg,)))  # revealed: Unknown
 ```
 
-## Bi-directional Type Inference
+## Bidirectional Type Inference
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 Type inference accounts for parameter type annotations across all overloads.
 
@@ -1708,4 +1713,16 @@ def f(a: T | dict[str, int], b: int | str) -> int | str:
 
 x = f({"y": 1}, "a")
 reveal_type(x)  # revealed: str
+```
+
+```py
+from typing import SupportsRound, overload
+
+@overload
+def takes_str_or_float(x: str): ...
+@overload
+def takes_str_or_float(x: float): ...
+def takes_str_or_float(x: float | str): ...
+
+takes_str_or_float(round(1.0))
 ```
