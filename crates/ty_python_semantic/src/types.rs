@@ -7013,8 +7013,7 @@ impl<'db> KnownInstanceType<'db> {
                             tracked_set.constraints(self.db).display(self.db)
                         );
                         if let Some(vs) = tracked_set.valid_specializations(self.db) {
-                            let combined = (vs.clone())
-                                .implies(self.db, || tracked_set.constraints(self.db).clone());
+                            let combined = tracked_set.constraints(self.db).and(self.db, || *vs);
                             eprintln!("==> valid specs {}", vs.display(self.db));
                             eprintln!("==> combined    {}", combined.display(self.db));
                         }
