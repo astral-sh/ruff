@@ -13,19 +13,57 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::{EitherOrBoth, Itertools};
+use ruff_python_ast::ParameterWithDefault;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{
+    DynamicType, Type, TypeVarVariance, definition_expression_type, infer_definition_types,
+    semantic_index,
+};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::function::FunctionType;
+use crate::types::generics::{GenericContext, typing_self, walk_generic_context};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
+
+#[derive(Clone, Copy, Debug)]
+struct MethodInformation<'db> {
+    method: FunctionType<'db>,
+    class: ClassType<'db>,
+}
+
+fn infer_method_information<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<MethodInformation<'db>> {
+    let class_scope_id = definition.scope(db);
+    let file = class_scope_id.file(db);
+    let index = semantic_index(db, file);
+
+    let class_scope = index.scope(class_scope_id.file_scope_id(db));
+    let class_node = class_scope.node().as_class()?;
+
+    let method = infer_definition_types(db, definition)
+        .declaration_type(definition)
+        .inner_type()
+        .into_function_literal()?;
+
+    let class_def = index.expect_single_definition(class_node);
+    let class_literal = infer_definition_types(db, class_def)
+        .declaration_type(class_def)
+        .inner_type();
+    let class = class_literal.to_class_type(db)?;
+
+    Some(MethodInformation { method, class })
+}
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
@@ -60,6 +98,17 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
+    }
+
+    pub(crate) fn with_inherited_generic_context(
+        &self,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        Self::from_overloads(self.overloads.iter().map(|signature| {
+            signature
+                .clone()
+                .with_inherited_generic_context(inherited_generic_context)
+        }))
     }
 
     pub(crate) fn normalized_impl(
@@ -367,7 +416,9 @@ impl<'db> Signature<'db> {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
@@ -447,14 +498,6 @@ impl<'db> Signature<'db> {
                 .return_ty
                 .map(|return_ty| return_ty.normalized_impl(db, visitor)),
         }
-    }
-
-    pub(crate) fn apply_type_mapping<'a>(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -549,10 +592,7 @@ impl<'db> Signature<'db> {
             let self_type = self_type.unwrap_or(Type::unknown());
             let other_type = other_type.unwrap_or(Type::unknown());
             !result
-                .intersect(
-                    db,
-                    &self_type.is_equivalent_to_impl(db, other_type, visitor),
-                )
+                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
                 .is_never_satisfied()
         };
 
@@ -697,10 +737,7 @@ impl<'db> Signature<'db> {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
             !result
-                .intersect(
-                    db,
-                    &type1.has_relation_to_impl(db, type2, relation, visitor),
-                )
+                .intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
                 .is_never_satisfied()
         };
 
@@ -1186,16 +1223,72 @@ impl<'db> Parameters<'db> {
                 .map(|default| definition_expression_type(db, definition, default))
         };
 
+        let method_info = infer_method_information(db, definition);
+        let is_static_or_classmethod = method_info
+            .is_some_and(|f| f.method.is_staticmethod(db) || f.method.is_classmethod(db));
+
+        let inferred_annotation = |arg: &ParameterWithDefault| {
+            if let Some(MethodInformation { method, class }) = method_info
+                && !is_static_or_classmethod
+                && arg.parameter.annotation().is_none()
+                && parameters.index(arg.name().id()) == Some(0)
+            {
+                let method_has_self_in_generic_context =
+                    method.signature(db).overloads.iter().any(|s| {
+                        s.generic_context.is_some_and(|context| {
+                            context
+                                .variables(db)
+                                .iter()
+                                .any(|v| v.typevar(db).is_self(db))
+                        })
+                    });
+
+                if method_has_self_in_generic_context
+                    || class.is_generic()
+                    || class.known(db).is_some_and(KnownClass::is_fallback_class)
+                {
+                    let scope_id = definition.scope(db);
+                    let typevar_binding_context = Some(definition);
+                    let index = semantic_index(db, scope_id.file(db));
+                    let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+
+                    Some(
+                        typing_self(db, scope_id, typevar_binding_context, class, &Type::TypeVar)
+                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
+                    )
+                } else {
+                    // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
+                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
+                    // be the only type variable, so we can just use the class directly.
+                    Some(Type::instance(db, class))
+                }
+            } else {
+                None
+            }
+        };
+
         let pos_only_param = |param: &ast::ParameterWithDefault| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &param.parameter,
-                ParameterKind::PositionalOnly {
-                    name: Some(param.parameter.name.id.clone()),
-                    default_type: default_type(param),
-                },
-            )
+            if let Some(inferred_annotation_type) = inferred_annotation(param) {
+                Parameter {
+                    annotated_type: Some(inferred_annotation_type),
+                    inferred_annotation: true,
+                    kind: ParameterKind::PositionalOnly {
+                        name: Some(param.parameter.name.id.clone()),
+                        default_type: default_type(param),
+                    },
+                    form: ParameterForm::Value,
+                }
+            } else {
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &param.parameter,
+                    ParameterKind::PositionalOnly {
+                        name: Some(param.parameter.name.id.clone()),
+                        default_type: default_type(param),
+                    },
+                )
+            }
         };
 
         let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
@@ -1219,15 +1312,27 @@ impl<'db> Parameters<'db> {
         }
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
+            if let Some(inferred_annotation_type) = inferred_annotation(arg) {
+                Parameter {
+                    annotated_type: Some(inferred_annotation_type),
+                    inferred_annotation: true,
+                    kind: ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                    form: ParameterForm::Value,
+                }
+            } else {
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &arg.parameter,
+                    ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                )
+            }
         });
 
         let variadic = vararg.as_ref().map(|arg| {
@@ -1334,6 +1439,17 @@ impl<'db> Parameters<'db> {
             .and_then(|parameter| parameter.is_positional().then_some(parameter))
     }
 
+    /// Return a positional-only parameter (with index) with the given name.
+    pub(crate) fn positional_only_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
+        self.iter().enumerate().find(|(_, parameter)| {
+            parameter.is_positional_only()
+                && parameter
+                    .name()
+                    .map(|p_name| p_name == name)
+                    .unwrap_or(false)
+        })
+    }
+
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
     pub(crate) fn variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
@@ -1389,6 +1505,10 @@ pub(crate) struct Parameter<'db> {
     /// Annotated type of the parameter.
     annotated_type: Option<Type<'db>>,
 
+    /// Does the type of this parameter come from an explicit annotation, or was it inferred from
+    /// the context, like `Self` for the `self` parameter of instance methods.
+    inferred_annotation: bool,
+
     kind: ParameterKind<'db>,
     pub(crate) form: ParameterForm,
 }
@@ -1397,6 +1517,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
             annotated_type: None,
+            inferred_annotation: false,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -1408,6 +1529,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn positional_or_keyword(name: Name) -> Self {
         Self {
             annotated_type: None,
+            inferred_annotation: false,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -1419,6 +1541,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn variadic(name: Name) -> Self {
         Self {
             annotated_type: None,
+            inferred_annotation: false,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -1427,6 +1550,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_only(name: Name) -> Self {
         Self {
             annotated_type: None,
+            inferred_annotation: false,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -1438,6 +1562,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn keyword_variadic(name: Name) -> Self {
         Self {
             annotated_type: None,
+            inferred_annotation: false,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -1476,6 +1601,7 @@ impl<'db> Parameter<'db> {
                 .annotated_type
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
             kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
+            inferred_annotation: self.inferred_annotation,
             form: self.form,
         }
     }
@@ -1491,6 +1617,7 @@ impl<'db> Parameter<'db> {
     ) -> Self {
         let Parameter {
             annotated_type,
+            inferred_annotation,
             kind,
             form,
         } = self;
@@ -1534,6 +1661,7 @@ impl<'db> Parameter<'db> {
 
         Self {
             annotated_type: Some(annotated_type),
+            inferred_annotation: *inferred_annotation,
             kind,
             form: *form,
         }
@@ -1549,11 +1677,14 @@ impl<'db> Parameter<'db> {
             annotated_type: parameter.annotation().map(|annotation| {
                 definition_expression_type(db, definition, annotation).apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 )
             }),
             kind,
             form: ParameterForm::Value,
+            inferred_annotation: false,
         }
     }
 
@@ -1606,6 +1737,11 @@ impl<'db> Parameter<'db> {
     /// Kind of the parameter.
     pub(crate) fn kind(&self) -> &ParameterKind<'db> {
         &self.kind
+    }
+
+    /// Whether or not the type of this parameter should be displayed.
+    pub(crate) fn should_annotation_be_displayed(&self) -> bool {
+        !self.inferred_annotation
     }
 
     /// Name of the parameter (if it has one).

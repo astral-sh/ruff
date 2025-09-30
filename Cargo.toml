@@ -86,7 +86,7 @@ etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
-get-size2 = { version = "0.6.3", features = [
+get-size2 = { version = "0.7.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -144,7 +144,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "3713cd7eb30821c0c086591832dd6f59f2af7fe7", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "29ab321b45d00daa4315fa2a06f7207759a8c87e", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -203,7 +203,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom", "ruff_options_metadata", "uuid"]
+ignored = ["getrandom", "ruff_options_metadata", "uuid", "get-size2"]
 
 
 [workspace.lints.rust]

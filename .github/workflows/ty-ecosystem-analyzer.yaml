@@ -64,7 +64,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@fc0f612798710b0dd69bb7528bc9b361dc60bd43"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@6ce3a609575bc84eaf5d247739529c60b6c2ae5b"
 
           ecosystem-analyzer \
             --repository ruff \
@@ -95,6 +95,14 @@ jobs:
             --new-name "$REF_NAME" \
             --output diff-statistics.md
 
+          ecosystem-analyzer \
+            generate-timing-diff \
+            diagnostics-old.json \
+            diagnostics-new.json \
+            --old-name "main (merge base)" \
+            --new-name "$REF_NAME" \
+            --output-html dist/timing.html
+
           echo '## `ecosystem-analyzer` results' > comment.md
           echo >> comment.md
           cat diff-statistics.md >> comment.md
@@ -118,7 +126,7 @@ jobs:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
         run: |
           echo >> comment.md
-          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)**" >> comment.md
+          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)** ([timing results]($DEPLOYMENT_URL/timing))" >> comment.md
 
       - name: Upload comment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -137,3 +145,9 @@ jobs:
         with:
           name: diff.html
           path: dist/diff.html
+
+      - name: Upload timing diff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: timing.html
+          path: dist/timing.html

@@ -85,6 +85,34 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
+## Nested `TypedDict`
+
+Nested `TypedDict` fields are also supported.
+
+```py
+from typing import TypedDict
+
+class Inner(TypedDict):
+    name: str
+    age: int | None
+
+class Person(TypedDict):
+    inner: Inner
+```
+
+```py
+alice: Person = {"inner": {"name": "Alice", "age": 30}}
+
+reveal_type(alice["inner"]["name"])  # revealed: str
+reveal_type(alice["inner"]["age"])  # revealed: int | None
+
+# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "non_existing""
+reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
+
+# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "extra""
+alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
+```
+
 ## Validation of `TypedDict` construction
 
 ```py
@@ -629,16 +657,14 @@ alice: Employee = {"name": "Alice", "employee_id": 1}
 eve: Employee = {"name": "Eve"}
 
 def combine(p: Person, e: Employee):
-    # TODO: Should be `Person` once we support the implicit type of self
-    reveal_type(p.copy())  # revealed: Unknown
-    # TODO: Should be `Employee` once we support the implicit type of self
-    reveal_type(e.copy())  # revealed: Unknown
+    reveal_type(p.copy())  # revealed: Person
+    reveal_type(e.copy())  # revealed: Employee
 
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person` once we support the implicit type of self and subtyping for TypedDicts
-    reveal_type(p | e)  # revealed: Employee
+    # TODO: Should be `Person` once we support subtyping for TypedDicts
+    reveal_type(p | e)  # revealed: Person | Employee
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their

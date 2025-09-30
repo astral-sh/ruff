@@ -2272,7 +2272,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
                 //
                 // We also only add these inside function scopes, since considering module-level
-                // constraints can affect the the type of imported symbols, leading to a lot more
+                // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
                 if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                     if !self.source_type.is_stub() && self.in_function_scope() {

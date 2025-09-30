@@ -228,3 +228,15 @@ pub(crate) const fn is_sim910_expanded_key_support_enabled(settings: &LinterSett
 pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/20178
+pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20200
+pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

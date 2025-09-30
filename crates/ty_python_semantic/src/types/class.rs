@@ -376,8 +376,8 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
-    pub(super) const fn is_not_generic(self) -> bool {
-        matches!(self, Self::NonGeneric(_))
+    pub(super) const fn is_generic(self) -> bool {
+        matches!(self, Self::Generic(_))
     }
 
     pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
@@ -1185,7 +1185,7 @@ impl<'db> ClassType<'db> {
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
                     Type::Callable(
                         new_function
-                            .into_bound_method_type(db, self_ty)
+                            .into_bound_method_type(db, correct_return_type)
                             .into_callable_type(db),
                     )
                 } else {
@@ -1524,6 +1524,18 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
             generic_context.unknown_specialization(db)
+        })
+    }
+
+    /// Returns a specialization of this class where each typevar is mapped to itself. The second
+    /// parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on the use case.
+    pub(crate) fn identity_specialization(
+        self,
+        db: &'db dyn Db,
+        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+    ) -> ClassType<'db> {
+        self.apply_specialization(db, |generic_context| {
+            generic_context.identity_specialization(db, typevar_to_type)
         })
     }
 
@@ -2625,7 +2637,14 @@ impl<'db> ClassLiteral<'db> {
                 .map_type(|ty|
                     ty.apply_type_mapping(
                         db,
-                        &TypeMapping::ReplaceSelf {new_upper_bound: determine_upper_bound(db, self, specialization, ClassBase::is_typed_dict) }
+                        &TypeMapping::ReplaceSelf {
+                            new_upper_bound: determine_upper_bound(
+                                db,
+                                self,
+                                specialization,
+                                ClassBase::is_typed_dict
+                            )
+                        }
                     )
                 )
         }
@@ -3664,6 +3683,7 @@ pub enum KnownClass {
     Auto,
     Member,
     Nonmember,
+    StrEnum,
     // abc
     ABCMeta,
     // Types
@@ -3720,6 +3740,8 @@ pub enum KnownClass {
     TypedDictFallback,
     // string.templatelib
     Template,
+    // pathlib
+    Path,
     // ty_extensions
     ConstraintSet,
 }
@@ -3766,7 +3788,8 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
-            | Self::Template => Some(Truthiness::AlwaysTrue),
+            | Self::Template
+            | Self::Path => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -3804,6 +3827,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
@@ -3864,6 +3888,7 @@ impl KnownClass {
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
+            | KnownClass::StrEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -3906,7 +3931,8 @@ impl KnownClass {
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
-            | KnownClass::Template => false,
+            | KnownClass::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -3944,6 +3970,7 @@ impl KnownClass {
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
+            | KnownClass::StrEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -3986,7 +4013,8 @@ impl KnownClass {
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
-            | KnownClass::Template => false,
+            | KnownClass::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -4024,6 +4052,7 @@ impl KnownClass {
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
+            | KnownClass::StrEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4065,7 +4094,8 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
-            | KnownClass::Template => false,
+            | KnownClass::Template
+            | KnownClass::Path => false,
         }
     }
 
@@ -4142,6 +4172,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -4157,7 +4188,93 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
-            | Self::Template => false,
+            | Self::Template
+            | KnownClass::Path => false,
+        }
+    }
+
+    /// Return `true` if this class is a typeshed fallback class which is used to provide attributes and
+    /// methods for another type (e.g. `NamedTupleFallback` for actual `NamedTuple`s). These fallback
+    /// classes need special treatment in some places. For example, implicit usages of `Self` should not
+    /// be eagerly replaced with the fallback class itself. Instead, `Self` should eventually be treated
+    /// as referring to the destination type (e.g. the actual `NamedTuple`).
+    pub(crate) const fn is_fallback_class(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NotImplementedType
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::EllipsisType
+            | KnownClass::NoneType
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::Deprecated
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::ProtocolMeta
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleLike
+            | KnownClass::Template
+            | KnownClass::Path
+            | KnownClass::ConstraintSet
+            | KnownClass::InitVar => false,
+            KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
 
@@ -4226,6 +4343,7 @@ impl KnownClass {
             Self::Auto => "auto",
             Self::Member => "member",
             Self::Nonmember => "nonmember",
+            Self::StrEnum => "StrEnum",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -4256,6 +4374,7 @@ impl KnownClass {
             Self::ConstraintSet => "ConstraintSet",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
+            Self::Path => "Path",
             Self::ProtocolMeta => "_ProtocolMeta",
         }
     }
@@ -4462,9 +4581,12 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum | Self::EnumType | Self::Auto | Self::Member | Self::Nonmember => {
-                KnownModule::Enum
-            }
+            Self::Enum
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -4524,6 +4646,7 @@ impl KnownClass {
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
+            Self::Path => KnownModule::Pathlib,
         }
     }
 
@@ -4591,6 +4714,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::NewType
@@ -4605,7 +4729,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
-            | Self::Template => Some(false),
+            | Self::Template
+            | Self::Path => Some(false),
 
             Self::Tuple => None,
         }
@@ -4675,6 +4800,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -4690,7 +4816,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
-            | Self::Template => false,
+            | Self::Template
+            | Self::Path => false,
         }
     }
 
@@ -4762,6 +4889,9 @@ impl KnownClass {
             "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 Self::EnumType
             }
+            "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                Self::StrEnum
+            }
             "auto" => Self::Auto,
             "member" => Self::Member,
             "nonmember" => Self::Nonmember,
@@ -4783,6 +4913,7 @@ impl KnownClass {
             "ConstraintSet" => Self::ConstraintSet,
             "TypedDictFallback" => Self::TypedDictFallback,
             "Template" => Self::Template,
+            "Path" => Self::Path,
             "_ProtocolMeta" => Self::ProtocolMeta,
             _ => return None,
         };
@@ -4835,6 +4966,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
+            | Self::StrEnum
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
@@ -4853,7 +4985,8 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::Awaitable
             | Self::Generator
-            | Self::Template => module == self.canonical_module(db),
+            | Self::Template
+            | Self::Path => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
@@ -5387,7 +5520,9 @@ mod tests {
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
                     KnownClass::KwOnly => PythonVersion::PY310,
-                    KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
+                    KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
+                        PythonVersion::PY311
+                    }
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

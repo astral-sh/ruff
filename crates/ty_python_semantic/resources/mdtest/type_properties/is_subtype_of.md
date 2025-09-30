@@ -1753,12 +1753,6 @@ static_assert(is_subtype_of(TypeOf[B], ReturnsWithArgument[int, B]))
 static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
 static_assert(is_subtype_of(TypeOf[B], Returns[B]))
 
-class C: ...
-
-# TODO: These assertions should be true once we understand `Self`
-static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))  # error: [static-assert-error]
-static_assert(is_subtype_of(TypeOf[C], Returns[C]))  # error: [static-assert-error]
-
 class D[T]:
     def __init__(self, x: T) -> None: ...
 
@@ -1875,6 +1869,21 @@ static_assert(not is_subtype_of(TypeOf[F], Callable[[int], F]))
 static_assert(not is_subtype_of(TypeOf[F], ReturnsWithArgument[int, F]))
 ```
 
+### Classes with no constructor methods
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
+class A: ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[], A]))
+static_assert(is_subtype_of(TypeOf[A], Returns[A]))
+```
+
 ### Subclass of
 
 #### Type of a class with constructor methods
@@ -1939,8 +1948,6 @@ static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
 static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
-# TODO: This assertion should be true
-# error: [static-assert-error] "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 

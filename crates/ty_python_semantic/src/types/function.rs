@@ -77,11 +77,11 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
-    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    binding_type, todo_type, walk_type_mapping,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
+    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
+    UnionBuilder, all_members, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -623,33 +623,24 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn signature<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mappings: &'a [TypeMapping<'a, 'db>],
-    ) -> CallableSignature<'db>
-    where
-        'db: 'a,
-    {
+    fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let inherited_generic_context = self.inherited_generic_context(db);
         let (overloads, implementation) = self.overloads_and_implementation(db);
         if let Some(implementation) = implementation {
             if overloads.is_empty() {
-                return CallableSignature::single(type_mappings.iter().fold(
+                return CallableSignature::single(
                     implementation.signature(db, inherited_generic_context),
-                    |sig, mapping| sig.apply_type_mapping(db, mapping),
-                ));
+                );
             }
         }
 
-        CallableSignature::from_overloads(overloads.iter().map(|overload| {
-            type_mappings.iter().fold(
-                overload.signature(db, inherited_generic_context),
-                |sig, mapping| sig.apply_type_mapping(db, mapping),
-            )
-        }))
+        CallableSignature::from_overloads(
+            overloads
+                .iter()
+                .map(|overload| overload.signature(db, inherited_generic_context)),
+        )
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -660,20 +651,10 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn last_definition_signature<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mappings: &'a [TypeMapping<'a, 'db>],
-    ) -> Signature<'db>
-    where
-        'db: 'a,
-    {
+    fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let inherited_generic_context = self.inherited_generic_context(db);
-        type_mappings.iter().fold(
-            self.last_definition(db)
-                .signature(db, inherited_generic_context),
-            |sig, mapping| sig.apply_type_mapping(db, mapping),
-        )
+        self.last_definition(db)
+            .signature(db, inherited_generic_context)
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -691,11 +672,19 @@ impl<'db> FunctionLiteral<'db> {
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
-    /// Type mappings that should be applied to the function's parameter and return types. This
-    /// might include specializations of enclosing generic contexts (e.g. for non-generic methods
-    /// of a specialized generic class).
-    #[returns(deref)]
-    type_mappings: Box<[TypeMapping<'db, 'db>]>,
+    /// Contains a potentially modified signature for this function literal, in case certain operations
+    /// (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::updated_signature`].
+    #[returns(as_ref)]
+    updated_signature: Option<CallableSignature<'db>>,
+
+    /// Contains a potentially modified signature for the last overload or the implementation of this
+    /// function literal, in case certain operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::last_definition_signature`].
+    #[returns(as_ref)]
+    updated_last_definition_signature: Option<Signature<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -707,8 +696,13 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
     visitor: &V,
 ) {
     walk_function_literal(db, function.literal(db), visitor);
-    for mapping in function.type_mappings(db) {
-        walk_type_mapping(db, mapping, visitor);
+    if let Some(callable_signature) = function.updated_signature(db) {
+        for signature in &callable_signature.overloads {
+            walk_signature(db, signature, visitor);
+        }
+    }
+    if let Some(signature) = function.updated_last_definition_signature(db) {
+        walk_signature(db, signature, visitor);
     }
 }
 
@@ -722,21 +716,41 @@ impl<'db> FunctionType<'db> {
         let literal = self
             .literal(db)
             .with_inherited_generic_context(db, inherited_generic_context);
-        Self::new(db, literal, self.type_mappings(db))
+        let updated_signature = self.updated_signature(db).map(|signature| {
+            signature.with_inherited_generic_context(Some(inherited_generic_context))
+        });
+        let updated_last_definition_signature =
+            self.updated_last_definition_signature(db).map(|signature| {
+                signature
+                    .clone()
+                    .with_inherited_generic_context(Some(inherited_generic_context))
+            });
+        Self::new(
+            db,
+            literal,
+            updated_signature,
+            updated_last_definition_signature,
+        )
     }
 
-    pub(crate) fn with_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let type_mappings: Box<[_]> = self
-            .type_mappings(db)
-            .iter()
-            .cloned()
-            .chain(std::iter::once(type_mapping.to_owned()))
-            .collect();
-        Self::new(db, self.literal(db), type_mappings)
+        let updated_signature =
+            self.signature(db)
+                .apply_type_mapping_impl(db, type_mapping, visitor);
+        let updated_last_definition_signature = self
+            .last_definition_signature(db)
+            .apply_type_mapping_impl(db, type_mapping, visitor);
+        Self::new(
+            db,
+            self.literal(db),
+            Some(updated_signature),
+            Some(updated_last_definition_signature),
+        )
     }
 
     pub(crate) fn with_dataclass_transformer_params(
@@ -752,7 +766,7 @@ impl<'db> FunctionType<'db> {
             .with_dataclass_transformer_params(db, params);
         let literal =
             FunctionLiteral::new(db, last_definition, literal.inherited_generic_context(db));
-        Self::new(db, literal, self.type_mappings(db))
+        Self::new(db, literal, None, None)
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -907,7 +921,9 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        self.literal(db).signature(db, self.type_mappings(db))
+        self.updated_signature(db)
+            .cloned()
+            .unwrap_or_else(|| self.literal(db).signature(db))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -926,8 +942,9 @@ impl<'db> FunctionType<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
-        self.literal(db)
-            .last_definition_signature(db, self.type_mappings(db))
+        self.updated_last_definition_signature(db)
+            .cloned()
+            .unwrap_or_else(|| self.literal(db).last_definition_signature(db))
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
@@ -1017,12 +1034,19 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let mappings: Box<_> = self
-            .type_mappings(db)
-            .iter()
-            .map(|mapping| mapping.normalized_impl(db, visitor))
-            .collect();
-        Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
+        let literal = self.literal(db).normalized_impl(db, visitor);
+        let updated_signature = self
+            .updated_signature(db)
+            .map(|signature| signature.normalized_impl(db, visitor));
+        let updated_last_definition_signature = self
+            .updated_last_definition_signature(db)
+            .map(|signature| signature.normalized_impl(db, visitor));
+        Self::new(
+            db,
+            literal,
+            updated_signature,
+            updated_last_definition_signature,
+        )
     }
 }
 
@@ -1120,6 +1144,70 @@ fn is_instance_truthiness<'db>(
     }
 }
 
+/// Return true, if the type passed as `mode` would require us to pick a non-trivial overload of
+/// `builtins.open` / `os.fdopen` / `Path.open`.
+fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) -> bool {
+    // Return true for any mode that doesn't match typeshed's
+    // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
+    mode.into_string_literal().is_none_or(|mode| {
+        !matches!(
+            mode.value(db),
+            "r+" | "+r"
+                | "rt+"
+                | "r+t"
+                | "+rt"
+                | "tr+"
+                | "t+r"
+                | "+tr"
+                | "w+"
+                | "+w"
+                | "wt+"
+                | "w+t"
+                | "+wt"
+                | "tw+"
+                | "t+w"
+                | "+tw"
+                | "a+"
+                | "+a"
+                | "at+"
+                | "a+t"
+                | "+at"
+                | "ta+"
+                | "t+a"
+                | "+ta"
+                | "x+"
+                | "+x"
+                | "xt+"
+                | "x+t"
+                | "+xt"
+                | "tx+"
+                | "t+x"
+                | "+tx"
+                | "w"
+                | "wt"
+                | "tw"
+                | "a"
+                | "at"
+                | "ta"
+                | "x"
+                | "xt"
+                | "tx"
+                | "r"
+                | "rt"
+                | "tr"
+                | "U"
+                | "rU"
+                | "Ur"
+                | "rtU"
+                | "rUt"
+                | "Urt"
+                | "trU"
+                | "tUr"
+                | "Utr"
+        )
+    })
+}
+
 fn signature_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &CallableSignature<'db>,
@@ -1188,7 +1276,15 @@ pub enum KnownFunction {
     DunderImport,
     /// `importlib.import_module`, which returns the submodule.
     ImportModule,
+    /// `builtins.open`
     Open,
+
+    /// `os.fdopen`
+    Fdopen,
+
+    /// `tempfile.NamedTemporaryFile`
+    #[strum(serialize = "NamedTemporaryFile")]
+    NamedTemporaryFile,
 
     /// `typing(_extensions).final`
     Final,
@@ -1307,6 +1403,12 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
+            }
+            Self::Fdopen => {
+                matches!(module, KnownModule::Os)
+            }
+            Self::NamedTemporaryFile => {
+                matches!(module, KnownModule::Tempfile)
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
@@ -1656,72 +1758,33 @@ impl KnownFunction {
             }
 
             KnownFunction::Open => {
-                // Temporary special-casing for `builtins.open` to avoid an excessive number of false positives
-                // in lieu of proper support for PEP-614 type aliases.
-                if let [_, Some(mode), ..] = parameter_types {
-                    // Infer `Todo` for any argument that doesn't match typeshed's
-                    // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
-                    // Without this special-casing, we'd just always select the first overload in our current state,
-                    // which leads to lots of false positives.
-                    if mode.into_string_literal().is_none_or(|mode| {
-                        !matches!(
-                            mode.value(db),
-                            "r+" | "+r"
-                                | "rt+"
-                                | "r+t"
-                                | "+rt"
-                                | "tr+"
-                                | "t+r"
-                                | "+tr"
-                                | "w+"
-                                | "+w"
-                                | "wt+"
-                                | "w+t"
-                                | "+wt"
-                                | "tw+"
-                                | "t+w"
-                                | "+tw"
-                                | "a+"
-                                | "+a"
-                                | "at+"
-                                | "a+t"
-                                | "+at"
-                                | "ta+"
-                                | "t+a"
-                                | "+ta"
-                                | "x+"
-                                | "+x"
-                                | "xt+"
-                                | "x+t"
-                                | "+xt"
-                                | "tx+"
-                                | "t+x"
-                                | "+tx"
-                                | "w"
-                                | "wt"
-                                | "tw"
-                                | "a"
-                                | "at"
-                                | "ta"
-                                | "x"
-                                | "xt"
-                                | "tx"
-                                | "r"
-                                | "rt"
-                                | "tr"
-                                | "U"
-                                | "rU"
-                                | "Ur"
-                                | "rtU"
-                                | "rUt"
-                                | "Urt"
-                                | "trU"
-                                | "tUr"
-                                | "Utr"
-                        )
-                    }) {
-                        overload.set_return_type(todo_type!("`builtins.open` return type"));
-                    }
+                // TODO: Temporary special-casing for `builtins.open` to avoid an excessive number of
+                // false positives in lieu of proper support for PEP-613 type aliases.
+                if let [_, Some(mode), ..] = parameter_types
+                    && is_mode_with_nontrivial_return_type(db, *mode)
+                {
+                    overload.set_return_type(todo_type!("`builtins.open` return type"));
+                }
+            }
+
+            KnownFunction::Fdopen => {
+                // TODO: Temporary special-casing for `os.fdopen` to avoid an excessive number of
+                // false positives in lieu of proper support for PEP-613 type aliases.
+                if let [_, Some(mode), ..] = parameter_types
+                    && is_mode_with_nontrivial_return_type(db, *mode)
+                {
+                    overload.set_return_type(todo_type!("`os.fdopen` return type"));
+                }
+            }
+
+            KnownFunction::NamedTemporaryFile => {
+                // TODO: Temporary special-casing for `tempfile.NamedTemporaryFile` to avoid an excessive number of
+                // false positives in lieu of proper support for PEP-613 type aliases.
+                if let [Some(mode), ..] = parameter_types
+                    && is_mode_with_nontrivial_return_type(db, *mode)
+                {
+                    overload
+                        .set_return_type(todo_type!("`tempfile.NamedTemporaryFile` return type"));
                 }
             }
 
@@ -1755,6 +1818,10 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::Fdopen => KnownModule::Os,
+
+                KnownFunction::NamedTemporaryFile => KnownModule::Tempfile,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 

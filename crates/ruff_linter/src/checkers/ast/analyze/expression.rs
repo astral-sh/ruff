@@ -212,13 +212,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if ctx.is_store() {
                 let check_too_many_expressions =
                     checker.is_rule_enabled(Rule::ExpressionsInStarAssignment);
-                let check_two_starred_expressions =
-                    checker.is_rule_enabled(Rule::MultipleStarredExpressions);
                 pyflakes::rules::starred_expressions(
                     checker,
                     elts,
                     check_too_many_expressions,
-                    check_two_starred_expressions,
                     expr.range(),
                 );
             }
@@ -668,6 +665,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::BlockingPathMethodInAsyncFunction) {
+                flake8_async::rules::blocking_os_path(checker, call);
             }
             if checker.any_rule_enabled(&[
                 Rule::CreateSubprocessInAsyncFunction,

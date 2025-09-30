@@ -504,9 +504,16 @@ impl<'db> UnionBuilder<'db> {
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
                 if ty.is_equivalent_to(self.db, element_type)
                     || ty.is_subtype_of(self.db, element_type)
+                    || ty.into_intersection().is_some_and(|intersection| {
+                        intersection.positive(self.db).contains(&element_type)
+                    })
                 {
                     return;
-                } else if element_type.is_subtype_of(self.db, ty) {
+                } else if element_type.is_subtype_of(self.db, ty)
+                    || element_type
+                        .into_intersection()
+                        .is_some_and(|intersection| intersection.positive(self.db).contains(&ty))
+                {
                     to_remove.push(index);
                 } else if ty_negated.is_subtype_of(self.db, element_type) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an

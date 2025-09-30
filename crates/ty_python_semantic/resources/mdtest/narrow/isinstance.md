@@ -321,6 +321,8 @@ a covariant generic, this is equivalent to using the upper bound of the type par
 `object`):
 
 ```py
+from typing import Self
+
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError

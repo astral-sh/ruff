@@ -133,6 +133,11 @@ class Single(Enum):
     VALUE = 1
 
 static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
+
+static_assert(is_equivalent_to(Any, Any | Intersection[Any, str]))
+static_assert(is_equivalent_to(Any, Intersection[str, Any] | Any))
+static_assert(is_equivalent_to(Any, Any | Intersection[Any, Not[None]]))
+static_assert(is_equivalent_to(Any, Intersection[Not[None], Any] | Any))
 ```
 
 ## Tuples
