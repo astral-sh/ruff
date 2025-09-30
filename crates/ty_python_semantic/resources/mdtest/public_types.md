@@ -263,7 +263,7 @@ if flag():
     x = 1
 
     def f() -> None:
-        reveal_type(x)  # revealed: Unknown | Literal[1, 2]
+        reveal_type(x)  # revealed: int
     # Function only used inside this branch
     f()
 

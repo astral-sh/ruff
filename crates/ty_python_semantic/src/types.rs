@@ -6227,6 +6227,12 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
+    /// to `str`, or `def _() -> int` to `Callable[[], int]`).
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+    }
+
     /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build
     /// up a generic context from any legacy `TypeVar`s that appear in a function parameter list or
     /// `Generic` specialization.

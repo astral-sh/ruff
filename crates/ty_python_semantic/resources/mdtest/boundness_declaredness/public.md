@@ -237,11 +237,11 @@ b: SomeUnknownName = 1  # error: [unresolved-reference]
 ```py
 from mod import a, b
 
-reveal_type(a)  # revealed: Unknown | Literal[1]
+reveal_type(a)  # revealed: int
 reveal_type(b)  # revealed: Unknown
 
 # All external modifications of `a` are allowed:
-a = None
+a = None  # error: [invalid-assignment]
 ```
 
 ### Undeclared and possibly unbound
@@ -265,11 +265,11 @@ if flag:
 # on top of this document.
 from mod import a, b
 
-reveal_type(a)  # revealed: Unknown | Literal[1]
+reveal_type(a)  # revealed: int
 reveal_type(b)  # revealed: Unknown
 
 # All external modifications of `a` are allowed:
-a = None
+a = None  # error: [invalid-assignment]
 ```
 
 ### Undeclared and unbound

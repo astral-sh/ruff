@@ -95,7 +95,7 @@ TYPE_CHECKING: bool = ...
 ```py
 from constants import TYPE_CHECKING
 
-reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+reveal_type(TYPE_CHECKING)  # revealed: bool
 
 from stub import TYPE_CHECKING
 
