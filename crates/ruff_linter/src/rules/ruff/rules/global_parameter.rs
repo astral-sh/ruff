@@ -16,6 +16,7 @@ use crate::Violation;
 /// def f(a):
 ///     global a  # error
 ///
+///
 /// def g(a):
 ///     if True:
 ///         global a  # error
