@@ -3238,6 +3238,11 @@ impl<'db> ClassLiteral<'db> {
                         }
                     }
 
+                    // After potentially modifying declared for ClassVar/InitVar, check if it's now Unbound
+                    if declared.is_unbound() {
+                        return Place::Unbound.into();
+                    }
+
                     // The attribute is declared in the class body.
                     let class_body_bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                     let inferred = place_from_bindings(db, class_body_bindings);
