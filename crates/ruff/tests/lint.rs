@@ -6606,7 +6606,7 @@ fn add_noqa_conflicts_with_diff() {
     ----- stderr -----
     error: the argument '--add-noqa' cannot be used with '--diff'
 
-    Usage: ruff.exe check --add-noqa <FILES>...
+    Usage: ruff check --add-noqa <FILES>...
 
     For more information, try '--help'.
     ");
