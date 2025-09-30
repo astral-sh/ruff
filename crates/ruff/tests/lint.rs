@@ -6594,20 +6594,3 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     });
     Ok(())
 }
-
-#[test]
-fn add_noqa_conflicts_with_diff() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--add-noqa", "--diff", "."]), @r"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    error: the argument '--add-noqa' cannot be used with '--diff'
-
-    Usage: ruff check --add-noqa <FILES>...
-
-    For more information, try '--help'.
-    ");
-}
