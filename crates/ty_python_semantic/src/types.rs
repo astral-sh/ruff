@@ -52,7 +52,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
+    GenericContext, PartialSpecialization, Specialization, bind_typevar, typing_self,
+    walk_generic_context,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
@@ -5355,12 +5356,10 @@ impl<'db> Type<'db> {
                 Some(generic_context) => (
                     Some(class),
                     Some(generic_context),
-                    Type::from(class.apply_specialization(db, |_| {
-                        // It is important that identity_specialization specializes the class with
-                        // _inferable_ typevars, so that our specialization inference logic will
-                        // try to find a specialization for them.
-                        generic_context.identity_specialization(db)
-                    })),
+                    // It is important that identity_specialization specializes the class with
+                    // _inferable_ typevars, so that our specialization inference logic will
+                    // try to find a specialization for them.
+                    Type::from(class.identity_specialization(db, &Type::TypeVar)),
                 ),
                 _ => (None, None, self),
             },
@@ -5717,39 +5716,13 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    let upper_bound = Type::instance(
+                    Ok(typing_self(
                         db,
-                        class.apply_specialization(db, |generic_context| {
-                            let types = generic_context
-                                .variables(db)
-                                .iter()
-                                .map(|typevar| Type::NonInferableTypeVar(*typevar));
-
-                            generic_context.specialize(db, types.collect())
-                        }),
-                    );
-
-                    let class_definition = class.definition(db);
-                    let typevar = TypeVarInstance::new(
-                        db,
-                        ast::name::Name::new_static("Self"),
-                        Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
-                        // According to the [spec], we can consider `Self`
-                        // equivalent to an invariant type variable
-                        // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
-                        Some(TypeVarVariance::Invariant),
-                        None,
-                        TypeVarKind::TypingSelf,
-                    );
-                    Ok(bind_typevar(
-                        db,
-                        index,
-                        scope_id.file_scope_id(db),
+                        scope_id,
                         typevar_binding_context,
-                        typevar,
+                        class,
+                        &Type::NonInferableTypeVar,
                     )
-                    .map(Type::NonInferableTypeVar)
                     .unwrap_or(*self))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),

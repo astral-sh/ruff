@@ -188,6 +188,40 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     Ok(())
 }
 
+/// If `.` and `./src` are both registered as first-party search paths,
+/// the `./src` directory should take precedence for module resolution,
+/// because it is relative to `.`.
+#[test]
+fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([(
+        "src/package/__init__.py",
+        "from . import nonexistent_submodule",
+    )])?;
+
+    // If `./src` didn't take priority over `.` here, we would report
+    // "Module `src.package` has no member `nonexistent_submodule`"
+    // instead of "Module `package` has no member `nonexistent_submodule`".
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package` has no member `nonexistent_submodule`
+     --> src/package/__init__.py:1:15
+      |
+    1 | from . import nonexistent_submodule
+      |               ^^^^^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 /// This tests that, even if no Python *version* has been specified on the CLI or in a config file,
 /// ty is still able to infer the Python version from a `--python` argument on the CLI,
 /// *even if* the `--python` argument points to a system installation.
@@ -1738,8 +1772,8 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1814,8 +1848,8 @@ fn default_root_python_package() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1861,8 +1895,8 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1902,8 +1936,8 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     3 | print(f"{baz.it}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1959,8 +1993,8 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     3 | import foo
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
@@ -1975,8 +2009,8 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     5 | print(f"{baz.it}")
       |
     info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. <temp_dir>/src (first-party code)
+    info:   1. <temp_dir>/src (first-party code)
+    info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default

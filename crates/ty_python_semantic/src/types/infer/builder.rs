@@ -5950,7 +5950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
                 // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
                 // in `ClassType::own_class_member()`).
-                class.is_known(self.db(), KnownClass::Tuple) && class.is_not_generic()
+                class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
             );
 
             // temporary special-casing for all subclasses of `enum.Enum`

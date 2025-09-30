@@ -464,6 +464,7 @@ def f(x: str):
 from typing import TypeVar, overload
 
 T = TypeVar("T")
+S = TypeVar("S")
 
 def outer(t: T) -> None:
     def inner(t: T) -> None: ...
@@ -479,6 +480,13 @@ def overloaded_outer(t: T | None = None) -> None:
 
     if t is not None:
         inner(t)
+
+def outer(t: T) -> None:
+    def inner(inner_t: T, s: S) -> tuple[T, S]:
+        return inner_t, s
+    reveal_type(inner(t, 1))  # revealed: tuple[T@outer, Literal[1]]
+
+    inner("wrong", 1)  # error: [invalid-argument-type]
 ```
 
 ## Unpacking a TypeVar
