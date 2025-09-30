@@ -604,16 +604,10 @@ fn has_relation_in_invariant_position<'db>(
         ),
         // Subtyping between invariant type parameters without a top/bottom materialization involved
         // is equivalence
-        (None, None, TypeRelation::Subtyping) => derived_type.when_equivalent_to(db, *base_type),
-        (None, None, TypeRelation::Assignability) => derived_type
-            .has_relation_to_impl(db, *base_type, TypeRelation::Assignability, visitor)
+        (None, None, relation) => derived_type
+            .has_relation_to_impl(db, *base_type, relation, visitor)
             .and(db, || {
-                base_type.has_relation_to_impl(
-                    db,
-                    *derived_type,
-                    TypeRelation::Assignability,
-                    visitor,
-                )
+                base_type.has_relation_to_impl(db, *derived_type, relation, visitor)
             }),
         // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
         (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_in_invariant_position(
