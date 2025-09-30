@@ -3311,6 +3311,10 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
+        Type::instance(db, ClassType::NonGeneric(self))
+    }
+
     fn apply_slots_constraints(
         self,
         db: &'db dyn Db,
