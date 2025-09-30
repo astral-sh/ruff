@@ -1032,34 +1032,32 @@ impl ModifiedRange {
         let unformatted = unformatted.source_code();
         let formatted = formatted.source_code();
 
-        let start = unformatted
-            .char_indices()
-            .zip(formatted.chars())
-            .find_map(|((offset, old), new)| {
-                (old != new).then_some(TextSize::try_from(offset).unwrap())
-            })
-            // Fall back on the shorter text length if one of the strings is a strict prefix of the
-            // other (i.e. the zip iterator ended before finding a difference).
-            .unwrap_or_else(|| unformatted.text_len().min(formatted.text_len()));
+        let mut prefix_length = TextSize::ZERO;
+        for (unformatted, formatted) in unformatted.chars().zip(formatted.chars()) {
+            if unformatted != formatted {
+                break;
+            }
+            prefix_length += unformatted.text_len();
+        }
 
         // For the ends of the ranges, track the length of the common suffix and then subtract that
         // from each total text length. Unlike for `start`, the character offsets are very unlikely
         // to be equal, so they need to be treated separately.
         let mut suffix_length = TextSize::ZERO;
-        for (old, new) in unformatted[start.to_usize()..]
+        for (old, new) in unformatted[prefix_length.to_usize()..]
             .chars()
             .rev()
-            .zip(formatted[start.to_usize()..].chars().rev())
+            .zip(formatted[prefix_length.to_usize()..].chars().rev())
         {
-            if old == new {
-                suffix_length += old.text_len();
-            } else {
+            if old != new {
                 break;
             }
+            suffix_length += old.text_len();
         }
 
-        let unformatted_range = TextRange::new(start, unformatted.text_len() - suffix_length);
-        let formatted_range = TextRange::new(start, formatted.text_len() - suffix_length);
+        let unformatted_range =
+            TextRange::new(prefix_length, unformatted.text_len() - suffix_length);
+        let formatted_range = TextRange::new(prefix_length, formatted.text_len() - suffix_length);
 
         Self {
             unformatted: unformatted_range,
