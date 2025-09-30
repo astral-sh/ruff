@@ -1209,7 +1209,7 @@ impl<'db> SatisfiedClause<'db> {
         false
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
+    fn display(&self, db: &'db dyn Db) -> String {
         // This is a bit heavy-handed, but we need to output the constraints in a consistent order
         // even though Salsa IDs are assigned non-deterministically. This Display output is only
         // used in test cases, so we don't need to over-optimize it.
@@ -1228,16 +1228,16 @@ impl<'db> SatisfiedClause<'db> {
 
         let mut result = String::new();
         if constraints.len() > 1 {
-            result.push_str("(");
+            result.push('(');
         }
         for (i, constraint) in constraints.iter().enumerate() {
             if i > 0 {
                 result.push_str(" ∧ ");
             }
-            result.push_str(&constraint);
+            result.push_str(constraint);
         }
         if constraints.len() > 1 {
-            result.push_str(")");
+            result.push(')');
         }
         result
     }
@@ -1323,7 +1323,7 @@ impl<'db> SatisfiedClauses<'db> {
         false
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
+    fn display(&self, db: &'db dyn Db) -> String {
         // This is a bit heavy-handed, but we need to output the clauses in a consistent order
         // even though Salsa IDs are assigned non-deterministically. This Display output is only
         // used in test cases, so we don't need to over-optimize it.
@@ -1334,7 +1334,7 @@ impl<'db> SatisfiedClauses<'db> {
         let mut clauses: Vec<_> = self
             .clauses
             .iter()
-            .map(|clause| clause.display(db).to_string())
+            .map(|clause| clause.display(db))
             .collect();
         clauses.sort();
         clauses.join(" ∨ ")
