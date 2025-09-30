@@ -266,17 +266,13 @@ fn type_expr(
             Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
         }
         PythonType::None => {
-            let (edit, binding) = checker
-                .importer()
-                .get_or_import_builtin_symbol("None", at, checker.semantic())
-                .ok()?;
             let expr = Expr::Name(ast::ExprName {
-                id: binding.into(),
+                id: "None".into(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
             });
-            Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
+            Some((expr, vec![]))
         }
         PythonType::Ellipsis => None,
         PythonType::Dict => None,
