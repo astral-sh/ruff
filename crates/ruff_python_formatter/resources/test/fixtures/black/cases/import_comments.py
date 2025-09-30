@@ -1,0 +1,21 @@
+# ensure trailing comments are preserved
+import x  # comment
+from x import a  # comment
+from x import a, b  # comment
+from x import a as b  # comment
+from x import a as b, b as c  # comment
+
+# ensure intermixed end- and own-line comments are all preserved
+# and at least kept in their original order, if not their original
+# positions within the import statement
+from x import (  # alpha
+    # bravo
+    a  # charlie
+    # delta
+    as  # echo
+    # foxtrot
+    b  # golf
+    # hotel
+    ,  # india
+    # juliet
+)  # kilo
