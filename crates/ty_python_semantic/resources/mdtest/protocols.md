@@ -893,8 +893,10 @@ class LotsOfBindings(Protocol):
     match object():
         case l:  # error: [ambiguous-protocol-member]
             ...
+    # error: [ambiguous-protocol-member] "Consider adding an annotation, e.g. `m: int | str = ...`"
+    m = 1 if 1.2 > 3.4 else "a"
 
-# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]]
+# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"]]
 reveal_type(get_protocol_members(LotsOfBindings))
 
 class Foo(Protocol):

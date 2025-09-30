@@ -1166,21 +1166,26 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If this type is a literal, promote it to a type that this literal is an instance of.
+    /// Promote (possibly nested) literals to types that these literals are instances of.
     ///
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn literal_promotion_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+    }
+
+    /// Like [`Type::promote_literals`], but does not recurse into nested types.
+    fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
-            Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
-            Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
-            Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
-            Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
-            Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
-            Type::FunctionLiteral(literal) => Some(Type::Callable(literal.into_callable_type(db))),
-            _ => None,
+            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_instance(db),
+            Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db),
+            Type::IntLiteral(_) => KnownClass::Int.to_instance(db),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
+            Type::EnumLiteral(literal) => literal.enum_class_instance(db),
+            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            _ => self,
         }
     }
 
@@ -6080,8 +6085,7 @@ impl<'db> Type<'db> {
                 let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, visitor));
 
                 match type_mapping {
-                    TypeMapping::PromoteLiterals => function.literal_promotion_type(db)
-                        .expect("function literal should have a promotion type"),
+                    TypeMapping::PromoteLiterals => function.promote_literals_impl(db),
                     _ => function
                 }
             }
@@ -6189,8 +6193,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
-                TypeMapping::PromoteLiterals => self.literal_promotion_type(db)
-                    .expect("literal type should have a promotion type"),
+                TypeMapping::PromoteLiterals => self.promote_literals_impl(db)
             }
 
             Type::Dynamic(_) => match type_mapping {
