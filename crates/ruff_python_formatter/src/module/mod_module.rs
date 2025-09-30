@@ -1,7 +1,8 @@
 use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
-use ruff_text_size::Ranged;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::FormatNodeRule;
 use crate::prelude::*;
@@ -33,21 +34,39 @@ impl FormatNodeRule<ModModule> for FormatModModule {
                 let source = f.context().source();
                 let source_ends_without_newline = !source.ends_with('\n');
 
-                // Check if we're currently in a suppressed region by scanning all comments
+                // Check if we're currently in a suppressed region by scanning only module-level comments
                 let is_in_suppressed_region = {
                     let comment_ranges = f.context().comments().ranges();
                     let mut in_suppression = false;
 
                     // Get all comments in the file and check suppression state
+                    // Only consider comments that are at module level (not indented)
                     for comment_range in comment_ranges.iter() {
                         let comment_text = &source[comment_range.range()];
-                        if let Some(suppression_kind) =
-                            ruff_python_trivia::SuppressionKind::from_comment(comment_text)
-                        {
-                            match suppression_kind {
-                                ruff_python_trivia::SuppressionKind::Off => in_suppression = true,
-                                ruff_python_trivia::SuppressionKind::On => in_suppression = false,
-                                ruff_python_trivia::SuppressionKind::Skip => {} // Skip doesn't affect suppression state
+
+                        // Check if this comment is at module level (not indented)
+                        let is_module_level = {
+                            let line_start = source.line_start(comment_range.start());
+                            let before_comment =
+                                &source[TextRange::new(line_start, comment_range.start())];
+                            before_comment.trim_start().is_empty()
+                                || before_comment.trim_start().starts_with('#')
+                        };
+
+                        // Only consider module-level suppression comments
+                        if is_module_level {
+                            if let Some(suppression_kind) =
+                                ruff_python_trivia::SuppressionKind::from_comment(comment_text)
+                            {
+                                match suppression_kind {
+                                    ruff_python_trivia::SuppressionKind::Off => {
+                                        in_suppression = true;
+                                    }
+                                    ruff_python_trivia::SuppressionKind::On => {
+                                        in_suppression = false;
+                                    }
+                                    ruff_python_trivia::SuppressionKind::Skip => {} // Skip doesn't affect suppression state
+                                }
                             }
                         }
                     }
