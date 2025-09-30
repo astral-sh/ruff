@@ -958,6 +958,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         self.positive.insert(Type::Never);
                         return;
                     }
+                    // `T & ~T` = `T` if `T` is not a subtype of `T`
+                    // (this can only be true if `T` is a non-fully-static type)
+                    if existing_negative.is_equivalent_to(db, new_positive) {
+                        to_remove.push(index);
+                        continue;
+                    }
                     // A & ~B = A    if A and B are disjoint
                     if existing_negative.is_disjoint_from(db, new_positive) {
                         to_remove.push(index);
@@ -1046,6 +1052,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     if existing_positive.is_subtype_of(db, new_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
+                        return;
+                    }
+                    // `T & ~T` = `T` if `T` is not a subtype of `T`
+                    // (this can only be true if `T` is a non-fully-static type)
+                    if existing_positive.is_equivalent_to(db, new_negative) {
                         return;
                     }
                     // A & ~B = A    if A and B are disjoint
