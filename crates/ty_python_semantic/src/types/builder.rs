@@ -942,7 +942,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // S & ~T = Never    if S <: T
-                    if new_positive.is_redundant_in_union_with(db, *existing_negative) {
+                    if new_positive.is_subtype_of(db, *existing_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
@@ -1030,7 +1030,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 for existing_positive in &self.positive {
                     // S & ~T = Never    if S <: T
-                    if existing_positive.is_redundant_in_union_with(db, new_negative) {
+                    if existing_positive.is_subtype_of(db, new_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
