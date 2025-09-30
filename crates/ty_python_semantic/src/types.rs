@@ -1171,20 +1171,37 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+    pub(crate) fn promote_literals(
+        self,
+        db: &'db dyn Db,
+        promote_modules_and_functions: bool,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::PromoteLiterals {
+                promote_modules_and_functions,
+            },
+        )
     }
 
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
-    fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
+    fn promote_literals_impl(
+        self,
+        db: &'db dyn Db,
+        promote_modules_and_functions: bool,
+    ) -> Type<'db> {
         match self {
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_instance(db),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db),
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::EnumLiteral(literal) => literal.enum_class_instance(db),
-            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            Type::ModuleLiteral(_) if promote_modules_and_functions => {
+                KnownClass::ModuleType.to_instance(db)
+            }
+            Type::FunctionLiteral(literal) if promote_modules_and_functions => {
+                Type::Callable(literal.into_callable_type(db))
+            }
             _ => self,
         }
     }
@@ -6037,7 +6054,7 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::PromoteLiterals
+                TypeMapping::PromoteLiterals { .. }
                     | TypeMapping::BindLegacyTypevars(_)
                     | TypeMapping::MarkTypeVarsInferable(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
@@ -6059,7 +6076,7 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::PromoteLiterals
+                TypeMapping::PromoteLiterals { .. }
                     | TypeMapping::BindLegacyTypevars(_)
                     | TypeMapping::BindSelf(_)
                     | TypeMapping::ReplaceSelf { .. }
@@ -6074,7 +6091,7 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
-                TypeMapping::PromoteLiterals |
+                TypeMapping::PromoteLiterals { .. } |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
@@ -6085,7 +6102,7 @@ impl<'db> Type<'db> {
                 let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, visitor));
 
                 match type_mapping {
-                    TypeMapping::PromoteLiterals => function.promote_literals_impl(db),
+                    TypeMapping::PromoteLiterals { promote_modules_and_functions } => function.promote_literals_impl(db, *promote_modules_and_functions),
                     _ => function
                 }
             }
@@ -6193,7 +6210,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
-                TypeMapping::PromoteLiterals => self.promote_literals_impl(db)
+                TypeMapping::PromoteLiterals { promote_modules_and_functions } => self.promote_literals_impl(db, *promote_modules_and_functions)
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6203,7 +6220,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
-                TypeMapping::PromoteLiterals => self,
+                TypeMapping::PromoteLiterals { .. } => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -6225,12 +6242,6 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_) => self,
         }
-    }
-
-    /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
-    /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
     }
 
     /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build
@@ -6736,7 +6747,7 @@ pub enum TypeMapping<'a, 'db> {
     PartialSpecialization(PartialSpecialization<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    PromoteLiterals,
+    PromoteLiterals { promote_modules_and_functions: bool },
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -6769,7 +6780,7 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
-            | TypeMapping::PromoteLiterals
+            | TypeMapping::PromoteLiterals { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::MarkTypeVarsInferable(_)
             | TypeMapping::Materialize(_) => context,

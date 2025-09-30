@@ -823,7 +823,9 @@ fn place_by_id<'db>(
             });
 
             if scope.node(db).scope_kind().is_module() {
-                inferred.map_type(|ty| ty.promote_literals(db)).into()
+                inferred
+                    .map_type(|ty| ty.promote_literals(db, false))
+                    .into()
             } else if scope.file(db).is_stub(db) || scope.scope(db).visibility().is_private() {
                 // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in

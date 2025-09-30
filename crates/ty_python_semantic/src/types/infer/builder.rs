@@ -5432,7 +5432,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
+                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db(), true);
 
                 builder
                     .infer(Type::TypeVar(*elt_ty), inferred_elt_ty)
