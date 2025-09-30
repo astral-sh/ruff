@@ -1633,7 +1633,6 @@ impl<'db> CallableBinding<'db> {
             .collect::<Vec<_>>();
 
         for (argument_index, argument_type) in arguments.iter_types().enumerate() {
-            let argument_type = argument_type.top_materialization(db);
             for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
                 for (parameter_index, variadic_argument_type) in
@@ -1642,8 +1641,11 @@ impl<'db> CallableBinding<'db> {
                     if !participating_parameter_indexes.contains(&parameter_index) {
                         continue;
                     }
-                    union_argument_type_builders[parameter_index]
-                        .add_in_place(variadic_argument_type.unwrap_or(argument_type));
+                    union_argument_type_builders[parameter_index].add_in_place(
+                        variadic_argument_type
+                            .unwrap_or(argument_type)
+                            .top_materialization(db),
+                    );
                 }
             }
         }
