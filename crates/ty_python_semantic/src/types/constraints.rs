@@ -1210,37 +1210,36 @@ impl<'db> SatisfiedClause<'db> {
     }
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
-        struct DisplaySatisfiedClause<'a, 'db> {
-            clause: &'a SatisfiedClause<'db>,
-            db: &'db dyn Db,
-        }
+        // This is a bit heavy-handed, but we need to output the constraints in a consistent order
+        // even though Salsa IDs are assigned non-deterministically. This Display output is only
+        // used in test cases, so we don't need to over-optimize it.
 
-        impl Display for DisplaySatisfiedClause<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.clause.constraints.len() > 1 {
-                    f.write_str("(")?;
+        let mut constraints: Vec<_> = self
+            .constraints
+            .iter()
+            .map(|constraint| match constraint {
+                ConstraintAssignment::Positive(constraint) => constraint.display(db).to_string(),
+                ConstraintAssignment::Negative(constraint) => {
+                    constraint.display_negated(db).to_string()
                 }
-                for (i, constraint) in self.clause.constraints.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(" ∧ ")?;
-                    }
-                    match constraint {
-                        ConstraintAssignment::Positive(constraint) => {
-                            write!(f, "{}", constraint.display(self.db))?;
-                        }
-                        ConstraintAssignment::Negative(constraint) => {
-                            write!(f, "{}", constraint.display_negated(self.db))?;
-                        }
-                    }
-                }
-                if self.clause.constraints.len() > 1 {
-                    f.write_str(")")?;
-                }
-                Ok(())
+            })
+            .collect();
+        constraints.sort();
+
+        let mut result = String::new();
+        if constraints.len() > 1 {
+            result.push_str("(");
+        }
+        for (i, constraint) in constraints.iter().enumerate() {
+            if i > 0 {
+                result.push_str(" ∧ ");
             }
+            result.push_str(&constraint);
         }
-
-        DisplaySatisfiedClause { clause: self, db }
+        if constraints.len() > 1 {
+            result.push_str(")");
+        }
+        result
     }
 }
 
@@ -1325,26 +1324,19 @@ impl<'db> SatisfiedClauses<'db> {
     }
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
-        struct DisplaySatisfiedClauses<'a, 'db> {
-            clauses: &'a SatisfiedClauses<'db>,
-            db: &'db dyn Db,
-        }
+        // This is a bit heavy-handed, but we need to output the clauses in a consistent order
+        // even though Salsa IDs are assigned non-deterministically. This Display output is only
+        // used in test cases, so we don't need to over-optimize it.
 
-        impl Display for DisplaySatisfiedClauses<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.clauses.clauses.is_empty() {
-                    return f.write_str("always");
-                }
-                for (i, clause) in self.clauses.clauses.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(" ∨ ")?;
-                    }
-                    clause.display(self.db).fmt(f)?;
-                }
-                Ok(())
-            }
+        if self.clauses.is_empty() {
+            return String::from("always");
         }
-
-        DisplaySatisfiedClauses { clauses: self, db }
+        let mut clauses: Vec<_> = self
+            .clauses
+            .iter()
+            .map(|clause| clause.display(db).to_string())
+            .collect();
+        clauses.sort();
+        clauses.join(" ∨ ")
     }
 }
