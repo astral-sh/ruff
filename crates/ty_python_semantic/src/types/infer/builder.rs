@@ -92,7 +92,7 @@ use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
     UnionBuilder, UnionType, binding_type, todo_type,
 };
@@ -5432,8 +5432,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty =
-                    inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals);
+                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
 
                 builder
                     .infer(Type::TypeVar(*elt_ty), inferred_elt_ty)
