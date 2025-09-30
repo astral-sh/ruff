@@ -139,9 +139,6 @@ pub(crate) fn typing_self<'db>(
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
-/// TODO: Handle nested generic contexts better, with actual parent links to the lexically
-/// containing context.
-///
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
