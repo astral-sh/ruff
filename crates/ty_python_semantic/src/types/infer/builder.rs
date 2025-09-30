@@ -2141,10 +2141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deprecated,
             dataclass_transformer_params,
         );
-
-        let inherited_generic_context = None;
-        let function_literal =
-            FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
+        let function_literal = FunctionLiteral::new(self.db(), overload_literal);
 
         let mut inferred_ty =
             Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));

@@ -1011,8 +1011,7 @@ impl<'db> ClassType<'db> {
 
                 let synthesized_dunder = CallableType::function_like(
                     db,
-                    Signature::new(parameters, None)
-                        .with_inherited_generic_context(inherited_generic_context),
+                    Signature::new_generic(inherited_generic_context, parameters, None),
                 );
 
                 Place::bound(synthesized_dunder).into()
@@ -2244,8 +2243,14 @@ impl<'db> ClassLiteral<'db> {
             // so that the keyword-only parameters appear after positional parameters.
             parameters.sort_by_key(Parameter::is_keyword_only);
 
-            let mut signature = Signature::new(Parameters::new(parameters), return_ty);
-            signature.inherited_generic_context = self.generic_context(db);
+            let signature = match name {
+                "__new__" | "__init__" => Signature::new_generic(
+                    self.generic_context(db),
+                    Parameters::new(parameters),
+                    return_ty,
+                ),
+                _ => Signature::new(Parameters::new(parameters), return_ty),
+            };
             Some(CallableType::function_like(db, signature))
         };
 

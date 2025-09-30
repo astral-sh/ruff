@@ -654,7 +654,7 @@ pub(crate) struct DisplayOverloadLiteral<'db> {
 
 impl Display for DisplayOverloadLiteral<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let signature = self.literal.signature(self.db, None);
+        let signature = self.literal.signature(self.db);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
@@ -852,6 +852,10 @@ impl Display for DisplayGenericContext<'_> {
 }
 
 impl<'db> Specialization<'db> {
+    pub fn display(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+        self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
+    }
+
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
         &'db self,

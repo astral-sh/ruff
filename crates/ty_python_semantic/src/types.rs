@@ -5466,10 +5466,8 @@ impl<'db> Type<'db> {
                     .into_iter()
                     .flat_map(CallableBinding::matching_overloads)
                     .next()
-                    .and_then(|(_, binding)| binding.inherited_specialization())
-                    .filter(|specialization| {
-                        Some(specialization.generic_context(db)) == generic_context
-                    });
+                    .and_then(|(_, binding)| binding.specialization())
+                    .and_then(|specialization| specialization.restrict(db, generic_context?));
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
@@ -5477,13 +5475,16 @@ impl<'db> Type<'db> {
                     .into_iter()
                     .flat_map(CallableBinding::matching_overloads)
                     .next()
-                    .and_then(|(_, binding)| binding.inherited_specialization())
-                    .filter(|specialization| {
-                        Some(specialization.generic_context(db)) == generic_context
-                    });
+                    .and_then(|(_, binding)| binding.specialization())
+                    .and_then(|specialization| specialization.restrict(db, generic_context?));
                 let specialization =
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
+                    .map(|specialization| {
+                        // Promote any typevars that are inferred as a literal to the corresponding
+                        // instance type.
+                        specialization.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+                    })
                     .map(|specialization| {
                         Type::instance(
                             db,

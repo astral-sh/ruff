@@ -72,7 +72,7 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -338,11 +338,7 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    pub(crate) fn signature(
-        self,
-        db: &'db dyn Db,
-        inherited_generic_context: Option<GenericContext<'db>>,
-    ) -> Signature<'db> {
+    pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -420,7 +416,6 @@ impl<'db> OverloadLiteral<'db> {
         Signature::from_function(
             db,
             generic_context,
-            inherited_generic_context,
             definition,
             function_stmt_node,
             is_generator,
@@ -484,58 +479,13 @@ impl<'db> OverloadLiteral<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
-
-    /// The inherited generic context, if this function is a constructor method (`__new__` or
-    /// `__init__`) being used to infer the specialization of its generic class. If any of the
-    /// method's overloads are themselves generic, this is in addition to those per-overload
-    /// generic contexts (which are created lazily in [`OverloadLiteral::signature`]).
-    ///
-    /// If the function is not a constructor method, this field will always be `None`.
-    ///
-    /// If the function is a constructor method, we will end up creating two `FunctionLiteral`
-    /// instances for it. The first is created in [`TypeInferenceBuilder`][infer] when we encounter
-    /// the function definition during type inference. At this point, we don't yet know if the
-    /// function is a constructor method, so we create a `FunctionLiteral` with `None` for this
-    /// field.
-    ///
-    /// If at some point we encounter a call expression, which invokes the containing class's
-    /// constructor, as will create a _new_ `FunctionLiteral` instance for the function, with this
-    /// field [updated][] to contain the containing class's generic context.
-    ///
-    /// [infer]: crate::types::infer::TypeInferenceBuilder::infer_function_definition
-    /// [updated]: crate::types::class::ClassLiteral::own_class_member
-    inherited_generic_context: Option<GenericContext<'db>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
 
-fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    function: FunctionLiteral<'db>,
-    visitor: &V,
-) {
-    if let Some(context) = function.inherited_generic_context(db) {
-        walk_generic_context(db, context, visitor);
-    }
-}
-
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
-    fn with_inherited_generic_context(
-        self,
-        db: &'db dyn Db,
-        inherited_generic_context: GenericContext<'db>,
-    ) -> Self {
-        // A function cannot inherit more than one generic context from its containing class.
-        debug_assert!(self.inherited_generic_context(db).is_none());
-        Self::new(
-            db,
-            self.last_definition(db),
-            Some(inherited_generic_context),
-        )
-    }
-
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition(db).name(db)
@@ -626,21 +576,14 @@ impl<'db> FunctionLiteral<'db> {
     fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
-        let inherited_generic_context = self.inherited_generic_context(db);
         let (overloads, implementation) = self.overloads_and_implementation(db);
         if let Some(implementation) = implementation {
             if overloads.is_empty() {
-                return CallableSignature::single(
-                    implementation.signature(db, inherited_generic_context),
-                );
+                return CallableSignature::single(implementation.signature(db));
             }
         }
 
-        CallableSignature::from_overloads(
-            overloads
-                .iter()
-                .map(|overload| overload.signature(db, inherited_generic_context)),
-        )
+        CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -652,16 +595,7 @@ impl<'db> FunctionLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let inherited_generic_context = self.inherited_generic_context(db);
-        self.last_definition(db)
-            .signature(db, inherited_generic_context)
-    }
-
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let context = self
-            .inherited_generic_context(db)
-            .map(|ctx| ctx.normalized_impl(db, visitor));
-        Self::new(db, self.last_definition(db), context)
+        self.last_definition(db).signature(db)
     }
 }
 
@@ -695,7 +629,6 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
     function: FunctionType<'db>,
     visitor: &V,
 ) {
-    walk_function_literal(db, function.literal(db), visitor);
     if let Some(callable_signature) = function.updated_signature(db) {
         for signature in &callable_signature.overloads {
             walk_signature(db, signature, visitor);
@@ -713,23 +646,18 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
-        let literal = self
-            .literal(db)
+        let updated_signature = self
+            .signature(db)
             .with_inherited_generic_context(db, inherited_generic_context);
-        let updated_signature = self.updated_signature(db).map(|signature| {
-            signature.with_inherited_generic_context(Some(inherited_generic_context))
-        });
-        let updated_last_definition_signature =
-            self.updated_last_definition_signature(db).map(|signature| {
-                signature
-                    .clone()
-                    .with_inherited_generic_context(Some(inherited_generic_context))
-            });
+        let updated_last_definition_signature = self
+            .last_definition_signature(db)
+            .clone()
+            .with_inherited_generic_context(db, inherited_generic_context);
         Self::new(
             db,
-            literal,
-            updated_signature,
-            updated_last_definition_signature,
+            self.literal(db),
+            Some(updated_signature),
+            Some(updated_last_definition_signature),
         )
     }
 
@@ -764,8 +692,7 @@ impl<'db> FunctionType<'db> {
         let last_definition = literal
             .last_definition(db)
             .with_dataclass_transformer_params(db, params);
-        let literal =
-            FunctionLiteral::new(db, last_definition, literal.inherited_generic_context(db));
+        let literal = FunctionLiteral::new(db, last_definition);
         Self::new(db, literal, None, None)
     }
 
@@ -1034,7 +961,7 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let literal = self.literal(db).normalized_impl(db, visitor);
+        let literal = self.literal(db);
         let updated_signature = self
             .updated_signature(db)
             .map(|signature| signature.normalized_impl(db, visitor));
