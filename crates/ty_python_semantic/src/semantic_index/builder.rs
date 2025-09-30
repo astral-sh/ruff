@@ -2777,7 +2777,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }
-    fn is_binded_parameter(&self, name: &str) -> bool {
+    fn is_binded_parameter(&self, _name: &str) -> bool {
         false
     }
 }
