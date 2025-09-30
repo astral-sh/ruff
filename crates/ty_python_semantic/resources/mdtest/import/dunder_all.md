@@ -784,7 +784,7 @@ class A: ...
 from subexporter import *
 
 # TODO: Should we avoid including `Unknown` for this case?
-reveal_type(__all__)  # revealed: Unknown | list[Unknown | str]
+reveal_type(__all__)  # revealed: list[Unknown | str]
 
 __all__.append("B")
 

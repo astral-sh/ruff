@@ -91,19 +91,23 @@ If there's a namespace package with the same name as a module, the module takes 
 `foo.py`:
 
 ```py
-x = "module"
+class FromModule: ...
+
+x = FromModule
 ```
 
 `foo/bar.py`:
 
 ```py
-x = "namespace"
+class FromNamespace: ...
+
+x = FromNamespace
 ```
 
 ```py
 from foo import x
 
-reveal_type(x)  # revealed: Unknown | Literal["module"]
+reveal_type(x)  # revealed: <class 'FromModule'>
 
 import foo.bar  # error: [unresolved-import]
 ```

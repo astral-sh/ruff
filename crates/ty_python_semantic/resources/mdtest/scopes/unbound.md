@@ -17,7 +17,7 @@ class C:
         x = 2
 
 # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C'>` may be missing"
-reveal_type(C.x)  # revealed: Unknown | Literal[2]
+reveal_type(C.x)  # revealed: Unknown | int
 reveal_type(C.y)  # revealed: Unknown | Literal[1]
 ```
 
@@ -37,7 +37,7 @@ class C:
     # Possibly unbound variables in enclosing scopes are considered bound.
     y = x
 
-reveal_type(C.y)  # revealed: Unknown | Literal[1, "abc"]
+reveal_type(C.y)  # revealed: Unknown | Literal[1] | str
 ```
 
 ## Possibly unbound in class scope with multiple declarations

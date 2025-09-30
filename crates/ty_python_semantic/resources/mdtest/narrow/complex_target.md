@@ -167,11 +167,11 @@ if c.x is not None:
 
 if c.x is not None:
     def _():
-        reveal_type(c.x)  # revealed: Unknown | int | None
+        reveal_type(c.x)  # revealed: int | None
 
 def _():
     if c.x is not None:
-        reveal_type(c.x)  # revealed: (Unknown & ~None) | int
+        reveal_type(c.x)  # revealed: int
 ```
 
 ## Subscript narrowing

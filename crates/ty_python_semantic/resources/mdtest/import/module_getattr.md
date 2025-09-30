@@ -40,10 +40,10 @@ def __getattr__(name: str) -> int:
 import mixed_module
 
 # Explicit attribute should take precedence
-reveal_type(mixed_module.explicit_attr)  # revealed: Unknown | Literal["explicit"]
+reveal_type(mixed_module.explicit_attr)  # revealed: str
 
 # `__getattr__` should handle unknown attributes
-reveal_type(mixed_module.dynamic_attr)  # revealed: str
+reveal_type(mixed_module.dynamic_attr)  # revealed: int
 ```
 
 `mixed_module.py`:
@@ -51,8 +51,8 @@ reveal_type(mixed_module.dynamic_attr)  # revealed: str
 ```py
 explicit_attr = "explicit"
 
-def __getattr__(name: str) -> str:
-    return "dynamic"
+def __getattr__(name: str) -> int:
+    return 1
 ```
 
 ## Precedence: submodules vs `__getattr__`
