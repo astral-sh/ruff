@@ -187,12 +187,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 25 |
 26 | # Ok
    |
-help: Replace with `__1____000`
+help: Replace with `1_000`
 21 | 
 22 | # Errors
 23 | Decimal("1_000")
    - Decimal("__1____000") 
-24 + Decimal(__1____000) 
+24 + Decimal(1_000) 
 25 | 
 26 | # Ok
 27 | Decimal("2e-4")
