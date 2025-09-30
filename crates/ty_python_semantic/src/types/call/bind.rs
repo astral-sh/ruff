@@ -1588,7 +1588,9 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        let max_parameters = matching_overload_indexes
+        // The maximum number of parameters across all the overloads that are being considered
+        // for filtering.
+        let max_parameter_count = matching_overload_indexes
             .iter()
             .map(|&index| self.overloads[index].signature.parameters().len())
             .max()
@@ -1601,7 +1603,9 @@ impl<'db> CallableBinding<'db> {
         // gradual equivalent to the parameter types at the same index for other overloads.
         let mut participating_parameter_indexes = HashSet::new();
 
-        let mut first_parameter_types: Vec<Option<Type<'db>>> = vec![None; max_parameters];
+        // The parameter types at each index for the first overload containing a parameter at
+        // that index.
+        let mut first_parameter_types: Vec<Option<Type<'db>>> = vec![None; max_parameter_count];
 
         for argument_index in 0..arguments.len() {
             for overload_index in matching_overload_indexes {
@@ -1625,10 +1629,11 @@ impl<'db> CallableBinding<'db> {
         }
 
         let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
-            .take(max_parameters)
+            .take(max_parameter_count)
             .collect::<Vec<_>>();
 
         for (argument_index, argument_type) in arguments.iter_types().enumerate() {
+            let argument_type = argument_type.top_materialization(db);
             for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
                 for (parameter_index, variadic_argument_type) in
@@ -1637,11 +1642,8 @@ impl<'db> CallableBinding<'db> {
                     if !participating_parameter_indexes.contains(&parameter_index) {
                         continue;
                     }
-                    union_argument_type_builders[parameter_index].add_in_place(
-                        variadic_argument_type
-                            .unwrap_or(argument_type)
-                            .top_materialization(db),
-                    );
+                    union_argument_type_builders[parameter_index]
+                        .add_in_place(variadic_argument_type.unwrap_or(argument_type));
                 }
             }
         }
@@ -1672,9 +1674,12 @@ impl<'db> CallableBinding<'db> {
             }
 
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_parameters)
+                .take(max_parameter_count)
                 .collect::<Vec<_>>();
 
+            // The number of parameters that have been skipped because they don't participate in
+            // the filtering process. This is used to make sure the types are added to the
+            // corresponding parameter index in `union_parameter_types`.
             let mut skipped_parameters = 0;
 
             for argument_index in 0..arguments.len() {
@@ -1682,7 +1687,6 @@ impl<'db> CallableBinding<'db> {
                     let overload = &self.overloads[*overload_index];
                     for parameter_index in &overload.argument_matches[argument_index].parameters {
                         if !participating_parameter_indexes.contains(parameter_index) {
-                            // This parameter doesn't participate in the filtering process.
                             skipped_parameters += 1;
                             continue;
                         }
@@ -1699,8 +1703,8 @@ impl<'db> CallableBinding<'db> {
                             parameter_type =
                                 parameter_type.apply_specialization(db, inherited_specialization);
                         }
-                        let union_index = parameter_index.saturating_sub(skipped_parameters);
-                        union_parameter_types[union_index].add_in_place(parameter_type);
+                        union_parameter_types[parameter_index.saturating_sub(skipped_parameters)]
+                            .add_in_place(parameter_type);
                     }
                 }
             }
