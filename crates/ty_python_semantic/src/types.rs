@@ -1413,43 +1413,9 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is a [subtype of] type `target`.
+    /// Return true if this type is a subtype of type `target`.
     ///
-    /// For fully static types, this means that the set of objects represented by `self` is a
-    /// subset of the objects represented by `target`.
-    ///
-    /// For gradual types, it means that the union of all possible sets of values represented by
-    /// `self` (the "top materialization" of `self`) is a subtype of the intersection of all
-    /// possible sets of values represented by `target` (the "bottom materialization" of
-    /// `target`). In other words, for all possible pairs of materializations `self'` and
-    /// `target'`, `self'` is always a subtype of `target'`.
-    ///
-    /// Note that this latter expansion of the subtyping relation to non-fully-static types is not
-    /// described in the typing spec, but the primary use of the subtyping relation is for
-    /// simplifying unions and intersections, and this expansion to gradual types is sound and
-    /// allows us to better simplify many unions and intersections. This definition does mean the
-    /// subtyping relation is not reflexive for non-fully-static types (e.g. `Any` is not a subtype
-    /// of `Any`).
-    ///
-    /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
-    ///
-    /// There would be an even more general definition of subtyping for gradual types, allowing a
-    /// type `S` to be a subtype of a type `T` if the top materialization of `S` (`S+`) is a
-    /// subtype of `T+`, and the bottom materialization of `S` (`S-`) is a subtype of `T-`. This
-    /// definition is attractive in that it would restore reflexivity of subtyping for all types,
-    /// and would mean that gradual equivalence of `S` and `T` could be defined simply as `S <: T
-    /// && T <: S`. It would also be sound, in that simplifying unions or intersections according
-    /// to this definition of subtyping would still result in an equivalent type.
-    ///
-    /// Unfortunately using this definition would break transitivity of subtyping when both nominal
-    /// and structural types are involved, because Liskov enforcement for nominal types is based on
-    /// assignability, so we can have class `A` with method `def meth(self) -> Any` and a subclass
-    /// `B(A)` with method `def meth(self) -> int`. In this case, `A` would be a subtype of a
-    /// protocol `P` with method `def meth(self) -> Any`, but `B` would not be a subtype of `P`,
-    /// and yet `B` is (by nominal subtyping) a subtype of `A`, so we would have `B <: A` and `A <:
-    /// P`, but not `B <: P`. Losing transitivity of subtyping is not tenable (it makes union and
-    /// intersection simplification dependent on the order in which elements are added), so we do
-    /// not use this more general definition of subtyping.
+    /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_subtype_of(db, target).is_always_satisfied()
     }
@@ -1458,9 +1424,9 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, TypeRelation::Subtyping)
     }
 
-    /// Return true if this type is [assignable to] type `target`.
+    /// Return true if this type is assignable to type `target`.
     ///
-    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target).is_always_satisfied()
     }
@@ -1471,11 +1437,7 @@ impl<'db> Type<'db> {
 
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
-    /// The `UnionSimplification` relation sits in between [`TypeRelation::Subtyping`] and [`TypeRelation::Assignability`].
-    /// In most respects it behaves like subtyping, but it also allows three simplifications that are unsound for subtyping:
-    /// - `Any <: Any` under the `UnionSimplification` relation, but not under subtyping.
-    /// - `Any <: (Any | T)` under the `UnionSimplification` relation, but not under subtyping.
-    /// - `(Any & T) <: Any` under the `UnionSimplification` relation, but not under subtyping.
+    /// See [`TypeRelation::UnionSimplification`] for more details.
     pub(crate) fn is_redundant_in_union_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, TypeRelation::UnionSimplification)
             .is_always_satisfied()
@@ -9028,11 +8990,126 @@ impl<'db> ConstructorCallError<'db> {
     }
 }
 
+/// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
+    /// The "subtyping" relation.
+    ///
+    /// A [fully static] type `B` is a subtype of a fully static type `A` if and only if
+    /// the set of possible runtime values represented by `B` is a subset of the set
+    /// of possible runtime values represented by `A`.
+    ///
+    /// For a pair of types `C` and `D` that may or may not be fully static,
+    /// `D` can be said to be a subtype of `C` if every possible fully static
+    /// [materialization] of `D` is a subtype of every possible fully static
+    /// materialization of `C`. Another way of saying this is that `D` will be a
+    /// subtype of `C` if and only if the union of all possible sets of values
+    /// represented by `D` (the "top materialization" of `D`) is a subtype of the
+    /// intersection of all possible sets of values represented by `C` (the "bottom
+    /// materialization" of `C`).
+    ///
+    /// For example, `list[Any]` can be said to be a subtype of `Sequence[object]`,
+    /// because every possible fully static materialization of `list[Any]` (`list[int]`,
+    /// `list[str]`, `list[bytes | bool]`, `list[SupportsIndex]`, etc.) would be
+    /// considered a subtype of `Sequence[object]`.
+    ///
+    /// Note that this latter expansion of the subtyping relation to non-fully-static
+    /// types is not described in the typing spec, but this expansion to gradual types is
+    /// sound and consistent with the principles laid out in the spec. This definition
+    /// does mean the subtyping relation is not reflexive for non-fully-static types
+    /// (e.g. `Any` is not a subtype of `Any`).
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Subtyping,
-    UnionSimplification,
+
+    /// The "assignability" relation.
+    ///
+    /// The assignability relation between two types `A` and `B` dictates whether a
+    /// type checker should emit an error when a value of type `B` is assigned to a
+    /// variable declared as having type `A`.
+    ///
+    /// For a pair of [fully static] types `A` and `B`, the assignability relation
+    /// between `A` and `B` is the same as the subtyping relation.
+    ///
+    /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
+    /// assignability relation may be more permissive than the subtyping relation. `D`
+    /// can be said to be assignable to `C` if *any* possibly fully static [materialization]
+    /// of `D` is a subtype of *any* possible fully static materialization of `C`.
+    ///
+    /// For example, `Any` is not a subtype of `int`, because there are possible
+    /// materializations of `Any` (e.g., `str`) that are not subtypes of `int`.
+    /// `Any` is *assignable* to `int`, however, as there are *some* possible materializations
+    /// of `Any` (such as `int` itself!) that *are* subtypes of `int`. `Any` cannot even
+    /// be considered a subtype of itself, as two separate uses of `Any` in the same scope
+    /// might materialize to different types between which there would exist no subtyping
+    /// relation; nor is `Any` a subtype of `int | Any`, for the same reason. Nonetheless,
+    /// `Any` is assignable to both `Any` and `int | Any`.
+    ///
+    /// While `Any` can materialize to anything, the presence of `Any` in a type does not
+    /// necessarily make it assignable to everything. For example, `list[Any]` is not
+    /// assignable to `int`, because there are no possible fully static types we could
+    /// substitute for `Any` in this type that would make it a subtype of `int`. For the
+    /// same reason, a union such as `str | Any` is not assignable to `int`.
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Assignability,
+
+    /// The "union simplification" relation.
+    ///
+    /// The union simplification relation dictates whether the union `A | B` can be
+    /// pragmatically simplified to the type `A` without downstream consequences on ty's
+    /// inference of types elsewhere.
+    ///
+    /// For a pair of [fully static] types `A` and `B`, the assignability relation
+    /// between `A` and `B` is the same as the subtyping relation.
+    ///
+    /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
+    /// union simplification relation sits in between the subtyping relation and the
+    /// assignability relation. `D` can be said to be redundant in a union with `C` if either:
+    ///
+    /// 1. `D` is a subtype of `C`; or,
+    /// 2. The top materialization of the type `C | D` is equivalent to the top
+    ///    materialization of `C`, *and* the bottom materialization of `C | D` is equivalent
+    ///    to the bottom materialization of `C`.
+    ///
+    /// Practically speaking, in most respects the union simplification relation is the
+    /// same as the subtyping relation. It is redundant to add `bool` to a union that
+    /// includes `int`, because `bool` is a subtype of `int`, so inference of attribute access
+    /// or binary expressions on the union `int | bool` would always produce a type that
+    /// represents the same set of possible sets of runtime values as if ty had inferred
+    /// the attribute access or binary expression on `int` alone.
+    ///
+    /// Where union simplification differs from the subtyping relation is that there are a
+    /// number of simplifications that can be made when simplifying unions that are not
+    /// strictly permitted by the subtyping relation. For example, it is safe to avoid adding
+    /// `Any` to a union that already includes `Any`, because `Any` already represents an
+    /// unknown set of possible sets of runtime values that can materialize to any type in a
+    /// gradual, permissive way. Inferring attribute access or binary expressions over
+    /// `Any | Any` could never conceivably yield a type that represents a different set of
+    /// possible sets of runtime values to inferring the same expression over `Any` alone;
+    /// although `Any` is not a subtype of `Any`, top materialization of both `Any` and
+    /// `Any | Any` is `object`, and the bottom materialization of both types is `Never`.
+    ///
+    /// The same principle also applies to intersections that include `Any` being added to
+    /// unions that include `Any`: for any type `A`, although naively distributing
+    /// type-inference operations over `(Any & A) | Any` could produce types that have
+    /// different displays to `Any`, `(Any & A) | Any` nonetheless has the same top
+    /// materialization as `Any` and the same bottom materialization as `Any`, and thus it is
+    /// redundant to add `Any & A` to a union that already includes `Any`.
+    ///
+    /// Union simplification cannot use the assignability relation, meanwhile, as it is
+    /// trivial to produce examples of cases where adding a type `B` to a union that includes
+    /// `A` would impact downstream type inference, even where `B` is assignable to `A`. For
+    /// example, `int` is assignable to `Any`, but attribute access over the union `int | Any`
+    /// will yield very different results to attribute access over `Any` alone. The top
+    /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
+    /// two differ in their bottom materializations (`Never` and `int`, respectively).
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
+    UnionSimplification,
 }
 
 impl TypeRelation {
