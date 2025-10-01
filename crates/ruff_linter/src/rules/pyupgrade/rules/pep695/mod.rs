@@ -318,8 +318,8 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 .first()
                 .is_some_and(Expr::is_string_literal_expr)
             {
-                // TODO(brent) `default` was added in PEP 696 and Python 3.13 but can't be used in
-                // generic type parameters before that
+                // `default` was added in PEP 696 and Python 3.13. We now support converting
+                // TypeVars with defaults to PEP 695 type parameters.
                 //
                 // ```python
                 // T = TypeVar("T", default=Any, bound=str)
