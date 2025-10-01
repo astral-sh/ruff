@@ -194,7 +194,10 @@ pub(crate) fn enum_metadata<'db>(
             // we don't know if it's a duplicate or not.
             if matches!(
                 value_ty,
-                Type::IntLiteral(_) | Type::StringLiteral(_) | Type::BytesLiteral(_)
+                Type::BooleanLiteral(_)
+                    | Type::IntLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::BytesLiteral(_)
             ) {
                 if let Some(canonical) = enum_values.get(&value_ty) {
                     // This is a duplicate value, create an alias to the canonical (first) member
