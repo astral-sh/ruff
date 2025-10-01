@@ -63,7 +63,7 @@ jobs:
 
           ecosystem-analyzer \
             generate-report \
-            --max-diagnostics-per-project=1200 \
+            --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \
             --output dist/index.html
 
