@@ -8,7 +8,7 @@ A name reference to a never-defined symbol in a function is implicitly a global 
 x = 1
 
 def f():
-    reveal_type(x)  # revealed: Unknown | Literal[1]
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Explicit global in function
@@ -18,7 +18,7 @@ x = 1
 
 def f():
     global x
-    reveal_type(x)  # revealed: Unknown | Literal[1]
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Unassignable type in function
@@ -201,7 +201,7 @@ x = 42
 
 def f():
     global x
-    reveal_type(x)  # revealed: Unknown | Literal[42]
+    reveal_type(x)  # revealed: Literal[42]
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
 ```
