@@ -19,7 +19,7 @@ use crate::types::{
     NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -142,11 +142,11 @@ pub(crate) fn typing_self<'db>(
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=GenericContext::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=GenericContext::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
-    pub(crate) variables: FxOrderSet<BoundTypeVarInstance<'db>>,
+    variables_inner: FxOrderMap<BoundTypeVarInstance<'db>, ()>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -155,7 +155,7 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
     visitor: &V,
 ) {
     for bound_typevar in context.variables(db) {
-        visitor.visit_bound_type_var_type(db, *bound_typevar);
+        visitor.visit_bound_type_var_type(db, bound_typevar);
     }
 }
 
@@ -163,6 +163,13 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
 impl get_size2::GetSize for GenericContext<'_> {}
 
 impl<'db> GenericContext<'db> {
+    fn from_variables(
+        db: &'db dyn Db,
+        variables: impl IntoIterator<Item = (BoundTypeVarInstance<'db>, ())>,
+    ) -> Self {
+        Self::new_internal(db, variables.into_iter().collect::<FxOrderMap<_, _>>())
+    }
+
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
         db: &'db dyn Db,
@@ -182,19 +189,33 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
+        Self::from_variables(
+            db,
+            type_params
+                .into_iter()
+                .map(|bound_typevar| (bound_typevar, ())),
+        )
     }
 
     /// Merge this generic context with another, returning a new generic context that
     /// contains type variables from both contexts.
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
-        Self::from_typevar_instances(
+        Self::from_variables(
             db,
-            self.variables(db)
+            self.variables_inner(db)
                 .iter()
-                .chain(other.variables(db).iter())
-                .copied(),
+                .chain(other.variables_inner(db).iter())
+                .map(|(bound_typevar, ())| (*bound_typevar, ())),
         )
+    }
+
+    pub(crate) fn variables(
+        self,
+        db: &'db dyn Db,
+    ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
+        self.variables_inner(db)
+            .iter()
+            .map(|(bound_typevar, _)| *bound_typevar)
     }
 
     fn variable_from_type_param(
@@ -244,7 +265,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::from_typevar_instances(db, variables))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -260,18 +281,17 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::from_typevar_instances(db, variables))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
-        self.variables(db).len()
+        self.variables_inner(db).len()
     }
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
             self.variables(db)
-                .iter()
-                .map(|typevar| Self::parameter_from_typevar(db, *typevar)),
+                .map(|typevar| Self::parameter_from_typevar(db, typevar)),
         );
         Signature::new(parameters, None)
     }
@@ -306,8 +326,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         known_class: Option<KnownClass>,
     ) -> Specialization<'db> {
-        let partial =
-            self.specialize_partial(db, std::iter::repeat_n(None, self.variables(db).len()));
+        let partial = self.specialize_partial(db, std::iter::repeat_n(None, self.len(db)));
         if known_class == Some(KnownClass::Tuple) {
             Specialization::new(
                 db,
@@ -329,31 +348,24 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
     ) -> Specialization<'db> {
-        let types = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar_to_type(*typevar))
-            .collect();
+        let types = self.variables(db).map(typevar_to_type).collect();
         self.specialize(db, types)
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = vec![Type::unknown(); self.variables(db).len()];
+        let types = vec![Type::unknown(); self.len(db)];
         self.specialize(db, types.into())
     }
 
     /// Returns a tuple type of the typevars introduced by this generic context.
     pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
-        Type::heterogeneous_tuple(
-            db,
-            self.variables(db)
-                .iter()
-                .map(|typevar| Type::TypeVar(*typevar)),
-        )
+        Type::heterogeneous_tuple(db, self.variables(db).map(Type::TypeVar))
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
-        self.variables(db).is_subset(other.variables(db))
+        let other_variables = other.variables_inner(db);
+        self.variables(db)
+            .all(|bound_typevar| other_variables.contains_key(&bound_typevar))
     }
 
     pub(crate) fn binds_typevar(
@@ -362,9 +374,7 @@ impl<'db> GenericContext<'db> {
         typevar: TypeVarInstance<'db>,
     ) -> Option<BoundTypeVarInstance<'db>> {
         self.variables(db)
-            .iter()
             .find(|self_bound_typevar| self_bound_typevar.typevar(db) == typevar)
-            .copied()
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -376,7 +386,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
-        assert!(self.variables(db).len() == types.len());
+        assert!(self.len(db) == types.len());
         Specialization::new(db, self, types, None, None)
     }
 
@@ -400,7 +410,7 @@ impl<'db> GenericContext<'db> {
     {
         let types = types.into_iter();
         let variables = self.variables(db);
-        assert!(variables.len() == types.len());
+        assert!(self.len(db) == types.len());
 
         // Typevars can have other typevars as their default values, e.g.
         //
@@ -439,14 +449,13 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let variables = self
             .variables(db)
-            .iter()
             .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
 
         Self::from_typevar_instances(db, variables)
     }
 
-    fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {
-        ruff_memory_usage::order_set_heap_size(variables)
+    fn heap_size((variables,): &(FxOrderMap<BoundTypeVarInstance<'db>, ()>,)) -> usize {
+        ruff_memory_usage::order_map_heap_size(variables)
     }
 }
 
@@ -661,13 +670,12 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> Option<Self> {
-        let self_variables = self.generic_context(db).variables(db);
+        let self_variables = self.generic_context(db).variables_inner(db);
         let self_types = self.types(db);
         let restricted_variables = generic_context.variables(db);
         let restricted_types: Option<Box<[_]>> = restricted_variables
-            .iter()
             .map(|variable| {
-                let index = self_variables.get_index_of(variable)?;
+                let index = self_variables.get_index_of(&variable)?;
                 self_types.get(index).copied()
             })
             .collect();
@@ -694,7 +702,7 @@ impl<'db> Specialization<'db> {
     ) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
-            .variables(db)
+            .variables_inner(db)
             .get_index_of(&bound_typevar)?;
         self.types(db).get(index).copied()
     }
@@ -832,7 +840,6 @@ impl<'db> Specialization<'db> {
         let types: Box<[_]> = self
             .generic_context(db)
             .variables(db)
-            .into_iter()
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
                 match bound_typevar.variance(db) {
@@ -901,7 +908,7 @@ impl<'db> Specialization<'db> {
         let other_materialization_kind = other.materialization_kind(db);
 
         let mut result = ConstraintSet::from(true);
-        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -952,7 +959,7 @@ impl<'db> Specialization<'db> {
         }
 
         let mut result = ConstraintSet::from(true);
-        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -1024,7 +1031,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     ) -> Option<Type<'db>> {
         let index = self
             .generic_context
-            .variables(db)
+            .variables_inner(db)
             .get_index_of(&bound_typevar)?;
         self.types.get(index).copied()
     }
@@ -1048,8 +1055,7 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
         let types = generic_context
             .variables(self.db)
-            .iter()
-            .map(|variable| self.types.get(variable).copied());
+            .map(|variable| self.types.get(&variable).copied());
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)
     }

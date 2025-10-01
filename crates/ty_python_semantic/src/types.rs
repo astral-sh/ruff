@@ -6772,13 +6772,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 db,
                 context
                     .variables(db)
-                    .iter()
-                    .filter(|var| !var.typevar(db).is_self(db))
-                    .copied(),
+                    .filter(|var| !var.typevar(db).is_self(db)),
             ),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
-                context.variables(db).iter().map(|typevar| {
+                context.variables(db).map(|typevar| {
                     if typevar.typevar(db).is_self(db) {
                         BoundTypeVarInstance::synthetic_self(
                             db,
@@ -6786,7 +6784,7 @@ impl<'db> TypeMapping<'_, 'db> {
                             typevar.binding_context(db),
                         )
                     } else {
-                        *typevar
+                        typevar
                     }
                 }),
             ),

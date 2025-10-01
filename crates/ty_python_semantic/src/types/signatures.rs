@@ -422,7 +422,6 @@ impl<'db> Signature<'db> {
             (Some(legacy_ctx), Some(ctx)) => {
                 if legacy_ctx
                     .variables(db)
-                    .iter()
                     .exactly_one()
                     .is_ok_and(|bound_typevar| bound_typevar.typevar(db).is_self(db))
                 {
@@ -1226,10 +1225,7 @@ impl<'db> Parameters<'db> {
                 let method_has_self_in_generic_context =
                     method.signature(db).overloads.iter().any(|s| {
                         s.generic_context.is_some_and(|context| {
-                            context
-                                .variables(db)
-                                .iter()
-                                .any(|v| v.typevar(db).is_self(db))
+                            context.variables(db).any(|v| v.typevar(db).is_self(db))
                         })
                     });
 

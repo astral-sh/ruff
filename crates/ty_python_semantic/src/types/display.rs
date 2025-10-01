@@ -832,7 +832,6 @@ impl Display for DisplayGenericContext<'_> {
         let variables = self.generic_context.variables(self.db);
 
         let non_implicit_variables: Vec<_> = variables
-            .iter()
             .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
             .collect();
 

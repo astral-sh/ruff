@@ -324,7 +324,6 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                 specialization
                     .generic_context(db)
                     .variables(db)
-                    .iter()
                     .zip(specialization.types(db))
                     .map(|(generic_typevar, ty)| {
                         if let Some(explicit_variance) =
@@ -346,7 +345,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                             let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
                             origin
                                 .with_polarity(typevar_variance_in_substituted_type)
-                                .variance_of(db, *generic_typevar)
+                                .variance_of(db, generic_typevar)
                         }
                     }),
             )
