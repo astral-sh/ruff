@@ -5481,11 +5481,6 @@ impl<'db> Type<'db> {
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
                     .map(|specialization| {
-                        // Promote any typevars that are inferred as a literal to the corresponding
-                        // instance type.
-                        specialization.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
-                    })
-                    .map(|specialization| {
                         Type::instance(
                             db,
                             generic_origin.apply_specialization(db, |_| specialization),

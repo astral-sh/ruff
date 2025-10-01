@@ -1078,9 +1078,18 @@ impl<'db> SpecializationBuilder<'db> {
     }
 
     pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
-        let types = generic_context
-            .variables(self.db)
-            .map(|variable| self.types.get(&variable).copied());
+        let types = (generic_context.variables_inner(self.db).iter()).map(|(variable, options)| {
+            let mut ty = self.types.get(variable).copied();
+
+            // When inferring a specialization for a generic class typevar from a constructor call,
+            // promote any typevars that are inferred as a literal to the corresponding instance
+            // type.
+            if options.should_promote_literals {
+                ty = ty.map(|ty| ty.promote_literals(self.db));
+            }
+
+            ty
+        });
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)
     }
