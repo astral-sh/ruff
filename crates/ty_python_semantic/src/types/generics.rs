@@ -554,6 +554,7 @@ fn is_subtype_in_invariant_position<'db>(
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
+    inferable: Option<GenericContext<'db>>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -578,6 +579,7 @@ fn is_subtype_in_invariant_position<'db>(
         derived.has_relation_to_impl(
             db,
             base,
+            inferable,
             TypeRelation::Subtyping,
             relation_visitor,
             disjointness_visitor,
@@ -630,6 +632,7 @@ fn has_relation_in_invariant_position<'db>(
     derived_materialization: Option<MaterializationKind>,
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
+    inferable: Option<GenericContext<'db>>,
     relation: TypeRelation,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -643,6 +646,7 @@ fn has_relation_in_invariant_position<'db>(
             derived_mat,
             base_type,
             base_mat,
+            inferable,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -662,6 +666,7 @@ fn has_relation_in_invariant_position<'db>(
             .has_relation_to_impl(
                 db,
                 *base_type,
+                inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
@@ -670,6 +675,7 @@ fn has_relation_in_invariant_position<'db>(
                 base_type.has_relation_to_impl(
                     db,
                     *derived_type,
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -683,6 +689,7 @@ fn has_relation_in_invariant_position<'db>(
                 MaterializationKind::Top,
                 base_type,
                 base_mat,
+                inferable,
                 relation_visitor,
                 disjointness_visitor,
             )
@@ -694,6 +701,7 @@ fn has_relation_in_invariant_position<'db>(
                 derived_mat,
                 base_type,
                 MaterializationKind::Bottom,
+                inferable,
                 relation_visitor,
                 disjointness_visitor,
             )
@@ -705,6 +713,7 @@ fn has_relation_in_invariant_position<'db>(
             MaterializationKind::Bottom,
             base_type,
             base_mat,
+            inferable,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -714,6 +723,7 @@ fn has_relation_in_invariant_position<'db>(
             derived_mat,
             base_type,
             MaterializationKind::Top,
+            inferable,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -957,6 +967,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: Option<GenericContext<'db>>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -971,6 +982,7 @@ impl<'db> Specialization<'db> {
             return self_tuple.has_relation_to_impl(
                 db,
                 other_tuple,
+                inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
@@ -998,6 +1010,7 @@ impl<'db> Specialization<'db> {
                     self_materialization_kind,
                     other_type,
                     other_materialization_kind,
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -1005,6 +1018,7 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Covariant => self_type.has_relation_to_impl(
                     db,
                     *other_type,
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -1012,6 +1026,7 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Contravariant => other_type.has_relation_to_impl(
                     db,
                     *self_type,
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -1030,6 +1045,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
+        inferable: Option<GenericContext<'db>>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
@@ -1055,7 +1071,7 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => {
-                    self_type.is_equivalent_to_impl(db, *other_type, visitor)
+                    self_type.is_equivalent_to_impl(db, *other_type, inferable, visitor)
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
@@ -1068,7 +1084,8 @@ impl<'db> Specialization<'db> {
             (Some(_), None) | (None, Some(_)) => return ConstraintSet::from(false),
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
-                let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
+                let compatible =
+                    self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor);
                 if result.intersect(db, compatible).is_never_satisfied() {
                     return result;
                 }

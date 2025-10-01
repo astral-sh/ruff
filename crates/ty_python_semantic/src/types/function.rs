@@ -81,9 +81,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
-    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    NormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext,
+    TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -895,8 +895,10 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: Option<GenericContext<'db>>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // A function type is the subtype of itself, and not of any other function type. However,
         // our representation of a function type includes any specialization that should be applied
@@ -914,13 +916,21 @@ impl<'db> FunctionType<'db> {
 
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.has_relation_to_impl(db, other_signature, relation, visitor)
+        self_signature.has_relation_to_impl(
+            db,
+            other_signature,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
     }
 
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: Option<GenericContext<'db>>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
@@ -931,7 +941,7 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_equivalent_to_impl(db, other_signature, visitor)
+        self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
