@@ -130,7 +130,13 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 _ => rest,
             };
 
-            let replacement = format!("{unary}{rest}");
+            // If the original string had digit separators, normalize them
+            let replacement = if has_digit_separators {
+                normalize_digit_separators(original_str, unary, rest)
+            } else {
+                format!("{unary}{rest}")
+            };
+
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
@@ -194,6 +200,51 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
         }
         _ => {}
     }
+}
+
+/// Normalizes digit separators in a numeric string by:
+/// - Stripping leading and trailing underscores
+/// - Collapsing medial underscore sequences to single underscores
+/// - Adding proper thousand separators every 3 digits from the right
+fn normalize_digit_separators(original_str: &str, unary: &str, _numeric_part: &str) -> String {
+    // Remove the unary sign from the original string to work with the numeric part
+    let without_unary = if original_str.starts_with('+') || original_str.starts_with('-') {
+        &original_str[1..]
+    } else {
+        original_str
+    };
+
+    // Strip leading and trailing underscores
+    let trimmed = without_unary.trim_matches('_');
+
+    // If the trimmed string is empty or all underscores, return just the unary sign
+    if trimmed.is_empty() {
+        return format!("{unary}0");
+    }
+
+    // Extract only digits from the trimmed string
+    let digits: String = trimmed.chars().filter(char::is_ascii_digit).collect();
+
+    // If no digits found, return 0
+    if digits.is_empty() {
+        return format!("{unary}0");
+    }
+
+    // Add thousand separators every 3 digits from the right
+    let mut result = String::new();
+    let chars: Vec<char> = digits.chars().collect();
+    let mut i = chars.len();
+
+    while i > 0 {
+        i -= 1;
+        result.insert(0, chars[i]);
+        if i > 0 && (chars.len() - i).is_multiple_of(3) {
+            result.insert(0, '_');
+        }
+    }
+
+    // Return the formatted result with unary sign
+    format!("{unary}{result}")
 }
 
 // ```console

@@ -167,12 +167,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^
 24 | Decimal("__1____000") 
    |
-help: Replace with `1000`
+help: Replace with `1_000`
 20 | # See https://github.com/astral-sh/ruff/issues/13807
 21 | 
 22 | # Errors
    - Decimal("1_000")
-23 + Decimal(1000)
+23 + Decimal(1_000)
 24 | Decimal("__1____000") 
 25 | 
 26 | # Ok
@@ -188,12 +188,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 25 |
 26 | # Ok
    |
-help: Replace with `1000`
+help: Replace with `1_000`
 21 | 
 22 | # Errors
 23 | Decimal("1_000")
    - Decimal("__1____000") 
-24 + Decimal(1000) 
+24 + Decimal(1_000) 
 25 | 
 26 | # Ok
 27 | Decimal("2e-4")
@@ -547,12 +547,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 76 | Decimal("1_234_567")   # Unsafe fix: removes separators, becomes Decimal(1234567)
 77 | Decimal("-5_000")      # Unsafe fix: removes separators, becomes Decimal(-5000)
    |
-help: Replace with `15000000`
+help: Replace with `15_000_000`
 72 | 
 73 | # Test cases for digit separators (marked as unsafe fixes)
 74 | # https://github.com/astral-sh/ruff/issues/20572
    - Decimal("15_000_000")  # Unsafe fix: removes separators, becomes Decimal(15000000)
-75 + Decimal(15000000)  # Unsafe fix: removes separators, becomes Decimal(15000000)
+75 + Decimal(15_000_000)  # Unsafe fix: removes separators, becomes Decimal(15000000)
 76 | Decimal("1_234_567")   # Unsafe fix: removes separators, becomes Decimal(1234567)
 77 | Decimal("-5_000")      # Unsafe fix: removes separators, becomes Decimal(-5000)
 78 | Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
@@ -568,12 +568,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 77 | Decimal("-5_000")      # Unsafe fix: removes separators, becomes Decimal(-5000)
 78 | Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
    |
-help: Replace with `1234567`
+help: Replace with `1_234_567`
 73 | # Test cases for digit separators (marked as unsafe fixes)
 74 | # https://github.com/astral-sh/ruff/issues/20572
 75 | Decimal("15_000_000")  # Unsafe fix: removes separators, becomes Decimal(15000000)
    - Decimal("1_234_567")   # Unsafe fix: removes separators, becomes Decimal(1234567)
-76 + Decimal(1234567)   # Unsafe fix: removes separators, becomes Decimal(1234567)
+76 + Decimal(1_234_567)   # Unsafe fix: removes separators, becomes Decimal(1234567)
 77 | Decimal("-5_000")      # Unsafe fix: removes separators, becomes Decimal(-5000)
 78 | Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
 note: This is an unsafe fix and may change runtime behavior
@@ -587,12 +587,12 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^^
 78 | Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
    |
-help: Replace with `-5000`
+help: Replace with `-5_000`
 74 | # https://github.com/astral-sh/ruff/issues/20572
 75 | Decimal("15_000_000")  # Unsafe fix: removes separators, becomes Decimal(15000000)
 76 | Decimal("1_234_567")   # Unsafe fix: removes separators, becomes Decimal(1234567)
    - Decimal("-5_000")      # Unsafe fix: removes separators, becomes Decimal(-5000)
-77 + Decimal(-5000)      # Unsafe fix: removes separators, becomes Decimal(-5000)
+77 + Decimal(-5_000)      # Unsafe fix: removes separators, becomes Decimal(-5000)
 78 | Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
 note: This is an unsafe fix and may change runtime behavior
 
@@ -604,10 +604,10 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 78 | Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
    |         ^^^^^^^^
    |
-help: Replace with `+9999`
+help: Replace with `+9_999`
 75 | Decimal("15_000_000")  # Unsafe fix: removes separators, becomes Decimal(15000000)
 76 | Decimal("1_234_567")   # Unsafe fix: removes separators, becomes Decimal(1234567)
 77 | Decimal("-5_000")      # Unsafe fix: removes separators, becomes Decimal(-5000)
    - Decimal("+9_999")      # Unsafe fix: removes separators, becomes Decimal(+9999)
-78 + Decimal(+9999)      # Unsafe fix: removes separators, becomes Decimal(+9999)
+78 + Decimal(+9_999)      # Unsafe fix: removes separators, becomes Decimal(+9999)
 note: This is an unsafe fix and may change runtime behavior
