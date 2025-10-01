@@ -122,6 +122,10 @@ impl Display for DisplayTypeVar<'_> {
                 }
             }
         }
+        if let Some(default) = self.type_var.default {
+            f.write_str(" = ")?;
+            f.write_str(&self.source[default.range()])?;
+        }
 
         Ok(())
     }
@@ -133,66 +137,62 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             name,
             restriction,
             kind,
-            default: _, // TODO(brent) see below
+            default,
         }: &'a TypeVar<'a>,
     ) -> Self {
         match kind {
-            TypeParamKind::TypeVar => {
-                TypeParam::TypeVar(TypeParamTypeVar {
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    name: Identifier::new(*name, TextRange::default()),
-                    bound: match restriction {
-                        Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
-                        Some(TypeVarRestriction::Constraint(constraints)) => {
-                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
-                                ctx: ast::ExprContext::Load,
-                                parenthesized: true,
-                            })))
-                        }
-                        Some(TypeVarRestriction::AnyStr) => {
-                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                elts: vec![
-                                    Expr::Name(ExprName {
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        id: Name::from("str"),
-                                        ctx: ast::ExprContext::Load,
-                                    }),
-                                    Expr::Name(ExprName {
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        id: Name::from("bytes"),
-                                        ctx: ast::ExprContext::Load,
-                                    }),
-                                ],
-                                ctx: ast::ExprContext::Load,
-                                parenthesized: true,
-                            })))
-                        }
-                        None => None,
-                    },
-                    // We don't handle defaults here yet. Should perhaps be a different rule since
-                    // defaults are only valid in 3.13+.
-                    default: None,
-                })
-            }
+            TypeParamKind::TypeVar => TypeParam::TypeVar(TypeParamTypeVar {
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                name: Identifier::new(*name, TextRange::default()),
+                bound: match restriction {
+                    Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
+                    Some(TypeVarRestriction::Constraint(constraints)) => {
+                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                            range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
+                            ctx: ast::ExprContext::Load,
+                            parenthesized: true,
+                        })))
+                    }
+                    Some(TypeVarRestriction::AnyStr) => {
+                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                            range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            elts: vec![
+                                Expr::Name(ExprName {
+                                    range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                    id: Name::from("str"),
+                                    ctx: ast::ExprContext::Load,
+                                }),
+                                Expr::Name(ExprName {
+                                    range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                    id: Name::from("bytes"),
+                                    ctx: ast::ExprContext::Load,
+                                }),
+                            ],
+                            ctx: ast::ExprContext::Load,
+                            parenthesized: true,
+                        })))
+                    }
+                    None => None,
+                },
+                default: default.map(|expr| Box::new((*expr).clone())),
+            }),
             TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 name: Identifier::new(*name, TextRange::default()),
-                default: None,
+                default: default.map(|expr| Box::new((*expr).clone())),
             }),
             TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 name: Identifier::new(*name, TextRange::default()),
-                default: None,
+                default: default.map(|expr| Box::new((*expr).clone())),
             }),
         }
     }
@@ -373,15 +373,8 @@ fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
     }
 
     // If any type variables were not unique, just bail out here. this is a runtime error and we
-    // can't predict what the user wanted. also bail out if any Python 3.13+ default values are
-    // found on the type parameters
-    (vars
-        .iter()
-        .unique_by(|tvar| tvar.name)
-        .filter(|tvar| tvar.default.is_none())
-        .count()
-        == vars.len())
-    .then_some(vars)
+    // can't predict what the user wanted.
+    (vars.iter().unique_by(|tvar| tvar.name).count() == vars.len()).then_some(vars)
 }
 
 /// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
