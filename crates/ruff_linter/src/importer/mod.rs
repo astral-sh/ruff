@@ -75,9 +75,16 @@ impl<'a> Importer<'a> {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
         } else {
-            // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
-                .into_edit(&required_import)
+            // Check if there are any future imports that we need to respect
+            if let Some(last_future_import) = self.find_last_future_import() {
+                // Insert after the last future import
+                Insertion::end_of_statement(last_future_import, self.source, self.stylist)
+                    .into_edit(&required_import)
+            } else {
+                // Insert at the start of the file.
+                Insertion::start_of_file(self.python_ast, self.source, self.stylist)
+                    .into_edit(&required_import)
+            }
         }
     }
 
@@ -522,6 +529,17 @@ impl<'a> Importer<'a> {
         } else {
             None
         }
+    }
+
+    /// Find the last `from __future__` import statement in the AST.
+    fn find_last_future_import(&self) -> Option<&'a Stmt> {
+        self.python_ast.iter().rev().find(|stmt| {
+            if let Stmt::ImportFrom(import_from) = stmt {
+                import_from.module.as_deref() == Some("__future__")
+            } else {
+                false
+            }
+        })
     }
 
     /// Add a `from __future__ import annotations` import.
