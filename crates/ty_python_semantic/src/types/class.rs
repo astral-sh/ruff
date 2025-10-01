@@ -19,7 +19,9 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, Specialization, walk_specialization,
+};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -534,14 +536,15 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other, None).is_always_satisfied()
+        self.when_subclass_of(db, other, &InferableTypeVars::none())
+            .is_always_satisfied()
     }
 
     pub(super) fn when_subclass_of(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
@@ -557,7 +560,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -608,7 +611,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {

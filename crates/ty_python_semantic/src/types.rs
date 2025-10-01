@@ -52,8 +52,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, bind_typevar, typing_self,
-    walk_generic_context,
+    GenericContext, InferableTypeVars, PartialSpecialization, Specialization, bind_typevar,
+    typing_self, walk_generic_context,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -563,7 +563,7 @@ impl<'db> PropertyInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
     }
@@ -572,7 +572,7 @@ impl<'db> PropertyInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let getter_equivalence = if let Some(getter) = self.getter(db) {
@@ -1452,14 +1452,15 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target, None).is_always_satisfied()
+        self.when_subtype_of(db, target, &InferableTypeVars::none())
+            .is_always_satisfied()
     }
 
     fn when_subtype_of(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
     }
@@ -1468,7 +1469,7 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target, None)
+        self.when_assignable_to(db, target, &InferableTypeVars::none())
             .is_always_satisfied()
     }
 
@@ -1476,7 +1477,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
     }
@@ -1485,15 +1486,20 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.has_relation_to(db, other, None, TypeRelation::Redundancy)
-            .is_always_satisfied()
+        self.has_relation_to(
+            db,
+            other,
+            &InferableTypeVars::none(),
+            TypeRelation::Redundancy,
+        )
+        .is_always_satisfied()
     }
 
     fn has_relation_to(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
@@ -1510,7 +1516,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1652,7 +1658,7 @@ impl<'db> Type<'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if inferable.is_none_or(|inferable| !inferable.contains(db, bound_typevar))
+                if !inferable.is_inferable(bound_typevar)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -1685,7 +1691,7 @@ impl<'db> Type<'db> {
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if inferable.is_none_or(|inferable| !inferable.contains(db, bound_typevar))
+                if !inferable.is_inferable(bound_typevar)
                     && !bound_typevar
                         .typevar(db)
                         .constraints(db)
@@ -1725,8 +1731,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeVar(bound_typevar), _)
-                if inferable.is_some_and(|inferable| inferable.contains(db, bound_typevar))
-                    && relation.is_assignability() =>
+                if inferable.is_inferable(bound_typevar) && relation.is_assignability() =>
             {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
@@ -1828,9 +1833,7 @@ impl<'db> Type<'db> {
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(bound_typevar))
-                if inferable.is_none_or(|inferable| !inferable.contains(db, bound_typevar)) =>
-            {
+            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(bound_typevar) => {
                 ConstraintSet::from(false)
             }
 
@@ -2316,7 +2319,7 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, None)
+        self.when_equivalent_to(db, other, &InferableTypeVars::none())
             .is_always_satisfied()
     }
 
@@ -2324,7 +2327,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
     }
@@ -2333,7 +2336,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -2439,7 +2442,7 @@ impl<'db> Type<'db> {
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other, None)
+        self.when_disjoint_from(db, other, &InferableTypeVars::none())
             .is_always_satisfied()
     }
 
@@ -2447,7 +2450,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_disjoint_from_impl(
             db,
@@ -2462,7 +2465,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -2470,7 +2473,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
-            inferable: Option<GenericContext<'db>>,
+            inferable: &InferableTypeVars<'db>,
             disjointness_visitor: &IsDisjointVisitor<'db>,
             relation_visitor: &HasRelationToVisitor<'db>,
         ) -> ConstraintSet<'db> {
@@ -2539,7 +2542,7 @@ impl<'db> Type<'db> {
 
             (tvar @ Type::TypeVar(bound_typevar), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::TypeVar(bound_typevar))
-                if inferable.is_none_or(|inferable| !inferable.contains(db, bound_typevar))
+                if !inferable.is_inferable(bound_typevar)
                     && intersection.negative(db).contains(&tvar) =>
             {
                 ConstraintSet::from(true)
@@ -2550,7 +2553,7 @@ impl<'db> Type<'db> {
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
             (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar))
-                if inferable.is_none_or(|inferable| !inferable.contains(db, bound_typevar)) =>
+                if !inferable.is_inferable(bound_typevar) =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => ConstraintSet::from(false),
@@ -9768,7 +9771,7 @@ impl<'db> BoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -9802,7 +9805,7 @@ impl<'db> BoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.function(db)
@@ -9935,7 +9938,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -9960,7 +9963,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -10030,7 +10033,7 @@ impl<'db> KnownBoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -10098,7 +10101,7 @@ impl<'db> KnownBoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: Option<GenericContext<'db>>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
@@ -10964,7 +10967,7 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: Option<GenericContext<'db>>,
+        _inferable: &InferableTypeVars<'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -11066,7 +11069,7 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: Option<GenericContext<'db>>,
+        _inferable: &InferableTypeVars<'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {

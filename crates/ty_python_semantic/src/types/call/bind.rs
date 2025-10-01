@@ -3,6 +3,7 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -26,7 +27,9 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
+use crate::types::generics::{
+    InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
+};
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
@@ -597,7 +600,8 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints = ty_a.when_equivalent_to(db, *ty_b, None);
+                                let constraints =
+                                    ty_a.when_equivalent_to(db, *ty_b, &InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -607,7 +611,8 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints = ty_a.when_subtype_of(db, *ty_b, None);
+                                let constraints =
+                                    ty_a.when_subtype_of(db, *ty_b, &InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -617,7 +622,8 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints = ty_a.when_assignable_to(db, *ty_b, None);
+                                let constraints =
+                                    ty_a.when_assignable_to(db, *ty_b, &InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -627,7 +633,8 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints = ty_a.when_disjoint_from(db, *ty_b, None);
+                                let constraints =
+                                    ty_a.when_disjoint_from(db, *ty_b, &InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -2583,6 +2590,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_type = argument_type.apply_specialization(self.db, specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, specialization);
             }
+            let inferable_typevars = match self.specialization {
+                Some(specialization) => Cow::Borrowed(
+                    specialization
+                        .generic_context(self.db)
+                        .inferable_typevars(self.db),
+                ),
+                None => Cow::Owned(InferableTypeVars::none()),
+            };
             // This is one of the few places where we want to check if there's _any_ specialization
             // where assignability holds; normally we want to check that assignability holds for
             // _all_ specializations.
@@ -2590,12 +2605,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // constraint set that we get from this assignability check, instead of inferring and
             // building them in an earlier separate step.
             if argument_type
-                .when_assignable_to(
-                    self.db,
-                    expected_ty,
-                    self.specialization
-                        .map(|specialization| specialization.generic_context(self.db)),
-                )
+                .when_assignable_to(self.db, expected_ty, inferable_typevars.as_ref())
                 .is_never_satisfied()
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
