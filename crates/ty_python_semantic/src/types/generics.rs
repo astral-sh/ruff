@@ -105,7 +105,6 @@ pub(crate) fn typing_self<'db>(
     scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
-    typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
 ) -> Option<Type<'db>> {
     let index = semantic_index(db, scope_id.file(db));
 
@@ -116,7 +115,7 @@ pub(crate) fn typing_self<'db>(
         Some(
             TypeVarBoundOrConstraints::UpperBound(Type::instance(
                 db,
-                class.identity_specialization(db, typevar_to_type),
+                class.identity_specialization(db),
             ))
             .into(),
         ),
@@ -136,7 +135,7 @@ pub(crate) fn typing_self<'db>(
         typevar_binding_context,
         typevar,
     )
-    .map(typevar_to_type)
+    .map(Type::TypeVar)
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -311,6 +310,14 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).len()
     }
 
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        self.variables_inner(db).contains_key(&bound_typevar)
+    }
+
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
             self.variables(db)
@@ -364,14 +371,8 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
-    /// The second parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on
-    /// the use case.
-    pub(crate) fn identity_specialization(
-        self,
-        db: &'db dyn Db,
-        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
-    ) -> Specialization<'db> {
-        let types = self.variables(db).map(typevar_to_type).collect();
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        let types = self.variables(db).map(Type::TypeVar).collect();
         self.specialize(db, types)
     }
 

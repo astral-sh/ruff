@@ -1057,7 +1057,6 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::NonInferableTypeVar(..)
         | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
@@ -1653,11 +1652,7 @@ impl KnownFunction {
             }
 
             KnownFunction::RangeConstraint => {
-                let [
-                    Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
-                    Some(upper),
-                ] = parameter_types
+                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
                 else {
                     return;
                 };
@@ -1670,11 +1665,7 @@ impl KnownFunction {
             }
 
             KnownFunction::NegatedRangeConstraint => {
-                let [
-                    Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
-                    Some(upper),
-                ] = parameter_types
+                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
                 else {
                     return;
                 };
