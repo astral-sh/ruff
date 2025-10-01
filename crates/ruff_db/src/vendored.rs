@@ -401,7 +401,7 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
     ///
     /// ## Panics:
     /// If a path with an unsupported component for vendored paths is passed.
-    /// Unsupported components are path prefixes and path root directories.
+    /// Unsupported components are path prefixes (but root directories are now supported).
     fn from(path: &'a VendoredPath) -> Self {
         /// Remove `.` and `..` components, and validate that unsupported components are not present.
         ///
@@ -420,6 +420,12 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
                         // all resolve to the same path relative to the zip archive
                         // (see https://github.com/astral-sh/ruff/pull/11991#issuecomment-2185278014)
                         normalized_parts.pop();
+                    }
+                    camino::Utf8Component::RootDir => {
+                        // Ignore root directory components - vendored paths should be relative
+                        // to the zip archive root anyway. This handles cases like "/module1.py"
+                        // which can occur when paths are parsed from URIs.
+                        continue;
                     }
                     unsupported => {
                         panic!("Unsupported component in a vendored path: {unsupported}")
@@ -733,5 +739,55 @@ pub(crate) mod tests {
             &mock_typeshed(),
             VendoredPath::new("./stdlib/asyncio/../asyncio/tasks.pyi"),
         )
+    }
+
+    #[test]
+    fn functools_file_with_leading_slash() {
+        test_file(&mock_typeshed(), VendoredPath::new("/stdlib/functools.pyi"))
+    }
+
+    #[test]
+    fn asyncio_file_with_leading_slash() {
+        test_file(
+            &mock_typeshed(),
+            VendoredPath::new("/stdlib/asyncio/tasks.pyi"),
+        )
+    }
+
+    #[test]
+    fn stdlib_dir_with_leading_slash() {
+        test_directory("/stdlib")
+    }
+
+    #[test]
+    fn asyncio_dir_with_leading_slash() {
+        test_directory("/stdlib/asyncio")
+    }
+
+    #[test]
+    fn issue_1290_reproduction() {
+        // Test case that reproduces the issue from https://github.com/astral-sh/ty/issues/1290
+        // The playground was crashing when trying to access files like "vendored:/module1.py"
+        // which would be parsed as "/module1.py" and cause a panic due to unsupported RootDir component
+        let mock_typeshed = mock_typeshed();
+        
+        // These paths should not panic anymore
+        let paths = [
+            "/module1.py",
+            "/main.py", 
+            "/stdlib/functools.pyi",
+            "/stdlib/asyncio/tasks.pyi",
+        ];
+        
+        for path in paths {
+            let vendored_path = VendoredPath::new(path);
+            // This should not panic - it should either find the file or return an error gracefully
+            let result = mock_typeshed.read_to_string(vendored_path);
+            // We don't care if the file exists or not, just that it doesn't panic
+            match result {
+                Ok(_) => println!("Found file: {}", path),
+                Err(_) => println!("File not found (expected): {}", path),
+            }
+        }
     }
 }
