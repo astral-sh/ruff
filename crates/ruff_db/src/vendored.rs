@@ -399,9 +399,8 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
     /// - Normalize `\\` separators to `/`
     /// - Validate that the path does not have any unsupported components
     ///
-    /// ## Panics:
-    /// If a path with an unsupported component for vendored paths is passed.
-    /// Unsupported components are path prefixes (but root directories are now supported).
+    /// Note: Windows path prefixes and root directories are ignored so that
+    /// vendored paths are always treated as relative to the archive root.
     fn from(path: &'a VendoredPath) -> Self {
         /// Remove `.` and `..` components, and validate that unsupported components are not present.
         ///
@@ -427,9 +426,14 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
                         // which can occur when paths are parsed from URIs.
                         continue;
                     }
-                    unsupported => {
-                        panic!("Unsupported component in a vendored path: {unsupported}")
-                    }
+                    // On Windows, `Prefix` can represent drive letters or verbatim prefixes
+                    // like `\\?\`. Treat these as ignored so that the remaining components
+                    // are resolved relative to the archive root instead of panicking.
+                    #[cfg(windows)]
+                    camino::Utf8Component::Prefix(_) => continue,
+                    // `Prefix` does not occur on Unix per camino docs; no action required.
+                    #[cfg(unix)]
+                    _ => unreachable!(),
                 }
             }
             normalized_parts.join("/")
