@@ -633,9 +633,9 @@ impl CondaEnvironmentKind {
         };
 
         if name == default_env {
-            CondaEnvironmentKind::Base
-        } else {
             CondaEnvironmentKind::Child
+        } else {
+            CondaEnvironmentKind::Base
         }
     }
 }
