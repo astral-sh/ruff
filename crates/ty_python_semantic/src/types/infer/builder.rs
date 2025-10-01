@@ -1923,8 +1923,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 //
                 // If type arguments are supplied to `(Async)Iterable`, `(Async)Iterator`,
                 // `(Async)Generator` or `(Async)GeneratorType` in the return annotation,
-                // we should iterate over the `yield` expressions and `return` statements in the function
-                // to check that they are consistent with the type arguments provided.
+                // we should iterate over the `yield` expressions and `return` statements
+                // in the function to check that they are consistent with the type arguments
+                // provided. Once we do this, the `.to_instance_unknown` call below should
+                // be replaced with `.to_specialized_instance`.
                 let inferred_return = if function.is_async {
                     KnownClass::AsyncGeneratorType
                 } else {
@@ -1932,7 +1934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 if !inferred_return
-                    .to_instance(self.db())
+                    .to_instance_unknown(self.db())
                     .is_assignable_to(self.db(), expected_ty)
                 {
                     report_invalid_generator_function_return_type(

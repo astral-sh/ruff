@@ -4403,14 +4403,22 @@ impl KnownClass {
         KnownClassDisplay { db, class: self }
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing all possible instances of the class.
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing all possible instances of
+    /// the class. If this class is generic, this will use the default specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
+    /// parameter is specialized to `Unknown`.
+    pub(crate) fn to_instance_unknown(self, db: &dyn Db) -> Type<'_> {
+        self.try_to_class_literal(db)
+            .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
             .unwrap_or_else(Type::unknown)
     }
 
