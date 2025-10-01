@@ -167,15 +167,16 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^
 24 | Decimal("__1____000") 
    |
-help: Replace with `1_000`
+help: Replace with `1000`
 20 | # See https://github.com/astral-sh/ruff/issues/13807
 21 | 
 22 | # Errors
    - Decimal("1_000")
-23 + Decimal(1_000)
+23 + Decimal(1000)
 24 | Decimal("__1____000") 
 25 | 
 26 | # Ok
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:24:9
@@ -187,15 +188,16 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 25 |
 26 | # Ok
    |
-help: Replace with `1_000`
+help: Replace with `1000`
 21 | 
 22 | # Errors
 23 | Decimal("1_000")
    - Decimal("__1____000") 
-24 + Decimal(1_000) 
+24 + Decimal(1000) 
 25 | 
 26 | # Ok
 27 | Decimal("2e-4")
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:48:9
@@ -545,15 +547,16 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 76 | Decimal("1_234_567")   # Should preserve digit separators
 77 | Decimal("-5_000")      # Should preserve negative with separators
    |
-help: Replace with `15_000_000`
+help: Replace with `15000000`
 72 | 
 73 | # Additional test cases for digit separator preservation
 74 | # https://github.com/astral-sh/ruff/issues/20572
    - Decimal("15_000_000")  # Should preserve digit separators
-75 + Decimal(15_000_000)  # Should preserve digit separators
+75 + Decimal(15000000)  # Should preserve digit separators
 76 | Decimal("1_234_567")   # Should preserve digit separators
 77 | Decimal("-5_000")      # Should preserve negative with separators
 78 | Decimal("+9_999")      # Should preserve positive with separators
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:76:9
@@ -565,14 +568,15 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 77 | Decimal("-5_000")      # Should preserve negative with separators
 78 | Decimal("+9_999")      # Should preserve positive with separators
    |
-help: Replace with `1_234_567`
+help: Replace with `1234567`
 73 | # Additional test cases for digit separator preservation
 74 | # https://github.com/astral-sh/ruff/issues/20572
 75 | Decimal("15_000_000")  # Should preserve digit separators
    - Decimal("1_234_567")   # Should preserve digit separators
-76 + Decimal(1_234_567)   # Should preserve digit separators
+76 + Decimal(1234567)   # Should preserve digit separators
 77 | Decimal("-5_000")      # Should preserve negative with separators
 78 | Decimal("+9_999")      # Should preserve positive with separators
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:77:9
@@ -583,13 +587,14 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^^
 78 | Decimal("+9_999")      # Should preserve positive with separators
    |
-help: Replace with `-5_000`
+help: Replace with `-5000`
 74 | # https://github.com/astral-sh/ruff/issues/20572
 75 | Decimal("15_000_000")  # Should preserve digit separators
 76 | Decimal("1_234_567")   # Should preserve digit separators
    - Decimal("-5_000")      # Should preserve negative with separators
-77 + Decimal(-5_000)      # Should preserve negative with separators
+77 + Decimal(-5000)      # Should preserve negative with separators
 78 | Decimal("+9_999")      # Should preserve positive with separators
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:78:9
@@ -599,9 +604,10 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 78 | Decimal("+9_999")      # Should preserve positive with separators
    |         ^^^^^^^^
    |
-help: Replace with `+9_999`
+help: Replace with `+9999`
 75 | Decimal("15_000_000")  # Should preserve digit separators
 76 | Decimal("1_234_567")   # Should preserve digit separators
 77 | Decimal("-5_000")      # Should preserve negative with separators
    - Decimal("+9_999")      # Should preserve positive with separators
-78 + Decimal(+9_999)      # Should preserve positive with separators
+78 + Decimal(+9999)      # Should preserve positive with separators
+note: This is an unsafe fix and may change runtime behavior

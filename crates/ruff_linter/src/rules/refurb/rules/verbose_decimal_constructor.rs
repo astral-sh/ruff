@@ -130,15 +130,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 _ => rest,
             };
 
-            // If the original string had digit separators, add proper thousand separators
-            let replacement = if has_digit_separators {
-                // Convert to integer literal with proper thousand separators
-                // Reconstruct valid separators (not necessarily the original ones)
-                let numeric_value = format!("{unary}{rest}");
-                add_thousand_separators(&numeric_value)
-            } else {
-                format!("{unary}{rest}")
-            };
+            let replacement = format!("{unary}{rest}");
 
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
@@ -147,10 +139,19 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                value.range(),
-            )));
+            // Mark the fix as unsafe if the original string had digit separators
+            // because the replacement might not preserve the original formatting
+            if has_digit_separators {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    replacement,
+                    value.range(),
+                )));
+            } else {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    replacement,
+                    value.range(),
+                )));
+            }
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -203,33 +204,3 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 // 640
 // ```
 const PYTHONINTMAXSTRDIGITS: usize = 640;
-
-/// Add thousand separators to a numeric string to make it more readable.
-/// This function adds underscores every 3 digits from the right, but only
-/// if the original string had digit separators.
-fn add_thousand_separators(numeric_str: &str) -> String {
-    // Extract the sign if present
-    let (sign, digits) = if let Some(stripped) = numeric_str.strip_prefix('-') {
-        ("-", stripped)
-    } else if let Some(stripped) = numeric_str.strip_prefix('+') {
-        ("+", stripped)
-    } else {
-        ("", numeric_str)
-    };
-
-    // Add thousand separators every 3 digits from the right
-    let mut result = String::new();
-    result.push_str(sign);
-
-    let chars: Vec<char> = digits.chars().collect();
-    let len = chars.len();
-
-    for (i, &ch) in chars.iter().enumerate() {
-        if i > 0 && (len - i).is_multiple_of(3) {
-            result.push('_');
-        }
-        result.push(ch);
-    }
-
-    result
-}
