@@ -173,13 +173,6 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Check whether this callable type is a subtype of another callable type.
-    ///
-    /// See [`Type::is_subtype_of`] for more details.
-    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other).is_always_satisfied()
-    }
-
     fn is_subtype_of_impl(&self, db: &'db dyn Db, other: &Self) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
@@ -188,20 +181,6 @@ impl<'db> CallableSignature<'db> {
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
         )
-    }
-
-    /// Check whether this callable type is assignable to another callable type.
-    ///
-    /// See [`Type::is_assignable_to`] for more details.
-    pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.has_relation_to_impl(
-            db,
-            other,
-            TypeRelation::Assignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
-        )
-        .is_always_satisfied()
     }
 
     pub(crate) fn has_relation_to_impl(

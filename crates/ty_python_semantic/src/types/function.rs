@@ -896,39 +896,25 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        match relation {
-            TypeRelation::Subtyping | TypeRelation::Redundancy => {
-                ConstraintSet::from(self.is_subtype_of(db, other))
-            }
-            TypeRelation::Assignability => ConstraintSet::from(self.is_assignable_to(db, other)),
-        }
-    }
-
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // A function type is the subtype of itself, and not of any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if self.normalized(db) == other.normalized(db) {
-            return true;
+        if matches!(relation, TypeRelation::Subtyping | TypeRelation::Redundancy)
+            && self.normalized(db) == other.normalized(db)
+        {
+            return ConstraintSet::from(true);
         }
+
         if self.literal(db) != other.literal(db) {
-            return false;
+            return ConstraintSet::from(false);
         }
+
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_subtype_of(db, other_signature)
-    }
-
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        // A function type is assignable to itself, and not to any other function type. However,
-        // our representation of a function type includes any specialization that should be applied
-        // to the signature. Different specializations of the same function type are only
-        // assignable to each other if they result in assignable signatures.
-        self.literal(db) == other.literal(db)
-            && self.signature(db).is_assignable_to(db, other.signature(db))
+        self_signature.has_relation_to_impl(db, other_signature, relation, visitor)
     }
 
     pub(crate) fn is_equivalent_to_impl(
