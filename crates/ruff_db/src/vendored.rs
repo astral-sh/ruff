@@ -770,15 +770,15 @@ pub(crate) mod tests {
         // The playground was crashing when trying to access files like "vendored:/module1.py"
         // which would be parsed as "/module1.py" and cause a panic due to unsupported RootDir component
         let mock_typeshed = mock_typeshed();
-        
+
         // These paths should not panic anymore
         let paths = [
             "/module1.py",
-            "/main.py", 
+            "/main.py",
             "/stdlib/functools.pyi",
             "/stdlib/asyncio/tasks.pyi",
         ];
-        
+
         for path in paths {
             let vendored_path = VendoredPath::new(path);
             // This should not panic - it should either find the file or return an error gracefully
