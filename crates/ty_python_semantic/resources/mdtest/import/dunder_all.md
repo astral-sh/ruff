@@ -783,6 +783,7 @@ class A: ...
 ```py
 from subexporter import *
 
+# TODO: we could potentially infer `list[str] | tuple[str, ...]` here
 reveal_type(__all__)  # revealed: list[Unknown | str]
 
 __all__.append("B")

@@ -829,11 +829,11 @@ fn place_by_id<'db>(
             // mutation to type check correctly, and for code that uses the global, it accurately
             // reflects the lack of knowledge about the type.
             //
-            // External modifications (or modifications through `global` statements) that would
-            // require a wider type are relatively rare. From a practical perspective, we can
-            // therefore achieve a better user experience by trusting the inferred type. Users
-            // who need the external mutation to work can always annotate the global with the
-            // wider type. And everyone else benefits from more precise type inference.
+            // However, external modifications (or modifications through `global` statements) that
+            // would require a wider type are relatively rare. From a practical perspective, we can
+            // therefore achieve a better user experience by trusting the inferred type. Users who
+            // need the external mutation to work can always annotate the global with the wider
+            // type. And everyone else benefits from more precise type inference.
             let is_module_global = scope.node(db).scope_kind().is_module();
 
             // If the visibility of the scope is private (like for a function scope), we also do
