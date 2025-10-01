@@ -429,11 +429,9 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
                     // On Windows, `Prefix` can represent drive letters or verbatim prefixes
                     // like `\\?\`. Treat these as ignored so that the remaining components
                     // are resolved relative to the archive root instead of panicking.
-                    #[cfg(windows)]
+                    // On Unix, `Prefix` does not occur per camino docs, but we still handle it
+                    // to keep the match exhaustive across all targets.
                     camino::Utf8Component::Prefix(_) => continue,
-                    // `Prefix` does not occur on Unix per camino docs; no action required.
-                    #[cfg(unix)]
-                    _ => unreachable!(),
                 }
             }
             normalized_parts.join("/")
