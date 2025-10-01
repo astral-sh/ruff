@@ -142,10 +142,7 @@ impl AutoPythonType {
                 });
                 Some((expr, vec![no_return_edit]))
             }
-            AutoPythonType::Atom(python_type) => {
-                let (expr, edits) = type_expr(python_type, checker, at)?;
-                Some((expr, edits))
-            }
+            AutoPythonType::Atom(python_type) => type_expr(python_type, checker, at),
             AutoPythonType::Union(python_types) => {
                 if target_version >= PythonVersion::PY310 {
                     // Aggregate all the individual types (e.g., `int`, `float`).
@@ -214,38 +211,14 @@ impl AutoPythonType {
 ///
 /// If the [`Expr`] relies on importing any external symbols, those imports will be returned as
 /// additional edits.
-fn type_expr(
+pub(crate) fn type_expr(
     python_type: PythonType,
     checker: &Checker,
     at: TextSize,
 ) -> Option<(Expr, Vec<Edit>)> {
     match python_type {
-        PythonType::String => {
-            let (edit, binding) = checker
-                .importer()
-                .get_or_import_builtin_symbol("str", at, checker.semantic())
-                .ok()?;
-            let expr = Expr::Name(ast::ExprName {
-                id: binding.into(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                ctx: ExprContext::Load,
-            });
-            Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
-        }
-        PythonType::Bytes => {
-            let (edit, binding) = checker
-                .importer()
-                .get_or_import_builtin_symbol("bytes", at, checker.semantic())
-                .ok()?;
-            let expr = Expr::Name(ast::ExprName {
-                id: binding.into(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                ctx: ExprContext::Load,
-            });
-            Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
-        }
+        PythonType::String => create_name_expr("str", checker, at),
+        PythonType::Bytes => create_name_expr("bytes", checker, at),
         PythonType::Number(number) => {
             let symbol = match number {
                 NumberLike::Integer => "int",
@@ -253,25 +226,10 @@ fn type_expr(
                 NumberLike::Complex => "complex",
                 NumberLike::Bool => "bool",
             };
-            let (edit, binding) = checker
-                .importer()
-                .get_or_import_builtin_symbol(symbol, at, checker.semantic())
-                .ok()?;
-            let expr = Expr::Name(ast::ExprName {
-                id: binding.into(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                ctx: ExprContext::Load,
-            });
-            Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
+            create_name_expr(symbol, checker, at)
         }
         PythonType::None => {
-            let expr = Expr::Name(ast::ExprName {
-                id: "None".into(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                ctx: ExprContext::Load,
-            });
+            let expr = Expr::NoneLiteral(ast::ExprNoneLiteral::default());
             Some((expr, vec![]))
         }
         PythonType::Ellipsis => None,
@@ -281,4 +239,24 @@ fn type_expr(
         PythonType::Tuple => None,
         PythonType::Generator => None,
     }
+}
+
+/// Helper function to create a name expression with proper builtin symbol handling.
+fn create_name_expr(
+    symbol: impl Into<Name>,
+    checker: &Checker,
+    at: TextSize,
+) -> Option<(Expr, Vec<Edit>)> {
+    let symbol_name = symbol.into();
+    let (edit, binding) = checker
+        .importer()
+        .get_or_import_builtin_symbol(symbol_name.as_str(), at, checker.semantic())
+        .ok()?;
+    let expr = Expr::Name(ast::ExprName {
+        id: binding.into(),
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        ctx: ExprContext::Load,
+    });
+    Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
 }

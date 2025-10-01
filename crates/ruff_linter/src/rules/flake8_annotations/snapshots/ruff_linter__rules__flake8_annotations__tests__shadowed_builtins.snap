@@ -56,14 +56,21 @@ ANN204 [*] Missing return type annotation for special method `__str__`
 13 |         return "!"
    |
 help: Add return type annotation: `str`
-9  | 
-10 | class C:
-11 |     @override
+1  | from collections import UserString as str
+2  | from typing import override
+3  + import builtins
+4  | 
+5  | def foo():
+6  |     return "!"
+--------------------------------------------------------------------------------
+10 | 
+11 | class C:
+12 |     @override
    -     def __str__(self):
-12 +     def __str__(self) -> str:
-13 |         return "!"
-14 |     
-15 |     @staticmethod
+13 +     def __str__(self) -> builtins.str:
+14 |         return "!"
+15 |     
+16 |     @staticmethod
 note: This is an unsafe fix and may change runtime behavior
 
 ANN205 [*] Missing return type annotation for staticmethod `foo`
