@@ -1450,6 +1450,16 @@ impl<'db> ClassLiteral<'db> {
         )
     }
 
+    /// Returns the generic context that should be inherited by any constructor methods of this
+    /// class.
+    ///
+    /// When inferring a specialization of the class's generic context from a constructor call, we
+    /// promote any typevars that are inferred as a literal to the corresponding instance type.
+    fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.generic_context(db)
+            .map(|generic_context| generic_context.promote_literals(db))
+    }
+
     fn file(self, db: &dyn Db) -> File {
         self.body_scope(db).file(db)
     }
@@ -1992,7 +2002,7 @@ impl<'db> ClassLiteral<'db> {
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(
                             db,
-                            class.own_class_member(db, self.generic_context(db), name),
+                            class.own_class_member(db, self.inherited_generic_context(db), name),
                         )
                     });
                 }
@@ -2244,7 +2254,7 @@ impl<'db> ClassLiteral<'db> {
 
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
-                    self.generic_context(db),
+                    self.inherited_generic_context(db),
                     Parameters::new(parameters),
                     return_ty,
                 ),
@@ -2297,7 +2307,7 @@ impl<'db> ClassLiteral<'db> {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
                     .into_class_literal()?
-                    .own_class_member(db, self.generic_context(db), None, name)
+                    .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .place
                     .ignore_possibly_unbound()
                     .map(|ty| {
@@ -5423,7 +5433,7 @@ enum SlotsKind {
 impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
         let Place::Type(slots_ty, bound) = base
-            .own_class_member(db, base.generic_context(db), None, "__slots__")
+            .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
             .place
         else {
             return Self::NotSpecified;

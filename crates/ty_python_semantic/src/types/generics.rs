@@ -138,7 +138,16 @@ pub(crate) fn typing_self<'db>(
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub struct GenericContextTypeVarOptions {}
+pub struct GenericContextTypeVarOptions {
+    should_promote_literals: bool,
+}
+
+impl GenericContextTypeVarOptions {
+    fn promote_literals(mut self) -> Self {
+        self.should_promote_literals = true;
+        self
+    }
+}
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
@@ -197,6 +206,17 @@ impl<'db> GenericContext<'db> {
             type_params
                 .into_iter()
                 .map(|bound_typevar| (bound_typevar, GenericContextTypeVarOptions::default())),
+        )
+    }
+
+    /// Returns a copy of this generic context where we will promote literal types in any inferred
+    /// specializations.
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Self {
+        Self::from_variables(
+            db,
+            self.variables_inner(db)
+                .iter()
+                .map(|(bound_typevar, options)| (*bound_typevar, options.promote_literals())),
         )
     }
 
