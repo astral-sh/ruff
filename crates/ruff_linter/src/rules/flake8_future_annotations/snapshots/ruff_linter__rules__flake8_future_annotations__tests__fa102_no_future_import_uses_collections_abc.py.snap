@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
+assertion_line: 57
+---
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+ --> no_future_import_uses_collections_abc.py:4:25
+  |
+4 | def takes_sequence(seq: Sequence[int]) -> None:
+  |                         ^^^^^^^^^^^^^
+5 |     ...
+  |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import Sequence
+3 | 
+4 | 
+note: This is an unsafe fix and may change runtime behavior
