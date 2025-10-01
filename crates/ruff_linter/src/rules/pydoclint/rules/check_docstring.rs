@@ -6,6 +6,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -593,24 +594,29 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
         let line_end = current_pos + line.len();
 
         if let Some(entry) = line.strip_prefix(indentation) {
-            if entry.chars().next().is_some_and(|first_char| {
-                first_char.is_ascii_alphabetic() || first_char == '_' || first_char == '*'
-            }) {
+            if entry
+                .chars()
+                .next()
+                .is_some_and(|first_char| !first_char.is_whitespace())
+            {
                 let Some((before_colon, _)) = entry.split_once(':') else {
                     current_pos = line_end + 1;
                     continue;
                 };
                 if let Some(param) = before_colon.split_whitespace().next() {
-                    let param_start = line_start + indentation.len();
-                    let param_end = param_start + param.len();
+                    let param_name = param.trim_start_matches('*');
+                    if is_identifier(param_name) {
+                        let param_start = line_start + indentation.len();
+                        let param_end = param_start + param.len();
 
-                    entries.push(ParameterEntry {
-                        name: param.trim_start_matches('*'),
-                        range: TextRange::new(
-                            content_start + TextSize::try_from(param_start).unwrap(),
-                            content_start + TextSize::try_from(param_end).unwrap(),
-                        ),
-                    });
+                        entries.push(ParameterEntry {
+                            name: param_name,
+                            range: TextRange::new(
+                                content_start + TextSize::try_from(param_start).unwrap(),
+                                content_start + TextSize::try_from(param_end).unwrap(),
+                            ),
+                        });
+                    }
                 }
             }
         }
@@ -643,21 +649,26 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
         let line_end = current_pos + potential.len();
 
         if let Some(entry) = potential.strip_prefix(indentation) {
-            if entry.chars().next().is_some_and(|first_char| {
-                first_char.is_ascii_alphabetic() || first_char == '_' || first_char == '*'
-            }) {
-                if let Some(param) = entry.split(':').next() {
-                    let param_name = param.trim_end();
-                    let param_start = line_start + indentation.len();
-                    let param_end = param_start + param_name.len();
+            if entry
+                .chars()
+                .next()
+                .is_some_and(|first_char| !first_char.is_whitespace())
+            {
+                if let Some(before_colon) = entry.split(':').next() {
+                    let param = before_colon.trim_end();
+                    let param_name = param.trim_start_matches('*');
+                    if is_identifier(param_name) {
+                        let param_start = line_start + indentation.len();
+                        let param_end = param_start + param.len();
 
-                    entries.push(ParameterEntry {
-                        name: param_name.trim_start_matches('*'),
-                        range: TextRange::new(
-                            content_start + TextSize::try_from(param_start).unwrap(),
-                            content_start + TextSize::try_from(param_end).unwrap(),
-                        ),
-                    });
+                        entries.push(ParameterEntry {
+                            name: param_name,
+                            range: TextRange::new(
+                                content_start + TextSize::try_from(param_start).unwrap(),
+                                content_start + TextSize::try_from(param_end).unwrap(),
+                            ),
+                        });
+                    }
                 }
             }
         }
