@@ -192,7 +192,7 @@ for _ in range(3):
         lambda x: x  # Should not trigger B023 - x is a lambda parameter
 
 
-# Test case from issue comment - pandas apply (should still trigger B023 for legitimate cases)
+# Test case from issue comment - pandas apply (should NOT trigger B023 - apply is safe like map)
 import pandas as pd
 
 data = pd.DataFrame()
@@ -205,16 +205,16 @@ def modifier(value):
 
 for _i in range(0, 4):
     data[f"v{_i}"] = data["hex"].apply(
-        lambda x: modifier(x[2 * _i : 2 * _i + 2]),  # Should trigger B023 - _i is not bound
+        lambda x: modifier(x[2 * _i : 2 * _i + 2]),  # Should NOT trigger B023 - apply is safe
     )
 
 
-# Test case from issue comment - nested function (should still trigger B023 for legitimate cases)
+# Test case from issue comment - nested function (should NOT trigger B023 - value is function parameter)
 for _ in range(2):
 
     def add_one():
         def _add_one_inner(value):
-            return value + 1  # Should trigger B023 - value is not bound to loop variable
+            return value + 1  # Should NOT trigger B023 - value is function parameter
 
         return _add_one_inner
 
