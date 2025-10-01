@@ -1,8 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
-use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::FormatNodeRule;
 use crate::prelude::*;
@@ -19,63 +18,34 @@ impl FormatNodeRule<ModModule> for FormatModModule {
             node_index: _,
         } = item;
 
+        let source = f.context().source();
+
         if body.is_empty() {
+            let comments = f.context().comments();
             // Only preserve an empty line if the source contains an empty line too.
-            if !f.context().comments().has_leading(item)
-                && lines_after(range.start(), f.context().source()) != 0
-            {
+            if !comments.has_leading(item) && lines_after(range.start(), source) != 0 {
                 empty_line().fmt(f)
             } else {
                 Ok(())
             }
         } else {
-            // Check if the original source ends without a newline and if we're in a suppressed region
-            let should_add_trailing_newline = {
-                let source = f.context().source();
-                let source_ends_without_newline = !source.ends_with('\n');
-
-                // Check if we're currently in a suppressed region by scanning only module-level comments
-                let is_in_suppressed_region = {
-                    let comment_ranges = f.context().comments().ranges();
-                    let mut in_suppression = false;
-
-                    // Get all comments in the file and check suppression state
-                    // Only consider comments that are at module level (not indented)
-                    for comment_range in comment_ranges.iter() {
-                        let comment_text = &source[comment_range.range()];
-
-                        // Check if this comment is at module level (not indented)
-                        let is_module_level = {
-                            let line_start = source.line_start(comment_range.start());
-                            let before_comment =
-                                &source[TextRange::new(line_start, comment_range.start())];
-                            before_comment.trim_start().is_empty()
-                                || before_comment.trim_start().starts_with('#')
-                        };
-
-                        // Only consider module-level suppression comments
-                        if is_module_level {
-                            if let Some(suppression_kind) =
-                                ruff_python_trivia::SuppressionKind::from_comment(comment_text)
-                            {
-                                match suppression_kind {
-                                    ruff_python_trivia::SuppressionKind::Off => {
-                                        in_suppression = true;
-                                    }
-                                    ruff_python_trivia::SuppressionKind::On => {
-                                        in_suppression = false;
-                                    }
-                                    ruff_python_trivia::SuppressionKind::Skip => {} // Skip doesn't affect suppression state
-                                }
-                            }
-                        }
+            let comments = f.context().comments();
+            // Determine if module-level suppression is active at EOF by
+            // iterating comments attached to top-level statements.
+            let mut module_suppressed_at_eof = false;
+            for statement in body {
+                for comment in comments.leading_trailing(statement) {
+                    if comment.is_suppression_off_comment(source) {
+                        module_suppressed_at_eof = true;
+                    } else if comment.is_suppression_on_comment(source) {
+                        module_suppressed_at_eof = false;
                     }
+                }
+            }
 
-                    in_suppression
-                };
-
-                !(source_ends_without_newline && is_in_suppressed_region)
-            };
+            let source_ends_without_newline = !source.ends_with('\n');
+            let should_add_trailing_newline =
+                !(source_ends_without_newline && module_suppressed_at_eof);
 
             if should_add_trailing_newline {
                 write!(
@@ -87,7 +57,7 @@ impl FormatNodeRule<ModModule> for FormatModModule {
                     ]
                 )
             } else {
-                // Don't add trailing newline if we're in a suppressed region
+                // Don't add trailing newline if we're in a suppressed region at EOF
                 body.format().with_options(SuiteKind::TopLevel).fmt(f)
             }
         }

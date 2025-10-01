@@ -1,0 +1,15 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/only_fmt_off_comment.py
+---
+## Input
+```python
+# Only module-level suppression comment should be considered; no trailing newline should be added
+# fmt: off
+```
+
+## Output
+```python
+# Only module-level suppression comment should be considered; no trailing newline should be added
+# fmt: off
+```

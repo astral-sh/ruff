@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/module_level_trailing_off.py
+---
+## Input
+```python
+# Module-level fmt: off at EOF should prevent adding trailing newline
+# fmt: off
+print("a")
+
+```
+
+## Output
+```python
+# Module-level fmt: off at EOF should prevent adding trailing newline
+# fmt: off
+print("a")
+```

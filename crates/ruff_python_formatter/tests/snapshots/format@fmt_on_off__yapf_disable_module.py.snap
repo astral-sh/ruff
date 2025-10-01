@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/yapf_disable_module.py
+---
+## Input
+```python
+# Support for yapf: disable at module level
+# yapf: disable
+print("yapf")
+
+```
+
+## Output
+```python
+# Support for yapf: disable at module level
+# yapf: disable
+print("yapf")
+```

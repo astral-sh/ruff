@@ -1,0 +1,29 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/function_level_only.py
+---
+## Input
+```python
+# Function-level fmt: off should not suppress module-level trailing newline
+def test():
+    # fmt: off
+    x=1
+    # fmt: on
+    return x
+
+print("module")
+
+```
+
+## Output
+```python
+# Function-level fmt: off should not suppress module-level trailing newline
+def test():
+    # fmt: off
+    x=1
+    # fmt: on
+    return x
+
+
+print("module")
+```
