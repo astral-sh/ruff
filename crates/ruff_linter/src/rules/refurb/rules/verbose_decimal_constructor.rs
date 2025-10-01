@@ -131,7 +131,6 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             };
 
             let replacement = format!("{unary}{rest}");
-
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
