@@ -15,4 +15,5 @@ Contents:
     aliases have also been added.
 
 """
+
 aliases: dict[str, str]

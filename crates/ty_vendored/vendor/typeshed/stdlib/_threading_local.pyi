@@ -5,6 +5,7 @@
  faster one available.  You should always import the `local` class from
  `threading`.)
 """
+
 from threading import RLock
 from typing import Any
 from typing_extensions import Self, TypeAlias
@@ -14,8 +15,8 @@ __all__ = ["local"]
 _LocalDict: TypeAlias = dict[Any, Any]
 
 class _localimpl:
-    """A class managing thread-local dicts
-"""
+    """A class managing thread-local dicts"""
+
     __slots__ = ("key", "dicts", "localargs", "locallock", "__weakref__")
     key: str
     dicts: dict[int, tuple[ReferenceType[Any], _LocalDict]]
@@ -24,11 +25,11 @@ class _localimpl:
     locallock: RLock
     def get_dict(self) -> _LocalDict:
         """Return the dict for the current thread. Raises KeyError if none
-defined.
-"""
+        defined.
+        """
+
     def create_dict(self) -> _LocalDict:
-        """Create a new dict for the current thread, and return it.
-"""
+        """Create a new dict for the current thread, and return it."""
 
 class local:
     __slots__ = ("_local__impl", "__dict__")

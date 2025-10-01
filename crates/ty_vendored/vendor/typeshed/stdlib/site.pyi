@@ -68,6 +68,7 @@ named sitecustomize, which can perform arbitrary additional
 site-specific customizations.  If this import fails with an
 ImportError exception, it is silently ignored.
 """
+
 import sys
 from _typeshed import StrPath
 from collections.abc import Iterable
@@ -80,103 +81,112 @@ USER_BASE: str | None
 def main() -> None:
     """Add standard site-specific directories to the module search path.
 
-This function is called automatically when this module is imported,
-unless the python interpreter was started with the -S flag.
-"""
+    This function is called automatically when this module is imported,
+    unless the python interpreter was started with the -S flag.
+    """
+
 def abs_paths() -> None:  # undocumented
-    """Set all module __file__ and __cached__ attributes to an absolute path
-"""
+    """Set all module __file__ and __cached__ attributes to an absolute path"""
+
 def addpackage(sitedir: StrPath, name: StrPath, known_paths: set[str] | None) -> set[str] | None:  # undocumented
     """Process a .pth file within the site-packages directory:
-For each line in the file, either combine it with sitedir to a path
-and add that to known_paths, or execute it if it starts with 'import '.
-"""
+    For each line in the file, either combine it with sitedir to a path
+    and add that to known_paths, or execute it if it starts with 'import '.
+    """
+
 def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
     """Add 'sitedir' argument to sys.path if missing and handle .pth files in
-'sitedir'
-"""
+    'sitedir'
+    """
+
 def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
-    """Add site-packages to sys.path
-"""
+    """Add site-packages to sys.path"""
+
 def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
     """Add a per user site-package to sys.path
 
-Each user has its own python directory with site-packages in the
-home directory.
-"""
+    Each user has its own python directory with site-packages in the
+    home directory.
+    """
+
 def check_enableusersite() -> bool | None:  # undocumented
     """Check if user site directory is safe for inclusion
 
-The function tests for the command line flag (including environment var),
-process uid/gid equal to effective uid/gid.
+    The function tests for the command line flag (including environment var),
+    process uid/gid equal to effective uid/gid.
 
-None: Disabled for security reasons
-False: Disabled by user (command line option)
-True: Safe and enabled
-"""
+    None: Disabled for security reasons
+    False: Disabled by user (command line option)
+    True: Safe and enabled
+    """
 
 if sys.version_info >= (3, 13):
     def gethistoryfile() -> str:  # undocumented
         """Check if the PYTHON_HISTORY environment variable is set and define
-it as the .python_history file.  If PYTHON_HISTORY is not set, use the
-default .python_history file.
-"""
+        it as the .python_history file.  If PYTHON_HISTORY is not set, use the
+        default .python_history file.
+        """
 
 def enablerlcompleter() -> None:  # undocumented
     """Enable default readline configuration on interactive prompts, by
-registering a sys.__interactivehook__.
-"""
+    registering a sys.__interactivehook__.
+    """
 
 if sys.version_info >= (3, 13):
     def register_readline() -> None:  # undocumented
         """Configure readline completion on interactive prompts.
 
-If the readline module can be imported, the hook will set the Tab key
-as completion key and register ~/.python_history as history file.
-This can be overridden in the sitecustomize or usercustomize module,
-or in a PYTHONSTARTUP file.
-"""
+        If the readline module can be imported, the hook will set the Tab key
+        as completion key and register ~/.python_history as history file.
+        This can be overridden in the sitecustomize or usercustomize module,
+        or in a PYTHONSTARTUP file.
+        """
 
 def execsitecustomize() -> None:  # undocumented
-    """Run custom site specific code, if available.
-"""
+    """Run custom site specific code, if available."""
+
 def execusercustomize() -> None:  # undocumented
-    """Run custom user specific code, if available.
-"""
+    """Run custom user specific code, if available."""
+
 def getsitepackages(prefixes: Iterable[str] | None = None) -> list[str]:
     """Returns a list containing all global site-packages directories.
 
-For each directory present in ``prefixes`` (or the global ``PREFIXES``),
-this function will find its `site-packages` subdirectory depending on the
-system environment, and will return a list of full paths.
-"""
+    For each directory present in ``prefixes`` (or the global ``PREFIXES``),
+    this function will find its `site-packages` subdirectory depending on the
+    system environment, and will return a list of full paths.
+    """
+
 def getuserbase() -> str:
     """Returns the `user base` directory path.
 
-The `user base` directory can be used to store data. If the global
-variable ``USER_BASE`` is not initialized yet, this function will also set
-it.
-"""
+    The `user base` directory can be used to store data. If the global
+    variable ``USER_BASE`` is not initialized yet, this function will also set
+    it.
+    """
+
 def getusersitepackages() -> str:
     """Returns the user-specific site-packages directory path.
 
-If the global variable ``USER_SITE`` is not initialized yet, this
-function will also set it.
-"""
+    If the global variable ``USER_SITE`` is not initialized yet, this
+    function will also set it.
+    """
+
 def makepath(*paths: StrPath) -> tuple[str, str]: ...  # undocumented
 def removeduppaths() -> set[str]:  # undocumented
     """Remove duplicate entries from sys.path along with making them
-absolute
-"""
+    absolute
+    """
+
 def setcopyright() -> None:  # undocumented
-    """Set 'copyright' and 'credits' in builtins
-"""
+    """Set 'copyright' and 'credits' in builtins"""
+
 def sethelper() -> None: ...  # undocumented
 def setquit() -> None:  # undocumented
     """Define new builtins 'quit' and 'exit'.
 
-These are objects which make the interpreter exit when called.
-The repr of each object contains a hint at how it works.
+    These are objects which make the interpreter exit when called.
+    The repr of each object contains a hint at how it works.
 
-"""
+    """
+
 def venv(known_paths: set[str] | None) -> set[str] | None: ...  # undocumented

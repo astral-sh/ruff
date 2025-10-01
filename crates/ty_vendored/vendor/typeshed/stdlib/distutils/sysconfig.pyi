@@ -8,6 +8,7 @@ available.
 Written by:   Fred L. Drake, Jr.
 Email:        <fdrake@acm.org>
 """
+
 import sys
 from collections.abc import Mapping
 from distutils.ccompiler import CCompiler
@@ -29,6 +30,7 @@ def expand_makefile_vars(s: str, vars: Mapping[str, str]) -> str:
     variable expansions; if 'vars' is the output of 'parse_makefile()',
     you're fine.  Returns a variable-expanded version of 's'.
     """
+
 @overload
 @deprecated("SO is deprecated, use EXT_SUFFIX. Support is removed in Python 3.11")
 def get_config_var(name: Literal["SO"]) -> int | str | None:
@@ -37,6 +39,7 @@ def get_config_var(name: Literal["SO"]) -> int | str | None:
 
     Equivalent to get_config_vars().get(name)
     """
+
 @overload
 def get_config_var(name: str) -> int | str | None: ...
 @overload
@@ -50,14 +53,15 @@ def get_config_vars() -> dict[str, str | int]:
     With arguments, return a list of values that result from looking up
     each argument in the configuration variable dictionary.
     """
+
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[str | int]: ...
 def get_config_h_filename() -> str:
-    """Return the path of pyconfig.h.
-"""
+    """Return the path of pyconfig.h."""
+
 def get_makefile_filename() -> str:
-    """Return the path of the Makefile.
-"""
+    """Return the path of the Makefile."""
+
 def get_python_inc(plat_specific: bool | Literal[0, 1] = 0, prefix: str | None = None) -> str:
     """Return the directory containing installed Python header files.
 
@@ -69,6 +73,7 @@ def get_python_inc(plat_specific: bool | Literal[0, 1] = 0, prefix: str | None =
     If 'prefix' is supplied, use it instead of sys.base_prefix or
     sys.base_exec_prefix -- i.e., ignore 'plat_specific'.
     """
+
 def get_python_lib(
     plat_specific: bool | Literal[0, 1] = 0, standard_lib: bool | Literal[0, 1] = 0, prefix: str | None = None
 ) -> str:
@@ -85,6 +90,7 @@ def get_python_lib(
     If 'prefix' is supplied, use it instead of sys.base_prefix or
     sys.base_exec_prefix -- i.e., ignore 'plat_specific'.
     """
+
 def customize_compiler(compiler: CCompiler) -> None:
     """Do any platform-specific customization of a CCompiler instance.
 
@@ -95,6 +101,6 @@ def customize_compiler(compiler: CCompiler) -> None:
 if sys.version_info < (3, 10):
     def get_python_version() -> str:
         """Return a string containing the major and minor Python version,
-    leaving off the patchlevel.  Sample return values could be '1.5'
-    or '2.2'.
-    """
+        leaving off the patchlevel.  Sample return values could be '1.5'
+        or '2.2'.
+        """
