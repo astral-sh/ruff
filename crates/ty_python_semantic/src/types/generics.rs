@@ -137,6 +137,9 @@ pub(crate) fn typing_self<'db>(
     .map(typevar_to_type)
 }
 
+#[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub struct GenericContextTypeVarOptions {}
+
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
 /// # Ordering
@@ -146,7 +149,7 @@ pub(crate) fn typing_self<'db>(
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
-    variables_inner: FxOrderMap<BoundTypeVarInstance<'db>, ()>,
+    variables_inner: FxOrderMap<BoundTypeVarInstance<'db>, GenericContextTypeVarOptions>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -165,7 +168,7 @@ impl get_size2::GetSize for GenericContext<'_> {}
 impl<'db> GenericContext<'db> {
     fn from_variables(
         db: &'db dyn Db,
-        variables: impl IntoIterator<Item = (BoundTypeVarInstance<'db>, ())>,
+        variables: impl IntoIterator<Item = (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions)>,
     ) -> Self {
         Self::new_internal(db, variables.into_iter().collect::<FxOrderMap<_, _>>())
     }
@@ -193,7 +196,7 @@ impl<'db> GenericContext<'db> {
             db,
             type_params
                 .into_iter()
-                .map(|bound_typevar| (bound_typevar, ())),
+                .map(|bound_typevar| (bound_typevar, GenericContextTypeVarOptions::default())),
         )
     }
 
@@ -205,7 +208,7 @@ impl<'db> GenericContext<'db> {
             self.variables_inner(db)
                 .iter()
                 .chain(other.variables_inner(db).iter())
-                .map(|(bound_typevar, ())| (*bound_typevar, ())),
+                .map(|(bound_typevar, options)| (*bound_typevar, *options)),
         )
     }
 
@@ -454,7 +457,9 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances(db, variables)
     }
 
-    fn heap_size((variables,): &(FxOrderMap<BoundTypeVarInstance<'db>, ()>,)) -> usize {
+    fn heap_size(
+        (variables,): &(FxOrderMap<BoundTypeVarInstance<'db>, GenericContextTypeVarOptions>,),
+    ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
 }
