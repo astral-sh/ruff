@@ -5887,10 +5887,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let elt_tys = |collection_class: KnownClass| {
             let class_literal = collection_class.try_to_class_literal(self.db())?;
             let generic_context = class_literal.generic_context(self.db())?;
-            Some((class_literal, generic_context.variables(self.db())))
+            Some((
+                class_literal,
+                generic_context,
+                generic_context.variables(self.db()),
+            ))
         };
 
-        let Some((class_literal, elt_tys)) = elt_tys(collection_class) else {
+        let Some((class_literal, generic_context, elt_tys)) = elt_tys(collection_class) else {
             // Infer the element types without type context, and fallback to unknown for
             // custom typesheds.
             for elt in elts.flatten().flatten() {
@@ -5906,7 +5910,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|specialization| specialization.types(self.db()));
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db());
+        let mut builder =
+            SpecializationBuilder::new(self.db(), generic_context.inferable_typevars(self.db()));
 
         match annotated_elt_tys {
             // The annotated type acts as a constraint for `T`.
@@ -5971,7 +5976,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let class_type = class_literal.apply_specialization(self.db(), |generic_context| {
+        let class_type = class_literal.apply_specialization(self.db(), |_| {
             builder.build(generic_context, TypeContext::default())
         });
 

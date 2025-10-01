@@ -2521,11 +2521,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn infer_specialization(&mut self) {
-        if self.signature.generic_context.is_none() {
+        let Some(generic_context) = self.signature.generic_context else {
             return;
-        }
+        };
 
-        let mut builder = SpecializationBuilder::new(self.db);
+        let mut builder =
+            SpecializationBuilder::new(self.db, generic_context.inferable_typevars(self.db));
 
         // Note that we infer the annotated type _before_ the arguments if this call is part of
         // an annotated assignment, to closer match the order of any unions written in the type
@@ -2570,10 +2571,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        self.specialization = self
-            .signature
-            .generic_context
-            .map(|gc| builder.build(gc, *self.call_expression_tcx));
+        self.specialization = Some(builder.build(generic_context, *self.call_expression_tcx));
     }
 
     fn check_argument_type(

@@ -1206,13 +1206,15 @@ impl<'db> PartialSpecialization<'_, 'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
+    inferable: &'db InferableTypeVars<'db>,
     types: FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, inferable: &'db InferableTypeVars<'db>) -> Self {
         Self {
             db,
+            inferable,
             types: FxHashMap::default(),
         }
     }
@@ -1351,7 +1353,10 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar)) => {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty.is_assignable_to(self.db, bound) {
+                        if !ty
+                            .when_assignable_to(self.db, bound, self.inferable)
+                            .is_always_satisfied()
+                        {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,
@@ -1361,7 +1366,10 @@ impl<'db> SpecializationBuilder<'db> {
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         for constraint in constraints.elements(self.db) {
-                            if ty.is_assignable_to(self.db, *constraint) {
+                            if ty
+                                .when_assignable_to(self.db, *constraint, self.inferable)
+                                .is_always_satisfied()
+                            {
                                 self.add_type_mapping(bound_typevar, *constraint);
                                 return Ok(());
                             }
