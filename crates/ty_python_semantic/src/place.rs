@@ -840,14 +840,7 @@ fn place_by_id<'db>(
             // not union with `Unknown`, because the symbol cannot be modified externally.
             let scope_has_private_visibility = scope.scope(db).visibility().is_private();
 
-            // We generally trust undeclared places in stubs and do not union with `Unknown`.
-            let in_stub_file = scope.file(db).is_stub(db);
-
-            if is_considered_non_modifiable
-                || is_module_global
-                || scope_has_private_visibility
-                || in_stub_file
-            {
+            if is_considered_non_modifiable || is_module_global || scope_has_private_visibility {
                 inferred.into()
             } else {
                 // Widen the inferred type of undeclared public symbols by unioning with `Unknown`
