@@ -602,8 +602,18 @@ fn has_relation_in_invariant_position<'db>(
             base_mat,
             visitor,
         ),
-        // Subtyping between invariant type parameters without a top/bottom materialization involved
-        // is equivalence
+        // Subtyping between invariant type parameters without a top/bottom materialization necessitates
+        // checking the subtyping relation both ways: `A` must be a subtype of `B` *and* `B` must be a
+        // subtype of `A`. The same applies to assignability.
+        //
+        // For subtyping between fully static types, this is the same as equivalence. However, we cannot
+        // use `is_equivalent_to` (or `when_equivalent_to`) here, because we (correctly) understand
+        // `list[Any]` as being equivalent to `list[Any]`, but we don't want `list[Any]` to be
+        // considered a subtype of `list[Any]`. For assignability, we would have the opposite issue if
+        // we simply checked for equivalence here: `Foo[Any]` should be considered assignable to
+        // `Foo[list[Any]]` even if `Foo` is invariant, and even though `Any` is not equivalent to
+        // `list[Any]`, because `Any` is assignable to `list[Any]` and `list[Any]` is assignable to
+        // `Any`.
         (None, None, relation) => derived_type
             .has_relation_to_impl(db, *base_type, relation, visitor)
             .and(db, || {
