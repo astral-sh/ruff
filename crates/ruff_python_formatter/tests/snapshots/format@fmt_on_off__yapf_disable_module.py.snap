@@ -7,7 +7,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off
 # Support for yapf: disable at module level
 # yapf: disable
 print("yapf")
-
 ```
 
 ## Output

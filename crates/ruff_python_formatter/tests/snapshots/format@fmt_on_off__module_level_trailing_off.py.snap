@@ -7,7 +7,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off
 # Module-level fmt: off at EOF should prevent adding trailing newline
 # fmt: off
 print("a")
-
 ```
 
 ## Output

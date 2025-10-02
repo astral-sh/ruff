@@ -1,4 +1,3 @@
-use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
 use ruff_text_size::Ranged;
@@ -29,37 +28,34 @@ impl FormatNodeRule<ModModule> for FormatModModule {
                 Ok(())
             }
         } else {
-            let comments = f.context().comments();
-            // Determine if module-level suppression is active at EOF by
-            // iterating comments attached to top-level statements.
-            let mut module_suppressed_at_eof = false;
-            for statement in body {
-                for comment in comments.leading_trailing(statement) {
-                    if comment.is_suppression_off_comment(source) {
-                        module_suppressed_at_eof = true;
-                    } else if comment.is_suppression_on_comment(source) {
-                        module_suppressed_at_eof = false;
-                    }
-                }
+            body.format().with_options(SuiteKind::TopLevel).fmt(f)?;
+
+            if source.ends_with('\n') || !has_unclosed_fmt_off(body, f.context()) {
+                hard_line_break().fmt(f)?;
             }
 
-            let source_ends_without_newline = !source.ends_with('\n');
-            let should_add_trailing_newline =
-                !(source_ends_without_newline && module_suppressed_at_eof);
+            Ok(())
+        }
+    }
+}
 
-            if should_add_trailing_newline {
-                write!(
-                    f,
-                    [
-                        body.format().with_options(SuiteKind::TopLevel),
-                        // Trailing newline at the end of the file
-                        hard_line_break()
-                    ]
-                )
-            } else {
-                // Don't add trailing newline if we're in a suppressed region at EOF
-                body.format().with_options(SuiteKind::TopLevel).fmt(f)
+/// Determines if there's an unclosed fmt:off suppression at the end of the module
+fn has_unclosed_fmt_off(body: &[ruff_python_ast::Stmt], context: &PyFormatContext) -> bool {
+    let comments = context.comments();
+    let source = context.source();
+
+    // Determine if module-level suppression is active at EOF by
+    // iterating comments attached to top-level statements.
+    let mut module_suppressed_at_eof = false;
+    for statement in body {
+        for comment in comments.leading_trailing(statement) {
+            if comment.is_suppression_off_comment(source) {
+                module_suppressed_at_eof = true;
+            } else if comment.is_suppression_on_comment(source) {
+                module_suppressed_at_eof = false;
             }
         }
     }
+
+    module_suppressed_at_eof
 }
