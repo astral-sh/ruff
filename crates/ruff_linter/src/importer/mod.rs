@@ -533,13 +533,16 @@ impl<'a> Importer<'a> {
 
     /// Find the last `from __future__` import statement in the AST.
     fn find_last_future_import(&self) -> Option<&'a Stmt> {
-        self.python_ast.iter().rev().find(|stmt| {
-            if let Stmt::ImportFrom(import_from) = stmt {
-                import_from.module.as_deref() == Some("__future__")
-            } else {
-                false
-            }
-        })
+        self.python_ast
+            .iter()
+            .take_while(|stmt| {
+                if let Stmt::ImportFrom(import_from) = stmt {
+                    import_from.module.as_deref() == Some("__future__")
+                } else {
+                    false
+                }
+            })
+            .last()
     }
 
     /// Add a `from __future__ import annotations` import.
