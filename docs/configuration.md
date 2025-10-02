@@ -52,8 +52,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     [tool.ruff.lint]
     # Enable Pyflakes (`F`), a subset of the pycodestyle (`E`) codes,
-	# and a couple of other codes corresponding to CPython deprecations
-	# and syntax warnings by default.
+    # and a couple of other codes corresponding to CPython deprecations
+    # and syntax warnings by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F", "PYI057", "B012"]
