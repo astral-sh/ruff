@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test_case(Path::new("no_future_import_uses_lowercase.py"))]
-    #[test_case(Path::new("no_future_import_uses_collections_abc.py"))]
+    #[test_case(Path::new("no_future_import_uses_preview_generics.py"))]
     #[test_case(Path::new("no_future_import_uses_union.py"))]
     #[test_case(Path::new("no_future_import_uses_union_inner.py"))]
     #[test_case(Path::new("ok_no_types.py"))]
