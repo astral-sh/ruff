@@ -594,6 +594,11 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
+        // If this lint is being reported as part of multi-inference of a given expression,
+        // silence it to avoid duplicated diagnostics.
+        if ctx.is_in_multi_inference() {
+            return None;
+        }
         Some(DiagnosticGuardBuilder { ctx, id, severity })
     }
 
