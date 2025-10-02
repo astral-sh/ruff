@@ -9,6 +9,31 @@ import re
 import shelve
 import types
 import weakref
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterable,
+    AsyncIterator,
+    Awaitable,
+    ByteString,
+    Callable,
+    Collection,
+    Container,
+    Coroutine,
+    Generator,
+    Iterable,
+    Iterator,
+    ItemsView,
+    KeysView,
+    Mapping,
+    MappingView,
+    MutableMapping,
+    MutableSequence,
+    MutableSet,
+    Reversible,
+    Sequence,
+    Set,
+    ValuesView,
+)
 
 
 def takes_preview_generics(
@@ -39,5 +64,28 @@ def takes_preview_generics(
     weak_method: weakref.WeakMethod[int],
     weak_set: weakref.WeakSet[int],
     weak_value_dict: weakref.WeakValueDictionary[object, int],
+    awaitable: Awaitable[int],
+    coroutine: Coroutine[int, None, str],
+    async_iterable: AsyncIterable[int],
+    async_iterator: AsyncIterator[int],
+    async_generator: AsyncGenerator[int, None],
+    iterable: Iterable[int],
+    iterator: Iterator[int],
+    generator: Generator[int, None, None],
+    reversible: Reversible[int],
+    container: Container[int],
+    collection: Collection[int],
+    callable_obj: Callable[[int], str],
+    set_obj: Set[int],
+    mutable_set: MutableSet[int],
+    mapping: Mapping[str, int],
+    mutable_mapping: MutableMapping[str, int],
+    sequence: Sequence[int],
+    mutable_sequence: MutableSequence[int],
+    byte_string: ByteString[int],
+    mapping_view: MappingView[str, int],
+    keys_view: KeysView[str],
+    items_view: ItemsView[str, int],
+    values_view: ValuesView[int],
 ) -> None:
     ...
