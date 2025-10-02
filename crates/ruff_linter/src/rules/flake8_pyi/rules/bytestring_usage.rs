@@ -20,9 +20,21 @@ use crate::{FixAvailability, Violation};
 /// from typing import ByteString
 /// ```
 ///
-/// Use instead:
+/// On Python versions after 3.12, use the `Buffer` type from the standard library instead:
 /// ```python
 /// from collections.abc import Buffer
+/// ```
+///
+/// For earlier Python versions, you can use `typing_extensions`:
+/// ```python
+/// from typing_extensions import Buffer
+/// ```
+///
+/// or a union:
+/// ```python
+/// from typing import Union
+///
+/// x: Union[bytes, bytearray, memoryview]
 /// ```
 ///
 /// ## References
