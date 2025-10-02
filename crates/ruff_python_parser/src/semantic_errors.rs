@@ -7,7 +7,7 @@ use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
     comparable::ComparableExpr,
-    helpers,
+    helpers, name,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -1125,6 +1125,12 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::AlternateBindedPattern(expected, found) => {
+                write!(
+                    f,
+                    "alternative pattern bind different names: expected `{expected}`, found `{found}`"
+                )
+            }
         }
     }
 }
@@ -1353,7 +1359,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1371,7 +1380,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1498,6 +1510,8 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
+
+    AlternateBindedPattern(String, String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1748,12 +1762,43 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // test_ok multiple_assignment_in_case_pattern
                 // match 2:
                 //     case Class(x) | [x] | x: ...
+
+                let mut all_names: Vec<Vec<String>> = Vec::new();
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
+                    let mut names: Vec<String> =
+                        visitor.names.iter().map(ToString::to_string).collect();
+                    names.sort();
+                    all_names.push(names);
+                }
+
+                if let Some(first_name) = all_names.first() {
+                    for current_name in all_names.iter().skip(1) {
+                        if current_name != first_name {
+                            // test_err alternate_binded_pattern
+                            // match x:
+                            //     case [a] | [b]: ...
+                            //     case [a] | []: ...
+                            //     case (x, y) | (x,): ...
+                            //     case [a, _] | [a, b]: ...
+                            //     case (x, (y | z)): ...
+                            //     case [a] | [b] | [c]: ...
+
+                            SemanticSyntaxChecker::add_error(
+                                self.ctx,
+                                SemanticSyntaxErrorKind::AlternateBindedPattern(
+                                    first_name.join(", "),
+                                    current_name.join(", "),
+                                ),
+                                pattern.range(),
+                            );
+                            break;
+                        }
+                    }
                 }
             }
         }

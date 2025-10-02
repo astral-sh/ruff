@@ -1,0 +1,563 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/alternate_binded_pattern.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..266,
+        body: [
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 0..262,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..32,
+                            node_index: NodeIndex(None),
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 18..27,
+                                    node_index: NodeIndex(None),
+                                    patterns: [
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 18..21,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 19..20,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("a"),
+                                                                    range: 19..20,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 24..27,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 25..26,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("b"),
+                                                                    range: 25..26,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 29..32,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 29..32,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 57..75,
+                            node_index: NodeIndex(None),
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 62..70,
+                                    node_index: NodeIndex(None),
+                                    patterns: [
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 62..65,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 63..64,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("a"),
+                                                                    range: 63..64,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 68..70,
+                                                node_index: NodeIndex(None),
+                                                patterns: [],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 72..75,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 72..75,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 102..125,
+                            node_index: NodeIndex(None),
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 107..120,
+                                    node_index: NodeIndex(None),
+                                    patterns: [
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 107..113,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 108..109,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 108..109,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 111..112,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("y"),
+                                                                    range: 111..112,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 116..120,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 117..118,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 117..118,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 122..125,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 122..125,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 147..172,
+                            node_index: NodeIndex(None),
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 152..167,
+                                    node_index: NodeIndex(None),
+                                    patterns: [
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 152..158,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 153..154,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("a"),
+                                                                    range: 153..154,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 156..157,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: None,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 161..167,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 162..163,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("a"),
+                                                                    range: 162..163,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 165..166,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("b"),
+                                                                    range: 165..166,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 169..172,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 169..172,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 192..214,
+                            node_index: NodeIndex(None),
+                            pattern: MatchSequence(
+                                PatternMatchSequence {
+                                    range: 197..209,
+                                    node_index: NodeIndex(None),
+                                    patterns: [
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                range: 198..199,
+                                                node_index: NodeIndex(None),
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("x"),
+                                                        range: 198..199,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchOr(
+                                            PatternMatchOr {
+                                                range: 202..207,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 202..203,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("y"),
+                                                                    range: 202..203,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 206..207,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("z"),
+                                                                    range: 206..207,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 211..214,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 211..214,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 237..262,
+                            node_index: NodeIndex(None),
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 242..257,
+                                    node_index: NodeIndex(None),
+                                    patterns: [
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 242..245,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 243..244,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("a"),
+                                                                    range: 243..244,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 248..251,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 249..250,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("b"),
+                                                                    range: 249..250,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 254..257,
+                                                node_index: NodeIndex(None),
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 255..256,
+                                                            node_index: NodeIndex(None),
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("c"),
+                                                                    range: 255..256,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 259..262,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 259..262,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | match x:
+2 |     case [a] | [b]: ...                    
+  |          ^^^^^^^^^ Syntax Error: alternative pattern bind different names: expected `a`, found `b`
+3 |     case [a] | []: ...                      
+4 |     case (x, y) | (x,): ...                 
+  |
+
+
+  |
+1 | match x:
+2 |     case [a] | [b]: ...                    
+3 |     case [a] | []: ...                      
+  |          ^^^^^^^^ Syntax Error: alternative pattern bind different names: expected `a`, found ``
+4 |     case (x, y) | (x,): ...                 
+5 |     case [a, _] | [a, b]: ...               
+  |
+
+
+  |
+2 |     case [a] | [b]: ...                    
+3 |     case [a] | []: ...                      
+4 |     case (x, y) | (x,): ...                 
+  |          ^^^^^^^^^^^^^ Syntax Error: alternative pattern bind different names: expected `x, y`, found `x`
+5 |     case [a, _] | [a, b]: ...               
+6 |     case (x, (y | z)): ...                  
+  |
+
+
+  |
+3 |     case [a] | []: ...                      
+4 |     case (x, y) | (x,): ...                 
+5 |     case [a, _] | [a, b]: ...               
+  |          ^^^^^^^^^^^^^^^ Syntax Error: alternative pattern bind different names: expected `a`, found `a, b`
+6 |     case (x, (y | z)): ...                  
+7 |     case [a] | [b] | [c]: ...   
+  |
+
+
+  |
+4 |     case (x, y) | (x,): ...                 
+5 |     case [a, _] | [a, b]: ...               
+6 |     case (x, (y | z)): ...                  
+  |               ^^^^^ Syntax Error: alternative pattern bind different names: expected `y`, found `z`
+7 |     case [a] | [b] | [c]: ...   
+  |
+
+
+  |
+5 |     case [a, _] | [a, b]: ...               
+6 |     case (x, (y | z)): ...                  
+7 |     case [a] | [b] | [c]: ...   
+  |          ^^^^^^^^^^^^^^^ Syntax Error: alternative pattern bind different names: expected `a`, found `b`
+  |
