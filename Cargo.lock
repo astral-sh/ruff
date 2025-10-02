@@ -4449,6 +4449,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "serde-wasm-bindgen",
+ "tracing",
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
