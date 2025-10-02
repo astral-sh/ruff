@@ -30,10 +30,7 @@ Released on 2025-10-02.
 
 ### Other changes
 
-- Handle t-string prefixes in `SimpleTokenizer` ([#20578](https://github.com/astral-sh/ruff/pull/20578))
 - \[`playground`\] Fix quick fixes for empty ranges in playground ([#20599](https://github.com/astral-sh/ruff/pull/20599))
-- \[`ruff`\] Fix minor typos in doc comments ([#20623](https://github.com/astral-sh/ruff/pull/20623))
-- \[`ty`\] Reject renaming files to start with slash in Playground ([#20666](https://github.com/astral-sh/ruff/pull/20666))
 
 ### Contributors
 
