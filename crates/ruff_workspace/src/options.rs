@@ -804,11 +804,12 @@ pub struct LintCommonOptions {
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
     #[option(
-        default = r#"["E4", "E7", "E9", "F"]"#,
+        default = r#"["E4", "E7", "E9", "F", "B012", "PYI057"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E4", "E7", "E9", "F", "B", "Q"]
+            # On top of the defaults (`E4`, E7`, `E9`, `F`, `B012`, and `PYI057`),
+            # enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E4", "E7", "E9", "F", "PYI057", "B", "Q"]
         "#
     )]
     pub select: Option<Vec<RuleSelector>>,

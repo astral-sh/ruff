@@ -311,9 +311,13 @@ for more on the linting and formatting commands, respectively.
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
-By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
-stylistic rules that overlap with the use of a formatter, like `ruff format` or
-[Black](https://github.com/psf/black).
+By default, Ruff enables Flake8's `F` rules, along with a subset of the `E`
+rules, omitting any stylistic rules that overlap with the use of a formatter,
+like `ruff format` or [Black](https://github.com/psf/black). Ruff also enables
+[`B012`](https://docs.astral.sh/ruff/rules/jump-statement-in-finally/), which
+corresponds to a `SyntaxWarning`, and
+[`PYI057`](https://docs.astral.sh/ruff/rules/byte-string-usage/), which flags
+usage of some long-deprecated APIs in the standard library.
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
 catches a wide variety of common errors (like unused imports) with zero configuration.
