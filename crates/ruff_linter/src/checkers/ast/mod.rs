@@ -75,7 +75,6 @@ use crate::rules::pyflakes::rules::{
 use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
 };
-use crate::rules::ruff::rules::GlobalParameter;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
@@ -674,11 +673,6 @@ impl SemanticSyntaxContext for Checker<'_> {
                     );
                 }
             }
-            SemanticSyntaxErrorKind::GlobalParameter(name) => {
-                if self.is_rule_enabled(Rule::GlobalParameter) {
-                    self.report_diagnostic(GlobalParameter { name }, error.range);
-                }
-            }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 // F706
                 if self.is_rule_enabled(Rule::ReturnOutsideFunction) {
@@ -730,6 +724,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
             | SemanticSyntaxErrorKind::InvalidExpression(..)
+            | SemanticSyntaxErrorKind::GlobalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
@@ -852,23 +847,33 @@ impl SemanticSyntaxContext for Checker<'_> {
         false
     }
 
-    fn is_binded_parameter(&self, name: &str) -> bool {
-        if !self.in_function_scope() {
-            return false;
+    fn is_bound_parameter(&self, name: &str) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => {
+                    if let Some(binding_id) = scope.get(name) {
+                        let binding = self.semantic.binding(binding_id);
+                        if matches!(binding.kind, BindingKind::Argument) {
+                            return true;
+                        }
+                        if let Some(&shadowed_id) = self.semantic.shadowed_bindings.get(&binding_id)
+                        {
+                            let shadowed_binding = self.semantic.binding(shadowed_id);
+                            if matches!(shadowed_binding.kind, BindingKind::Argument) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
+            }
         }
 
-        if let Some(binding_id) = self.semantic.lookup_symbol(name) {
-            let binding = self.semantic.binding(binding_id);
-            if matches!(binding.kind, BindingKind::Argument) {
-                return true;
-            }
-            if let Some(&shadowed_id) = self.semantic.shadowed_bindings.get(&binding_id) {
-                let shadowed_binding = self.semantic.binding(shadowed_id);
-                if matches!(shadowed_binding.kind, BindingKind::Argument) {
-                    return true;
-                }
-            }
-        }
         false
     }
 

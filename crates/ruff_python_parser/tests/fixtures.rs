@@ -576,7 +576,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         true
     }
 
-    fn is_binded_parameter(&self, name: &str) -> bool {
+    fn is_bound_parameter(&self, name: &str) -> bool {
         false
     }
 

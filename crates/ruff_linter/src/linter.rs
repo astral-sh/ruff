@@ -1041,6 +1041,30 @@ mod tests {
         "DuplicateMatchKey"
     )]
     #[test_case(
+        "global_parameter",
+        "
+        def f(a):
+            global a
+
+        def g(a):
+            if True:
+                global a 
+
+        def h(a):
+            def inner():
+                global a 
+
+        def i(a):
+            try:
+                global a 
+            except Exception:
+                pass
+
+        ",
+        PythonVersion::PY310,
+        "GlobalParameter"
+    )]
+    #[test_case(
         "duplicate_match_class_attribute",
         "
         match x:
@@ -1213,7 +1237,6 @@ mod tests {
         Rule::LoadBeforeGlobalDeclaration,
         Path::new("load_before_global_declaration.py")
     )]
-    #[test_case(Rule::GlobalParameter, Path::new("global_parameter.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async_function.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("async_comprehension.py"))]
     #[test_case(
