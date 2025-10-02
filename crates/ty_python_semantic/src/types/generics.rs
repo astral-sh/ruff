@@ -1326,7 +1326,9 @@ impl<'db> SpecializationBuilder<'db> {
         // without specializing `T` to `None`.
         if !matches!(formal, Type::ProtocolInstance(_))
             && !actual.is_never()
-            && actual.is_subtype_of(self.db, formal)
+            && actual
+                .when_subtype_of(self.db, formal, self.inferable)
+                .is_always_satisfied()
         {
             return Ok(());
         }
