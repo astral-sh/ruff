@@ -6595,3 +6595,38 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     });
     Ok(())
 }
+
+#[test]
+fn default_rules() {
+    let stdin = "\
+	def f():
+		try:
+			from typing import ByteString as TypingByteString  # PYI057
+			from collections.abc import ByteString as CollectionsByteString  # PYI057
+		except:
+			pass
+		finally:
+			return  # B012
+";
+
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--output-format=concise", "--no-cache", "--stdin-filename=test.py", "-"])
+            .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:3:23: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+    test.py:3:37: F401 [*] `typing.ByteString` imported but unused
+    test.py:4:32: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
+    test.py:4:46: F401 [*] `collections.abc.ByteString` imported but unused
+    test.py:5:3: E722 Do not use bare `except`
+    test.py:8:4: B012 `return` inside `finally` blocks cause exceptions to be silenced
+    Found 6 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ",
+    );
+}
