@@ -1413,7 +1413,10 @@ impl<'db> CallableBinding<'db> {
                     let parameter_type = overload.signature.parameters()[*parameter_index]
                         .annotated_type()
                         .unwrap_or(Type::unknown());
-                    if argument_type.is_assignable_to(db, parameter_type) {
+                    if argument_type
+                        .when_assignable_to(db, parameter_type, overload.inferable_typevars)
+                        .is_always_satisfied()
+                    {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
                     }
@@ -1639,7 +1642,14 @@ impl<'db> CallableBinding<'db> {
                         .unwrap_or(Type::unknown());
                     let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
-                        if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
+                        if !first_parameter_type
+                            .when_equivalent_to(
+                                db,
+                                current_parameter_type,
+                                overload.inferable_typevars,
+                            )
+                            .is_always_satisfied()
+                        {
                             participating_parameter_indexes.insert(parameter_index);
                         }
                     } else {
@@ -1756,7 +1766,12 @@ impl<'db> CallableBinding<'db> {
                 matching_overloads.all(|(_, overload)| {
                     overload
                         .return_type()
-                        .is_equivalent_to(db, first_overload_return_type)
+                        .when_equivalent_to(
+                            db,
+                            first_overload_return_type,
+                            overload.inferable_typevars,
+                        )
+                        .is_always_satisfied()
                 })
             } else {
                 // No matching overload
@@ -2725,7 +2740,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return;
             };
 
-            if !key_type.is_assignable_to(self.db, KnownClass::Str.to_instance(self.db)) {
+            if !key_type
+                .when_assignable_to(
+                    self.db,
+                    KnownClass::Str.to_instance(self.db),
+                    self.inferable_typevars,
+                )
+                .is_always_satisfied()
+            {
                 self.errors.push(BindingError::InvalidKeyType {
                     argument_index: adjusted_argument_index,
                     provided_ty: key_type,
@@ -2760,8 +2782,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
-    fn finish(self) -> Option<Specialization<'db>> {
-        self.specialization
+    fn finish(self) -> (InferableTypeVars<'db, 'db>, Option<Specialization<'db>>) {
+        (self.inferable_typevars, self.specialization)
     }
 }
 
@@ -2825,6 +2847,9 @@ pub(crate) struct Binding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
 
+    /// The inferable typevars in this signature.
+    inferable_typevars: InferableTypeVars<'db, 'db>,
+
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
 
@@ -2851,6 +2876,7 @@ impl<'db> Binding<'db> {
             callable_type: signature_type,
             signature_type,
             return_ty: Type::unknown(),
+            inferable_typevars: InferableTypeVars::None,
             specialization: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
@@ -2922,7 +2948,7 @@ impl<'db> Binding<'db> {
         checker.infer_specialization();
 
         checker.check_argument_types();
-        self.specialization = checker.finish();
+        (self.inferable_typevars, self.specialization) = checker.finish();
         if let Some(specialization) = self.specialization {
             self.return_ty = self.return_ty.apply_specialization(db, specialization);
         }
