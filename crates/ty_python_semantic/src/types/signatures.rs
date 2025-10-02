@@ -702,15 +702,6 @@ impl<'db> Signature<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // The typevars in self and other should also be considered inferable when checking whether
-        // two signatures are equivalent.
-        let self_inferable =
-            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let other_inferable =
-            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let inferable = inferable.merge(self_inferable.as_ref());
-        let inferable = inferable.merge(other_inferable.as_ref());
-
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -771,6 +762,15 @@ impl<'db> Signature<'db> {
                 )
             }
         }
+
+        // The typevars in self and other should also be considered inferable when checking whether
+        // two signatures are equivalent.
+        let self_inferable =
+            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
+        let other_inferable =
+            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
+        let inferable = inferable.merge(self_inferable.as_ref());
+        let inferable = inferable.merge(other_inferable.as_ref());
 
         let mut result = ConstraintSet::from(true);
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
