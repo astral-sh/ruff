@@ -67,8 +67,9 @@ impl<'a> Importer<'a> {
     /// Add an import statement to import the given module.
     ///
     /// If there are no existing imports, the new import will be added at the top
-    /// of the file. Otherwise, it will be added after the most recent top-level
-    /// import statement.
+    /// of the file. If there are future imports, the new import will be added
+    /// after the last future import. Otherwise, it will be added after the most
+    /// recent top-level import statement.
     pub(crate) fn add_import(&self, import: &NameImport, at: TextSize) -> Edit {
         let required_import = import.to_string();
         if let Some(stmt) = self.preceding_import(at) {
@@ -536,6 +537,18 @@ impl<'a> Importer<'a> {
         self.python_ast
             .iter()
             .take_while(|stmt| {
+                match stmt {
+                    Stmt::ImportFrom(import_from) => {
+                        import_from.module.as_deref() == Some("__future__")
+                    }
+                    Stmt::Expr(stmt_expr) => {
+                        // Allow docstrings (string literals) to come before future imports
+                        matches!(stmt_expr.value.as_ref(), Expr::StringLiteral(_))
+                    }
+                    _ => false,
+                }
+            })
+            .filter(|stmt| {
                 if let Stmt::ImportFrom(import_from) = stmt {
                     import_from.module.as_deref() == Some("__future__")
                 } else {
