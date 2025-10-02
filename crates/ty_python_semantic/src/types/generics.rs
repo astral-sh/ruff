@@ -140,68 +140,32 @@ pub(crate) fn typing_self<'db>(
     .map(Type::TypeVar)
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, salsa::Update)]
-pub(crate) struct InferableTypeVars<'db> {
-    typevars: FxHashSet<BoundTypeVarInstance<'db>>,
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum InferableTypeVars<'a, 'db> {
+    None,
+    One(&'a FxHashSet<BoundTypeVarInstance<'db>>),
+    Two(
+        &'a InferableTypeVars<'a, 'db>,
+        &'a InferableTypeVars<'a, 'db>,
+    ),
 }
 
-impl<'db> InferableTypeVars<'db> {
-    pub(crate) fn none() -> Self {
-        InferableTypeVars {
-            typevars: FxHashSet::default(),
-        }
-    }
-
+impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn is_inferable(&self, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
-        self.typevars.contains(&bound_typevar)
+        match self {
+            InferableTypeVars::None => false,
+            InferableTypeVars::One(typevars) => typevars.contains(&bound_typevar),
+            InferableTypeVars::Two(left, right) => {
+                left.is_inferable(bound_typevar) || right.is_inferable(bound_typevar)
+            }
+        }
     }
 
-    fn from_bound_typevars(
-        db: &'db dyn Db,
-        bound_typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
-    ) -> Self {
-        struct CollectTypeVars<'db> {
-            typevars: RefCell<FxHashSet<BoundTypeVarInstance<'db>>>,
-            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+    pub(crate) fn merge(&'a self, other: Option<&'a InferableTypeVars<'a, 'db>>) -> Self {
+        match other {
+            Some(other) => InferableTypeVars::Two(self, other),
+            None => *self,
         }
-
-        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                true
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.typevars.borrow_mut().insert(bound_typevar);
-                walk_bound_type_var_type(db, bound_typevar, self);
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                match TypeKind::from(ty) {
-                    TypeKind::Atomic => {}
-                    TypeKind::NonAtomic(non_atomic_type) => {
-                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                            // If we have already seen this type, we can skip it.
-                            return;
-                        }
-                        walk_non_atomic_type(db, non_atomic_type, self);
-                    }
-                }
-            }
-        }
-
-        let visitor = CollectTypeVars {
-            typevars: RefCell::new(FxHashSet::default()),
-            seen_types: RefCell::new(FxIndexSet::default()),
-        };
-        for bound_typevar in bound_typevars {
-            visitor.visit_bound_type_var_type(db, bound_typevar);
-        }
-        let typevars = visitor.typevars.into_inner();
-        Self { typevars }
     }
 }
 
@@ -301,9 +265,62 @@ impl<'db> GenericContext<'db> {
         )
     }
 
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+        // The first inner function is so that salsa is caching the FxHashSet, not the
+        // InferableTypeVars that wraps it. (That way InferableTypeVars can contain references, and
+        // doesn't need to impl salsa::Update.)
+        InferableTypeVars::One(self.inferable_typevars_inner(db))
+    }
+
     #[salsa::tracked(returns(ref))]
-    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
-        InferableTypeVars::from_bound_typevars(db, self.variables(db))
+    fn inferable_typevars_inner(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarInstance<'db>> {
+        // The second inner function is because the salsa macros seem to not like nested structs
+        // and impl blocks inside the function.
+        self.inferable_typevars_innerer(db)
+    }
+
+    fn inferable_typevars_innerer(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarInstance<'db>> {
+        struct CollectTypeVars<'db> {
+            typevars: RefCell<FxHashSet<BoundTypeVarInstance<'db>>>,
+            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars.borrow_mut().insert(bound_typevar);
+                walk_bound_type_var_type(db, bound_typevar, self);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
+                            // If we have already seen this type, we can skip it.
+                            return;
+                        }
+                        walk_non_atomic_type(db, non_atomic_type, self);
+                    }
+                }
+            }
+        }
+
+        let visitor = CollectTypeVars {
+            typevars: RefCell::new(FxHashSet::default()),
+            seen_types: RefCell::new(FxIndexSet::default()),
+        };
+        for bound_typevar in self.variables(db) {
+            visitor.visit_bound_type_var_type(db, bound_typevar);
+        }
+        visitor.typevars.into_inner()
     }
 
     pub(crate) fn variables(
@@ -620,7 +637,7 @@ fn is_subtype_in_invariant_position<'db>(
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
-    inferable: &InferableTypeVars<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -698,7 +715,7 @@ fn has_relation_in_invariant_position<'db>(
     derived_materialization: Option<MaterializationKind>,
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
-    inferable: &InferableTypeVars<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
     relation: TypeRelation,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1033,7 +1050,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: &InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1111,7 +1128,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
-        inferable: &InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
@@ -1206,12 +1223,12 @@ impl<'db> PartialSpecialization<'_, 'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    inferable: &'db InferableTypeVars<'db>,
+    inferable: InferableTypeVars<'db, 'db>,
     types: FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, inferable: &'db InferableTypeVars<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db, 'db>) -> Self {
         Self {
             db,
             inferable,
