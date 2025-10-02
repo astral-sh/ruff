@@ -1,0 +1,461 @@
+---
+source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
+assertion_line: 74
+---
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:15:13
+   |
+14 | def takes_preview_generics(
+15 |     future: asyncio.Future[int],
+   |             ^^^^^^^^^^^^^^^^^^^
+16 |     task: asyncio.Task[str],
+17 |     deque_object: collections.deque[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:16:11
+   |
+14 | def takes_preview_generics(
+15 |     future: asyncio.Future[int],
+16 |     task: asyncio.Task[str],
+   |           ^^^^^^^^^^^^^^^^^
+17 |     deque_object: collections.deque[int],
+18 |     defaultdict_object: collections.defaultdict[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:17:19
+   |
+15 |     future: asyncio.Future[int],
+16 |     task: asyncio.Task[str],
+17 |     deque_object: collections.deque[int],
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+18 |     defaultdict_object: collections.defaultdict[str, int],
+19 |     ordered_dict: collections.OrderedDict[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:18:25
+   |
+16 |     task: asyncio.Task[str],
+17 |     deque_object: collections.deque[int],
+18 |     defaultdict_object: collections.defaultdict[str, int],
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 |     ordered_dict: collections.OrderedDict[str, int],
+20 |     counter_obj: collections.Counter[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:19:19
+   |
+17 |     deque_object: collections.deque[int],
+18 |     defaultdict_object: collections.defaultdict[str, int],
+19 |     ordered_dict: collections.OrderedDict[str, int],
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 |     counter_obj: collections.Counter[str],
+21 |     chain_map: collections.ChainMap[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:20:18
+   |
+18 |     defaultdict_object: collections.defaultdict[str, int],
+19 |     ordered_dict: collections.OrderedDict[str, int],
+20 |     counter_obj: collections.Counter[str],
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+21 |     chain_map: collections.ChainMap[str, int],
+22 |     context_manager: contextlib.AbstractContextManager[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:21:16
+   |
+19 |     ordered_dict: collections.OrderedDict[str, int],
+20 |     counter_obj: collections.Counter[str],
+21 |     chain_map: collections.ChainMap[str, int],
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |     context_manager: contextlib.AbstractContextManager[str],
+23 |     async_context_manager: contextlib.AbstractAsyncContextManager[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:22:22
+   |
+20 |     counter_obj: collections.Counter[str],
+21 |     chain_map: collections.ChainMap[str, int],
+22 |     context_manager: contextlib.AbstractContextManager[str],
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+23 |     async_context_manager: contextlib.AbstractAsyncContextManager[int],
+24 |     dataclass_field: dataclasses.Field[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:23:28
+   |
+21 |     chain_map: collections.ChainMap[str, int],
+22 |     context_manager: contextlib.AbstractContextManager[str],
+23 |     async_context_manager: contextlib.AbstractAsyncContextManager[int],
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 |     dataclass_field: dataclasses.Field[int],
+25 |     cached_prop: functools.cached_property[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:24:22
+   |
+22 |     context_manager: contextlib.AbstractContextManager[str],
+23 |     async_context_manager: contextlib.AbstractAsyncContextManager[int],
+24 |     dataclass_field: dataclasses.Field[int],
+   |                      ^^^^^^^^^^^^^^^^^^^^^^
+25 |     cached_prop: functools.cached_property[int],
+26 |     partial_method: functools.partialmethod[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:25:18
+   |
+23 |     async_context_manager: contextlib.AbstractAsyncContextManager[int],
+24 |     dataclass_field: dataclasses.Field[int],
+25 |     cached_prop: functools.cached_property[int],
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 |     partial_method: functools.partialmethod[int],
+27 |     path_like: os.PathLike[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:26:21
+   |
+24 |     dataclass_field: dataclasses.Field[int],
+25 |     cached_prop: functools.cached_property[int],
+26 |     partial_method: functools.partialmethod[int],
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 |     path_like: os.PathLike[str],
+28 |     lifo_queue: queue.LifoQueue[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:27:16
+   |
+25 |     cached_prop: functools.cached_property[int],
+26 |     partial_method: functools.partialmethod[int],
+27 |     path_like: os.PathLike[str],
+   |                ^^^^^^^^^^^^^^^^
+28 |     lifo_queue: queue.LifoQueue[int],
+29 |     regular_queue: queue.Queue[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:28:17
+   |
+26 |     partial_method: functools.partialmethod[int],
+27 |     path_like: os.PathLike[str],
+28 |     lifo_queue: queue.LifoQueue[int],
+   |                 ^^^^^^^^^^^^^^^^^^^^
+29 |     regular_queue: queue.Queue[int],
+30 |     priority_queue: queue.PriorityQueue[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:29:20
+   |
+27 |     path_like: os.PathLike[str],
+28 |     lifo_queue: queue.LifoQueue[int],
+29 |     regular_queue: queue.Queue[int],
+   |                    ^^^^^^^^^^^^^^^^
+30 |     priority_queue: queue.PriorityQueue[int],
+31 |     simple_queue: queue.SimpleQueue[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:30:21
+   |
+28 |     lifo_queue: queue.LifoQueue[int],
+29 |     regular_queue: queue.Queue[int],
+30 |     priority_queue: queue.PriorityQueue[int],
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^
+31 |     simple_queue: queue.SimpleQueue[int],
+32 |     regex_pattern: re.Pattern[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:31:19
+   |
+29 |     regular_queue: queue.Queue[int],
+30 |     priority_queue: queue.PriorityQueue[int],
+31 |     simple_queue: queue.SimpleQueue[int],
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+32 |     regex_pattern: re.Pattern[str],
+33 |     regex_match: re.Match[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:32:20
+   |
+30 |     priority_queue: queue.PriorityQueue[int],
+31 |     simple_queue: queue.SimpleQueue[int],
+32 |     regex_pattern: re.Pattern[str],
+   |                    ^^^^^^^^^^^^^^^
+33 |     regex_match: re.Match[str],
+34 |     bsd_db_shelf: shelve.BsdDbShelf[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:33:18
+   |
+31 |     simple_queue: queue.SimpleQueue[int],
+32 |     regex_pattern: re.Pattern[str],
+33 |     regex_match: re.Match[str],
+   |                  ^^^^^^^^^^^^^
+34 |     bsd_db_shelf: shelve.BsdDbShelf[str, int],
+35 |     db_filename_shelf: shelve.DbfilenameShelf[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:34:19
+   |
+32 |     regex_pattern: re.Pattern[str],
+33 |     regex_match: re.Match[str],
+34 |     bsd_db_shelf: shelve.BsdDbShelf[str, int],
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 |     db_filename_shelf: shelve.DbfilenameShelf[str, int],
+36 |     shelf_obj: shelve.Shelf[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:35:24
+   |
+33 |     regex_match: re.Match[str],
+34 |     bsd_db_shelf: shelve.BsdDbShelf[str, int],
+35 |     db_filename_shelf: shelve.DbfilenameShelf[str, int],
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 |     shelf_obj: shelve.Shelf[str, int],
+37 |     mapping_proxy: types.MappingProxyType[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:36:16
+   |
+34 |     bsd_db_shelf: shelve.BsdDbShelf[str, int],
+35 |     db_filename_shelf: shelve.DbfilenameShelf[str, int],
+36 |     shelf_obj: shelve.Shelf[str, int],
+   |                ^^^^^^^^^^^^^^^^^^^^^^
+37 |     mapping_proxy: types.MappingProxyType[str, int],
+38 |     weak_key_dict: weakref.WeakKeyDictionary[object, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:37:20
+   |
+35 |     db_filename_shelf: shelve.DbfilenameShelf[str, int],
+36 |     shelf_obj: shelve.Shelf[str, int],
+37 |     mapping_proxy: types.MappingProxyType[str, int],
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 |     weak_key_dict: weakref.WeakKeyDictionary[object, int],
+39 |     weak_method: weakref.WeakMethod[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:38:20
+   |
+36 |     shelf_obj: shelve.Shelf[str, int],
+37 |     mapping_proxy: types.MappingProxyType[str, int],
+38 |     weak_key_dict: weakref.WeakKeyDictionary[object, int],
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 |     weak_method: weakref.WeakMethod[int],
+40 |     weak_set: weakref.WeakSet[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:39:18
+   |
+37 |     mapping_proxy: types.MappingProxyType[str, int],
+38 |     weak_key_dict: weakref.WeakKeyDictionary[object, int],
+39 |     weak_method: weakref.WeakMethod[int],
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^
+40 |     weak_set: weakref.WeakSet[int],
+41 |     weak_value_dict: weakref.WeakValueDictionary[object, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:40:15
+   |
+38 |     weak_key_dict: weakref.WeakKeyDictionary[object, int],
+39 |     weak_method: weakref.WeakMethod[int],
+40 |     weak_set: weakref.WeakSet[int],
+   |               ^^^^^^^^^^^^^^^^^^^^
+41 |     weak_value_dict: weakref.WeakValueDictionary[object, int],
+42 | ) -> None:
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:41:22
+   |
+39 |     weak_method: weakref.WeakMethod[int],
+40 |     weak_set: weakref.WeakSet[int],
+41 |     weak_value_dict: weakref.WeakValueDictionary[object, int],
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+42 | ) -> None:
+43 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior

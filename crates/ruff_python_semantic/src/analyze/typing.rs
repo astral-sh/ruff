@@ -150,14 +150,34 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 pub fn is_pep585_generic(
     expr: &Expr,
     semantic: &SemanticModel,
-    include_collections_abc: bool,
+    include_preview_generics: bool,
 ) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| match qualified_name.segments() {
             ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
             | ["collections", "deque" | "defaultdict"] => true,
-            [
+            ["asyncio", "Future" | "Task"]
+            | ["collections", "ChainMap" | "Counter" | "OrderedDict"]
+            | [
+                "contextlib",
+                "AbstractAsyncContextManager" | "AbstractContextManager",
+            ]
+            | ["dataclasses", "Field"]
+            | ["functools", "cached_property" | "partialmethod"]
+            | ["os", "PathLike"]
+            | [
+                "queue",
+                "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue",
+            ]
+            | ["re", "Match" | "Pattern"]
+            | ["shelve", "BsdDbShelf" | "DbfilenameShelf" | "Shelf"]
+            | ["types", "MappingProxyType"]
+            | [
+                "weakref",
+                "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary",
+            ]
+            | [
                 "collections",
                 "abc",
                 "AsyncGenerator" | "AsyncIterable" | "AsyncIterator" | "Awaitable" | "ByteString"
@@ -165,7 +185,7 @@ pub fn is_pep585_generic(
                 | "Iterable" | "Iterator" | "KeysView" | "Mapping" | "MappingView"
                 | "MutableMapping" | "MutableSequence" | "MutableSet" | "Reversible" | "Sequence"
                 | "Set" | "ValuesView",
-            ] => include_collections_abc,
+            ] => include_preview_generics,
             _ => false,
         })
 }

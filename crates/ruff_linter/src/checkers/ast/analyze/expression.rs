@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_future_required_collections_abc_enabled, is_optional_as_none_in_union_enabled,
+    is_future_required_preview_generics_enabled, is_optional_as_none_in_union_enabled,
     is_unnecessary_default_type_args_stubs_enabled,
 };
 use crate::registry::Rule;
@@ -73,7 +73,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     && typing::is_pep585_generic(
                         value,
                         &checker.semantic,
-                        is_future_required_collections_abc_enabled(checker.settings()),
+                        is_future_required_preview_generics_enabled(checker.settings()),
                     )
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(

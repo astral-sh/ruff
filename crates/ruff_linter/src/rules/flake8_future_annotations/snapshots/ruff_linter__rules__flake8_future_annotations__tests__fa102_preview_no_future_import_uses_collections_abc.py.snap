@@ -1,17 +1,393 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
-assertion_line: 73
+assertion_line: 74
 ---
 FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
- --> no_future_import_uses_collections_abc.py:4:25
-  |
-4 | def takes_sequence(seq: Sequence[int]) -> None:
-  |                         ^^^^^^^^^^^^^
-5 |     ...
-  |
+  --> no_future_import_uses_collections_abc.py:29:16
+   |
+28 | def takes_collections_abc(
+29 |     awaitable: Awaitable[int],
+   |                ^^^^^^^^^^^^^^
+30 |     coroutine: Coroutine[int, None, str],
+31 |     async_iterable: AsyncIterable[int],
+   |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
-2 | from collections.abc import Sequence
-3 | 
-4 | 
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:30:16
+   |
+28 | def takes_collections_abc(
+29 |     awaitable: Awaitable[int],
+30 |     coroutine: Coroutine[int, None, str],
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |     async_iterable: AsyncIterable[int],
+32 |     async_iterator: AsyncIterator[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:31:21
+   |
+29 |     awaitable: Awaitable[int],
+30 |     coroutine: Coroutine[int, None, str],
+31 |     async_iterable: AsyncIterable[int],
+   |                     ^^^^^^^^^^^^^^^^^^
+32 |     async_iterator: AsyncIterator[int],
+33 |     async_generator: AsyncGenerator[int, None],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:32:21
+   |
+30 |     coroutine: Coroutine[int, None, str],
+31 |     async_iterable: AsyncIterable[int],
+32 |     async_iterator: AsyncIterator[int],
+   |                     ^^^^^^^^^^^^^^^^^^
+33 |     async_generator: AsyncGenerator[int, None],
+34 |     iterable: Iterable[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:33:22
+   |
+31 |     async_iterable: AsyncIterable[int],
+32 |     async_iterator: AsyncIterator[int],
+33 |     async_generator: AsyncGenerator[int, None],
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+34 |     iterable: Iterable[int],
+35 |     iterator: Iterator[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:34:15
+   |
+32 |     async_iterator: AsyncIterator[int],
+33 |     async_generator: AsyncGenerator[int, None],
+34 |     iterable: Iterable[int],
+   |               ^^^^^^^^^^^^^
+35 |     iterator: Iterator[int],
+36 |     generator: Generator[int, None, None],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:35:15
+   |
+33 |     async_generator: AsyncGenerator[int, None],
+34 |     iterable: Iterable[int],
+35 |     iterator: Iterator[int],
+   |               ^^^^^^^^^^^^^
+36 |     generator: Generator[int, None, None],
+37 |     reversible: Reversible[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:36:16
+   |
+34 |     iterable: Iterable[int],
+35 |     iterator: Iterator[int],
+36 |     generator: Generator[int, None, None],
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |     reversible: Reversible[int],
+38 |     container: Container[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:37:17
+   |
+35 |     iterator: Iterator[int],
+36 |     generator: Generator[int, None, None],
+37 |     reversible: Reversible[int],
+   |                 ^^^^^^^^^^^^^^^
+38 |     container: Container[int],
+39 |     collection: Collection[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:38:16
+   |
+36 |     generator: Generator[int, None, None],
+37 |     reversible: Reversible[int],
+38 |     container: Container[int],
+   |                ^^^^^^^^^^^^^^
+39 |     collection: Collection[int],
+40 |     callable_obj: Callable[[int], str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:39:17
+   |
+37 |     reversible: Reversible[int],
+38 |     container: Container[int],
+39 |     collection: Collection[int],
+   |                 ^^^^^^^^^^^^^^^
+40 |     callable_obj: Callable[[int], str],
+41 |     set_obj: Set[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:40:19
+   |
+38 |     container: Container[int],
+39 |     collection: Collection[int],
+40 |     callable_obj: Callable[[int], str],
+   |                   ^^^^^^^^^^^^^^^^^^^^
+41 |     set_obj: Set[int],
+42 |     mutable_set: MutableSet[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:41:14
+   |
+39 |     collection: Collection[int],
+40 |     callable_obj: Callable[[int], str],
+41 |     set_obj: Set[int],
+   |              ^^^^^^^^
+42 |     mutable_set: MutableSet[int],
+43 |     mapping: Mapping[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:42:18
+   |
+40 |     callable_obj: Callable[[int], str],
+41 |     set_obj: Set[int],
+42 |     mutable_set: MutableSet[int],
+   |                  ^^^^^^^^^^^^^^^
+43 |     mapping: Mapping[str, int],
+44 |     mutable_mapping: MutableMapping[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:43:14
+   |
+41 |     set_obj: Set[int],
+42 |     mutable_set: MutableSet[int],
+43 |     mapping: Mapping[str, int],
+   |              ^^^^^^^^^^^^^^^^^
+44 |     mutable_mapping: MutableMapping[str, int],
+45 |     sequence: Sequence[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:44:22
+   |
+42 |     mutable_set: MutableSet[int],
+43 |     mapping: Mapping[str, int],
+44 |     mutable_mapping: MutableMapping[str, int],
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^
+45 |     sequence: Sequence[int],
+46 |     mutable_sequence: MutableSequence[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:45:15
+   |
+43 |     mapping: Mapping[str, int],
+44 |     mutable_mapping: MutableMapping[str, int],
+45 |     sequence: Sequence[int],
+   |               ^^^^^^^^^^^^^
+46 |     mutable_sequence: MutableSequence[int],
+47 |     byte_string: ByteString[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:46:23
+   |
+44 |     mutable_mapping: MutableMapping[str, int],
+45 |     sequence: Sequence[int],
+46 |     mutable_sequence: MutableSequence[int],
+   |                       ^^^^^^^^^^^^^^^^^^^^
+47 |     byte_string: ByteString[int],
+48 |     mapping_view: MappingView[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:47:18
+   |
+45 |     sequence: Sequence[int],
+46 |     mutable_sequence: MutableSequence[int],
+47 |     byte_string: ByteString[int],
+   |                  ^^^^^^^^^^^^^^^
+48 |     mapping_view: MappingView[str, int],
+49 |     keys_view: KeysView[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:48:19
+   |
+46 |     mutable_sequence: MutableSequence[int],
+47 |     byte_string: ByteString[int],
+48 |     mapping_view: MappingView[str, int],
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+49 |     keys_view: KeysView[str],
+50 |     items_view: ItemsView[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:49:16
+   |
+47 |     byte_string: ByteString[int],
+48 |     mapping_view: MappingView[str, int],
+49 |     keys_view: KeysView[str],
+   |                ^^^^^^^^^^^^^
+50 |     items_view: ItemsView[str, int],
+51 |     values_view: ValuesView[int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:50:17
+   |
+48 |     mapping_view: MappingView[str, int],
+49 |     keys_view: KeysView[str],
+50 |     items_view: ItemsView[str, int],
+   |                 ^^^^^^^^^^^^^^^^^^^
+51 |     values_view: ValuesView[int],
+52 | ) -> None:
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_collections_abc.py:51:18
+   |
+49 |     keys_view: KeysView[str],
+50 |     items_view: ItemsView[str, int],
+51 |     values_view: ValuesView[int],
+   |                  ^^^^^^^^^^^^^^^
+52 | ) -> None:
+53 |     ...
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from collections.abc import (
+3 |     AsyncGenerator,
+4 |     AsyncIterable,
 note: This is an unsafe fix and may change runtime behavior

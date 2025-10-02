@@ -60,6 +60,7 @@ mod tests {
     }
 
     #[test_case(Path::new("no_future_import_uses_collections_abc.py"))]
+    #[test_case(Path::new("no_future_import_uses_preview_generics.py"))]
     fn fa102_preview(path: &Path) -> Result<()> {
         let snapshot = format!("fa102_preview_{}", path.to_string_lossy());
         let diagnostics = test_path(
