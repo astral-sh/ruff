@@ -7,7 +7,7 @@ use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
     comparable::ComparableExpr,
-    helpers, name,
+    helpers,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
