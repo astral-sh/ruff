@@ -200,7 +200,7 @@ pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettin
     settings.preview.is_enabled()
 }
 
-// flake8-future-annotations: extend FA102 to `collections.abc` generics.
+// https://github.com/astral-sh/ruff/pull/20659
 pub(crate) const fn is_future_required_collections_abc_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
