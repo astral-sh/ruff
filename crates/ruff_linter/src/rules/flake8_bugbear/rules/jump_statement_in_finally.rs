@@ -18,6 +18,9 @@ use crate::checkers::ast::Checker;
 /// `break`, `continue`, or `return` statement is reached in a `finally` block,
 /// any exception raised in the `try` or `except` blocks will be silenced.
 ///
+/// [PEP 765](https://peps.python.org/pep-0765/) additionally made this a `SyntaxWarning` starting
+/// in Python 3.14. It may become a `SyntaxError` in the future.
+///
 /// ## Example
 /// ```python
 /// def speed(distance, time):
