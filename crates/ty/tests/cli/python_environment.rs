@@ -946,6 +946,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 /// 2) If `CONDA_PREFIX` environment variable is set (and .filename == `CONDA_DEFAULT_ENV`)
 /// 3) If a `.venv` directory exists at the project root
 /// 4) If `CONDA_PREFIX` environment variable is set (and .filename != `CONDA_DEFAULT_ENV`)
+///    or if `_CONDA_ROOT` is set (and `_CONDA_ROOT` == `CONDA_PREFIX`)
 ///
 /// This test (and the next one) is aiming at validating the logic around these cases.
 ///
@@ -1232,6 +1233,55 @@ home = ./
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
+    // run with _CONDA_ROOT and CONDA_PREFIX (unequal!) set, should find ChildConda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
+        .env("_CONDA_ROOT", "conda"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ChildConda`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |                      ^^^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda"))
+        .env("_CONDA_ROOT", "conda"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `BaseConda`
+     --> test.py:5:22
+      |
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |                      ^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
     Ok(())
 }
 
@@ -1473,6 +1523,55 @@ home = ./
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
         .env("CONDA_DEFAULT_ENV", "base"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `BaseConda`
+     --> test.py:5:22
+      |
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |                      ^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with _CONDA_ROOT and CONDA_PREFIX (unequal!) set, should find ChildConda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
+        .env("_CONDA_ROOT", "conda"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ChildConda`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |                      ^^^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda"))
+        .env("_CONDA_ROOT", "conda"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
