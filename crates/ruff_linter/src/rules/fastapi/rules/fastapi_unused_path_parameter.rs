@@ -164,9 +164,9 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     // Check if any of the path parameters are not in the function signature.
-    for (path_param, range) in path_params {
-        // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
-        if !is_identifier(path_param) {
+    for (path_param, param_content, range) in path_params {
+        // Ignore parameters that FastAPI doesn't recognize as valid path parameters
+        if !is_fastapi_valid_path_parameter(path_param, param_content) {
             continue;
         }
 
@@ -215,6 +215,43 @@ fn non_posonly_non_variadic_parameters(
         .args
         .iter()
         .chain(&function_def.parameters.kwonlyargs)
+}
+
+/// Returns `true` if a path parameter is valid according to FastAPI's rules.
+///
+/// FastAPI only recognizes path parameters that:
+/// 1. Are valid Python identifiers
+/// 2. Contain only ASCII characters
+/// 3. Do not contain spaces
+///
+/// This function validates the parameter name (before any colon) and also checks
+/// that the entire parameter content (including converter) is ASCII and space-free.
+fn is_fastapi_valid_path_parameter(param_name: &str, param_content: &str) -> bool {
+    // Must be a valid Python identifier
+    if !is_identifier(param_name) {
+        return false;
+    }
+
+    // Must contain only ASCII characters
+    if !param_name.is_ascii() {
+        return false;
+    }
+
+    // Must not contain spaces
+    if param_name.contains(' ') {
+        return false;
+    }
+
+    // The entire parameter content (including converter) must be ASCII and space-free
+    if !param_content.is_ascii() {
+        return false;
+    }
+
+    if param_content.contains(' ') {
+        return false;
+    }
+
+    true
 }
 
 #[derive(Debug, is_macro::Is)]
@@ -475,7 +512,7 @@ impl<'a> PathParamIterator<'a> {
 }
 
 impl<'a> Iterator for PathParamIterator<'a> {
-    type Item = (&'a str, Range<usize>);
+    type Item = (&'a str, &'a str, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((start, c)) = self.chars.next() {
@@ -487,7 +524,7 @@ impl<'a> Iterator for PathParamIterator<'a> {
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
                     let param_name = &param_content[..param_name_end];
 
-                    return Some((param_name, start..end + 1));
+                    return Some((param_name, param_content, start..end + 1));
                 }
             }
         }
