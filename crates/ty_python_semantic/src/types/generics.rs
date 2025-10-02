@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -166,6 +167,31 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
             Some(other) => InferableTypeVars::Two(self, other),
             None => *self,
         }
+    }
+
+    // Keep this around for debugging purposes
+    #[expect(dead_code)]
+    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
+        fn find_typevars<'db>(
+            result: &mut FxHashSet<BoundTypeVarInstance<'db>>,
+            inferable: &InferableTypeVars<'_, 'db>,
+        ) {
+            match inferable {
+                InferableTypeVars::None => {}
+                InferableTypeVars::One(typevars) => result.extend(typevars.iter().copied()),
+                InferableTypeVars::Two(left, right) => {
+                    find_typevars(result, left);
+                    find_typevars(result, right);
+                }
+            }
+        }
+
+        let mut typevars = FxHashSet::default();
+        find_typevars(&mut typevars, self);
+        format!(
+            "[{}]",
+            typevars.into_iter().map(|btv| btv.display(db)).format(", ")
+        )
     }
 }
 
