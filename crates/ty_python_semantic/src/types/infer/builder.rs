@@ -91,10 +91,10 @@ use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType,
+    ValidSpecializationsConstraintSet, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -6944,12 +6944,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::UnaryOp::Invert,
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
             ) => {
+                let valid_specializations = constraints.valid_specializations(self.db()).copied();
                 let constraints = constraints.constraints(self.db());
                 let result = constraints.negate(self.db());
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
-                    self.db(),
-                    result,
-                )))
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    ValidSpecializationsConstraintSet::new(
+                        self.db(),
+                        valid_specializations,
+                        result,
+                    ),
+                ))
             }
 
             (ast::UnaryOp::Not, ty) => ty
@@ -7306,26 +7310,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-                ast::Operator::BitAnd,
+                ast::Operator::BitAnd | ast::Operator::BitOr,
             ) => {
+                let valid_specializations = match (
+                    left.valid_specializations(self.db()),
+                    right.valid_specializations(self.db()),
+                ) {
+                    (Some(left), Some(right)) => Some(left.and(self.db(), || *right)),
+                    (Some(single), None) | (None, Some(single)) => Some(*single),
+                    (None, None) => None,
+                };
                 let left = left.constraints(self.db());
                 let right = right.constraints(self.db());
-                let result = left.and(self.db(), || *right);
+                let result = match op {
+                    ast::Operator::BitAnd => left.and(self.db(), || *right),
+                    ast::Operator::BitOr => left.or(self.db(), || *right),
+                    _ => unreachable!("operator should only be BitAnd or BitOr"),
+                };
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), result),
-                )))
-            }
-
-            (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-                ast::Operator::BitOr,
-            ) => {
-                let left = left.constraints(self.db());
-                let right = right.constraints(self.db());
-                let result = left.or(self.db(), || *right);
-                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), result),
+                    ValidSpecializationsConstraintSet::new(
+                        self.db(),
+                        valid_specializations,
+                        result,
+                    ),
                 )))
             }
 
