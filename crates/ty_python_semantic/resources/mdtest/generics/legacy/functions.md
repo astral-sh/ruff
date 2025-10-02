@@ -530,3 +530,17 @@ age, name = team.employees[0]
 reveal_type(age)  # revealed: Age
 reveal_type(name)  # revealed: Name
 ```
+
+## `~T` is never assignable to `T`
+
+```py
+from typing import TypeVar
+from ty_extensions import Not
+
+T = TypeVar("T")
+
+def f(x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
+```
