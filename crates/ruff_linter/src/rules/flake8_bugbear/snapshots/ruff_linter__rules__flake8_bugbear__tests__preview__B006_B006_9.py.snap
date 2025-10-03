@@ -72,7 +72,7 @@ help: Replace with `None`; initialize within function
    - def f4(x=(z := [1, ])):
 13 + def f4(x=None):
 14 +     if x is None:
-15 +         x = (z := [1])
+15 +         x = (z := [1, ])
 16 |     print(x)
 17 | 
 18 | 
@@ -92,7 +92,7 @@ help: Replace with `None`; initialize within function
    - def f5(x=([1, ])):
 17 + def f5(x=None):
 18 +     if x is None:
-19 +         x = [1]
+19 +         x = ([1, ])
 20 |     print(x)
 21 | 
 22 | 
