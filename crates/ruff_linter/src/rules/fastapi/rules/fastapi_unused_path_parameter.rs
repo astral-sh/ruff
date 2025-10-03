@@ -1,12 +1,14 @@
 use std::iter::Peekable;
 use std::ops::Range;
 use std::str::CharIndices;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
-use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Fix;
@@ -166,7 +168,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     // Check if any of the path parameters are not in the function signature.
     for (path_param, param_content, range) in path_params {
         // Ignore parameters that FastAPI doesn't recognize as valid path parameters
-        if !is_fastapi_valid_path_parameter(path_param, param_content) {
+        if !is_fastapi_valid_path_parameter(param_content) {
             continue;
         }
 
@@ -217,41 +219,13 @@ fn non_posonly_non_variadic_parameters(
         .chain(&function_def.parameters.kwonlyargs)
 }
 
-/// Returns `true` if a path parameter is valid according to FastAPI's rules.
-///
-/// FastAPI only recognizes path parameters that:
-/// 1. Are valid Python identifiers
-/// 2. Contain only ASCII characters
-/// 3. Do not contain spaces
-///
-/// This function validates the parameter name (before any colon) and also checks
-/// that the entire parameter content (including converter) is ASCII and space-free.
-fn is_fastapi_valid_path_parameter(param_name: &str, param_content: &str) -> bool {
-    // Must be a valid Python identifier
-    if !is_identifier(param_name) {
-        return false;
-    }
+/// Matches the Starlette pattern for path parameters with optional converters.
+static FASTAPI_PATH_PARAM_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([a-zA-Z_][a-zA-Z0-9_]*)(:[a-zA-Z_][a-zA-Z0-9_]*)?$").unwrap());
 
-    // Must contain only ASCII characters
-    if !param_name.is_ascii() {
-        return false;
-    }
-
-    // Must not contain spaces
-    if param_name.contains(' ') {
-        return false;
-    }
-
-    // The entire parameter content (including converter) must be ASCII and space-free
-    if !param_content.is_ascii() {
-        return false;
-    }
-
-    if param_content.contains(' ') {
-        return false;
-    }
-
-    true
+/// Returns `true` if a path parameter is valid according to FastAPI's exact regex.
+fn is_fastapi_valid_path_parameter(param_content: &str) -> bool {
+    FASTAPI_PATH_PARAM_REGEX.is_match(param_content)
 }
 
 #[derive(Debug, is_macro::Is)]
