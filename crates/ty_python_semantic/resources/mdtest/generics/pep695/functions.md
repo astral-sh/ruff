@@ -286,6 +286,10 @@ def union_param[T](x: T | None) -> T:
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
 reveal_type(union_param(None))  # revealed: Unknown
+
+def _(x: int | None):
+    # TODO: should be `int`
+    reveal_type(union_param(x))  # revealed: Unknown
 ```
 
 ```py

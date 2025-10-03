@@ -343,6 +343,50 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
+        let mut signature = self.raw_signature(db, inherited_generic_context);
+
+        let scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let function_node = scope.node(db).expect_function().node(&module);
+        let index = semantic_index(db, scope.file(db));
+        let file_scope_id = scope.file_scope_id(db);
+        let is_generator = file_scope_id.is_generator_function(index);
+
+        if function_node.is_async && !is_generator {
+            signature = signature.wrap_coroutine_return_type(db);
+        }
+        signature = signature.mark_typevars_inferable(db);
+
+        let pep695_ctx = function_node.type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(db, index, self.definition(db), type_params)
+        });
+        let legacy_ctx = GenericContext::from_function_params(
+            db,
+            self.definition(db),
+            signature.parameters(),
+            signature.return_ty,
+        );
+        signature.generic_context =
+            GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
+
+        signature
+    }
+
+    /// Typed internally-visible "raw" signature for this function.
+    /// That is, type variables in parameter types and the return type remain non-inferable,
+    /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn raw_signature(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -404,11 +448,11 @@ impl<'db> OverloadLiteral<'db> {
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
-        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+        let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
         let file_scope_id = scope.file_scope_id(db);
-        let is_generator = file_scope_id.is_generator_function(index);
+
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
             db,
             self,
@@ -419,11 +463,10 @@ impl<'db> OverloadLiteral<'db> {
 
         Signature::from_function(
             db,
-            generic_context,
+            pep695_ctx,
             inherited_generic_context,
             definition,
             function_stmt_node,
-            is_generator,
             has_implicitly_positional_first_parameter,
         )
     }
@@ -655,6 +698,20 @@ impl<'db> FunctionLiteral<'db> {
         let inherited_generic_context = self.inherited_generic_context(db);
         self.last_definition(db)
             .signature(db, inherited_generic_context)
+    }
+
+    /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        let inherited_generic_context = self.inherited_generic_context(db);
+        self.last_definition(db)
+            .raw_signature(db, inherited_generic_context)
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -945,6 +1002,17 @@ impl<'db> FunctionType<'db> {
         self.updated_last_definition_signature(db)
             .cloned()
             .unwrap_or_else(|| self.literal(db).last_definition_signature(db))
+    }
+
+    /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_fn=last_definition_signature_cycle_recover,
+        cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.literal(db).last_definition_raw_signature(db)
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
