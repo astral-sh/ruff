@@ -623,7 +623,7 @@ impl CondaEnvironmentKind {
     fn from_prefix_path(system: &dyn System, path: &SystemPath) -> Self {
         // If `_CONDA_ROOT` is set and matches `CONDA_PREFIX`, it's the base environment.
         if let Ok(conda_root) = system.env_var(EnvVars::CONDA_ROOT) {
-            if path.as_str() == &conda_root {
+            if path.as_str() == conda_root {
                 return Self::Base;
             }
         }
