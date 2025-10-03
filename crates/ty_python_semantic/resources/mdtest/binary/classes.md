@@ -18,6 +18,11 @@ reveal_type(A | B)  # revealed: UnionType
 
 ## Union of two classes (prior to 3.10)
 
+```toml
+[environment]
+python-version = "3.9"
+```
+
 ```py
 class A: ...
 class B: ...

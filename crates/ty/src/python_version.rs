@@ -7,9 +7,9 @@ pub enum PythonVersion {
     Py37,
     #[value(name = "3.8")]
     Py38,
-    #[default]
     #[value(name = "3.9")]
     Py39,
+    #[default]
     #[value(name = "3.10")]
     Py310,
     #[value(name = "3.11")]

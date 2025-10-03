@@ -86,7 +86,7 @@ impl PythonVersion {
 
 impl Default for PythonVersion {
     fn default() -> Self {
-        Self::PY39
+        Self::PY310
     }
 }
 

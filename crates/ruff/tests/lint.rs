@@ -4482,7 +4482,7 @@ from typing import Union;foo: Union[int, str] = 1
 
         # Formatter Settings
         formatter.exclude = []
-        formatter.unresolved_target_version = 3.9
+        formatter.unresolved_target_version = 3.10
         formatter.per_file_target_version = {}
         formatter.preview = disabled
         formatter.line_width = 88
@@ -4497,7 +4497,7 @@ from typing import Union;foo: Union[int, str] = 1
         # Analyze Settings
         analyze.exclude = []
         analyze.preview = disabled
-        analyze.target_version = 3.9
+        analyze.target_version = 3.10
         analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
@@ -4768,7 +4768,7 @@ from typing import Union;foo: Union[int, str] = 1
 
         # Formatter Settings
         formatter.exclude = []
-        formatter.unresolved_target_version = 3.9
+        formatter.unresolved_target_version = 3.10
         formatter.per_file_target_version = {}
         formatter.preview = disabled
         formatter.line_width = 88
@@ -4783,7 +4783,7 @@ from typing import Union;foo: Union[int, str] = 1
         # Analyze Settings
         analyze.exclude = []
         analyze.preview = disabled
-        analyze.target_version = 3.9
+        analyze.target_version = 3.10
         analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
