@@ -7,10 +7,6 @@
 
 use crate::settings::LinterSettings;
 
-pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // Rule-specific behavior
 
 // https://github.com/astral-sh/ruff/pull/15541

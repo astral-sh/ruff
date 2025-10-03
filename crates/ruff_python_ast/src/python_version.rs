@@ -55,16 +55,8 @@ impl PythonVersion {
         Self::PY37
     }
 
-    // TODO: change this to 314 when it is released
     pub const fn latest() -> Self {
-        Self::PY313
-    }
-
-    /// The latest Python version supported in preview
-    pub fn latest_preview() -> Self {
-        let latest_preview = Self::PY314;
-        debug_assert!(latest_preview >= Self::latest());
-        latest_preview
+        Self::PY314
     }
 
     pub const fn latest_ty() -> Self {
