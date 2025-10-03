@@ -88,13 +88,12 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -2141,10 +2140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deprecated,
             dataclass_transformer_params,
         );
-
-        let inherited_generic_context = None;
-        let function_literal =
-            FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
+        let function_literal = FunctionLiteral::new(self.db(), overload_literal);
 
         let mut inferred_ty =
             Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));
@@ -5354,16 +5350,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         collection_class: KnownClass,
     ) -> Option<Type<'db>> {
         // Extract the type variable `T` from `list[T]` in typeshed.
-        fn elt_tys(
-            collection_class: KnownClass,
-            db: &dyn Db,
-        ) -> Option<(ClassLiteral<'_>, &FxOrderSet<BoundTypeVarInstance<'_>>)> {
-            let class_literal = collection_class.try_to_class_literal(db)?;
-            let generic_context = class_literal.generic_context(db)?;
-            Some((class_literal, generic_context.variables(db)))
-        }
+        let elt_tys = |collection_class: KnownClass| {
+            let class_literal = collection_class.try_to_class_literal(self.db())?;
+            let generic_context = class_literal.generic_context(self.db())?;
+            Some((class_literal, generic_context.variables(self.db())))
+        };
 
-        let (class_literal, elt_tys) = elt_tys(collection_class, self.db()).unwrap_or_else(|| {
+        let (class_literal, elt_tys) = elt_tys(collection_class).unwrap_or_else(|| {
             let name = collection_class.name(self.db());
             panic!("Typeshed should always have a `{name}` class in `builtins.pyi`")
         });
@@ -5382,9 +5375,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Note that we infer the annotated type _before_ the elements, to more closely match the
             // order of any unions as written in the type annotation.
             Some(annotated_elt_tys) => {
-                for (elt_ty, annotated_elt_ty) in iter::zip(elt_tys, annotated_elt_tys) {
+                for (elt_ty, annotated_elt_ty) in iter::zip(elt_tys.clone(), annotated_elt_tys) {
                     builder
-                        .infer(Type::TypeVar(*elt_ty), *annotated_elt_ty)
+                        .infer(Type::TypeVar(elt_ty), *annotated_elt_ty)
                         .ok()?;
                 }
             }
@@ -5392,10 +5385,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // If a valid type annotation was not provided, avoid restricting the type of the collection
             // by unioning the inferred type with `Unknown`.
             None => {
-                for elt_ty in elt_tys {
-                    builder
-                        .infer(Type::TypeVar(*elt_ty), Type::unknown())
-                        .ok()?;
+                for elt_ty in elt_tys.clone() {
+                    builder.infer(Type::TypeVar(elt_ty), Type::unknown()).ok()?;
                 }
             }
         }
@@ -5415,10 +5406,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_value_ty.known_specialization(KnownClass::Dict, self.db())
                 {
                     for (elt_ty, inferred_elt_ty) in
-                        iter::zip(elt_tys, specialization.types(self.db()))
+                        iter::zip(elt_tys.clone(), specialization.types(self.db()))
                     {
                         builder
-                            .infer(Type::TypeVar(*elt_ty), *inferred_elt_ty)
+                            .infer(Type::TypeVar(elt_ty), *inferred_elt_ty)
                             .ok()?;
                     }
                 }
@@ -5427,7 +5418,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // The inferred type of each element acts as an additional constraint on `T`.
-            for (elt, elt_ty, elt_tcx) in itertools::izip!(elts, elt_tys, elt_tcxs.clone()) {
+            for (elt, elt_ty, elt_tcx) in itertools::izip!(elts, elt_tys.clone(), elt_tcxs.clone())
+            {
                 let Some(inferred_elt_ty) = self.infer_optional_expression(elt, elt_tcx) else {
                     continue;
                 };
@@ -5436,9 +5428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // unions for large nested list literals, which the constraint solver struggles with.
                 let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
 
-                builder
-                    .infer(Type::TypeVar(*elt_ty), inferred_elt_ty)
-                    .ok()?;
+                builder.infer(Type::TypeVar(elt_ty), inferred_elt_ty).ok()?;
             }
         }
 
@@ -9012,7 +9002,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
             .collect();
-        typevars.map(|typevars| GenericContext::new(self.db(), typevars))
+        typevars.map(|typevars| GenericContext::from_typevar_instances(self.db(), typevars))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {

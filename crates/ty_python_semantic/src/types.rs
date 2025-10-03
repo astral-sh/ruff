@@ -5456,28 +5456,19 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                let new_specialization = new_call_outcome
-                    .and_then(Result::ok)
-                    .as_ref()
-                    .and_then(Bindings::single_element)
-                    .into_iter()
-                    .flat_map(CallableBinding::matching_overloads)
-                    .next()
-                    .and_then(|(_, binding)| binding.inherited_specialization())
-                    .filter(|specialization| {
-                        Some(specialization.generic_context(db)) == generic_context
-                    });
-                let init_specialization = init_call_outcome
-                    .and_then(Result::ok)
-                    .as_ref()
-                    .and_then(Bindings::single_element)
-                    .into_iter()
-                    .flat_map(CallableBinding::matching_overloads)
-                    .next()
-                    .and_then(|(_, binding)| binding.inherited_specialization())
-                    .filter(|specialization| {
-                        Some(specialization.generic_context(db)) == generic_context
-                    });
+                let specialize_constructor = |outcome: Option<Bindings<'db>>| {
+                    let (_, binding) = outcome
+                        .as_ref()?
+                        .single_element()?
+                        .matching_overloads()
+                        .next()?;
+                    binding.specialization()?.restrict(db, generic_context?)
+                };
+
+                let new_specialization =
+                    specialize_constructor(new_call_outcome.and_then(Result::ok));
+                let init_specialization =
+                    specialize_constructor(init_call_outcome.and_then(Result::ok));
                 let specialization =
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
@@ -6768,13 +6759,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 db,
                 context
                     .variables(db)
-                    .iter()
-                    .filter(|var| !var.typevar(db).is_self(db))
-                    .copied(),
+                    .filter(|var| !var.typevar(db).is_self(db)),
             ),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
-                context.variables(db).iter().map(|typevar| {
+                context.variables(db).map(|typevar| {
                     if typevar.typevar(db).is_self(db) {
                         BoundTypeVarInstance::synthetic_self(
                             db,
@@ -6782,7 +6771,7 @@ impl<'db> TypeMapping<'_, 'db> {
                             typevar.binding_context(db),
                         )
                     } else {
-                        *typevar
+                        typevar
                     }
                 }),
             ),
