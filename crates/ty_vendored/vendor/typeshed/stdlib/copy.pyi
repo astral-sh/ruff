@@ -51,17 +51,16 @@ __getstate__() and __setstate__().  See the documentation for module
 
 import sys
 from typing import Any, Protocol, TypeVar, type_check_only
-from typing_extensions import Self
 
 __all__ = ["Error", "copy", "deepcopy"]
 
 _T = TypeVar("_T")
-_SR = TypeVar("_SR", bound=_SupportsReplace)
+_RT_co = TypeVar("_RT_co", covariant=True)
 
 @type_check_only
-class _SupportsReplace(Protocol):
-    # In reality doesn't support args, but there's no other great way to express this.
-    def __replace__(self, *args: Any, **kwargs: Any) -> Self: ...
+class _SupportsReplace(Protocol[_RT_co]):
+    # In reality doesn't support args, but there's no great way to express this.
+    def __replace__(self, /, *_: Any, **changes: Any) -> _RT_co: ...
 
 # None in CPython but non-None in Jython
 PyStringMap: Any
@@ -81,7 +80,8 @@ def copy(x: _T) -> _T:
 
 if sys.version_info >= (3, 13):
     __all__ += ["replace"]
-    def replace(obj: _SR, /, **changes: Any) -> _SR:
+    # The types accepted by `**changes` match those of `obj.__replace__`.
+    def replace(obj: _SupportsReplace[_RT_co], /, **changes: Any) -> _RT_co:
         """Return a new object replacing specified fields with new values.
 
         This is especially useful for immutable objects, like named tuples or

@@ -4153,7 +4153,14 @@ def open(
     opener: _Opener | None = None,
 ) -> IO[Any]: ...
 def ord(c: str | bytes | bytearray, /) -> int:
-    """Return the Unicode code point for a one-character string."""
+    """Return the ordinal value of a character.
+
+    If the argument is a one-character string, return the Unicode code
+    point of that character.
+
+    If the argument is a bytes or bytearray object of length 1, return its
+    single byte value.
+    """
 
 @type_check_only
 class _SupportsWriteAndFlush(SupportsWrite[_T_contra], SupportsFlush, Protocol[_T_contra]): ...
@@ -4451,7 +4458,7 @@ def __import__(
     name: str,
     globals: Mapping[str, object] | None = None,
     locals: Mapping[str, object] | None = None,
-    fromlist: Sequence[str] = (),
+    fromlist: Sequence[str] | None = (),
     level: int = 0,
 ) -> types.ModuleType:
     """Import a module.

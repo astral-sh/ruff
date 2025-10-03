@@ -561,13 +561,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/types.pyi:941:11
+           --> stdlib/types.pyi:950:11
             |
-        939 | if sys.version_info >= (3, 10):
-        940 |     @final
-        941 |     class NoneType:
+        948 | if sys.version_info >= (3, 10):
+        949 |     @final
+        950 |     class NoneType:
             |           ^^^^^^^^
-        942 |         """The type of the None singleton."""
+        951 |         """The type of the None singleton."""
             |
         info: Source
          --> main.py:3:5
