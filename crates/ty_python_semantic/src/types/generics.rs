@@ -236,9 +236,7 @@ impl<'db> GenericContext<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
-        self.variables_inner(db)
-            .iter()
-            .map(|(bound_typevar, _)| *bound_typevar)
+        self.variables_inner(db).keys().copied()
     }
 
     fn variable_from_type_param(
