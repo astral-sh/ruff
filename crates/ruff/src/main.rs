@@ -41,7 +41,6 @@ pub fn main() -> ExitCode {
 
     let args = wild::args_os();
     let args = match argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
-        .map_err(anyhow::Error::from)
         .context("Failed to read CLI arguments from files")
     {
         Ok(args) => args,
