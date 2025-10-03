@@ -30,32 +30,28 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(case.root()).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(
-            case.command()
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--config")
-                .arg(case.root().join("ruff.toml"))
-                .args(["--stdin-filename", "test.py"])
-                .arg("-")
-                .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-        test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-        Found 3 errors.
-        [*] 2 fixable with the `--fix` option.
+    assert_cmd_snapshot!(
+        case.command()
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(case.root().join("ruff.toml"))
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
+    test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
+    test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 3 errors.
+    [*] 2 fixable with the `--fix` option.
 
-        ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-          - 'extend-select' -> 'lint.extend-select'
-          - 'flake8-quotes' -> 'lint.flake8-quotes'
-        ");
-    });
+    ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+      - 'extend-select' -> 'lint.extend-select'
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
+    ");
 
     Ok(())
 }
@@ -73,28 +69,24 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(case.root()).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(
-            case.command()
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--config")
-                .arg(case.root().join("ruff.toml"))
-                .arg("-")
-                .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            -:1:5: Q000 [*] Double quotes found but single quotes preferred
-            -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-            -:1:19: Q000 [*] Double quotes found but single quotes preferred
-            Found 3 errors.
-            [*] 2 fixable with the `--fix` option.
+    assert_cmd_snapshot!(
+        case.command()
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(case.root().join("ruff.toml"))
+            .arg("-")
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        -:1:5: Q000 [*] Double quotes found but single quotes preferred
+        -:1:5: B005 Using `.strip()` with multi-character strings is misleading
+        -:1:19: Q000 [*] Double quotes found but single quotes preferred
+        Found 3 errors.
+        [*] 2 fixable with the `--fix` option.
 
-            ----- stderr -----
-            ");
-    });
+        ----- stderr -----
+        ");
 
     Ok(())
 }
@@ -112,16 +104,13 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(case.root()).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(
-            case.command()
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--config")
-                .arg(case.root().join("ruff.toml"))
-                .arg("-")
-                .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+    assert_cmd_snapshot!(
+        case.command()
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(case.root().join("ruff.toml"))
+            .arg("-")
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -132,10 +121,9 @@ inline-quotes = "single"
         [*] 2 fixable with the `--fix` option.
 
         ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in ruff.toml:
           - 'extend-select' -> 'lint.extend-select'
         ");
-    });
 
     Ok(())
 }
@@ -157,16 +145,13 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(case.root()).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(
-            case.command()
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--config")
-                .arg(case.root().join("ruff.toml"))
-                .arg("-")
-                .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+    assert_cmd_snapshot!(
+        case.command()
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(case.root().join("ruff.toml"))
+            .arg("-")
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -177,10 +162,9 @@ inline-quotes = "single"
         [*] 2 fixable with the `--fix` option.
 
         ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in ruff.toml:
           - 'flake8-quotes' -> 'lint.flake8-quotes'
         ");
-    });
 
     Ok(())
 }
