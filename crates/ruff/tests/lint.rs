@@ -13,7 +13,7 @@ use assert_fs::fixture::{ChildPath, FileTouch, PathChild};
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
-use test_fixture::{RuffTestFixture, tempdir_filter};
+use test_fixture::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
