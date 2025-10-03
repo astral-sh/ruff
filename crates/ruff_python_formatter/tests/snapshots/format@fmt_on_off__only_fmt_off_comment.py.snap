@@ -5,8 +5,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off
 ## Input
 ```python
 # Only module-level suppression comment should be considered; no trailing newline should be added
-# fmt: off
-```
+# fmt: off```
 
 ## Output
 ```python

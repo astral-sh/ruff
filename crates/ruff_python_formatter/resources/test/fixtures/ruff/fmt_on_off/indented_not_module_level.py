@@ -3,4 +3,3 @@ if True:
     x = 1
   # fmt: off
     y = 2
-

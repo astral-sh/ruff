@@ -11,9 +11,7 @@ def test():
     # fmt: on
     return x
 
-print("module")
-
-```
+print("module")```
 
 ## Output
 ```python

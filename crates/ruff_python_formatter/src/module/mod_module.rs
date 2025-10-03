@@ -30,7 +30,7 @@ impl FormatNodeRule<ModModule> for FormatModModule {
         } else {
             body.format().with_options(SuiteKind::TopLevel).fmt(f)?;
 
-            if source.ends_with('\n') || !has_unclosed_fmt_off(body, f.context()) {
+            if source.ends_with(['\n', '\r']) || !has_unclosed_fmt_off(body, f.context()) {
                 hard_line_break().fmt(f)?;
             }
 

@@ -8,9 +8,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off
 if True:
     x = 1
   # fmt: off
-    y = 2
-
-```
+    y = 2```
 
 ## Output
 ```python

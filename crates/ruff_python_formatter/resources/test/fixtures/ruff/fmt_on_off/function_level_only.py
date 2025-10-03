@@ -6,4 +6,3 @@ def test():
     return x
 
 print("module")
-

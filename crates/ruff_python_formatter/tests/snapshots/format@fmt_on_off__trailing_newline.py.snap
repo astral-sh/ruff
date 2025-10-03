@@ -15,8 +15,7 @@ print("world")
 # fmt: off
 print("suppressed")
 # fmt: on
-print("formatted")
-```
+print("formatted")```
 
 ## Output
 ```python
