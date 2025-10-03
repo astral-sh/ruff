@@ -298,7 +298,7 @@ impl<'db> GenericContext<'db> {
         InferableTypeVars::One(self.inferable_typevars_inner(db))
     }
 
-    #[salsa::tracked(returns(ref))]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
     fn inferable_typevars_inner(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarInstance<'db>> {
         // The second inner function is because the salsa macros seem to not like nested structs
         // and impl blocks inside the function.
