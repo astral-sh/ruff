@@ -111,19 +111,19 @@ inline-quotes = "single"
             .arg(case.root().join("ruff.toml"))
             .arg("-")
             .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        -:1:5: Q000 [*] Double quotes found but single quotes preferred
-        -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        -:1:19: Q000 [*] Double quotes found but single quotes preferred
-        Found 3 errors.
-        [*] 2 fixable with the `--fix` option.
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:5: Q000 [*] Double quotes found but single quotes preferred
+    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
+    -:1:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 3 errors.
+    [*] 2 fixable with the `--fix` option.
 
-        ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in ruff.toml:
-          - 'extend-select' -> 'lint.extend-select'
-        ");
+    ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+      - 'extend-select' -> 'lint.extend-select'
+    ");
 
     Ok(())
 }
@@ -152,19 +152,19 @@ inline-quotes = "single"
             .arg(case.root().join("ruff.toml"))
             .arg("-")
             .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        -:1:5: Q000 [*] Double quotes found but single quotes preferred
-        -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        -:1:19: Q000 [*] Double quotes found but single quotes preferred
-        Found 3 errors.
-        [*] 2 fixable with the `--fix` option.
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:5: Q000 [*] Double quotes found but single quotes preferred
+    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
+    -:1:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 3 errors.
+    [*] 2 fixable with the `--fix` option.
 
-        ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in ruff.toml:
-          - 'flake8-quotes' -> 'lint.flake8-quotes'
-        ");
+    ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
+    ");
 
     Ok(())
 }
