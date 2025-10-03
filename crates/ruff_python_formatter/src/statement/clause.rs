@@ -5,6 +5,7 @@ use ruff_python_ast::{
     StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
@@ -520,11 +521,10 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
                 f.context().comments().trailing(last_child_in_body),
                 f.context().source(),
             )
-            && !source[TextRange::new(
+            && !source.contains_line_break(TextRange::new(
                 self.format_header.header.range(source).unwrap().start(),
                 last_child_in_body.end(),
-            )]
-            .contains('\n')
+            ))
         {
             write_suppressed_clause(self, f)
         } else {
