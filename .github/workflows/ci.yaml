@@ -932,7 +932,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark formatter lexer linter parser
+        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
@@ -967,7 +967,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ty
+        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark --bench ty
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1

@@ -32,8 +32,8 @@ use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, UnionType, WrapperDescriptorKind, enums,
-    ide_support, todo_type,
+    TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -1588,6 +1588,14 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
+        // The maximum number of parameters across all the overloads that are being considered
+        // for filtering.
+        let max_parameter_count = matching_overload_indexes
+            .iter()
+            .map(|&index| self.overloads[index].signature.parameters().len())
+            .max()
+            .unwrap_or(0);
+
         // These are the parameter indexes that matches the arguments that participate in the
         // filtering process.
         //
@@ -1595,41 +1603,67 @@ impl<'db> CallableBinding<'db> {
         // gradual equivalent to the parameter types at the same index for other overloads.
         let mut participating_parameter_indexes = HashSet::new();
 
-        // These only contain the top materialized argument types for the corresponding
-        // participating parameter indexes.
-        let mut top_materialized_argument_types = vec![];
+        // The parameter types at each index for the first overload containing a parameter at
+        // that index.
+        let mut first_parameter_types: Vec<Option<Type<'db>>> = vec![None; max_parameter_count];
 
-        for (argument_index, argument_type) in arguments.iter_types().enumerate() {
-            let mut first_parameter_type: Option<Type<'db>> = None;
-            let mut participating_parameter_index = None;
-
-            'overload: for overload_index in matching_overload_indexes {
+        for argument_index in 0..arguments.len() {
+            for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
-                for parameter_index in &overload.argument_matches[argument_index].parameters {
+                for &parameter_index in &overload.argument_matches[argument_index].parameters {
                     // TODO: For an unannotated `self` / `cls` parameter, the type should be
                     // `typing.Self` / `type[typing.Self]`
-                    let current_parameter_type = overload.signature.parameters()[*parameter_index]
+                    let current_parameter_type = overload.signature.parameters()[parameter_index]
                         .annotated_type()
                         .unwrap_or(Type::unknown());
+                    let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
                         if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
-                            participating_parameter_index = Some(*parameter_index);
-                            break 'overload;
+                            participating_parameter_indexes.insert(parameter_index);
                         }
                     } else {
-                        first_parameter_type = Some(current_parameter_type);
+                        *first_parameter_type = Some(current_parameter_type);
                     }
                 }
             }
+        }
 
-            if let Some(parameter_index) = participating_parameter_index {
-                participating_parameter_indexes.insert(parameter_index);
-                top_materialized_argument_types.push(argument_type.top_materialization(db));
+        let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
+            .take(max_parameter_count)
+            .collect::<Vec<_>>();
+
+        for (argument_index, argument_type) in arguments.iter_types().enumerate() {
+            for overload_index in matching_overload_indexes {
+                let overload = &self.overloads[*overload_index];
+                for (parameter_index, variadic_argument_type) in
+                    overload.argument_matches[argument_index].iter()
+                {
+                    if !participating_parameter_indexes.contains(&parameter_index) {
+                        continue;
+                    }
+                    union_argument_type_builders[parameter_index].add_in_place(
+                        variadic_argument_type
+                            .unwrap_or(argument_type)
+                            .top_materialization(db),
+                    );
+                }
             }
         }
 
-        let top_materialized_argument_type =
-            Type::heterogeneous_tuple(db, top_materialized_argument_types);
+        // These only contain the top materialized argument types for the corresponding
+        // participating parameter indexes.
+        let top_materialized_argument_type = Type::heterogeneous_tuple(
+            db,
+            union_argument_type_builders
+                .into_iter()
+                .filter_map(|builder| {
+                    if builder.is_empty() {
+                        None
+                    } else {
+                        Some(builder.build())
+                    }
+                }),
+        );
 
         // A flag to indicate whether we've found the overload that makes the remaining overloads
         // unmatched for the given argument types.
@@ -1640,15 +1674,22 @@ impl<'db> CallableBinding<'db> {
                 self.overloads[*current_index].mark_as_unmatched_overload();
                 continue;
             }
-            let mut parameter_types = Vec::with_capacity(arguments.len());
+
+            let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
+                .take(max_parameter_count)
+                .collect::<Vec<_>>();
+
+            // The number of parameters that have been skipped because they don't participate in
+            // the filtering process. This is used to make sure the types are added to the
+            // corresponding parameter index in `union_parameter_types`.
+            let mut skipped_parameters = 0;
+
             for argument_index in 0..arguments.len() {
-                // The parameter types at the current argument index.
-                let mut current_parameter_types = vec![];
                 for overload_index in &matching_overload_indexes[..=upto] {
                     let overload = &self.overloads[*overload_index];
                     for parameter_index in &overload.argument_matches[argument_index].parameters {
                         if !participating_parameter_indexes.contains(parameter_index) {
-                            // This parameter doesn't participate in the filtering process.
+                            skipped_parameters += 1;
                             continue;
                         }
                         // TODO: For an unannotated `self` / `cls` parameter, the type should be
@@ -1660,17 +1701,24 @@ impl<'db> CallableBinding<'db> {
                             parameter_type =
                                 parameter_type.apply_specialization(db, specialization);
                         }
-                        current_parameter_types.push(parameter_type);
+                        union_parameter_types[parameter_index.saturating_sub(skipped_parameters)]
+                            .add_in_place(parameter_type);
                     }
                 }
-                if current_parameter_types.is_empty() {
-                    continue;
-                }
-                parameter_types.push(UnionType::from_elements(db, current_parameter_types));
             }
-            if top_materialized_argument_type
-                .is_assignable_to(db, Type::heterogeneous_tuple(db, parameter_types))
-            {
+
+            let parameter_types = Type::heterogeneous_tuple(
+                db,
+                union_parameter_types.into_iter().filter_map(|builder| {
+                    if builder.is_empty() {
+                        None
+                    } else {
+                        Some(builder.build())
+                    }
+                }),
+            );
+
+            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
                 filter_remaining_overloads = true;
             }
         }
