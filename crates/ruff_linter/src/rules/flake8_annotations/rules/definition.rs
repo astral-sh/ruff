@@ -4,13 +4,14 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Definition;
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::registry::Rule;
-use crate::rules::flake8_annotations::helpers::auto_return_type;
+use crate::rules::flake8_annotations::helpers::{auto_return_type, type_expr};
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -825,11 +826,31 @@ pub(crate) fn definition(
                     },
                     function.identifier(),
                 );
-                if let Some(return_type) = return_type {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        format!(" -> {return_type}"),
-                        function.parameters.end(),
-                    )));
+                if let Some(return_type_str) = return_type {
+                    // Convert the simple return type to a proper expression that handles shadowed builtins
+                    let python_type = match return_type_str {
+                        "str" => PythonType::String,
+                        "bytes" => PythonType::Bytes,
+                        "int" => PythonType::Number(NumberLike::Integer),
+                        "float" => PythonType::Number(NumberLike::Float),
+                        "complex" => PythonType::Number(NumberLike::Complex),
+                        "bool" => PythonType::Number(NumberLike::Bool),
+                        "None" => PythonType::None,
+                        _ => return, // Unknown type, skip
+                    };
+
+                    if let Some((expr, edits)) =
+                        type_expr(python_type, checker, function.parameters.start())
+                    {
+                        let return_type_expr = checker.generator().expr(&expr);
+                        diagnostic.set_fix(Fix::unsafe_edits(
+                            Edit::insertion(
+                                format!(" -> {return_type_expr}"),
+                                function.parameters.end(),
+                            ),
+                            edits,
+                        ));
+                    }
                 }
                 diagnostics.push(diagnostic);
             }

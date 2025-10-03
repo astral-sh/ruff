@@ -543,3 +543,14 @@ def _(x: int):
 
     reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
 ```
+
+## `~T` is never assignable to `T`
+
+```py
+from ty_extensions import Not
+
+def f[T](x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
+```

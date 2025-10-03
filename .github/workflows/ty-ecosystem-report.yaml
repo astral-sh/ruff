@@ -49,12 +49,13 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@6ce3a609575bc84eaf5d247739529c60b6c2ae5b"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@279f8a15b0e7f77213bf9096dbc2335a19ef89c5"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
             analyze \
+            --profile=release \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
@@ -62,7 +63,7 @@ jobs:
 
           ecosystem-analyzer \
             generate-report \
-            --max-diagnostics-per-project=1200 \
+            --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \
             --output dist/index.html
 
