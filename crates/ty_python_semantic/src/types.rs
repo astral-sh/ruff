@@ -5459,24 +5459,19 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                let new_specialization = new_call_outcome
-                    .and_then(Result::ok)
-                    .as_ref()
-                    .and_then(Bindings::single_element)
-                    .into_iter()
-                    .flat_map(CallableBinding::matching_overloads)
-                    .next()
-                    .and_then(|(_, binding)| binding.specialization())
-                    .and_then(|specialization| specialization.restrict(db, generic_context?));
-                let init_specialization = init_call_outcome
-                    .and_then(Result::ok)
-                    .as_ref()
-                    .and_then(Bindings::single_element)
-                    .into_iter()
-                    .flat_map(CallableBinding::matching_overloads)
-                    .next()
-                    .and_then(|(_, binding)| binding.specialization())
-                    .and_then(|specialization| specialization.restrict(db, generic_context?));
+                let specialize_constructor = |outcome: Option<Bindings<'db>>| {
+                    let (_, binding) = outcome
+                        .as_ref()?
+                        .single_element()?
+                        .matching_overloads()
+                        .next()?;
+                    binding.specialization()?.restrict(db, generic_context?)
+                };
+
+                let new_specialization =
+                    specialize_constructor(new_call_outcome.and_then(Result::ok));
+                let init_specialization =
+                    specialize_constructor(init_call_outcome.and_then(Result::ok));
                 let specialization =
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
