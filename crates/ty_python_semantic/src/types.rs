@@ -9006,7 +9006,7 @@ pub(crate) enum TypeRelation {
     /// subtype of `C` if and only if the union of all possible sets of values
     /// represented by `D` (the "top materialization" of `D`) is a subtype of the
     /// intersection of all possible sets of values represented by `C` (the "bottom
-    /// materialization" of `C`).
+    /// materialization" of `C`). More concisely: `D <: C` iff `Top[D] <: Bottom[C]`.
     ///
     /// For example, `list[Any]` can be said to be a subtype of `Sequence[object]`,
     /// because every possible fully static materialization of `list[Any]` (`list[int]`,
@@ -9034,8 +9034,13 @@ pub(crate) enum TypeRelation {
     ///
     /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
     /// assignability relation may be more permissive than the subtyping relation. `D`
-    /// can be said to be assignable to `C` if *any* possibly fully static [materialization]
-    /// of `D` is a subtype of *any* possible fully static materialization of `C`.
+    /// can be said to be assignable to `C` if *some* possible fully static [materialization]
+    /// of `D` is a subtype of *some* possible fully static materialization of `C`.
+    /// Another way of saying this is that `D` will be assignable to `C` if and only if the
+    /// intersection of all possible sets of values represented by `D` (the "bottom
+    /// materialization" of `D`) is a subtype of the union of all possible sets of values
+    /// represented by `C` (the "top materialization" of `C`).
+    /// More concisely: `D <: C` iff `Bottom[D] <: Top[C]`.
     ///
     /// For example, `Any` is not a subtype of `int`, because there are possible
     /// materializations of `Any` (e.g., `str`) that are not subtypes of `int`.
@@ -9062,17 +9067,16 @@ pub(crate) enum TypeRelation {
     /// pragmatically simplified to the type `A` without downstream consequences on ty's
     /// inference of types elsewhere.
     ///
-    /// For a pair of [fully static] types `A` and `B`, the assignability relation
+    /// For a pair of [fully static] types `A` and `B`, the union simplification relation
     /// between `A` and `B` is the same as the subtyping relation.
     ///
     /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
     /// union simplification relation sits in between the subtyping relation and the
-    /// assignability relation. `D` can be said to be redundant in a union with `C` if either:
-    ///
-    /// 1. `D` is a subtype of `C`; or,
-    /// 2. The top materialization of the type `C | D` is equivalent to the top
-    ///    materialization of `C`, *and* the bottom materialization of `C | D` is equivalent
-    ///    to the bottom materialization of `C`.
+    /// assignability relation. `D` can be said to be redundant in a union with `C` if the
+    /// top materialization of the type `C | D` is equivalent to the top materialization of
+    /// `C`, *and* the bottom materialization of `C | D` is equivalent to the bottom
+    /// materialization of `C`.
+    /// More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
     ///
     /// Practically speaking, in most respects the union simplification relation is the
     /// same as the subtyping relation. It is redundant to add `bool` to a union that
