@@ -198,7 +198,15 @@ fn move_initialization(
             "{}{} = {}",
             parameter.parameter.name(),
             annotation,
-            checker.generator().expr_parenthesized(default)
+            locator.slice(
+                parenthesized_range(
+                    default.into(),
+                    parameter.into(),
+                    checker.comment_ranges(),
+                    checker.source()
+                )
+                .unwrap_or(default.range())
+            )
         );
     } else {
         let _ = write!(
