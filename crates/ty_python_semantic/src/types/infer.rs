@@ -44,6 +44,7 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::Db;
+use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
@@ -631,8 +632,11 @@ struct DefinitionInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
 
-    /// The definitions that are deferred.
+    /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
+
+    /// Deferred expressions within a deferred definition.
+    deferred_expressions: Box<[AstNodeRef<ast::Expr>]>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,

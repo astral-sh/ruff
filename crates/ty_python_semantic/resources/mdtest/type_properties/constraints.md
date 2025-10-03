@@ -343,7 +343,7 @@ def _[T]() -> None:
     reveal_type(negated_range_constraint(Sub, T, Base) & negated_range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(¬(Base ≤ T@_ ≤ Super) ∧ ¬(SubSub ≤ T@_ ≤ Sub))]
     reveal_type(negated_range_constraint(SubSub, T, Sub) & negated_range_constraint(Base, T, Super))
-    # revealed: ty_extensions.ConstraintSet[(¬(SubSub ≤ T@_ ≤ Sub) ∧ ¬(Unrelated ≤ T@_))]
+    # revealed: ty_extensions.ConstraintSet[(¬(Unrelated ≤ T@_) ∧ ¬(SubSub ≤ T@_ ≤ Sub))]
     reveal_type(negated_range_constraint(SubSub, T, Sub) & negated_range_constraint(Unrelated, T, object))
 ```
 
@@ -421,7 +421,7 @@ def _[T]() -> None:
     reveal_type(range_constraint(Sub, T, Base) | range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (SubSub ≤ T@_ ≤ Sub)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Base, T, Super))
-    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Unrelated ≤ T@_)]
+    # revealed: ty_extensions.ConstraintSet[(Unrelated ≤ T@_) ∨ (SubSub ≤ T@_ ≤ Sub)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Unrelated, T, object))
 ```
 
