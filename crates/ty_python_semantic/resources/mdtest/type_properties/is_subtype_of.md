@@ -1963,6 +1963,10 @@ static_assert(not is_subtype_of(type[A], Callable[[int], A]))
 
 ### Bound methods
 
+The bound `self` or `cls` parameter of a bound method has been curried away, and is no longer
+available as a parameter when calling it. It therefore is not considered when checking subtyping
+involving the bound method.
+
 ```py
 from typing import Callable
 from ty_extensions import TypeOf, static_assert, is_subtype_of
@@ -1981,10 +1985,129 @@ static_assert(is_subtype_of(TypeOf[a.f], Callable[[int], int]))
 static_assert(is_subtype_of(TypeOf[a.g], Callable[[int], int]))
 static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
 
-static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
+```
+
+Return types are in covariant position:
+
+```py
+static_assert(is_subtype_of(TypeOf[a.f], Callable[[int], object]))
+static_assert(is_subtype_of(TypeOf[a.g], Callable[[int], object]))
+static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], object]))
+
+static_assert(not is_subtype_of(TypeOf[a.f], Callable[[int], bool]))
+static_assert(not is_subtype_of(TypeOf[a.g], Callable[[int], bool]))
+static_assert(not is_subtype_of(TypeOf[A.g], Callable[[int], bool]))
+```
+
+Parameter types are in contravariant position:
+
+```py
+static_assert(not is_subtype_of(TypeOf[a.f], Callable[[object], int]))
+static_assert(not is_subtype_of(TypeOf[a.g], Callable[[object], int]))
+static_assert(not is_subtype_of(TypeOf[A.g], Callable[[object], int]))
+
+static_assert(is_subtype_of(TypeOf[a.f], Callable[[bool], int]))
+static_assert(is_subtype_of(TypeOf[a.g], Callable[[bool], int]))
+static_assert(is_subtype_of(TypeOf[A.g], Callable[[bool], int]))
+```
+
+We should get the same results when comparing with a bound method of a different class.
+
+```py
+class B:
+    def returns_int(self, a: int) -> int:
+        return 0
+
+    def returns_object(self, a: int) -> object:
+        return a
+
+    def returns_bool(self, a: int) -> bool:
+        return True
+
+    def takes_object(self, a: object) -> int:
+        return 0
+
+    def takes_bool(self, a: bool) -> int:
+        return 0
+
+    @classmethod
+    def class_returns_int(cls, a: int) -> int:
+        return 0
+
+    @classmethod
+    def class_returns_object(cls, a: int) -> object:
+        return a
+
+    @classmethod
+    def class_returns_bool(cls, a: int) -> bool:
+        return True
+
+    @classmethod
+    def class_takes_object(cls, a: object) -> int:
+        return 0
+
+    @classmethod
+    def class_takes_bool(cls, a: bool) -> int:
+        return 0
+
+b = B()
+
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[b.returns_object]))
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[b.returns_int]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[b.returns_bool]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[b.takes_object]))
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[b.takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[b.class_returns_object]))
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[b.class_returns_int]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[b.class_returns_bool]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[b.class_takes_object]))
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[b.class_takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[B.class_returns_object]))
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[B.class_returns_int]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[B.class_returns_bool]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[B.class_takes_object]))
+static_assert(is_subtype_of(TypeOf[a.f], TypeOf[B.class_takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[b.returns_object]))
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[b.returns_int]))
+static_assert(not is_subtype_of(TypeOf[a.g], TypeOf[b.returns_bool]))
+static_assert(not is_subtype_of(TypeOf[a.g], TypeOf[b.takes_object]))
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[b.takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[b.class_returns_object]))
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[b.class_returns_int]))
+static_assert(not is_subtype_of(TypeOf[a.g], TypeOf[b.class_returns_bool]))
+static_assert(not is_subtype_of(TypeOf[a.g], TypeOf[b.class_takes_object]))
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[b.class_takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[B.class_returns_object]))
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[B.class_returns_int]))
+static_assert(not is_subtype_of(TypeOf[a.g], TypeOf[B.class_returns_bool]))
+static_assert(not is_subtype_of(TypeOf[a.g], TypeOf[B.class_takes_object]))
+static_assert(is_subtype_of(TypeOf[a.g], TypeOf[B.class_takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[b.returns_object]))
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[b.returns_int]))
+static_assert(not is_subtype_of(TypeOf[A.g], TypeOf[b.returns_bool]))
+static_assert(not is_subtype_of(TypeOf[A.g], TypeOf[b.takes_object]))
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[b.takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[b.class_returns_object]))
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[b.class_returns_int]))
+static_assert(not is_subtype_of(TypeOf[A.g], TypeOf[b.class_returns_bool]))
+static_assert(not is_subtype_of(TypeOf[A.g], TypeOf[b.class_takes_object]))
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[b.class_takes_bool]))
+
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[B.class_returns_object]))
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[B.class_returns_int]))
+static_assert(not is_subtype_of(TypeOf[A.g], TypeOf[B.class_returns_bool]))
+static_assert(not is_subtype_of(TypeOf[A.g], TypeOf[B.class_takes_object]))
+static_assert(is_subtype_of(TypeOf[A.g], TypeOf[B.class_takes_bool]))
 ```
 
 ### Overloads

@@ -9165,20 +9165,16 @@ impl<'db> BoundMethodType<'db> {
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // A bound method is a typically a subtype of itself. However, we must explicitly verify
-        // the subtyping of the underlying function signatures (since they might be specialized
-        // differently), and of the bound self parameter (taking care that parameters, including a
-        // bound self parameter, are contravariant.)
-        self.function(db)
-            .has_relation_to_impl(db, other.function(db), relation, visitor)
-            .and(db, || {
-                other.self_instance(db).has_relation_to_impl(
-                    db,
-                    self.self_instance(db),
-                    relation,
-                    visitor,
-                )
-            })
+        // Note that we do not consider `self_instance`, and we use `into_callable_type` to compare
+        // the signatures of the bound methods _after_ the `self` parameter has been bound. The
+        // bound `self` is no longer available as a parameter to callers, and should therefore not
+        // influence the result of the check.
+        self.into_callable_type(db).has_relation_to_impl(
+            db,
+            other.into_callable_type(db),
+            relation,
+            visitor,
+        )
     }
 
     fn is_equivalent_to_impl(
@@ -9187,13 +9183,12 @@ impl<'db> BoundMethodType<'db> {
         other: Self,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        self.function(db)
-            .is_equivalent_to_impl(db, other.function(db), visitor)
-            .and(db, || {
-                other
-                    .self_instance(db)
-                    .is_equivalent_to_impl(db, self.self_instance(db), visitor)
-            })
+        // Note that we do not consider `self_instance`, and we use `into_callable_type` to compare
+        // the signatures of the bound methods _after_ the `self` parameter has been bound. The
+        // bound `self` is no longer available as a parameter to callers, and should therefore not
+        // influence the result of the check.
+        self.into_callable_type(db)
+            .is_equivalent_to_impl(db, other.into_callable_type(db), visitor)
     }
 }
 
