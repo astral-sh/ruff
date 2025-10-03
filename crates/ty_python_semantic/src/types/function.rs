@@ -969,7 +969,7 @@ impl<'db> FunctionType<'db> {
         _visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match relation {
-            TypeRelation::Subtyping | TypeRelation::UnionSimplification => {
+            TypeRelation::Subtyping | TypeRelation::Redundancy => {
                 ConstraintSet::from(self.is_subtype_of(db, other))
             }
             TypeRelation::Assignability => ConstraintSet::from(self.is_assignable_to(db, other)),

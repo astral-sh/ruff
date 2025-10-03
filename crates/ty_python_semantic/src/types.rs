@@ -1437,9 +1437,9 @@ impl<'db> Type<'db> {
 
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
-    /// See [`TypeRelation::UnionSimplification`] for more details.
-    pub(crate) fn is_redundant_in_union_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.has_relation_to(db, other, TypeRelation::UnionSimplification)
+    /// See [`TypeRelation::Redundancy`] for more details.
+    pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        self.has_relation_to(db, other, TypeRelation::Redundancy)
             .is_always_satisfied()
     }
 
@@ -1520,7 +1520,7 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping => false,
                 TypeRelation::Assignability => true,
-                TypeRelation::UnionSimplification => match target {
+                TypeRelation::Redundancy => match target {
                     Type::Dynamic(_) => true,
                     Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                     _ => false,
@@ -1529,7 +1529,7 @@ impl<'db> Type<'db> {
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping => false,
                 TypeRelation::Assignability => true,
-                TypeRelation::UnionSimplification => match self {
+                TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
                         intersection.positive(db).iter().any(Type::is_dynamic)
@@ -9061,31 +9061,29 @@ pub(crate) enum TypeRelation {
     /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Assignability,
 
-    /// The "union simplification" relation.
+    /// The "redundancy" relation.
     ///
-    /// The union simplification relation dictates whether the union `A | B` can be
-    /// pragmatically simplified to the type `A` without downstream consequences on ty's
-    /// inference of types elsewhere.
+    /// The redundancy relation dictates whether the union `A | B` can be safely simplified
+    /// to the type `A` without downstream consequences on ty's inference of types elsewhere.
     ///
-    /// For a pair of [fully static] types `A` and `B`, the union simplification relation
-    /// between `A` and `B` is the same as the subtyping relation.
+    /// For a pair of [fully static] types `A` and `B`, the redundancy relation between `A`
+    /// and `B` is the same as the subtyping relation.
     ///
     /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
-    /// union simplification relation sits in between the subtyping relation and the
-    /// assignability relation. `D` can be said to be redundant in a union with `C` if the
-    /// top materialization of the type `C | D` is equivalent to the top materialization of
-    /// `C`, *and* the bottom materialization of `C | D` is equivalent to the bottom
-    /// materialization of `C`.
+    /// redundancy relation sits in between the subtyping relation and the assignability relation.
+    /// `D` can be said to be redundant in a union with `C` if the top materialization of the type
+    /// `C | D` is equivalent to the top materialization of `C`, *and* the bottom materialization
+    /// of `C | D` is equivalent to the bottom materialization of `C`.
     /// More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
     ///
-    /// Practically speaking, in most respects the union simplification relation is the
-    /// same as the subtyping relation. It is redundant to add `bool` to a union that
-    /// includes `int`, because `bool` is a subtype of `int`, so inference of attribute access
-    /// or binary expressions on the union `int | bool` would always produce a type that
-    /// represents the same set of possible sets of runtime values as if ty had inferred
-    /// the attribute access or binary expression on `int` alone.
+    /// Practically speaking, in most respects the redundancy relation is the same as the subtyping
+    /// relation. It is redundant to add `bool` to a union that includes `int`, because `bool` is a
+    /// subtype of `int`, so inference of attribute access or binary expressions on the union
+    /// `int | bool` would always produce a type that represents the same set of possible sets of
+    /// runtime values as if ty had inferred the attribute access or binary expression on `int`
+    /// alone.
     ///
-    /// Where union simplification differs from the subtyping relation is that there are a
+    /// Where the redundancy relation differs from the subtyping relation is that there are a
     /// number of simplifications that can be made when simplifying unions that are not
     /// strictly permitted by the subtyping relation. For example, it is safe to avoid adding
     /// `Any` to a union that already includes `Any`, because `Any` already represents an
@@ -9113,7 +9111,7 @@ pub(crate) enum TypeRelation {
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    UnionSimplification,
+    Redundancy,
 }
 
 impl TypeRelation {
