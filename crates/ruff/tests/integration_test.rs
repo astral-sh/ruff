@@ -1692,7 +1692,10 @@ fn check_input_from_argfile() -> Result<()> {
 // Regression test for https://github.com/astral-sh/ruff/issues/20655
 fn missing_argfile_reports_error() {
     let mut cmd = RuffCheck::default().filename("@!.txt").build();
-    assert_cmd_snapshot!(cmd, @r"
+    insta::with_settings!({filters => vec![
+        ("The system cannot find the file specified.", "No such file or directory")
+    ]}, {
+        assert_cmd_snapshot!(cmd, @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1703,6 +1706,7 @@ fn missing_argfile_reports_error() {
       Cause: failed to open file `!.txt`
       Cause: No such file or directory (os error 2)
     ");
+    });
 }
 
 #[test]
