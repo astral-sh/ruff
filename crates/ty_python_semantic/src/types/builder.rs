@@ -502,18 +502,9 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
-                if ty.is_equivalent_to(self.db, element_type)
-                    || ty.is_subtype_of(self.db, element_type)
-                    || ty.into_intersection().is_some_and(|intersection| {
-                        intersection.positive(self.db).contains(&element_type)
-                    })
-                {
+                if ty.is_redundant_with(self.db, element_type) {
                     return;
-                } else if element_type.is_subtype_of(self.db, ty)
-                    || element_type
-                        .into_intersection()
-                        .is_some_and(|intersection| intersection.positive(self.db).contains(&ty))
-                {
+                } else if element_type.is_redundant_with(self.db, ty) {
                     to_remove.push(index);
                 } else if ty_negated.is_subtype_of(self.db, element_type) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
@@ -930,13 +921,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
-                    if existing_positive.is_subtype_of(db, new_positive)
-                        || existing_positive.is_equivalent_to(db, new_positive)
-                    {
+                    if existing_positive.is_redundant_with(db, new_positive) {
                         return;
                     }
                     // same rule, reverse order
-                    if new_positive.is_subtype_of(db, *existing_positive) {
+                    if new_positive.is_redundant_with(db, *existing_positive) {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
@@ -1027,9 +1016,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
-                    if existing_negative.is_subtype_of(db, new_negative)
-                        || existing_negative.is_equivalent_to(db, new_negative)
-                    {
+                    if existing_negative.is_redundant_with(db, new_negative) {
                         to_remove.push(index);
                     }
                     // same rule, reverse order

@@ -551,7 +551,9 @@ impl<'db> ClassType<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => ConstraintSet::from(other.is_object(db)),
+                    TypeRelation::Subtyping | TypeRelation::Redundancy => {
+                        ConstraintSet::from(other.is_object(db))
+                    }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
                 },
 
