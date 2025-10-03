@@ -89,12 +89,13 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
-    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarInstance, TypeVarKind, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
+    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
+    TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -4989,8 +4990,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .flatten();
 
-        let overloads_count = overloads_with_binding.clone().count();
-
         for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
                 // Splatted arguments are inferred before parameter matching to
@@ -5010,15 +5009,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let (old_multi_inference_state, was_in_multi_inference) = if overloads_count == 1 {
-                // If there is only a single binding and overload, there is a unique parameter type annotation
-                // for each argument.
-                let multi_inference_state = self.multi_inference_state;
+            // Retrieve the parameter type for the current argument in a given overload and its binding.
+            let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
+                let argument_index = if binding.bound_type.is_some() {
+                    argument_index + 1
+                } else {
+                    argument_index
+                };
 
-                // And we can emit any diagnostics directly for the unique type context.
-                let is_in_multi_inference = self.context.is_in_multi_inference();
+                let argument_matches = &overload.argument_matches()[argument_index];
+                let [parameter_index] = argument_matches.parameters.as_slice() else {
+                    return None;
+                };
 
-                (multi_inference_state, is_in_multi_inference)
+                overload.signature.parameters()[*parameter_index].annotated_type()
+            };
+
+            // If there is only a single binding and overload, we can infer the argument directly with
+            // the unique parameter type annotation.
+            if let Ok((overload, binding)) = overloads_with_binding.clone().exactly_one() {
+                self.infer_expression_impl(
+                    ast_argument,
+                    TypeContext::new(parameter_type(overload, binding)),
+                );
             } else {
                 // Otherwise, each type is a valid independent inference of the given argument, and we may
                 // require different permutations of argument types to correctly perform argument expansion
@@ -5040,37 +5053,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // for non-matching overloads.
                 let was_in_multi_inference = self.context.set_multi_inference(true);
 
-                (old_multi_inference_state, was_in_multi_inference)
-            };
+                // Infer the type of each argument once with each distinct parameter type as type context.
+                let parameter_types = overloads_with_binding
+                    .clone()
+                    .filter_map(|(overload, binding)| parameter_type(overload, binding))
+                    .collect::<FxHashSet<_>>();
 
-            // Infer the type of each argument once for each matching overload signature, with the given annotated
-            // parameter type as type context.
-            //
-            // TODO: De-duplicate the type contexts to avoid inferring the same expression multiple times
-            // with the same type context.
-            for (overload, binding) in overloads_with_binding.clone() {
-                let argument_index = if binding.bound_type.is_some() {
-                    argument_index + 1
-                } else {
-                    argument_index
-                };
+                for parameter_type in parameter_types {
+                    self.infer_expression_impl(
+                        ast_argument,
+                        TypeContext::new(Some(parameter_type)),
+                    );
+                }
 
-                let argument_matches = &overload.argument_matches()[argument_index];
-                let [parameter_index] = argument_matches.parameters.as_slice() else {
-                    continue;
-                };
-
-                let parameter_type =
-                    overload.signature.parameters()[*parameter_index].annotated_type();
-
-                self.infer_expression_impl(ast_argument, TypeContext::new(parameter_type));
+                // Restore the multi-inference state.
+                self.multi_inference_state = old_multi_inference_state;
+                self.context.set_multi_inference(was_in_multi_inference);
             }
 
             *argument_type = self.try_expression_type(ast_argument);
-
-            // Restore the multi-inference state.
-            self.multi_inference_state = old_multi_inference_state;
-            self.context.set_multi_inference(was_in_multi_inference);
         }
     }
 
