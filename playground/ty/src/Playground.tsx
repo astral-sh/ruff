@@ -60,15 +60,6 @@ export default function Playground() {
   }, [files]);
 
   const handleFileAdded = (workspace: Workspace, name: string) => {
-    if (name.startsWith("/")) {
-      setError("File names cannot start with '/'.");
-      return;
-    }
-    if (name.startsWith("vendored:")) {
-      setError("File names cannot start with 'vendored:'.");
-      return;
-    }
-
     let handle = null;
 
     if (name === SETTINGS_FILE_NAME) {
