@@ -206,8 +206,7 @@ class PlaygroundServer
   private getVendoredPath(uri: Uri): string {
     // Monaco parses "vendored://stdlib/typing.pyi" as authority="stdlib", path="/typing.pyi"
     // We need to reconstruct the full path
-    const fullPath = uri.authority ? `${uri.authority}${uri.path}` : uri.path;
-    return fullPath.startsWith("/") ? fullPath.slice(1) : fullPath;
+    return uri.authority ? `${uri.authority}${uri.path}` : uri.path;
   }
 
   constructor(
