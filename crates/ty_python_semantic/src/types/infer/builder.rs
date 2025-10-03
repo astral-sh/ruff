@@ -4982,7 +4982,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // If there is a single overload that does not match, we still infer the argument
                     // types for better diagnostics.
                     MatchingOverloadIndex::None => match binding.overloads() {
-                        [overload] => Some(Either::Left([(overload, binding)].into_iter())),
+                        [overload] => Some(Either::Left(std::iter::once((overload, binding)))),
                         _ => None,
                     },
                 }
