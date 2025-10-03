@@ -311,7 +311,10 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
-        AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::StmtImportFrom(import_from) => {
+            handle_import_from_comment(comment, import_from, source)
+        }
+        AnyNodeRef::Alias(alias) => handle_alias_comment(comment, alias, source),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprStringLiteral(_) => match comment.enclosing_parent() {
@@ -1936,6 +1939,7 @@ fn handle_bracketed_end_of_line_comment<'a>(
 fn handle_import_from_comment<'a>(
     comment: DecoratedComment<'a>,
     import_from: &'a ast::StmtImportFrom,
+    source: &str,
 ) -> CommentPlacement<'a> {
     // The comment needs to be on the same line, but before the first member. For example, we want
     // to treat this as a dangling comment:
@@ -1963,8 +1967,46 @@ fn handle_import_from_comment<'a>(
     {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        if let Some(SimpleToken {
+            kind: SimpleTokenKind::Comma,
+            ..
+        }) = SimpleTokenizer::starts_at(comment.start(), source)
+            .skip_trivia()
+            .next()
+        {
+            // treat comments before the comma as dangling, after as trailing (default)
+            if let Some(AnyNodeRef::Alias(alias)) = comment.preceding_node() {
+                CommentPlacement::dangling(alias, comment)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        } else {
+            CommentPlacement::Default(comment)
+        }
     }
+}
+
+fn handle_alias_comment<'a>(
+    comment: DecoratedComment<'a>,
+    alias: &'a ruff_python_ast::Alias,
+    source: &str,
+) -> CommentPlacement<'a> {
+    if let Some(asname) = &alias.asname {
+        if let Some(SimpleToken {
+            kind: SimpleTokenKind::As,
+            range: as_range,
+        }) = SimpleTokenizer::starts_at(alias.name.end(), source)
+            .skip_trivia()
+            .next()
+        {
+            return if comment.start() < as_range.start() {
+                CommentPlacement::trailing(&alias.name, comment)
+            } else {
+                CommentPlacement::leading(asname, comment)
+            };
+        }
+    }
+    CommentPlacement::Default(comment)
 }
 
 /// Attach an enclosed end-of-line comment to a [`ast::StmtWith`].

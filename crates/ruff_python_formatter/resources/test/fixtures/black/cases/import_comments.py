@@ -5,9 +5,15 @@ from x import a, b  # comment
 from x import a as b  # comment
 from x import a as b, b as c  # comment
 
-# ensure intermixed end- and own-line comments are all preserved
-# and at least kept in their original order, if not their original
-# positions within the import statement
+# ensure intermixed comments are all preserved
+from x import (  # one
+    # two
+    a  # three
+    # four
+    ,  # five
+    # six
+)  # seven
+
 from x import (  # alpha
     # bravo
     a  # charlie

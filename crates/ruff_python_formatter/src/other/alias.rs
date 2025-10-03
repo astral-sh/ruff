@@ -16,18 +16,45 @@ impl FormatNodeRule<Alias> for FormatAlias {
             name,
             asname,
         } = item;
-        DotDelimitedIdentifier::new(name).fmt(f)?;
-        if let Some(asname) = asname {
-            let comments = f.context().comments().clone();
-            let dangling = comments.dangling(item);
+        write!(f, [DotDelimitedIdentifier::new(name)])?;
+
+        let comments = f.context().comments().clone();
+        if comments.has_trailing(name) {
             write!(
                 f,
                 [
-                    space(),
-                    token("as"),
-                    space(),
-                    asname.format(),
-                    trailing_comments(dangling),
+                    trailing_comments(comments.trailing(name)),
+                    hard_line_break()
+                ]
+            )?;
+        } else if asname.is_some() {
+            write!(f, [space()])?;
+        }
+
+        if let Some(asname) = asname {
+            write!(f, [token("as"),])?;
+
+            if comments.has_leading(asname) {
+                write!(
+                    f,
+                    [
+                        trailing_comments(comments.leading(asname)),
+                        hard_line_break()
+                    ]
+                )?;
+            } else {
+                write!(f, [space()])?;
+            }
+
+            write!(f, [asname.format()])?;
+        }
+
+        if comments.has_dangling(item) {
+            write!(
+                f,
+                [
+                    trailing_comments(comments.dangling(item)),
+                    hard_line_break()
                 ]
             )?;
         }
