@@ -1,0 +1,260 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
+  --> FURB103.py:12:6
+   |
+11 | # FURB103
+12 | with open("file.txt", "w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |     f.write("test")
+   |
+help: Replace with `Path("file.txt").write_text("test")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+10 | # Errors.
+11 | 
+12 | # FURB103
+   - with open("file.txt", "w") as f:
+   -     f.write("test")
+13 + pathlib.Path("file.txt").write_text("test")
+14 | 
+15 | # FURB103
+16 | with open("file.txt", "wb") as f:
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(foobar)`
+  --> FURB103.py:16:6
+   |
+15 | # FURB103
+16 | with open("file.txt", "wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_bytes(foobar)`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+14 |     f.write("test")
+15 | 
+16 | # FURB103
+   - with open("file.txt", "wb") as f:
+   -     f.write(foobar)
+17 + pathlib.Path("file.txt").write_bytes(foobar)
+18 | 
+19 | # FURB103
+20 | with open("file.txt", mode="wb") as f:
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
+  --> FURB103.py:20:6
+   |
+19 | # FURB103
+20 | with open("file.txt", mode="wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |     f.write(b"abc")
+   |
+help: Replace with `Path("file.txt").write_bytes(b"abc")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+18 |     f.write(foobar)
+19 | 
+20 | # FURB103
+   - with open("file.txt", mode="wb") as f:
+   -     f.write(b"abc")
+21 + pathlib.Path("file.txt").write_bytes(b"abc")
+22 | 
+23 | # FURB103
+24 | with open("file.txt", "w", encoding="utf8") as f:
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
+  --> FURB103.py:24:6
+   |
+23 | # FURB103
+24 | with open("file.txt", "w", encoding="utf8") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_text(foobar, encoding="utf8")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+22 |     f.write(b"abc")
+23 | 
+24 | # FURB103
+   - with open("file.txt", "w", encoding="utf8") as f:
+   -     f.write(foobar)
+25 + pathlib.Path("file.txt").write_text(foobar, encoding="utf8")
+26 | 
+27 | # FURB103
+28 | with open("file.txt", "w", errors="ignore") as f:
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
+  --> FURB103.py:28:6
+   |
+27 | # FURB103
+28 | with open("file.txt", "w", errors="ignore") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_text(foobar, errors="ignore")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+26 |     f.write(foobar)
+27 | 
+28 | # FURB103
+   - with open("file.txt", "w", errors="ignore") as f:
+   -     f.write(foobar)
+29 + pathlib.Path("file.txt").write_text(foobar, errors="ignore")
+30 | 
+31 | # FURB103
+32 | with open("file.txt", mode="w") as f:
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
+  --> FURB103.py:32:6
+   |
+31 | # FURB103
+32 | with open("file.txt", mode="w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_text(foobar)`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+30 |     f.write(foobar)
+31 | 
+32 | # FURB103
+   - with open("file.txt", mode="w") as f:
+   -     f.write(foobar)
+33 + pathlib.Path("file.txt").write_text(foobar)
+34 | 
+35 | # FURB103
+36 | with open(foo(), "wb") as f:
+
+FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
+  --> FURB103.py:36:6
+   |
+35 | # FURB103
+36 | with open(foo(), "wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^
+37 |     # The body of `with` is non-trivial, but the recommendation holds.
+38 |     bar("pre")
+   |
+help: Replace with `Path(foo()).write_bytes(bar())`
+
+FURB103 `open` and `write` should be replaced by `Path("a.txt").write_text(x)`
+  --> FURB103.py:44:6
+   |
+43 | # FURB103
+44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^
+45 |     a.write(x)
+46 |     b.write(y)
+   |
+help: Replace with `Path("a.txt").write_text(x)`
+
+FURB103 `open` and `write` should be replaced by `Path("b.txt").write_bytes(y)`
+  --> FURB103.py:44:31
+   |
+43 | # FURB103
+44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^
+45 |     a.write(x)
+46 |     b.write(y)
+   |
+help: Replace with `Path("b.txt").write_bytes(y)`
+
+FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(bar(bar(a + x)))`
+  --> FURB103.py:49:18
+   |
+48 | # FURB103
+49 | with foo() as a, open("file.txt", "w") as b, foo() as c:
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+50 |     # We have other things in here, multiple with items, but the user
+51 |     # writes a single time to file and that bit they can replace.
+   |
+help: Replace with `Path("file.txt").write_text(bar(bar(a + x)))`
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
+  --> FURB103.py:58:6
+   |
+57 | # FURB103
+58 | with open("file.txt", "w", newline="\r\n") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+59 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
+1  + import pathlib
+2  | def foo():
+3  |     ...
+4  | 
+--------------------------------------------------------------------------------
+56 | 
+57 | 
+58 | # FURB103
+   - with open("file.txt", "w", newline="\r\n") as f:
+   -     f.write(foobar)
+59 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
+60 | 
+61 | 
+62 | import builtins
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
+  --> FURB103.py:66:6
+   |
+65 | # FURB103
+66 | with builtins.open("file.txt", "w", newline="\r\n") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
+60 | 
+61 | 
+62 | import builtins
+63 + import pathlib
+64 | 
+65 | 
+66 | # FURB103
+   - with builtins.open("file.txt", "w", newline="\r\n") as f:
+   -     f.write(foobar)
+67 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
+68 | 
+69 | 
+70 | from builtins import open as o
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
+  --> FURB103.py:74:6
+   |
+73 | # FURB103
+74 | with o("file.txt", "w", newline="\r\n") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 |     f.write(foobar)
+   |
+help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
+68 | 
+69 | 
+70 | from builtins import open as o
+71 + import pathlib
+72 | 
+73 | 
+74 | # FURB103
+   - with o("file.txt", "w", newline="\r\n") as f:
+   -     f.write(foobar)
+75 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
+76 | 
+77 | # Non-errors.
+78 |

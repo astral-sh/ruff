@@ -240,3 +240,13 @@ pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
 pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_read_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_write_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
