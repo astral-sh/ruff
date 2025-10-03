@@ -293,18 +293,6 @@ help: Replace with conversion flag
 48 | f"{repr(1)=}"
 49 | 
 
-RUF010 Use explicit conversion flag
-  --> RUF010.py:48:4
-   |
-46 | f"{builtins.repr(1)}"
-47 |
-48 | f"{repr(1)=}"
-   |    ^^^^^^^
-49 |
-50 | f"{repr(lambda: 1)}"
-   |
-help: Replace with conversion flag
-
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:50:4
    |
@@ -383,6 +371,7 @@ help: Replace with conversion flag
 56 + f"{(x for x in [])!s}"
 57 | 
 58 | f"{str((x for x in []))}"
+59 | 
 
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:58:4
@@ -391,6 +380,8 @@ RUF010 [*] Use explicit conversion flag
 57 |
 58 | f"{str((x for x in []))}"
    |    ^^^^^^^^^^^^^^^^^^^^
+59 |
+60 | # Debug text cases - should not trigger RUF010
    |
 help: Replace with conversion flag
 55 | 
@@ -398,3 +389,6 @@ help: Replace with conversion flag
 57 | 
    - f"{str((x for x in []))}"
 58 + f"{(x for x in [])!s}"
+59 | 
+60 | # Debug text cases - should not trigger RUF010
+61 | f"{str(1)=}"
