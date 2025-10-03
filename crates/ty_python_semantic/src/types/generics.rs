@@ -298,7 +298,12 @@ impl<'db> GenericContext<'db> {
         InferableTypeVars::One(self.inferable_typevars_inner(db))
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_fn=inferable_typevars_cycle_recover,
+        cycle_initial=inferable_typevars_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     fn inferable_typevars_inner(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarInstance<'db>> {
         // The second inner function is because the salsa macros seem to not like nested structs
         // and impl blocks inside the function.
@@ -594,6 +599,22 @@ impl<'db> GenericContext<'db> {
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
+}
+
+fn inferable_typevars_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &FxHashSet<BoundTypeVarInstance<'db>>,
+    _count: u32,
+    _self: GenericContext<'db>,
+) -> salsa::CycleRecoveryAction<FxHashSet<BoundTypeVarInstance<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn inferable_typevars_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: GenericContext<'db>,
+) -> FxHashSet<BoundTypeVarInstance<'db>> {
+    FxHashSet::default()
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
