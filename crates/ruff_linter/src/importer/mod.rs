@@ -534,28 +534,16 @@ impl<'a> Importer<'a> {
 
     /// Find the last `from __future__` import statement in the AST.
     fn find_last_future_import(&self) -> Option<&'a Stmt> {
-        self.python_ast
-            .iter()
-            .take_while(|stmt| {
-                match stmt {
-                    Stmt::ImportFrom(import_from) => {
-                        import_from.module.as_deref() == Some("__future__")
-                    }
-                    Stmt::Expr(stmt_expr) => {
-                        // Allow docstrings (string literals) to come before future imports
-                        matches!(stmt_expr.value.as_ref(), Expr::StringLiteral(_))
-                    }
-                    _ => false,
-                }
-            })
-            .filter(|stmt| {
-                if let Stmt::ImportFrom(import_from) = stmt {
-                    import_from.module.as_deref() == Some("__future__")
-                } else {
-                    false
-                }
-            })
-            .last()
+        use ruff_python_ast::helpers::is_docstring_stmt;
+
+        let mut body = self.python_ast.iter().peekable();
+        let _docstring = body.next_if(|stmt| is_docstring_stmt(stmt));
+
+        body.take_while(|stmt| {
+            stmt.as_import_from_stmt()
+                .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+        })
+        .last()
     }
 
     /// Add a `from __future__ import annotations` import.
