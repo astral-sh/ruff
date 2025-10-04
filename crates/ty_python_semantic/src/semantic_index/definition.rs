@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
+use crate::place::ReExportKind;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeId};
 use crate::semantic_index::symbol::ScopedSymbolId;
@@ -41,7 +42,7 @@ pub struct Definition<'db> {
     pub kind: DefinitionKind<'db>,
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
-    pub(crate) is_reexported: bool,
+    pub(crate) is_reexported: ReExportKind,
 }
 
 // The Salsa heap is tracked separately.
@@ -337,7 +338,7 @@ impl<'ast> From<StarImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '
 pub(crate) struct ImportDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImport,
     pub(crate) alias_index: usize,
-    pub(crate) is_reexported: bool,
+    pub(crate) is_reexported: ReExportKind,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -350,7 +351,7 @@ pub(crate) struct StarImportDefinitionNodeRef<'ast> {
 pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
     pub(crate) alias_index: usize,
-    pub(crate) is_reexported: bool,
+    pub(crate) is_reexported: ReExportKind,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -678,11 +679,11 @@ pub enum DefinitionKind<'db> {
 }
 
 impl DefinitionKind<'_> {
-    pub(crate) fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> ReExportKind {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
-            _ => true,
+            _ => ReExportKind::Yes,
         }
     }
 
@@ -956,7 +957,7 @@ impl<'db> ComprehensionDefinitionKind<'db> {
 pub struct ImportDefinitionKind {
     node: AstNodeRef<ast::StmtImport>,
     alias_index: usize,
-    is_reexported: bool,
+    is_reexported: ReExportKind,
 }
 
 impl ImportDefinitionKind {
@@ -968,7 +969,7 @@ impl ImportDefinitionKind {
         &self.node.node(module).names[self.alias_index]
     }
 
-    pub(crate) fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> ReExportKind {
         self.is_reexported
     }
 }
@@ -977,7 +978,7 @@ impl ImportDefinitionKind {
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
-    is_reexported: bool,
+    is_reexported: ReExportKind,
 }
 
 impl ImportFromDefinitionKind {
@@ -989,7 +990,7 @@ impl ImportFromDefinitionKind {
         &self.node.node(module).names[self.alias_index]
     }
 
-    pub(crate) fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> ReExportKind {
         self.is_reexported
     }
 }
