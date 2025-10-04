@@ -10,7 +10,7 @@ use std::str;
 use std::{fs, path::Path};
 
 use anyhow::Result;
-use assert_fs::fixture::{ChildPath, FileTouch, PathChild};
+
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
@@ -4859,9 +4859,9 @@ from typing import Union;foo: Union[int, str] = 1
 
 #[test]
 fn checks_notebooks_in_stable() -> anyhow::Result<()> {
-    let tempdir = TempDir::new()?;
-    std::fs::write(
-        tempdir.path().join("main.ipynb"),
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "main.ipynb",
         r#"
 {
  "cells": [
@@ -4901,11 +4901,12 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--select")
         .arg("F401")
-        .current_dir(&tempdir)
+        .arg(".")
         , @r"
     success: false
     exit_code: 1
@@ -4924,26 +4925,18 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
 /// See: <https://github.com/astral-sh/ruff/issues/13519>
 #[test]
 fn nested_implicit_namespace_package() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let root = ChildPath::new(tempdir.path());
+    let fixture = RuffTestFixture::new()?;
 
-    root.child("foo").child("__init__.py").touch()?;
-    root.child("foo")
-        .child("bar")
-        .child("baz")
-        .child("__init__.py")
-        .touch()?;
-    root.child("foo")
-        .child("bar")
-        .child("baz")
-        .child("bop.py")
-        .touch()?;
+    fixture.write_file("foo/__init__.py", "")?;
+    fixture.write_file("foo/bar/baz/__init__.py", "")?;
+    fixture.write_file("foo/bar/baz/bop.py", "")?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--select")
         .arg("INP")
-        .current_dir(&tempdir)
+        .arg(".")
         , @r"
     success: true
     exit_code: 0
@@ -4953,166 +4946,158 @@ fn nested_implicit_namespace_package() -> Result<()> {
     ----- stderr -----
     ");
 
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--select")
-            .arg("INP")
-            .arg("--preview")
-            .current_dir(&tempdir)
-            , @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
-        Found 1 error.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select")
+        .arg("INP")
+        .arg("--preview")
+        .arg(".")
+        , @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+    Found 1 error.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
 
 #[test]
 fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint.flake8-import-conventions.aliases]
 "module.name" = "invalid.alias"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-    , @r#"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("-")
+        .pass_stdin("")
+        , @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: Failed to load configuration `[TMP]/ruff.toml`
-          Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 3, column 17
-          |
-        3 | "module.name" = "invalid.alias"
-          |                 ^^^^^^^^^^^^^^^
-        invalid value: string "invalid.alias", expected a Python identifier
-        "#);});
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `<temp_dir>/ruff.toml`
+      Cause: Failed to parse <temp_dir>/ruff.toml
+      Cause: TOML parse error at line 2, column 17
+      |
+    2 | "module.name" = "invalid.alias"
+      |                 ^^^^^^^^^^^^^^^
+    invalid value: string "invalid.alias", expected a Python identifier
+    "###);
     Ok(())
 }
 
 #[test]
 fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint.flake8-import-conventions.extend-aliases]
 "module.name" = "__debug__"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-    , @r#"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("-")
+        .pass_stdin("")
+        , @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: Failed to load configuration `[TMP]/ruff.toml`
-          Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 3, column 17
-          |
-        3 | "module.name" = "__debug__"
-          |                 ^^^^^^^^^^^
-        invalid value: string "__debug__", expected an assignable Python identifier
-        "#);});
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `<temp_dir>/ruff.toml`
+      Cause: Failed to parse <temp_dir>/ruff.toml
+      Cause: TOML parse error at line 2, column 17
+      |
+    2 | "module.name" = "__debug__"
+      |                 ^^^^^^^^^^^
+    invalid value: string "__debug__", expected an assignable Python identifier
+    "###);
     Ok(())
 }
 
 #[test]
 fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint.flake8-import-conventions.aliases]
 "module..invalid" = "alias"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-    , @r#"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("-")
+        .pass_stdin("")
+        , @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: Failed to load configuration `[TMP]/ruff.toml`
-          Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 3, column 1
-          |
-        3 | "module..invalid" = "alias"
-          | ^^^^^^^^^^^^^^^^^
-        invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
-        "#);});
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `<temp_dir>/ruff.toml`
+      Cause: Failed to parse <temp_dir>/ruff.toml
+      Cause: TOML parse error at line 2, column 1
+      |
+    2 | "module..invalid" = "alias"
+      | ^^^^^^^^^^^^^^^^^
+    invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
+
+    "###);
     Ok(())
 }
 
 #[test]
 fn flake8_import_convention_nfkc_normalization() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint.flake8-import-conventions.aliases]
 "test.module" = "_﹏𝘥𝘦𝘣𝘶𝘨﹏﹏"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-    , @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("-")
+        .pass_stdin("")
+        , @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
-        ");});
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
+    "###);
     Ok(())
 }
 
