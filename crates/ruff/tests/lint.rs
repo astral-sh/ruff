@@ -1941,10 +1941,8 @@ select = ["UP006"]
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python_equals_patch() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    let fixture = RuffTestFixture::with_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = "== 3.11.4"
 
@@ -1953,26 +1951,23 @@ select = ["UP006"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&pyproject_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1984,39 +1979,34 @@ select = ["UP006"]
 /// ```
 #[test]
 fn requires_python_no_tool() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
     )?;
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"from typing import Union;foo: Union[int, str] = 1"#,
     )?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .args(["--select","UP007"])
-            .arg("test.py")
-            .arg("-")
-            .current_dir(project_dir)
+
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--show-settings")
+        .args(["--select","UP007"])
+        .arg("test.py")
+        .arg("-")
             , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/test.py"
+        Resolved settings for: "<temp_dir>/test.py"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -2061,11 +2051,11 @@ requires-python = ">= 3.11"
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -2088,8 +2078,8 @@ requires-python = ">= 3.11"
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -2284,8 +2274,8 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        ");
+
     Ok(())
 }
 
@@ -2296,40 +2286,35 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_no_tool_preview_enabled() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
-    )?;
+    );
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"from typing import Union;foo: Union[int, str] = 1"#,
     )?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--preview")
-            .arg("--show-settings")
-            .args(["--select","UP007"])
-            .arg("test.py")
-            .arg("-")
-            .current_dir(project_dir)
+
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--preview")
+        .arg("--show-settings")
+        .args(["--select","UP007"])
+        .arg("test.py")
+        .arg("-")
             , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/test.py"
+        Resolved settings for: "<temp_dir>/test.py"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -2375,11 +2360,11 @@ requires-python = ">= 3.11"
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -2402,8 +2387,8 @@ requires-python = ">= 3.11"
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -2598,8 +2583,8 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        ");
+
     Ok(())
 }
 
@@ -2610,40 +2595,36 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
-    )?;
+    );
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"from typing import Union;foo: Union[int, str] = 1"#,
     )?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .args(["--select","UP007"])
-            .args(["--target-version","py310"])
-            .arg("test.py")
-            .arg("-")
-            .current_dir(project_dir)
+
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--target-version")
+        .arg("py38")
+        .arg("--show-settings")
+        .args(["--select","UP007"])
+        .arg("test.py")
+        .arg("-")
             , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/test.py"
+        Resolved settings for: "<temp_dir>/test.py"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -2688,11 +2669,11 @@ requires-python = ">= 3.11"
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -2715,8 +2696,8 @@ requires-python = ">= 3.11"
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -2911,8 +2892,8 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        ");
+
     Ok(())
 }
 /// ```
@@ -2922,40 +2903,34 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_no_tool_with_check() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
-    )?;
+    );
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"from typing import Union;foo: Union[int, str] = 1"#,
     )?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--select","UP007"])
-            .arg(".")
-            .current_dir(project_dir)
-            , @r###"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:31: UP007 [*] Use `X | Y` for type annotations
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        "###);
-    });
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select","UP007"])
+        .arg(".")
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP007 [*] Use `X | Y` for type annotations
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
     Ok(())
 }
 
@@ -2967,48 +2942,41 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"[lint]
 select = ["UP007"]
 "#,
     )?;
 
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
     )?;
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"
 from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("test.py")
-            .arg("--show-settings")
-            .current_dir(project_dir), @r#"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("test.py")
+        .arg("--show-settings"), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/test.py"
-        Settings path: "[TMP]/ruff.toml"
+        Resolved settings for: "<temp_dir>/test.py"
+        Settings path: "<temp_dir>/ruff.toml"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -3053,11 +3021,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -3080,8 +3048,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -3276,8 +3244,8 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        ");
+
     Ok(())
 }
 
@@ -3289,49 +3257,42 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_ruff_toml_no_target_fallback_check() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"[lint]
 select = ["UP007"]
 "#,
-    )?;
+    );
 
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
     )?;
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"
-from typing import Union;foo: Union[int, str] = 1
-"#,
+from typing import Union;foo: Union[int, str] = 1"#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg(".")
-            .current_dir(project_dir), @r###"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:2:31: UP007 [*] Use `X | Y` for type annotations
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "UP007"])
+        .arg("test.py")
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:31: UP007 [*] Use `X | Y` for type annotations
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        "###);
-    });
+    ----- stderr -----
+    "###);
     Ok(())
 }
 
@@ -3344,52 +3305,41 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_pyproject_toml_above() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let outer_pyproject = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &outer_pyproject,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
     )?;
 
-    let foodir = tempdir.path().join("foo");
-    fs::create_dir(foodir)?;
-
-    let inner_pyproject = tempdir.path().join("foo/pyproject.toml");
-    fs::write(
-        &inner_pyproject,
+    fixture.write_file(
+        "foo/pyproject.toml",
         r#"[project]
 "#,
     )?;
 
-    let testpy = tempdir.path().join("foo/test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "foo/test.py",
         r#"
 from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = dunce::canonicalize(testpy)?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)^foo\\test","foo/test")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .args(["--select","UP007"])
-            .arg("foo/test.py")
-            .current_dir(&project_dir), @r#"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--show-settings")
+        .args(["--select","UP007"])
+        .arg("foo/test.py")
+        .arg("-"), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/foo/test.py"
+        Resolved settings for: "<temp_dir>/foo/test.py"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -3434,11 +3384,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -3461,8 +3411,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -3657,8 +3607,8 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        "###);
+
     Ok(())
 }
 
@@ -3671,54 +3621,44 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_pyproject_toml_above_with_tool() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let outer_pyproject = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &outer_pyproject,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
     )?;
 
-    let foodir = tempdir.path().join("foo");
-    fs::create_dir(foodir)?;
-
-    let inner_pyproject = tempdir.path().join("foo/pyproject.toml");
-    fs::write(
-        &inner_pyproject,
+    fixture.write_file(
+        "foo/pyproject.toml",
         r#"
 [tool.ruff]
 target-version = "py310"
 "#,
     )?;
 
-    let testpy = tempdir.path().join("foo/test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "foo/test.py",
         r#"
 from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = dunce::canonicalize(testpy)?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"foo\\","foo/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .args(["--select","UP007"])
-            .arg("foo/test.py")
-            .current_dir(&project_dir), @r#"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--show-settings")
+        .args(["--select","UP007"])
+        .arg("foo/test.py")
+        .arg("-"), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/foo/test.py"
+        Resolved settings for: "<temp_dir>/foo/test.py"
+        Settings path: "<temp_dir>/foo/pyproject.toml"
 
         # General Settings
-        cache_dir = "[TMP]/foo/.ruff_cache"
+        cache_dir = "<temp_dir>/foo/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -3763,11 +3703,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/foo"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/foo"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -3790,8 +3730,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/foo",
-        	"[TMP]/foo/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -3986,8 +3926,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        "###);
     Ok(())
 }
 
@@ -4000,54 +3939,43 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_ruff_toml_above() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["UP007"]
 "#,
     )?;
 
-    let foodir = tempdir.path().join("foo");
-    fs::create_dir(foodir)?;
-
-    let pyproject_toml = tempdir.path().join("foo/pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    fixture.write_file(
+        "foo/pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 "#,
     )?;
 
-    let testpy = tempdir.path().join("foo/test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "foo/test.py",
         r#"
 from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = dunce::canonicalize(testpy)?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .arg("foo/test.py")
-            .current_dir(&project_dir), @r#"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--show-settings")
+        .arg("foo/test.py")
+        .arg("-"), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/foo/test.py"
-        Settings path: "[TMP]/ruff.toml"
+        Resolved settings for: "<temp_dir>/foo/test.py"
+        Settings path: "<temp_dir>/ruff.toml"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -4092,11 +4020,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -4119,8 +4047,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -4315,25 +4243,22 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        "###);
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .arg("test.py")
-            .current_dir(project_dir.join("foo")), @r#"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--show-settings")
+        .arg("test.py")
+        .current_dir(fixture.root().join("foo")), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "[TMP]/foo/test.py"
-        Settings path: "[TMP]/ruff.toml"
+        Resolved settings for: "<temp_dir>/foo/test.py"
+        Settings path: "<temp_dir>/ruff.toml"
 
         # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+        cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -4378,11 +4303,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/foo"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/foo"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -4405,8 +4330,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/foo",
+        	"<temp_dir>/foo/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -4601,8 +4526,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
+        "###);
     Ok(())
 }
 
@@ -4616,11 +4540,9 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_extend_from_shared_config() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 extend = "./shared/base_config.toml"
 [lint]
@@ -4628,51 +4550,42 @@ select = ["UP007"]
 "#,
     )?;
 
-    let shared_dir = tempdir.path().join("shared");
-    fs::create_dir(shared_dir)?;
-
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    fixture.write_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.10"
 "#,
     )?;
 
-    let shared_toml = tempdir.path().join("shared/base_config.toml");
-    fs::write(
-        &shared_toml,
+    fixture.write_file(
+        "shared/base_config.toml",
         r#"
 target-version = "py311"
 "#,
     )?;
 
-    let testpy = tempdir.path().join("test.py");
-    fs::write(
-        &testpy,
+    fixture.write_file(
+        "test.py",
         r#"
 from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = dunce::canonicalize(testpy)?;
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--show-settings")
+        .args(["--select","UP007"])
+        .arg("test.py")
+        .arg("-"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Resolved settings for: "<temp_dir>/test.py"
+    Settings path: "<temp_dir>/ruff.toml"
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--show-settings")
-            .arg("test.py")
-            .current_dir(&project_dir), @r#"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        Resolved settings for: "[TMP]/test.py"
-        Settings path: "[TMP]/ruff.toml"
-
-        # General Settings
-        cache_dir = "[TMP]/.ruff_cache"
+    # General Settings
+    cache_dir = "<temp_dir>/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -4717,11 +4630,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "[TMP]/"
+        file_resolver.project_root = "<temp_dir>/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "[TMP]/"
+        linter.project_root = "<temp_dir>/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -4744,8 +4657,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"[TMP]/",
-        	"[TMP]/src",
+        	"<temp_dir>/",
+        	"<temp_dir>/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -4940,9 +4853,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "#);
-    });
-
+        "###);
     Ok(())
 }
 
