@@ -34,7 +34,7 @@ class A:
 
 class B(A):
     __slots__ = ("y",)
-    
+
     def __init__(self, x: int):
         self.x = x
 
@@ -84,7 +84,7 @@ a.q = 5  # error: [unresolved-attribute]
 ```py
 class A:
     __slots__ = ["x", "y"]
-    
+
     def __init__(self):
         self.x = 1
 
@@ -99,7 +99,7 @@ a.z = 4  # error: [unresolved-attribute]
 ```py
 class A:
     __slots__ = {"x", "y"}
-    
+
     def __init__(self):
         self.x = 1
 
@@ -114,7 +114,7 @@ a.z = 4  # error: [unresolved-attribute]
 ```py
 class A:
     __slots__ = ("x", "__dict__")
-    
+
     def __init__(self, foo: int):
         self.foo = foo
 
@@ -154,16 +154,16 @@ a.y = 20
 ```py
 class A:
     __slots__ = ("x", "y")
-    
+
     def __init__(self, x: str, y: int):
         self.x = x
         self.y = y
-    
+
     @property
     def foo(self) -> str:
         return self.x
-    
-    @property 
+
+    @property
     def bar(self) -> int:
         return self.y
 
@@ -199,13 +199,13 @@ c.w = 4  # error: [unresolved-attribute]
 ```py
 class A:
     __slots__ = ("x",)
-    
+
     def __init__(self, x: str):
         self.x = x
 
 class B(A):
     __slots__ = ("y", "z")
-    
+
     def __init__(self, x: str, y: str, z: str):
         super().__init__(x)
         self.y = y
