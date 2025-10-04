@@ -19,7 +19,9 @@ const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
 fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
+    let path_str = path.as_ref().to_str().unwrap();
+    // Escape the full path and handle both forward and backward slashes for Windows compatibility
+    format!(r"{}[/\\]?", escape(path_str).replace(r"\\", r"[/\\]"))
 }
 
 #[test]
