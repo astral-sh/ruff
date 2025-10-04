@@ -1233,11 +1233,9 @@ import os
 fn required_version_bound_mismatch() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
-        format!(
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
+        &format!(
             r#"
 required-version = ">{version}"
 "#
@@ -1245,12 +1243,13 @@ required-version = ">{version}"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+        filters => vec![(version, "[VERSION]")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"
 import os
@@ -1272,22 +1271,21 @@ import os
 fn required_version_bound_match() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 required-version = ">=0.1.0"
 "#,
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+        filters => vec![(version, "[VERSION]")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"
 import os
@@ -1309,10 +1307,8 @@ import os
 /// Expand environment variables in `--config` paths provided via the CLI.
 #[test]
 fn config_expand() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["F"]
@@ -1320,13 +1316,13 @@ ignore = ["F841"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
         .arg("${NAME}.toml")
         .env("NAME", "ruff")
         .arg("-")
-        .current_dir(tempdir.path())
         .pass_stdin(r#"
 import os
 
@@ -1349,27 +1345,24 @@ def func():
 /// Per-file selects via ! negation in per-file-ignores
 #[test]
 fn negated_per_file_ignores() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint.per-file-ignores]
 "!selected.py" = ["RUF"]
 "#,
     )?;
-    let selected = tempdir.path().join("selected.py");
-    fs::write(selected, "")?;
-    let ignored = tempdir.path().join("ignored.py");
-    fs::write(ignored, "")?;
+    fixture.write_file("selected.py", "")?;
+    fixture.write_file("ignored.py", "")?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("--select")
         .arg("RUF901")
-        .current_dir(&tempdir)
         , @r"
     success: false
     exit_code: 1
@@ -1385,30 +1378,25 @@ fn negated_per_file_ignores() -> Result<()> {
 
 #[test]
 fn negated_per_file_ignores_absolute() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint.per-file-ignores]
 "!src/**.py" = ["RUF"]
 "#,
     )?;
-    let src_dir = tempdir.path().join("src");
-    fs::create_dir(&src_dir)?;
-    let selected = src_dir.join("selected.py");
-    fs::write(selected, "")?;
-    let ignored = tempdir.path().join("ignored.py");
-    fs::write(ignored, "")?;
+    fixture.write_file("src/selected.py", "")?;
+    fixture.write_file("ignored.py", "")?;
 
     insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(fixture
+            .command()
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
-            .arg(&ruff_toml)
+            .arg("ruff.toml")
             .arg("--select")
             .arg("RUF901")
-            .current_dir(&tempdir)
             , @r"
         success: false
         exit_code: 1
@@ -1426,28 +1414,25 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
 /// patterns are additive, can't use negative patterns to "un-ignore"
 #[test]
 fn negated_per_file_ignores_overlap() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint.per-file-ignores]
 "*.py" = ["RUF"]
 "!foo.py" = ["RUF"]
 "#,
     )?;
-    let foo_file = tempdir.path().join("foo.py");
-    fs::write(foo_file, "")?;
-    let bar_file = tempdir.path().join("bar.py");
-    fs::write(bar_file, "")?;
+    fixture.write_file("foo.py", "")?;
+    fixture.write_file("bar.py", "")?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("--select")
         .arg("RUF901")
-        .current_dir(&tempdir)
         , @r"
     success: true
     exit_code: 0
@@ -1461,80 +1446,69 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
 
 #[test]
 fn unused_interaction() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["F"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("--fix")
-            .arg("-")
-            .pass_stdin(r#"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("ruff.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("--fix")
+        .arg("-")
+        .pass_stdin(r#"
 import os  # F401
 
 def function():
     import os  # F811
     print(os.name)
 "#), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
-        import os  # F401
+    import os  # F401
 
-        def function():
-            print(os.name)
+    def function():
+        print(os.name)
 
-        ----- stderr -----
-        Found 1 error (1 fixed, 0 remaining).
-        ");
-    });
+    ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
+    ");
 
     Ok(())
 }
 
 #[test]
 fn add_noqa() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["RUF015"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("noqa.py");
-
-    fs::write(
-        &test_path,
+    fixture.write_file(
+        "noqa.py",
         r#"
 def first_square():
     return [x * x for x in range(20)][0]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        .arg(&test_path)
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
         .args(["--add-noqa"])
         .arg("-")
         .pass_stdin(r#"
@@ -1547,9 +1521,9 @@ def first_square():
     ----- stderr -----
     Added 1 noqa directive.
     ");
-    });
 
-    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+    let test_code =
+        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     def first_square():
@@ -1561,34 +1535,28 @@ def first_square():
 
 #[test]
 fn add_noqa_multiple_codes() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ANN001", "ANN201", "ARG001", "D103"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("noqa.py");
-
-    fs::write(
-        &test_path,
+    fixture.write_file(
+        "noqa.py",
         r#"
 def unused(x):
     pass
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        .arg(&test_path)
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
         .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
@@ -1602,9 +1570,9 @@ def unused(x):
     ----- stderr -----
     Added 1 noqa directive.
     ");
-    });
 
-    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+    let test_code =
+        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     def unused(x):  # noqa: ANN001, ANN201, D103
