@@ -1,4 +1,9 @@
 //! Test fixture utilities for ruff CLI tests
+//!
+//! The core concept is borrowed from ty/tests/cli/main.rs and can be extended
+//! with more functionality from there in the future if needed.
+
+#![allow(dead_code)]
 
 use anyhow::{Context as _, Result};
 use insta::internals::SettingsBindDropGuard;
@@ -74,28 +79,6 @@ impl RuffTestFixture {
         })
     }
 
-    /// Creates a test fixture with multiple files.
-    ///
-    /// # Arguments
-    ///
-    /// * `files` - An iterator of (path, content) pairs to create
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// let fixture = RuffTestFixture::with_files([
-    ///     ("ruff.toml", "select = ['E']"),
-    ///     ("src/main.py", "print('hello')"),
-    /// ])?;
-    /// ```
-    pub(crate) fn with_files<'a>(
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> Result<Self> {
-        let fixture = Self::new()?;
-        fixture.write_files(files)?;
-        Ok(fixture)
-    }
-
     /// Creates a test fixture with a single file.
     ///
     /// # Arguments
@@ -112,24 +95,6 @@ impl RuffTestFixture {
         let fixture = Self::new()?;
         fixture.write_file(path, content)?;
         Ok(fixture)
-    }
-
-    /// Writes multiple files to the test directory.
-    ///
-    /// Parent directories are created automatically if they don't exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `files` - An iterator of (path, content) pairs to create
-    pub(crate) fn write_files<'a>(
-        &self,
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> Result<()> {
-        for (path, content) in files {
-            self.write_file(path, content)?;
-        }
-
-        Ok(())
     }
 
     /// Ensures that the parent directory of a path exists.
@@ -159,29 +124,6 @@ impl RuffTestFixture {
         let content = content.trim_start_matches('\n');
         fs::write(&file_path, content)
             .with_context(|| format!("Failed to write file `{}`", file_path.display()))?;
-
-        Ok(())
-    }
-
-    /// Creates a symbolic link in the test directory (Unix only).
-    ///
-    /// # Arguments
-    ///
-    /// * `original` - The path to the original file/directory (relative to test root)
-    /// * `link` - The path for the symbolic link (relative to test root)
-    #[cfg(unix)]
-    pub(crate) fn write_symlink(
-        &self,
-        original: impl AsRef<Path>,
-        link: impl AsRef<Path>,
-    ) -> Result<()> {
-        let link_path = self.project_dir.join(link.as_ref());
-        let original_path = self.project_dir.join(original.as_ref());
-
-        Self::ensure_parent_directory(&link_path)?;
-
-        std::os::unix::fs::symlink(original_path, &link_path)
-            .with_context(|| format!("Failed to write symlink `{}`", link_path.display()))?;
 
         Ok(())
     }
