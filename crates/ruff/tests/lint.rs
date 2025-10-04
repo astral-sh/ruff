@@ -955,10 +955,8 @@ fn value_given_to_table_key_is_not_inline_table_2() {
 
 #[test]
 fn config_doubly_overridden_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 line-length = 100
 
@@ -966,18 +964,19 @@ line-length = 100
 select=["E501"]
 "#,
     )?;
-    let fixture = "x = 'longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss'";
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let test_code = "x = 'longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss'";
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         // The --line-length flag takes priority over both the config file
         // and the `--config="line-length=110"` flag,
         // despite them both being specified after this flag on the command line:
         .args(["--line-length", "90"])
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .args(["--config", "line-length=110"])
         .arg("-")
-        .pass_stdin(fixture), @r"
+        .pass_stdin(test_code), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -991,18 +990,17 @@ select=["E501"]
 
 #[test]
 fn complex_config_setting_overridden_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(&ruff_toml, "lint.select = ['N801']")?;
-    let fixture = "class violates_n801: pass";
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let fixture = RuffTestFixture::with_file("ruff.toml", "lint.select = ['N801']")?;
+    let test_code = "class violates_n801: pass";
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .args(["--config", "lint.per-file-ignores = {'generated.py' = ['N801']}"])
         .args(["--stdin-filename", "generated.py"])
         .arg("-")
-        .pass_stdin(fixture), @r"
+        .pass_stdin(test_code), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1584,20 +1582,17 @@ def unused(x):
 
 #[test]
 fn add_noqa_multiline_diagnostic() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["I"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("noqa.py");
-
-    fs::write(
-        &test_path,
+    fixture.write_file(
+        "noqa.py",
         r#"
 import z
 import c
@@ -1605,14 +1600,11 @@ import a
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        .arg(&test_path)
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
         .args(["--add-noqa"])
         .arg("-")
         .pass_stdin(r#"
@@ -1625,9 +1617,9 @@ import a
     ----- stderr -----
     Added 1 noqa directive.
     ");
-    });
 
-    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+    let test_code =
+        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     import z  # noqa: I001
@@ -1640,34 +1632,28 @@ import a
 
 #[test]
 fn add_noqa_existing_noqa() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ANN001", "ANN201", "ARG001", "D103"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("noqa.py");
-
-    fs::write(
-        &test_path,
+    fixture.write_file(
+        "noqa.py",
         r#"
 def unused(x):  # noqa: ANN001, ARG001, D103
     pass
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        .arg(&test_path)
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
         .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
@@ -1681,9 +1667,9 @@ def unused(x):  # noqa: ANN001, ARG001, D103
     ----- stderr -----
     Added 1 noqa directive.
     ");
-    });
 
-    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+    let test_code =
+        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
@@ -1695,20 +1681,17 @@ def unused(x):  # noqa: ANN001, ARG001, D103
 
 #[test]
 fn add_noqa_multiline_comment() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["UP031"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("noqa.py");
-
-    fs::write(
-        &test_path,
+    fixture.write_file(
+        "noqa.py",
         r#"
 print(
     """First line
@@ -1720,14 +1703,11 @@ print(
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        .arg(&test_path)
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
         .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
@@ -1741,9 +1721,9 @@ print(
     ----- stderr -----
     Added 1 noqa directive.
     ");
-    });
 
-    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+    let test_code =
+        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r#"
     print(
@@ -1760,10 +1740,9 @@ print(
 
 #[test]
 fn add_noqa_exclude() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 exclude = ["excluded.py"]
@@ -1771,41 +1750,33 @@ select = ["RUF015"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("noqa.py");
-
-    fs::write(
-        &test_path,
+    fixture.write_file(
+        "noqa.py",
         r#"
 def first_square():
     return [x * x for x in range(20)][0]
 "#,
     )?;
 
-    let exclude_path = tempdir.path().join("excluded.py");
-
-    fs::write(
-        &exclude_path,
+    fixture.write_file(
+        "excluded.py",
         r#"
 def first_square():
     return [x * x for x in range(20)][0]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .current_dir(tempdir.path())
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--add-noqa"]), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--add-noqa"]), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
-        ----- stderr -----
-        Added 1 noqa directive.
-        ");
-    });
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
 
     Ok(())
 }
@@ -1813,10 +1784,9 @@ def first_square():
 /// Regression test for <https://github.com/astral-sh/ruff/issues/2253>
 #[test]
 fn add_noqa_parent() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let test_path = tempdir.path().join("noqa.py");
-    fs::write(
-        &test_path,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "noqa.py",
         r#"
 from foo import (  # noqa: F401
 		bar
@@ -1824,22 +1794,18 @@ from foo import (  # noqa: F401
 		"#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--add-noqa")
-                .arg("--select=F401")
-                .arg("noqa.py")
-                .current_dir(&tempdir), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--add-noqa")
+        .arg("--select=F401")
+        .arg("noqa.py"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1847,10 +1813,8 @@ from foo import (  # noqa: F401
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
 
@@ -1859,30 +1823,26 @@ select = ["UP006"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    let fixture2 = RuffTestFixture::with_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.8"
 
@@ -1891,24 +1851,21 @@ select = ["UP006"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&pyproject_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        All checks passed!
+    assert_cmd_snapshot!(fixture2
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1916,10 +1873,8 @@ select = ["UP006"]
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python_patch() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    let fixture = RuffTestFixture::with_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11.4"
 
@@ -1928,26 +1883,23 @@ select = ["UP006"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&pyproject_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1955,10 +1907,8 @@ select = ["UP006"]
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python_equals() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let pyproject_toml = tempdir.path().join("pyproject.toml");
-    fs::write(
-        &pyproject_toml,
+    let fixture = RuffTestFixture::with_file(
+        "pyproject.toml",
         r#"[project]
 requires-python = "== 3.11"
 
@@ -1967,26 +1917,23 @@ select = ["UP006"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&pyproject_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
