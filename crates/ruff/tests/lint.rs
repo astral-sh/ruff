@@ -5,9 +5,11 @@
 mod test_fixture;
 
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
+use regex::escape;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 
@@ -15,6 +17,10 @@ use test_fixture::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
+
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
+}
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -5775,6 +5781,8 @@ match 42:  # invalid-syntax
 
     insta::with_settings!({
         filters => vec![
+            (tempdir_filter(fixture.root()).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
             (ruff_linter::VERSION, "[VERSION]"),
         ]
     }, {
@@ -5814,6 +5822,7 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
             output_format,
             "--select",
             "F401",
+            "--fix",
             "--show-fixes",
             "input.py",
         ])
