@@ -1,12 +1,14 @@
 use std::iter::Peekable;
 use std::ops::Range;
 use std::str::CharIndices;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
-use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Fix;
@@ -164,9 +166,9 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     // Check if any of the path parameters are not in the function signature.
-    for (path_param, range) in path_params {
-        // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
-        if !is_identifier(path_param) {
+    for (path_param, param_content, range) in path_params {
+        // Ignore parameters that FastAPI doesn't recognize as valid path parameters
+        if !is_fastapi_valid_path_parameter(param_content) {
             continue;
         }
 
@@ -215,6 +217,15 @@ fn non_posonly_non_variadic_parameters(
         .args
         .iter()
         .chain(&function_def.parameters.kwonlyargs)
+}
+
+/// Matches the Starlette pattern for path parameters with optional converters.
+static FASTAPI_PATH_PARAM_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([a-zA-Z_][a-zA-Z0-9_]*)(:[a-zA-Z_][a-zA-Z0-9_]*)?$").unwrap());
+
+/// Returns `true` if a path parameter is valid according to FastAPI's exact regex.
+fn is_fastapi_valid_path_parameter(param_content: &str) -> bool {
+    FASTAPI_PATH_PARAM_REGEX.is_match(param_content)
 }
 
 #[derive(Debug, is_macro::Is)]
@@ -475,7 +486,7 @@ impl<'a> PathParamIterator<'a> {
 }
 
 impl<'a> Iterator for PathParamIterator<'a> {
-    type Item = (&'a str, Range<usize>);
+    type Item = (&'a str, &'a str, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((start, c)) = self.chars.next() {
@@ -487,7 +498,7 @@ impl<'a> Iterator for PathParamIterator<'a> {
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
                     let param_name = &param_content[..param_name_end];
 
-                    return Some((param_name, start..end + 1));
+                    return Some((param_name, param_content, start..end + 1));
                 }
             }
         }
