@@ -645,6 +645,46 @@
             }
           ]
         },
+        "invalid-slots": {
+          "title": "detects non-string items in __slots__",
+          "description": "## What it does\nChecks for non-string items in `__slots__`.\n\n## Why is this bad?\nAll items in `__slots__` must be strings. Non-string items will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass C:\n    __slots__ = (1, 2, 3)  # error: __slots__ items must be strings\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-slots-annotation": {
+          "title": "detects instance attribute annotations not in __slots__",
+          "description": "## What it does\nChecks for instance attribute annotations for names that are not defined in `__slots__`.\n\n## Why is this bad?\nWhen a class defines `__slots__`, only the attributes listed in `__slots__` are allowed.\nAnnotating other attributes is misleading.\n\n## Examples\n```python\nclass C:\n    __slots__ = (\"foo\",)\n    bar: int  # error: 'bar' is not in __slots__\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-slots-default": {
+          "title": "detects class variables with defaults for names in __slots__",
+          "description": "## What it does\nChecks for class variable definitions with default values for names that are defined in `__slots__`.\n\n## Why is this bad?\nWhen a name is defined in `__slots__`, it cannot have a class-level default value.\nThis would raise an error at class definition time.\n\n## Examples\n```python\nclass C:\n    __slots__ = (\"foo\",)\n    foo: int = 1  # error: 'foo' in __slots__ conflicts with class variable\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-slots-on-builtin": {
+          "title": "detects invalid __slots__ on variable-length built-in subtypes",
+          "description": "## What it does\nChecks for non-empty `__slots__` definitions on classes that inherit from variable-length built-in types.\n\n## Why is this bad?\nVariable-length built-in types like `int`, `bytes`, and `tuple` have special memory layouts\nthat are incompatible with non-empty `__slots__`.\n\n## Examples\n```python\nclass C(int):\n    __slots__ = (\"foo\",)  # error: nonempty __slots__ not supported for subtype of 'int'\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-super-argument": {
           "title": "detects invalid arguments for `super()`",
           "description": "## What it does\nDetects `super()` calls where:\n- the first argument is not a valid class literal, or\n- the second argument is not an instance or subclass of the first argument.\n\n## Why is this bad?\n`super(type, obj)` expects:\n- the first argument to be a class,\n- and the second argument to satisfy one of the following:\n  - `isinstance(obj, type)` is `True`\n  - `issubclass(obj, type)` is `True`\n\nViolating this relationship will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass A:\n    ...\nclass B(A):\n    ...\n\nsuper(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`\n\nsuper(A(), B()) # error: `A()` is not a class\n\nsuper(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`\nsuper(B, A)  # error: `A` does not satisfy `issubclass(A, B)`\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
