@@ -11,18 +11,30 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Why is this bad?
 /// `ByteString` has been deprecated since Python 3.9 and will be removed in
-/// Python 3.14. The Python documentation recommends using either
+/// Python 3.17. The Python documentation recommends using either
 /// `collections.abc.Buffer` (or the `typing_extensions` backport
-/// on Python <3.12) or a union like `bytes | bytearray | memoryview` instead.
+/// on Python versions before 3.12) or a union like `bytes | bytearray | memoryview` instead.
 ///
 /// ## Example
 /// ```python
 /// from typing import ByteString
 /// ```
 ///
-/// Use instead:
+/// On Python versions after 3.12, use the `Buffer` type from the standard library instead:
 /// ```python
 /// from collections.abc import Buffer
+/// ```
+///
+/// For earlier Python versions, you can use `typing_extensions`:
+/// ```python
+/// from typing_extensions import Buffer
+/// ```
+///
+/// or a union:
+/// ```python
+/// from typing import Union
+///
+/// x: Union[bytes, bytearray, memoryview]
 /// ```
 ///
 /// ## References

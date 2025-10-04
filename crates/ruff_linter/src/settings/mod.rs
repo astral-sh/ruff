@@ -369,6 +369,17 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
         prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E9),
         redirected_from: None,
     },
+    // Additionally include rules that will correspond to CPython errors in the future:
+    // - B012 is a syntax warning in 3.14 and will become an error in the future
+    // - PYI057 reports deprecated members of the standard library
+    RuleSelector::Rule {
+        prefix: RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_012),
+        redirected_from: None,
+    },
+    RuleSelector::Rule {
+        prefix: RuleCodePrefix::Flake8Pyi(codes::Flake8Pyi::_057),
+        redirected_from: None,
+    },
 ];
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];

@@ -65,6 +65,8 @@ file_resolver.project_root = "<temp_dir>/"
 linter.exclude = []
 linter.project_root = "<temp_dir>/"
 linter.rules.enabled = [
+	jump-statement-in-finally (B012),
+	byte-string-usage (PYI057),
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
 	multiple-statements-on-one-line-colon (E701),
@@ -126,6 +128,8 @@ linter.rules.enabled = [
 	raise-not-implemented (F901),
 ]
 linter.rules.should_fix = [
+	jump-statement-in-finally (B012),
+	byte-string-usage (PYI057),
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
 	multiple-statements-on-one-line-colon (E701),
