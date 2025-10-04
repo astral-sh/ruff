@@ -371,10 +371,8 @@ _ = "---------------------------------------------------------------------------
 
 #[test]
 fn per_file_ignores_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 
@@ -383,13 +381,10 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--stdin-filename", "generated.py"])
         .args(["--per-file-ignores", "generated.py:Q"])
         .arg("-")
@@ -412,17 +407,14 @@ if __name__ == "__main__":
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
     ");
-    });
 
     Ok(())
 }
 
 #[test]
 fn extend_per_file_ignores_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 
@@ -431,13 +423,10 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--stdin-filename", "generated.py"])
         .args(["--extend-per-file-ignores", "generated.py:Q"])
         .arg("-")
@@ -460,7 +449,6 @@ if __name__ == "__main__":
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
     ");
-    });
 
     Ok(())
 }
@@ -468,33 +456,26 @@ if __name__ == "__main__":
 /// Regression test for [#8858](https://github.com/astral-sh/ruff/issues/8858)
 #[test]
 fn parent_configuration_override() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let root_ruff = tempdir.path().join("ruff.toml");
-    fs::write(
-        root_ruff,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ALL"]
 "#,
     )?;
 
-    let sub_dir = tempdir.path().join("subdirectory");
-    fs::create_dir(&sub_dir)?;
-
-    let subdirectory_ruff = sub_dir.join("ruff.toml");
-    fs::write(
-        subdirectory_ruff,
+    fixture.write_file(
+        "subdirectory/ruff.toml",
         r#"
 [lint]
 ignore = ["D203", "D212"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(sub_dir)
+    assert_cmd_snapshot!(fixture
+        .command()
+        .current_dir(fixture.root().join("subdirectory"))
         .args(STDIN_BASE_OPTIONS)
         , @r"
     success: true
@@ -505,7 +486,6 @@ ignore = ["D203", "D212"]
     ----- stderr -----
     warning: No Python files found under the given path(s)
     ");
-    });
 
     Ok(())
 }
@@ -563,20 +543,17 @@ fn config_override_rejected_if_invalid_toml() {
 
 #[test]
 fn too_many_config_files() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_dot_toml = tempdir.path().join("ruff.toml");
-    let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
-    fs::File::create(&ruff_dot_toml)?;
-    fs::File::create(&ruff2_dot_toml)?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file("ruff.toml", "")?;
+    fixture.write_file("ruff2.toml", "")?;
+
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_dot_toml)
+        .arg(fixture.root().join("ruff.toml"))
         .arg("--config")
-        .arg(&ruff2_dot_toml)
+        .arg(fixture.root().join("ruff2.toml"))
         .arg("."), @r"
     success: false
     exit_code: 2
@@ -586,10 +563,9 @@ fn too_many_config_files() -> Result<()> {
     ruff failed
       Cause: You cannot specify more than one configuration file on the command line.
 
-      tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+      tip: remove either `--config=<temp_dir>/ruff.toml` or `--config=<temp_dir>/ruff2.toml`.
            For more information, try `--help`.
     ");
-    });
     Ok(())
 }
 
@@ -613,76 +589,63 @@ fn extend_passed_via_config_argument() {
 
 #[test]
 fn nonexistent_extend_file() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-    fs::write(
-        project_dir.join("ruff.toml"),
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 extend = "ruff2.toml"
 "#,
     )?;
 
-    fs::write(
-        project_dir.join("ruff2.toml"),
+    fixture.write_file(
+        "ruff2.toml",
         r#"
 extend = "ruff3.toml"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![
-            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
-            ("The system cannot find the file specified.", "No such file or directory")
-        ]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check"]).current_dir(project_dir), @r"
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(["check"]), @r"
         success: false
         exit_code: 2
         ----- stdout -----
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
-          Cause: Failed to read [TMP]/ruff3.toml
+          Cause: Failed to load extended configuration `<temp_dir>/ruff3.toml` (`<temp_dir>/ruff.toml` extends `<temp_dir>/ruff2.toml` extends `<temp_dir>/ruff3.toml`)
+          Cause: Failed to read <temp_dir>/ruff3.toml
           Cause: No such file or directory (os error 2)
         ");
-    });
 
     Ok(())
 }
 
 #[test]
 fn circular_extend() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_path = dunce::canonicalize(tempdir.path())?;
-
-    fs::write(
-        project_path.join("ruff.toml"),
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 extend = "ruff2.toml"
 "#,
     )?;
-    fs::write(
-        project_path.join("ruff2.toml"),
+    fixture.write_file(
+        "ruff2.toml",
         r#"
 extend = "ruff3.toml"
 "#,
     )?;
-    fs::write(
-        project_path.join("ruff3.toml"),
+    fixture.write_file(
+        "ruff3.toml",
         r#"
 extend = "ruff.toml"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(["check"])
-            .current_dir(project_path),
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(["check"]),
         @r"
     success: false
     exit_code: 2
@@ -690,39 +653,32 @@ extend = "ruff.toml"
 
     ----- stderr -----
     ruff failed
-      Cause: Circular configuration detected: `[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml` extends `[TMP]/ruff.toml`
+      Cause: Circular configuration detected: `<temp_dir>/ruff.toml` extends `<temp_dir>/ruff2.toml` extends `<temp_dir>/ruff3.toml` extends `<temp_dir>/ruff.toml`
     ");
-    });
 
     Ok(())
 }
 
 #[test]
 fn parse_error_extends() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let project_path = dunce::canonicalize(tempdir.path())?;
-
-    fs::write(
-        project_path.join("ruff.toml"),
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 extend = "ruff2.toml"
 "#,
     )?;
-    fs::write(
-        project_path.join("ruff2.toml"),
+    fixture.write_file(
+        "ruff2.toml",
         r#"
 [lint]
 select = [E501]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(["check"])
-            .current_dir(project_path),
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(["check"]),
         @r"
     success: false
     exit_code: 2
@@ -730,31 +686,28 @@ select = [E501]
 
     ----- stderr -----
     ruff failed
-      Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
-      Cause: Failed to parse [TMP]/ruff2.toml
+      Cause: Failed to load extended configuration `<temp_dir>/ruff2.toml` (`<temp_dir>/ruff.toml` extends `<temp_dir>/ruff2.toml`)
+      Cause: Failed to parse <temp_dir>/ruff2.toml
       Cause: TOML parse error at line 3, column 11
       |
     3 | select = [E501]
       |           ^^^^
     string values must be quoted, expected literal string
     ");
-    });
 
     Ok(())
 }
 
 #[test]
 fn config_file_and_isolated() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_dot_toml = tempdir.path().join("ruff.toml");
-    fs::File::create(&ruff_dot_toml)?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file("ruff.toml", "")?;
+
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_dot_toml)
+        .arg(fixture.root().join("ruff.toml"))
         .arg("--isolated")
         .arg("."), @r"
     success: false
@@ -763,22 +716,19 @@ fn config_file_and_isolated() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+      Cause: The argument `--config=<temp_dir>/ruff.toml` cannot be used with `--isolated`
 
       tip: You cannot specify a configuration file and also specify `--isolated`,
            as `--isolated` causes ruff to ignore all configuration files.
            For more information, try `--help`.
     ");
-    });
     Ok(())
 }
 
 #[test]
 fn config_override_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 line-length = 100
 
@@ -789,7 +739,7 @@ select = ["I"]
 combine-as-imports = true
         "#,
     )?;
-    let fixture = r#"
+    let test_code = r#"
 from foo import (
     aaaaaaaaaaaaaaaaaaa,
     bbbbbbbbbbb as bbbbbbbbbbbbbbbb,
@@ -805,15 +755,16 @@ from foo import (
 
 x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
 "#;
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .args(["--config", "line-length=90"])
         .args(["--config", "lint.extend-select=['E501', 'F841']"])
         .args(["--config", "lint.isort.combine-as-imports = false"])
         .arg("-")
-        .pass_stdin(fixture), @r"
+        .pass_stdin(test_code), @r"
     success: false
     exit_code: 1
     ----- stdout -----
