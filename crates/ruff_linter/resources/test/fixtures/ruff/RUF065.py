@@ -43,3 +43,34 @@ logging.warning("Value: %r", repr(42))
 logging.error("Error: %r", repr([1, 2, 3]))
 logging.info("Debug info: %s", repr("test\nstring"))
 logging.warning("Value: %s", repr(42))
+
+# %s + ascii()
+logging.info("ASCII: %s", ascii("Hello\nWorld"))
+logging.warning("ASCII: %s", ascii("test"))
+
+# %s + oct()
+logging.info("Octal: %s", oct(42))
+logging.warning("Octal: %s", oct(255))
+
+# %s + hex()
+logging.info("Hex: %s", hex(42))
+logging.warning("Hex: %s", hex(255))
+
+# %b + bytes()
+logging.info("Bytes: %b", bytes("Hello", "utf-8"))
+logging.warning("Bytes: %b", bytes("test", "utf-8"))
+
+# Test with imported functions
+from logging import info, log
+
+info("ASCII: %s", ascii("Hello\nWorld"))
+log(logging.INFO, "ASCII: %s", ascii("test"))
+
+info("Octal: %s", oct(42))
+log(logging.INFO, "Octal: %s", oct(255))
+
+info("Hex: %s", hex(42))
+log(logging.INFO, "Hex: %s", hex(255))
+
+info("Bytes: %b", bytes("Hello", "utf-8"))
+log(logging.INFO, "Bytes: %b", bytes("test", "utf-8"))
