@@ -176,10 +176,10 @@ inline-quotes = "single"
 
 #[test]
 fn exclude() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let case = RuffTestFixture::new()?;
+
+    case.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 extend-exclude = ["out"]
@@ -192,10 +192,9 @@ inline-quotes = "single"
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
-        r#"
-from test import say_hy
+    case.write_file(
+        "main.py",
+        r#"from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
@@ -203,16 +202,14 @@ if __name__ == "__main__":
     )?;
 
     // Excluded file but passed to the CLI directly, should be linted
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
-        r#"
-def say_hy(name: str):
+    case.write_file(
+        "test.py",
+        r#"def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    fs::write(
-        tempdir.path().join("generated.py"),
+    case.write_file(
+        "generated.py",
         r#"NUMBERS = [
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -221,28 +218,23 @@ OTHER = "OTHER"
 "#,
     )?;
 
-    let out_dir = tempdir.path().join("out");
-    fs::create_dir(&out_dir)?;
+    case.write_file("out/a.py", r#"a = "a""#)?;
 
-    fs::write(out_dir.join("a.py"), r#"a = "a""#)?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
-        .arg(test_path.file_name().unwrap())
-        // Lint all other files in the directory, should respect the `exclude` and `lint.exclude` options
-        .arg("."), @r"
+    assert_cmd_snapshot!(
+        case.command()
+            .current_dir(case.root())
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "ruff.toml"])
+            // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
+            .arg("test.py")
+            // Lint all other files in the directory, should respect the `exclude` and `lint.exclude` options
+            .arg("."), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:4:16: Q000 [*] Double quotes found but single quotes preferred
-    main.py:5:12: Q000 [*] Double quotes found but single quotes preferred
-    test.py:3:15: Q000 [*] Double quotes found but single quotes preferred
+    main.py:3:16: Q000 [*] Double quotes found but single quotes preferred
+    main.py:4:12: Q000 [*] Double quotes found but single quotes preferred
+    test.py:2:15: Q000 [*] Double quotes found but single quotes preferred
     Found 3 errors.
     [*] 3 fixable with the `--fix` option.
 
@@ -250,7 +242,6 @@ OTHER = "OTHER"
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
     ");
-    });
 
     Ok(())
 }
@@ -258,43 +249,37 @@ OTHER = "OTHER"
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let root = tempdir.path();
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let case = RuffTestFixture::new()?;
+
+    case.write_file(
+        "ruff.toml",
         r#"
 [lint]
 exclude = ["main.py"]
 "#,
     )?;
 
-    let main = root.join("main.py");
-    fs::write(&main, "import os\n")?;
+    case.write_file("main.py", "import os\n")?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME))
-                .current_dir(root)
-                .args(STDIN_BASE_OPTIONS)
-                .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-                .arg(".")
-                // Explicitly pass main.py, should be linted regardless of it being excluded by lint.exclude
-                .arg("main.py"),
-            @r"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    main.py:1:8: F401 [*] `os` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(
+        case.command()
+            .current_dir(case.root())
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "ruff.toml"])
+            .arg(".")
+            // Explicitly pass main.py, should be linted regardless of it being excluded by lint.exclude
+            .arg("main.py"),
+        @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        main.py:1:8: F401 [*] `os` imported but unused
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-    ----- stderr -----
-    "
-        );
-    });
+        ----- stderr -----
+        "
+    );
 
     Ok(())
 }
