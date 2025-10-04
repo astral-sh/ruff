@@ -4,8 +4,8 @@
 
 mod test_fixture;
 
-use std::process::Command;
 use std::fs;
+use std::process::Command;
 
 use anyhow::Result;
 
