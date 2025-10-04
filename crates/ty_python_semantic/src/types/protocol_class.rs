@@ -21,6 +21,7 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
+        generics::InferableTypeVars,
         signatures::{Parameter, Parameters},
         todo_type,
     },
@@ -518,6 +519,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
@@ -525,7 +527,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => {
                 ConstraintSet::from(false)
             }
-            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
+            ProtocolMemberKind::Other(ty) => {
+                ty.is_disjoint_from_impl(db, other, inferable, visitor)
+            }
         }
     }
 
@@ -535,6 +539,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -570,7 +575,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     attribute_type
                 };
 
-                attribute_type.has_relation_to_impl(db, method.bind_self(db), relation, visitor)
+                attribute_type.has_relation_to_impl(
+                    db,
+                    method.bind_self(db),
+                    inferable,
+                    relation,
+                    visitor,
+                )
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
@@ -584,9 +595,15 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     return ConstraintSet::from(false);
                 };
                 member_type
-                    .has_relation_to_impl(db, attribute_type, relation, visitor)
+                    .has_relation_to_impl(db, attribute_type, inferable, relation, visitor)
                     .and(db, || {
-                        attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
+                        attribute_type.has_relation_to_impl(
+                            db,
+                            *member_type,
+                            inferable,
+                            relation,
+                            visitor,
+                        )
                     })
             }
         }

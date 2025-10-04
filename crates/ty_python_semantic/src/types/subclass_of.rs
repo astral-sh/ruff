@@ -1,6 +1,7 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::ConstraintSet;
+use crate::types::generics::InferableTypeVars;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
@@ -133,6 +134,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -151,7 +153,7 @@ impl<'db> SubclassOfType<'db> {
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to_impl(db, other_class, relation, visitor)
+                self_class.has_relation_to_impl(db, other_class, inferable, relation, visitor)
             }
         }
     }
@@ -163,6 +165,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {

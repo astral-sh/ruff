@@ -9,7 +9,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
-use crate::types::generics::walk_specialization;
+use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
@@ -121,6 +121,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -137,7 +138,7 @@ impl<'db> Type<'db> {
                 .interface(db)
                 .members(db)
                 .when_all(db, |member| {
-                    member.is_satisfied_by(db, self, relation, visitor)
+                    member.is_satisfied_by(db, self, inferable, relation, visitor)
                 })
         };
 
@@ -152,6 +153,7 @@ impl<'db> Type<'db> {
                 self.has_relation_to_impl(
                     db,
                     Type::non_tuple_instance(db, class),
+                    inferable,
                     relation,
                     visitor,
                 )
@@ -341,6 +343,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -349,10 +352,14 @@ impl<'db> NominalInstanceType<'db> {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.has_relation_to_impl(db, tuple2, relation, visitor),
-            _ => self
-                .class(db)
-                .has_relation_to_impl(db, other.class(db), relation, visitor),
+            ) => tuple1.has_relation_to_impl(db, tuple2, inferable, relation, visitor),
+            _ => self.class(db).has_relation_to_impl(
+                db,
+                other.class(db),
+                inferable,
+                relation,
+                visitor,
+            ),
         }
     }
 
@@ -360,18 +367,19 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
+            ) => tuple1.is_equivalent_to_impl(db, tuple2, inferable, visitor),
             (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
                 ConstraintSet::from(true)
             }
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to_impl(db, class2, visitor)
+                class1.is_equivalent_to_impl(db, class2, inferable, visitor)
             }
             _ => ConstraintSet::from(false),
         }
@@ -381,6 +389,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
@@ -389,7 +398,8 @@ impl<'db> NominalInstanceType<'db> {
         let mut result = ConstraintSet::from(false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
-                let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
+                let compatible =
+                    self_spec.is_disjoint_from_impl(db, &other_spec, inferable, visitor);
                 if result.union(db, compatible).is_always_satisfied() {
                     return result;
                 }
@@ -599,6 +609,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 .satisfies_protocol(
                     db,
                     protocol,
+                    InferableTypeVars::None,
                     TypeRelation::Subtyping,
                     &HasRelationToVisitor::default(),
                 )
@@ -656,6 +667,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -677,6 +689,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
+        _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         ConstraintSet::from(false)

@@ -207,15 +207,16 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
-                .typevar(db)
-                .bound_or_constraints(db)?
-            {
-                TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
-                TypeVarBoundOrConstraints::Constraints(constraints) => {
-                    self.generate_constraint(db, Type::Union(constraints))
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db)? {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        self.generate_constraint(db, bound)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        self.generate_constraint(db, Type::Union(constraints))
+                    }
                 }
-            },
+            }
 
             // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
             // e.g. `isinstance(x, list[int])` fails at runtime.
@@ -251,7 +252,6 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
-            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,
