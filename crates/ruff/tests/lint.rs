@@ -2,6 +2,7 @@
 
 #![cfg(not(target_family = "wasm"))]
 
+use regex::escape;
 mod test_fixture;
 
 use std::process::Command;
@@ -17,6 +18,10 @@ use test_fixture::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
+
+pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
+}
 
 #[test]
 fn top_level_options() -> Result<()> {
