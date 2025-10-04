@@ -2,26 +2,19 @@
 
 #![cfg(not(target_family = "wasm"))]
 
-use regex::escape;
 mod test_fixture;
 
 use std::process::Command;
-use std::str;
-use std::{fs, path::Path};
+use std::fs;
 
 use anyhow::Result;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use tempfile::TempDir;
 
 use test_fixture::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
-
-pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
-}
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -5270,25 +5263,19 @@ class Foo[_T, __T]:
 /// ├── ruff.toml
 /// └── urlparse
 ///     └── __init__.py
-fn create_a005_module_structure(tempdir: &TempDir) -> Result<()> {
-    fn create_module(path: &Path) -> Result<()> {
-        fs::create_dir(path)?;
-        fs::File::create(path.join("__init__.py"))?;
-        Ok(())
-    }
-
-    let foobar = tempdir.path().join("foobar");
-    create_module(&foobar)?;
-    for base in [&tempdir.path().into(), &foobar] {
-        for dir in ["abc", "collections"] {
-            create_module(&base.join(dir))?;
-        }
-        create_module(&base.join("collections").join("abc"))?;
-        create_module(&base.join("collections").join("foobar"))?;
-    }
-    create_module(&tempdir.path().join("urlparse"))?;
+fn create_a005_module_structure(fixture: &RuffTestFixture) -> Result<()> {
+    // Create module structure
+    fixture.write_file("abc/__init__.py", "")?;
+    fixture.write_file("collections/__init__.py", "")?;
+    fixture.write_file("collections/abc/__init__.py", "")?;
+    fixture.write_file("collections/foobar/__init__.py", "")?;
+    fixture.write_file("foobar/__init__.py", "")?;
+    fixture.write_file("foobar/abc/__init__.py", "")?;
+    fixture.write_file("foobar/collections/__init__.py", "")?;
+    fixture.write_file("foobar/collections/abc/__init__.py", "")?;
+    fixture.write_file("urlparse/__init__.py", "")?;
     // also create a ruff.toml to mark the project root
-    fs::File::create(tempdir.path().join("ruff.toml"))?;
+    fixture.write_file("ruff.toml", "")?;
 
     Ok(())
 }
@@ -5296,33 +5283,28 @@ fn create_a005_module_structure(tempdir: &TempDir) -> Result<()> {
 /// Test A005 with `strict-checking = true`
 #[test]
 fn a005_module_shadowing_strict() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    create_a005_module_structure(&tempdir)?;
+    let fixture = RuffTestFixture::new()?;
+    create_a005_module_structure(&fixture)?;
 
-    insta::with_settings!({
-        filters => vec![(r"\\", "/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(r#"lint.flake8-builtins.strict-checking = true"#)
-            .args(["--select", "A005"])
-            .current_dir(tempdir.path()),
-            @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        Found 6 errors.
+    assert_cmd_snapshot!(fixture.command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(r#"lint.flake8-builtins.strict-checking = true"#)
+        .args(["--select", "A005"]),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+    collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+    collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+    foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+    foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+    foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+    Found 6 errors.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -5330,30 +5312,24 @@ fn a005_module_shadowing_strict() -> Result<()> {
 /// Test A005 with `strict-checking = false`
 #[test]
 fn a005_module_shadowing_non_strict() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    create_a005_module_structure(&tempdir)?;
+    let fixture = RuffTestFixture::new()?;
+    create_a005_module_structure(&fixture)?;
 
-    insta::with_settings!({
-        filters => vec![(r"\\", "/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(r#"lint.flake8-builtins.strict-checking = false"#)
-            .args(["--select", "A005"])
-            .current_dir(tempdir.path()),
-            @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        Found 2 errors.
+    assert_cmd_snapshot!(fixture.command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(r#"lint.flake8-builtins.strict-checking = false"#)
+        .args(["--select", "A005"]),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+    collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+    Found 2 errors.
 
-        ----- stderr -----
-        ");
-
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -5361,29 +5337,26 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
 /// Test A005 with `strict-checking` unset
 ///
 /// This should match the non-strict version directly above
+/// Test A005 with `strict-checking` default (should be `false`)
 #[test]
 fn a005_module_shadowing_strict_default() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    create_a005_module_structure(&tempdir)?;
+    let fixture = RuffTestFixture::new()?;
+    create_a005_module_structure(&fixture)?;
 
-    insta::with_settings!({
-        filters => vec![(r"\\", "/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--select", "A005"])
-            .current_dir(tempdir.path()),
-            @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        Found 2 errors.
+    assert_cmd_snapshot!(fixture.command()
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "A005"]),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+    collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+    Found 2 errors.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 
@@ -5564,16 +5537,14 @@ match 2:
 /// Regression test for <https://github.com/astral-sh/ruff/issues/16417>
 #[test]
 fn cache_syntax_errors() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    fs::write(tempdir.path().join("main.py"), "match 2:\n    case 1: ...")?;
+    let fixture = RuffTestFixture::with_file("main.py", "match 2:\n    case 1: ...")?;
 
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    let mut cmd = fixture.command();
     // inline STDIN_BASE_OPTIONS to remove --no-cache
     cmd.args(["check", "--output-format", "concise"])
         .arg("--target-version=py39")
         .arg("--preview")
-        .arg("--quiet") // suppress `debug build without --no-cache` warnings
-        .current_dir(&tempdir);
+        .arg("--quiet"); // suppress `debug build without --no-cache` warnings
 
     assert_cmd_snapshot!(
         cmd,
@@ -5611,51 +5582,51 @@ fn cookiecutter_globbing() -> Result<()> {
     // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
     // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
     // user's glob does not.
-    let tempdir = TempDir::new()?;
-    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
-    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
-    let tests = cookiecutter.join("tests");
-    fs::create_dir_all(&tests)?;
-    fs::write(
-        &cookiecutter_toml,
+    let fixture = RuffTestFixture::new()?;
+
+    fixture.write_file(
+        "{{cookiecutter.repo_name}}/pyproject.toml",
         r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
     )?;
+
     // F811 example from the docs to ensure the glob still works
-    let maintest = tests.join("maintest.py");
-    fs::write(maintest, "import foo\nimport bar\nimport foo")?;
+    fixture.write_file(
+        "{{cookiecutter.repo_name}}/tests/maintest.py",
+        "import foo\nimport bar\nimport foo",
+    )?;
 
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--select=F811")
-                .current_dir(tempdir.path()), @r"
-			success: true
-			exit_code: 0
-			----- stdout -----
-			All checks passed!
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select=F811"), @r"
+		success: true
+		exit_code: 0
+		----- stdout -----
+		All checks passed!
 
-			----- stderr -----
-			");
-    });
+		----- stderr -----
+		");
 
     // after removing the config file with the ignore, F811 applies, so the glob worked above
-    fs::remove_file(cookiecutter_toml)?;
+    fs::remove_file(
+        fixture
+            .root()
+            .join("{{cookiecutter.repo_name}}/pyproject.toml"),
+    )?;
 
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-                .args(STDIN_BASE_OPTIONS)
-                .arg("--select=F811")
-                .current_dir(tempdir.path()), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .command()
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select=F811"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -5663,24 +5634,24 @@ fn cookiecutter_globbing() -> Result<()> {
 /// Like the test above but exercises the non-absolute path case in `PerFile::new`
 #[test]
 fn cookiecutter_globbing_no_project_root() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let tempdir = tempdir.path().join("{{cookiecutter.repo_name}}");
-    fs::create_dir(&tempdir)?;
+    let fixture = RuffTestFixture::new()?;
 
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .current_dir(&tempdir)
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
-		success: true
-		exit_code: 0
-		----- stdout -----
-		All checks passed!
+    // Create the nested directory structure
+    fs::create_dir(fixture.root().join("{{cookiecutter.repo_name}}"))?;
 
-		----- stderr -----
-		warning: No Python files found under the given path(s)
-		");
-    });
+    assert_cmd_snapshot!(fixture
+        .command()
+        .current_dir(fixture.root().join("{{cookiecutter.repo_name}}"))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	All checks passed!
+
+	----- stderr -----
+	warning: No Python files found under the given path(s)
+	");
 
     Ok(())
 }
@@ -5690,16 +5661,14 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
 /// disabling all AST-based rules).
 #[test]
 fn semantic_syntax_errors() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let fixture = RuffTestFixture::with_file("main.py", "[(x := 1) for x in foo]")?;
     let contents = "[(x := 1) for x in foo]";
-    fs::write(tempdir.path().join("main.py"), contents)?;
 
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    let mut cmd = fixture.command();
     // inline STDIN_BASE_OPTIONS to remove --no-cache
     cmd.args(["check", "--output-format", "concise"])
         .arg("--preview")
-        .arg("--quiet") // suppress `debug build without --no-cache` warnings
-        .current_dir(&tempdir);
+        .arg("--quiet"); // suppress `debug build without --no-cache` warnings
 
     assert_cmd_snapshot!(
         cmd,
@@ -5730,7 +5699,7 @@ fn semantic_syntax_errors() -> Result<()> {
 
     // ensure semantic errors are caught even without AST-based rules selected
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        fixture.command()
             .args(STDIN_BASE_OPTIONS)
             .args(["--config", "lint.select = []"])
             .arg("--preview")
@@ -5801,25 +5770,17 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let tempdir = TempDir::new()?;
-    let input = tempdir.path().join("input.py");
-    fs::write(&input, CONTENT)?;
-
+    let fixture = RuffTestFixture::with_file("input.py", CONTENT)?;
     let snapshot = format!("output_format_{output_format}");
-
-    let project_dir = dunce::canonicalize(tempdir.path())?;
 
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
             (ruff_linter::VERSION, "[VERSION]"),
         ]
     }, {
         assert_cmd_snapshot!(
             snapshot,
-            Command::new(get_cargo_bin(BIN_NAME))
+            fixture.command()
                 .args([
                     "check",
                     "--no-cache",
@@ -5831,7 +5792,6 @@ match 42:  # invalid-syntax
                     "py39",
                     "input.py",
                 ])
-                .current_dir(&tempdir),
         );
     });
 
@@ -5842,27 +5802,21 @@ match 42:  # invalid-syntax
 #[test_case::test_case("full"; "full_show_fixes")]
 #[test_case::test_case("grouped"; "grouped_show_fixes")]
 fn output_format_show_fixes(output_format: &str) -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let input = tempdir.path().join("input.py");
-    fs::write(&input, "import os  # F401")?;
-
+    let fixture = RuffTestFixture::with_file("input.py", "import os  # F401")?;
     let snapshot = format!("output_format_show_fixes_{output_format}");
 
     assert_cmd_snapshot!(
         snapshot,
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "check",
-                "--no-cache",
-                "--output-format",
-                output_format,
-                "--select",
-                "F401",
-                "--fix",
-                "--show-fixes",
-                "input.py",
-            ])
-            .current_dir(&tempdir),
+        fixture.command().args([
+            "check",
+            "--no-cache",
+            "--output-format",
+            output_format,
+            "--select",
+            "F401",
+            "--show-fixes",
+            "input.py",
+        ])
     );
 
     Ok(())
@@ -5929,36 +5883,30 @@ fn show_fixes_in_full_output_with_preview_enabled() {
 
 #[test]
 fn rule_panic_mixed_results_concise() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    // Create python files
-    let file_a_path = tempdir.path().join("normal.py");
-    let file_b_path = tempdir.path().join("panic.py");
-    fs::write(&file_a_path, b"import os")?;
-    fs::write(&file_b_path, b"print('hello, world!')")?;
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file("normal.py", "import os")?;
+    fixture.write_file("panic.py", "print('hello, world!')")?;
 
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r"\\", r"/"),
             (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=concise", "--no-cache"])
-            .args([file_a_path, file_b_path]),
+            .args(["normal.py", "panic.py"]),
         @r"
     success: false
     exit_code: 2
     ----- stdout -----
-    [TMP]/normal.py:1:1: RUF900 Hey this is a stable test rule.
-    [TMP]/normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    [TMP]/normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    [TMP]/normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    [TMP]/normal.py:1:1: RUF911 Hey this is a preview test rule.
-    [TMP]/normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    [TMP]/panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    normal.py:1:1: RUF900 Hey this is a stable test rule.
+    normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: RUF911 Hey this is a preview test rule.
+    normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    panic.py: panic: Panicked at <location> when checking `/private/var/folders/15/rz088rr90xs5h64b24tdcb500000gn/T/.tmpfkzilJ/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -5975,51 +5923,45 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
 
 #[test]
 fn rule_panic_mixed_results_full() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    // Create python files
-    let file_a_path = tempdir.path().join("normal.py");
-    let file_b_path = tempdir.path().join("panic.py");
-    fs::write(&file_a_path, b"import os")?;
-    fs::write(&file_b_path, b"print('hello, world!')")?;
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file("normal.py", "import os")?;
+    fixture.write_file("panic.py", "print('hello, world!')")?;
 
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r"\\", r"/"),
             (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>"),
         ]
     }, {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
-            .args([file_a_path, file_b_path]),
+            .args(["normal.py", "panic.py"]),
         @r"
     success: false
     exit_code: 2
     ----- stdout -----
     RUF900 Hey this is a stable test rule.
-    --> [TMP]/normal.py:1:1
+    --> normal.py:1:1
 
     RUF901 [*] Hey this is a stable test rule with a safe fix.
-    --> [TMP]/normal.py:1:1
+    --> normal.py:1:1
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
-    --> [TMP]/normal.py:1:1
+    --> normal.py:1:1
 
     RUF903 Hey this is a stable test rule with a display only fix.
-    --> [TMP]/normal.py:1:1
+    --> normal.py:1:1
 
     RUF911 Hey this is a preview test rule.
-    --> [TMP]/normal.py:1:1
+    --> normal.py:1:1
 
     RUF950 Hey this is a test rule that was redirected from another.
-    --> [TMP]/normal.py:1:1
+    --> normal.py:1:1
 
-    panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
-    --> [TMP]/panic.py:1:1
+    panic: Panicked at <location> when checking `/private/var/folders/15/rz088rr90xs5h64b24tdcb500000gn/T/.tmpBrxgo3/panic.py`: `This is a fake panic for testing.`
+    --> panic.py:1:1
     info: This indicates a bug in Ruff.
     info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
     info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
@@ -6041,36 +5983,25 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 /// Test that the same rule fires across all supported extensions, but not on unsupported files
 #[test]
 fn supported_file_extensions() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let inner_dir = tempdir.path().join("src");
-    fs::create_dir(&inner_dir)?;
+    let fixture = RuffTestFixture::new()?;
 
     // Create files of various types
     // text file
-    fs::write(inner_dir.join("thing.txt"), b"hello world\n")?;
+    fixture.write_file("src/thing.txt", "hello world\n")?;
     // regular python
-    fs::write(
-        inner_dir.join("thing.py"),
-        b"import os\nprint('hello world')\n",
-    )?;
+    fixture.write_file("src/thing.py", "import os\nprint('hello world')\n")?;
     // python typestub
-    fs::write(
-        inner_dir.join("thing.pyi"),
-        b"import os\nclass foo:\n  ...\n",
-    )?;
+    fixture.write_file("src/thing.pyi", "import os\nclass foo:\n  ...\n")?;
     // windows gui
-    fs::write(
-        inner_dir.join("thing.pyw"),
-        b"import os\nprint('hello world')\n",
-    )?;
+    fixture.write_file("src/thing.pyw", "import os\nprint('hello world')\n")?;
     // cython
-    fs::write(
-        inner_dir.join("thing.pyx"),
-        b"import os\ncdef int add(int a, int b):\n  return a + b\n",
+    fixture.write_file(
+        "src/thing.pyx",
+        "import os\ncdef int add(int a, int b):\n  return a + b\n",
     )?;
     // notebook
-    fs::write(
-        inner_dir.join("thing.ipynb"),
+    fixture.write_file(
+        "src/thing.ipynb",
         r#"
 {
  "cells": [
@@ -6110,65 +6041,47 @@ fn supported_file_extensions() -> Result<()> {
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r"\\", r"/"),
-        ]
-    }, {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        fixture.command()
             .args(["check", "--select", "F401", "--output-format=concise", "--no-cache"])
-            .args([inner_dir]),
+            .arg("src"),
         @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    [TMP]/src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
-    [TMP]/src/thing.py:1:8: F401 [*] `os` imported but unused
-    [TMP]/src/thing.pyi:1:8: F401 [*] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
+    src/thing.py:1:8: F401 [*] `os` imported but unused
+    src/thing.pyi:1:8: F401 [*] `os` imported but unused
     Found 3 errors.
     [*] 3 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
-    });
     Ok(())
 }
 
 /// Test that the same rule fires across all supported extensions, but not on unsupported files
 #[test]
 fn supported_file_extensions_preview_enabled() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let inner_dir = tempdir.path().join("src");
-    fs::create_dir(&inner_dir)?;
+    let fixture = RuffTestFixture::new()?;
 
     // Create files of various types
     // text file
-    fs::write(inner_dir.join("thing.txt"), b"hello world\n")?;
+    fixture.write_file("src/thing.txt", "hello world\n")?;
     // regular python
-    fs::write(
-        inner_dir.join("thing.py"),
-        b"import os\nprint('hello world')\n",
-    )?;
+    fixture.write_file("src/thing.py", "import os\nprint('hello world')\n")?;
     // python typestub
-    fs::write(
-        inner_dir.join("thing.pyi"),
-        b"import os\nclass foo:\n  ...\n",
-    )?;
+    fixture.write_file("src/thing.pyi", "import os\nclass foo:\n  ...\n")?;
     // windows gui
-    fs::write(
-        inner_dir.join("thing.pyw"),
-        b"import os\nprint('hello world')\n",
-    )?;
+    fixture.write_file("src/thing.pyw", "import os\nprint('hello world')\n")?;
     // cython
-    fs::write(
-        inner_dir.join("thing.pyx"),
-        b"import os\ncdef int add(int a, int b):\n  return a + b\n",
+    fixture.write_file(
+        "src/thing.pyx",
+        "import os\ncdef int add(int a, int b):\n  return a + b\n",
     )?;
     // notebook
-    fs::write(
-        inner_dir.join("thing.ipynb"),
+    fixture.write_file(
+        "src/thing.ipynb",
         r#"
 {
  "cells": [
@@ -6208,29 +6121,22 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r"\\", r"/"),
-        ]
-    }, {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        fixture.command()
             .args(["check", "--select", "F401", "--preview", "--output-format=concise", "--no-cache"])
-            .args([inner_dir]),
+            .arg("src"),
         @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    [TMP]/src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
-    [TMP]/src/thing.py:1:8: F401 [*] `os` imported but unused
-    [TMP]/src/thing.pyi:1:8: F401 [*] `os` imported but unused
-    [TMP]/src/thing.pyw:1:8: F401 [*] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
+    src/thing.py:1:8: F401 [*] `os` imported but unused
+    src/thing.pyi:1:8: F401 [*] `os` imported but unused
+    src/thing.pyw:1:8: F401 [*] `os` imported but unused
     Found 4 errors.
     [*] 4 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
-    });
     Ok(())
 }
