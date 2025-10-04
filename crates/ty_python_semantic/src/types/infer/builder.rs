@@ -42,7 +42,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, use_def_map,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
@@ -53,11 +53,11 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_SLOTS_ANNOTATION, INVALID_SLOTS_DEFAULT, INVALID_SLOTS_ON_BUILTIN, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
-    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
+    INVALID_SLOTS, INVALID_SLOTS_ANNOTATION, INVALID_SLOTS_DEFAULT, INVALID_SLOTS_ON_BUILTIN,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
     report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
@@ -2544,6 +2544,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_expression(base, TypeContext::default());
                 }
                 self.typevar_binding_context = previous_typevar_binding_context;
+
+                self.check_slots_on_builtin(class_node);
             }
         }
     }
@@ -2564,6 +2566,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_class_deferred(&mut self, definition: Definition<'db>, class: &ast::StmtClassDef) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+
         for base in class.bases() {
             if self.in_stub() {
                 self.infer_expression_with_state(
@@ -2576,6 +2579,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         self.typevar_binding_context = previous_typevar_binding_context;
+
+        self.check_slots_on_builtin(class);
+    }
+
+    fn check_slots_on_builtin(&mut self, class: &ast::StmtClassDef) {
+        let mut inherits_from_builtin = false;
+        for base in class.bases() {
+            let is_builtin_by_name = if let ast::Expr::Name(name_expr) = base {
+                matches!(
+                    name_expr.id.as_str(),
+                    "int" | "bytes" | "tuple" | "str" | "float" | "complex"
+                )
+            } else {
+                false
+            };
+
+            let base_ty = self.expression_type(base);
+            let is_builtin_by_type = match base_ty {
+                Type::ClassLiteral(class) => class.inherits_from_variable_length_builtin(self.db()),
+                _ => false,
+            };
+
+            if is_builtin_by_name || is_builtin_by_type {
+                inherits_from_builtin = true;
+                break;
+            }
+        }
+
+        if inherits_from_builtin {
+            for stmt in &class.body {
+                if let ast::Stmt::Assign(assign) = stmt {
+                    for target in &assign.targets {
+                        if let ast::Expr::Name(name) = target {
+                            if name.id.as_str() == "__slots__" {
+                                let is_nonempty = match assign.value.as_ref() {
+                                    ast::Expr::Tuple(tuple) => !tuple.elts.is_empty(),
+                                    ast::Expr::StringLiteral(_) => true,
+                                    ast::Expr::List(list) => !list.elts.is_empty(),
+                                    _ => false,
+                                };
+
+                                if is_nonempty {
+                                    if let Some(builder) = self.context.report_lint(
+                                        &INVALID_SLOTS_ON_BUILTIN,
+                                        assign.value.as_ref(),
+                                    ) {
+                                        builder.into_diagnostic(format_args!(
+                                            "nonempty __slots__ not supported for subtype of built-in type",
+                                        ));
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn infer_type_alias_definition(
@@ -3973,6 +4034,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             target_ty = Type::SpecialForm(special_form);
         }
 
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        if current_scope.kind() == ScopeKind::Class {
+            if let Some(name_expr) = target.as_name_expr() {
+                if name_expr.id.as_str() == "__slots__" {
+                    if let Some(tuple_expr) = value.as_tuple_expr() {
+                        for elt in &tuple_expr.elts {
+                            let elt_ty = self.expression_type(elt);
+                            if !matches!(elt_ty, Type::StringLiteral(_)) {
+                                let type_name = match elt_ty {
+                                    Type::IntLiteral(_) => "int",
+                                    Type::BooleanLiteral(_) => "bool",
+                                    _ => "non-string",
+                                };
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_SLOTS, value)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "__slots__ items must be strings, not '{type_name}'",
+                                    ));
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         self.store_expression_type(target, target_ty);
         self.add_binding(target.into(), definition, target_ty);
     }
@@ -4144,41 +4234,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.store_expression_type(target, declared.inner_type());
         }
 
-        // Check for __slots__ violations in class scope
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         if current_scope.kind() == ScopeKind::Class {
             if let Some(name_expr) = target.as_name_expr() {
                 let attribute_name = &name_expr.id;
 
-                // Get the class being defined
                 if let NodeWithScopeKind::Class(class_def) = current_scope.node() {
-                    // For __slots__ validation in the current class being defined,
-                    // we need to defer this to avoid circular dependencies.
-                    // For now, let's get the current __slots__ value directly.
-                    let table = self.index.place_table(current_scope_id);
-                    if let Some(slots_symbol_id) = table.symbol_id("__slots__") {
-                        let use_def = use_def_map(
-                            self.db(),
-                            ScopeId::new(self.db(), self.file(), current_scope_id),
-                        );
-                        let slots_declarations =
-                            use_def.end_of_scope_symbol_declarations(slots_symbol_id);
-                        let slots_place = place_from_declarations(self.db(), slots_declarations);
+                    let is_protocol = Self::class_is_protocol(class_def.node(self.module()));
+                    let class_body = &class_def.node(self.module()).body;
 
-                        if let Some(slots_ty) = slots_place
-                            .ignore_conflicting_declarations()
-                            .place
-                            .ignore_possibly_unbound()
-                        {
-                            let slots_members = self.extract_slots_from_type(slots_ty);
+                    let mut slots_value_expr = None;
+                    for stmt in class_body {
+                        if let ast::Stmt::Assign(assign_stmt) = stmt {
+                            for target in &assign_stmt.targets {
+                                if let ast::Expr::Name(name_expr) = target {
+                                    if name_expr.id.as_str() == "__slots__" {
+                                        slots_value_expr = Some(&assign_stmt.value);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if slots_value_expr.is_some() {
+                            break;
+                        }
+                    }
+
+                    if let Some(slots_expr) = slots_value_expr {
+                        if let ast::Expr::Tuple(tuple_expr) = slots_expr.as_ref() {
+                            let mut slot_names = FxHashSet::default();
+                            for elt in &tuple_expr.elts {
+                                if let ast::Expr::StringLiteral(string_lit) = elt {
+                                    slot_names.insert(string_lit.value.to_str().to_string());
+                                }
+                            }
+
+                            let slots_members = Some(slot_names);
 
                             if let Some(slots) = slots_members {
-                                // Check if this is a class variable default for a __slots__ name
                                 if value.is_some()
                                     && !declared.qualifiers.contains(TypeQualifiers::CLASS_VAR)
                                 {
-                                    // This is an instance variable with a default value
                                     if slots.contains(attribute_name.as_str()) {
                                         if let Some(builder) =
                                             self.context.report_lint(&INVALID_SLOTS_DEFAULT, target)
@@ -4191,8 +4288,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
 
                                 // Check if this is an annotation for a name not in __slots__
+                                // Skip this check for Protocol classes as their annotations are protocol members
                                 if value.is_none()
                                     && !declared.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                                    && !is_protocol
                                 {
                                     // This is an instance variable annotation without value
                                     if !slots.contains(attribute_name.as_str())
@@ -4209,20 +4308,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     }
                                 }
 
-                                // Check for __slots__ on variable-length built-in types
+                                // Check for non-string items in __slots__
                                 if attribute_name == "__slots__" && value.is_some() {
-                                    // Check if any base class is a variable-length built-in
-                                    if self
-                                        .class_inherits_from_builtin(class_def.node(self.module()))
-                                        && !slots.is_empty()
-                                    {
-                                        if let Some(builder) = self
-                                            .context
-                                            .report_lint(&INVALID_SLOTS_ON_BUILTIN, target)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "nonempty __slots__ not supported for subtype of built-in type",
-                                            ));
+                                    if let Some(value_expr) = value {
+                                        // Check if the value is a tuple with non-string literals
+                                        if let Some(tuple_expr) = value_expr.as_tuple_expr() {
+                                            for elt in &tuple_expr.elts {
+                                                let elt_ty = self.expression_type(elt);
+                                                if !matches!(elt_ty, Type::StringLiteral(_)) {
+                                                    if let Some(builder) = self
+                                                        .context
+                                                        .report_lint(&INVALID_SLOTS, elt)
+                                                    {
+                                                        builder.into_diagnostic(format_args!(
+                                                            "__slots__ items must be strings, not '{}'",
+                                                            elt_ty.display(self.db())
+                                                        ));
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -9340,64 +9444,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ScopeInference { expressions, extra }
     }
 
-    /// Extract slot names from a __slots__ type
-    fn extract_slots_from_type(&self, slots_ty: Type<'db>) -> Option<FxHashSet<String>> {
-        match slots_ty {
-            // __slots__ = ("a", "b")
-            Type::NominalInstance(nominal) => {
-                if let Some(tuple_spec) = nominal.tuple_spec(self.db()) {
-                    let mut slots = FxHashSet::default();
-                    for element in tuple_spec.all_elements() {
-                        if let Type::StringLiteral(string_literal) = element {
-                            slots.insert(string_literal.value(self.db()).to_string());
-                        } else {
-                            // Non-string element, consider it dynamic
-                            return None;
-                        }
-                    }
-                    Some(slots)
-                } else {
-                    None
-                }
-            }
-
-            // __slots__ = "abc"  # Expands to slots "a", "b", "c"
-            Type::StringLiteral(string_literal) => {
-                let mut slots = FxHashSet::default();
-                let slot_value = string_literal.value(self.db());
-
-                // Python treats a bare string as a sequence of slot names (one per character)
-                for ch in slot_value.chars() {
-                    slots.insert(ch.to_string());
-                }
-                Some(slots)
-            }
-
-            _ => None,
-        }
-    }
-
-    /// Check if a class inherits from a variable-length built-in type
-    fn class_inherits_from_builtin(&self, class_def: &ast::StmtClassDef) -> bool {
-        // Check if any base class (direct or indirect) is a variable-length builtin
+    /// Check if a class inherits from Protocol (AST-based check)
+    fn class_is_protocol(class_def: &ast::StmtClassDef) -> bool {
+        // Simple AST-based check: look for "Protocol" in base names
         for base in class_def.bases() {
-            let base_ty = self.expression_type(base);
-            if let Type::ClassLiteral(base_class) = base_ty {
-                // Check if the base is directly a builtin
-                if let Some(
-                    KnownClass::Int
-                    | KnownClass::Bytes
-                    | KnownClass::Tuple
-                    | KnownClass::Str
-                    | KnownClass::Float
-                    | KnownClass::Complex,
-                ) = base_class.known(self.db())
-                {
+            if let ast::Expr::Name(name_expr) = base {
+                if name_expr.id.as_str() == "Protocol" {
                     return true;
                 }
-                // Also check the base's entire MRO
-                if base_class.inherits_from_variable_length_builtin(self.db()) {
-                    return true;
+            }
+            // Also check for subscripted Protocol like Protocol[T]
+            if let ast::Expr::Subscript(subscript) = base {
+                if let ast::Expr::Name(name_expr) = subscript.value.as_ref() {
+                    if name_expr.id.as_str() == "Protocol" {
+                        return true;
+                    }
                 }
             }
         }

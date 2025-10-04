@@ -3293,20 +3293,21 @@ impl<'db> ClassLiteral<'db> {
                     place: Place::Unbound,
                     qualifiers: _,
                 } => {
-                    // Not declared in the class body; might still be declared/bound in a method.
+                    // Not declared in the class body, might still be declared/bound in a method.
                     let result =
                         Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
                     self.apply_slots_constraints(db, name, result)
                 }
             }
         } else {
-            // Neither declared nor bound in the class body; could be implicitly defined in a method.
+            // Neither declared nor bound in the class body, could be implicitly defined in a method.
             let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
             self.apply_slots_constraints(db, name, result)
         }
     }
 
     fn slots_special_attr_unavailable(self, db: &'db dyn Db, name: &str) -> bool {
+        // TODO: __dict__ is still accessible through inheritance from object in stubs
         match name {
             "__dict__" => !self.has_dict_in_slots(db) && self.all_slots_from_mro(db).is_some(),
             "__weakref__" => {
@@ -3329,7 +3330,9 @@ impl<'db> ClassLiteral<'db> {
         if let Some(all_slots) = self.all_slots_from_mro(db) {
             // This class (or a parent) defines __slots__
             if self.has_dict_in_slots(db) {
-                // __dict__ is in __slots__, so all attributes are allowed
+                if result.place.is_unbound() {
+                    return Place::Type(Type::unknown(), Boundness::Bound).into();
+                }
                 return result;
             }
 

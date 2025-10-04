@@ -101,6 +101,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_SLOTS);
+    registry.register_lint(&INVALID_SLOTS_ANNOTATION);
+    registry.register_lint(&INVALID_SLOTS_DEFAULT);
+    registry.register_lint(&INVALID_SLOTS_ON_BUILTIN);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1868,6 +1872,25 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_SLOTS_ON_BUILTIN = {
         summary: "detects invalid __slots__ on variable-length built-in subtypes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for non-string items in `__slots__`.
+    ///
+    /// ## Why is this bad?
+    /// All items in `__slots__` must be strings. Non-string items will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class C:
+    ///     __slots__ = (1, 2, 3)  # error: __slots__ items must be strings
+    /// ```
+    pub(crate) static INVALID_SLOTS = {
+        summary: "detects non-string items in __slots__",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
