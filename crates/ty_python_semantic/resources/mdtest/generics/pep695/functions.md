@@ -474,6 +474,13 @@ def overloaded_outer[T](t: T | None = None) -> None:
 
     if t is not None:
         inner(t)
+
+def outer[T](t: T) -> None:
+    def inner[S](inner_t: T, s: S) -> tuple[T, S]:
+        return inner_t, s
+    reveal_type(inner(t, 1))  # revealed: tuple[T@outer, Literal[1]]
+
+    inner("wrong", 1)  # error: [invalid-argument-type]
 ```
 
 ## Unpacking a TypeVar
@@ -534,6 +541,16 @@ class C:
 def _(x: int):
     reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
 
-    # TODO: this should be `tuple[C, int]` as well, once we support implicit `self`
-    reveal_type(C().implicit_self(x))  # revealed: tuple[Unknown, int]
+    reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
+```
+
+## `~T` is never assignable to `T`
+
+```py
+from ty_extensions import Not
+
+def f[T](x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
 ```

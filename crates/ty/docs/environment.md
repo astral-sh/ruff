@@ -35,12 +35,16 @@ ty also reads the following externally defined environment variables:
 
 ### `CONDA_DEFAULT_ENV`
 
-Used to determine if an active Conda environment is the base environment or not.
+Used to determine the name of the active Conda environment.
 
 ### `CONDA_PREFIX`
 
-Used to detect an activated Conda environment location.
+Used to detect the path of an active Conda environment.
 If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+
+### `_CONDA_ROOT`
+
+Used to determine the root install path of Conda.
 
 ### `PYTHONPATH`
 

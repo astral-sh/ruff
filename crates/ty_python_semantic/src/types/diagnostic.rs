@@ -2060,7 +2060,7 @@ pub(super) fn report_invalid_assignment<'db>(
     if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
         && let Some(value) = annotated_assignment.value(context.module())
     {
-        // Re-infer the RHS of the annotated assignment, ignoring the type context, for more precise
+        // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
         // error messages.
         source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
     }
@@ -2710,6 +2710,12 @@ pub(crate) fn report_undeclared_protocol_member(
                 SubclassOfInner::Dynamic(_) => return false,
             },
             Type::NominalInstance(instance) => instance.class(db),
+            Type::Union(union) => {
+                return union
+                    .elements(db)
+                    .iter()
+                    .all(|elem| should_give_hint(db, *elem));
+            }
             _ => return false,
         };
 
@@ -2741,9 +2747,7 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type
-            .literal_promotion_type(db)
-            .unwrap_or(binding_type);
+        let suggestion = binding_type.promote_literals(db);
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(

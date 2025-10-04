@@ -96,6 +96,15 @@ export default function Playground() {
     file: FileId,
     newName: string,
   ) => {
+    if (newName.startsWith("/")) {
+      setError("File names cannot start with '/'.");
+      return;
+    }
+    if (newName.startsWith("vendored:")) {
+      setError("File names cannot start with 'vendored:'.");
+      return;
+    }
+
     const handle = files.handles[file];
     let newHandle: FileHandle | null = null;
     if (handle == null) {

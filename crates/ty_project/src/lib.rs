@@ -666,24 +666,7 @@ where
     }) {
         Ok(result) => Ok(result),
         Err(error) => {
-            use std::fmt::Write;
-            let mut message = String::new();
-            message.push_str("Panicked");
-
-            if let Some(location) = error.location {
-                let _ = write!(&mut message, " at {location}");
-            }
-
-            let _ = write!(
-                &mut message,
-                " when checking `{file}`",
-                file = file.path(db)
-            );
-
-            if let Some(payload) = error.payload.as_str() {
-                let _ = write!(&mut message, ": `{payload}`");
-            }
-
+            let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,

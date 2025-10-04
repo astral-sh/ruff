@@ -117,7 +117,7 @@ static COLOUR_SCIENCE: std::sync::LazyLock<Benchmark<'static>> = std::sync::Lazy
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY310,
         },
-        477,
+        600,
     )
 });
 

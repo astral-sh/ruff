@@ -144,8 +144,8 @@ X = (Y := 3) + 4
 ```py
 from exporter import *
 
-reveal_type(X)  # revealed: Unknown | Literal[7]
-reveal_type(Y)  # revealed: Unknown | Literal[3]
+reveal_type(X)  # revealed: Literal[7]
+reveal_type(Y)  # revealed: Literal[3]
 ```
 
 ### Global-scope symbols defined in many other ways
@@ -781,9 +781,9 @@ else:
 from exporter import *
 
 # error: [possibly-unresolved-reference]
-reveal_type(A)  # revealed: Unknown | Literal[1]
+reveal_type(A)  # revealed: Literal[1]
 
-reveal_type(B)  # revealed: Unknown | Literal[2, 3]
+reveal_type(B)  # revealed: Literal[2, 3]
 ```
 
 ### Reachability constraints in the importing module
@@ -804,7 +804,7 @@ if coinflip():
     from exporter import *
 
 # error: [possibly-unresolved-reference]
-reveal_type(A)  # revealed: Unknown | Literal[1]
+reveal_type(A)  # revealed: Literal[1]
 ```
 
 ### Reachability constraints in the exporting module *and* the importing module

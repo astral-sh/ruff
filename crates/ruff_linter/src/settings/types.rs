@@ -535,6 +535,20 @@ pub enum OutputFormat {
     Sarif,
 }
 
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(
+            self,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        )
+    }
+}
+
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

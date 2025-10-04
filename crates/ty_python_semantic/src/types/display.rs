@@ -654,7 +654,7 @@ pub(crate) struct DisplayOverloadLiteral<'db> {
 
 impl Display for DisplayOverloadLiteral<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let signature = self.literal.signature(self.db, None);
+        let signature = self.literal.signature(self.db);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
@@ -832,7 +832,6 @@ impl Display for DisplayGenericContext<'_> {
         let variables = self.generic_context.variables(self.db);
 
         let non_implicit_variables: Vec<_> = variables
-            .iter()
             .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
             .collect();
 
@@ -852,6 +851,10 @@ impl Display for DisplayGenericContext<'_> {
 }
 
 impl<'db> Specialization<'db> {
+    pub fn display(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+        self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
+    }
+
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
         &'db self,
@@ -1209,11 +1212,13 @@ impl Display for DisplayParameter<'_> {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
             if let Some(annotated_type) = self.param.annotated_type() {
-                write!(
-                    f,
-                    ": {}",
-                    annotated_type.display_with(self.db, self.settings.clone())
-                )?;
+                if self.param.should_annotation_be_displayed() {
+                    write!(
+                        f,
+                        ": {}",
+                        annotated_type.display_with(self.db, self.settings.clone())
+                    )?;
+                }
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_ty) = self.param.default_type() {
