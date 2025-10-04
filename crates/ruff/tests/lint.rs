@@ -5898,6 +5898,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
 
     insta::with_settings!({
         filters => vec![
+            (tempdir_filter(fixture.root()).as_str(), "[TMP]/"),
             (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {
@@ -5915,7 +5916,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     normal.py:1:1: RUF911 Hey this is a preview test rule.
     normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    panic.py: panic: Panicked at <location> when checking `/private/var/folders/15/rz088rr90xs5h64b24tdcb500000gn/T/.tmpfkzilJ/panic.py`: `This is a fake panic for testing.`
+    panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -5938,7 +5939,8 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     insta::with_settings!({
         filters => vec![
-            (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>"),
+            (tempdir_filter(fixture.root()).as_str(), "[TMP]/"),
+            (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {
     assert_cmd_snapshot!(
@@ -5969,7 +5971,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     RUF950 Hey this is a test rule that was redirected from another.
     --> normal.py:1:1
 
-    panic: Panicked at <location> when checking `/private/var/folders/15/rz088rr90xs5h64b24tdcb500000gn/T/.tmpBrxgo3/panic.py`: `This is a fake panic for testing.`
+    panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> panic.py:1:1
     info: This indicates a bug in Ruff.
     info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
