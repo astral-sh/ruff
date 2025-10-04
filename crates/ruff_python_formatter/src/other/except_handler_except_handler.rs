@@ -5,7 +5,7 @@ use ruff_python_ast::ExceptHandlerExceptHandler;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Copy, Clone, Default)]
@@ -53,48 +53,40 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::ExceptHandler(item),
-                    dangling_comments,
-                    &format_with(|f| {
+            [clause(
+                ClauseHeader::ExceptHandler(item),
+                dangling_comments,
+                &format_with(|f| {
+                    write!(
+                        f,
+                        [
+                            token("except"),
+                            match except_handler_kind {
+                                ExceptHandlerKind::Regular => None,
+                                ExceptHandlerKind::Starred => Some(token("*")),
+                            }
+                        ]
+                    )?;
+
+                    if let Some(type_) = type_ {
                         write!(
                             f,
                             [
-                                token("except"),
-                                match except_handler_kind {
-                                    ExceptHandlerKind::Regular => None,
-                                    ExceptHandlerKind::Starred => Some(token("*")),
-                                }
+                                space(),
+                                maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
                             ]
                         )?;
-
-                        if let Some(type_) = type_ {
-                            write!(
-                                f,
-                                [
-                                    space(),
-                                    maybe_parenthesize_expression(
-                                        type_,
-                                        item,
-                                        Parenthesize::IfBreaks
-                                    )
-                                ]
-                            )?;
-                            if let Some(name) = name {
-                                write!(f, [space(), token("as"), space(), name.format()])?;
-                            }
+                        if let Some(name) = name {
+                            write!(f, [space(), token("as"), space(), name.format()])?;
                         }
+                    }
 
-                        Ok(())
-                    }),
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(self.last_suite_in_statement),
-                    dangling_comments
-                ),
-            ]
+                    Ok(())
+                }),
+                body,
+                SuiteKind::other(self.last_suite_in_statement),
+                dangling_comments
+            )]
         )
     }
 }

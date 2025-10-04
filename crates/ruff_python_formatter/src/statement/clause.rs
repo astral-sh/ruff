@@ -5,11 +5,13 @@ use ruff_python_ast::{
     StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
+use crate::preview::is_fix_fmt_skip_in_one_liners_enabled;
 use crate::statement::suite::{SuiteKind, contains_only_an_ellipsis};
-use crate::verbatim::write_suppressed_clause_header;
+use crate::verbatim::{verbatim_text, write_suppressed_clause_header};
 use crate::{has_skip_comment, prelude::*};
 
 /// The header of a compound statement clause.
@@ -34,6 +36,28 @@ pub(crate) enum ClauseHeader<'a> {
     While(&'a StmtWhile),
     With(&'a StmtWith),
     OrElse(ElseClause<'a>),
+}
+
+impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
+    fn from(value: ClauseHeader<'a>) -> Self {
+        match value {
+            ClauseHeader::Class(stmt_class_def) => stmt_class_def.into(),
+            ClauseHeader::Function(stmt_function_def) => stmt_function_def.into(),
+            ClauseHeader::If(stmt_if) => stmt_if.into(),
+            ClauseHeader::ElifElse(elif_else_clause) => elif_else_clause.into(),
+            ClauseHeader::Try(stmt_try) => stmt_try.into(),
+            ClauseHeader::ExceptHandler(except_handler_except_handler) => {
+                except_handler_except_handler.into()
+            }
+            ClauseHeader::TryFinally(stmt_try) => stmt_try.into(),
+            ClauseHeader::Match(stmt_match) => stmt_match.into(),
+            ClauseHeader::MatchCase(match_case) => match_case.into(),
+            ClauseHeader::For(stmt_for) => stmt_for.into(),
+            ClauseHeader::While(stmt_while) => stmt_while.into(),
+            ClauseHeader::With(stmt_with) => stmt_with.into(),
+            ClauseHeader::OrElse(else_clause) => else_clause.into(),
+        }
+    }
 }
 
 impl ClauseHeader<'_> {
@@ -307,6 +331,16 @@ pub(crate) enum ElseClause<'a> {
     While(&'a StmtWhile),
 }
 
+impl<'a> From<ElseClause<'a>> for AnyNodeRef<'a> {
+    fn from(value: ElseClause<'a>) -> Self {
+        match value {
+            ElseClause::Try(stmt_try) => stmt_try.into(),
+            ElseClause::For(stmt_for) => stmt_for.into(),
+            ElseClause::While(stmt_while) => stmt_while.into(),
+        }
+    }
+}
+
 pub(crate) struct FormatClauseHeader<'a, 'ast> {
     header: ClauseHeader<'a>,
     /// How to format the clause header
@@ -385,13 +419,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
     }
 }
 
-pub(crate) struct FormatClauseBody<'a> {
+struct FormatClauseBody<'a> {
     body: &'a Suite,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 }
 
-pub(crate) fn clause_body<'a>(
+fn clause_body<'a>(
     body: &'a Suite,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
@@ -430,6 +464,71 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
                     block_indent(&self.body.format().with_options(self.kind))
                 ]
             )
+        }
+    }
+}
+
+pub(crate) struct FormatClause<'a, 'ast> {
+    format_header: FormatClauseHeader<'a, 'ast>,
+    format_body: FormatClauseBody<'a>,
+}
+
+impl<'a> FormatClause<'a, '_> {
+    /// Sets the leading comments that precede an alternate branch.
+    #[must_use]
+    pub(crate) fn with_leading_comments<N>(
+        mut self,
+        comments: &'a [SourceComment],
+        last_node: Option<N>,
+    ) -> Self
+    where
+        N: Into<AnyNodeRef<'a>>,
+    {
+        self.format_header = self
+            .format_header
+            .with_leading_comments(comments, last_node);
+        self
+    }
+}
+
+/// Formats a clause, handling the case where the compound
+/// statement lies on a single line with `# fmt: skip` and
+/// should be suppressed.
+pub(crate) fn clause<'a, 'ast, Content>(
+    header: ClauseHeader<'a>,
+    trailing_colon_comment: &'a [SourceComment],
+    header_formatter: &'a Content,
+    body: &'a Suite,
+    kind: SuiteKind,
+    trailing_comments: &'a [SourceComment],
+) -> FormatClause<'a, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatClause {
+        format_header: clause_header(header, trailing_colon_comment, header_formatter),
+        format_body: clause_body(body, kind, trailing_comments),
+    }
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        let source = f.context().source();
+        if is_fix_fmt_skip_in_one_liners_enabled(f.context())
+            && let Some(last_child_in_body) =
+                AnyNodeRef::from(self.format_header.header).last_child_in_body()
+            && has_skip_comment(
+                f.context().comments().trailing(last_child_in_body),
+                f.context().source(),
+            )
+            && !source.contains_line_break(TextRange::new(
+                self.format_header.header.range(source).unwrap().start(),
+                last_child_in_body.end(),
+            ))
+        {
+            write_suppressed_clause(self, f)
+        } else {
+            write!(f, [self.format_header, self.format_body])
         }
     }
 }
@@ -501,4 +600,34 @@ fn colon_range(after_keyword_or_condition: TextSize, source: &str) -> FormatResu
             ))
         }
     }
+}
+
+#[cold]
+fn write_suppressed_clause(
+    clause: &FormatClause,
+    f: &mut Formatter<PyFormatContext<'_>>,
+) -> FormatResult<()> {
+    let header = clause.format_header.header;
+
+    let range_start = header.first_keyword_range(f.context().source())?.start();
+
+    let comments = f.context().comments().clone();
+
+    let last_child = AnyNodeRef::from(header).last_child_in_body().unwrap();
+    let range_end = last_child.end();
+
+    // Write the outer comments and format the node as verbatim
+    write!(
+        f,
+        [
+            source_position(range_start),
+            verbatim_text(TextRange::new(range_start, range_end)),
+            source_position(range_end),
+            trailing_comments(comments.trailing(last_child))
+        ]
+    )?;
+
+    comments.mark_verbatim_node_comments_formatted(AnyNodeRef::from(header));
+
+    Ok(())
 }
