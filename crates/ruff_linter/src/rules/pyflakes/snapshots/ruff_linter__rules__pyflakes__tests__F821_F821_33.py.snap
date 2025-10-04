@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `__class__`
+  --> F821_33.py:15:13
+   |
+14 | # Test: lambda outside class (should still fail)
+15 | h = lambda: __class__
+   |             ^^^^^^^^^
+   |
