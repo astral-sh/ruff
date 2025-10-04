@@ -5941,7 +5941,6 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(fixture.root()).as_str(), "[TMP]/"),
             (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {
