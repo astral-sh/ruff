@@ -286,10 +286,8 @@ exclude = ["main.py"]
 
 #[test]
 fn exclude_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let case = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 
@@ -301,16 +299,14 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
-        .args(["--stdin-filename", "generated.py"])
-        .arg("-")
-        .pass_stdin(r#"
+    assert_cmd_snapshot!(
+        case.command()
+            .current_dir(case.root())
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "ruff.toml"])
+            .args(["--stdin-filename", "generated.py"])
+            .arg("-")
+            .pass_stdin(r#"
 from test import say_hy
 
 if __name__ == "__main__":
@@ -328,17 +324,14 @@ if __name__ == "__main__":
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
     ");
-    });
 
     Ok(())
 }
 
 #[test]
 fn line_too_long_width_override() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let case = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 line-length = 80
 select = ["E501"]
@@ -348,16 +341,14 @@ max-line-length = 100
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(&ruff_toml)
-        .args(["--stdin-filename", "test.py"])
-        .arg("-")
-        .pass_stdin(r#"
+    assert_cmd_snapshot!(
+        case.command()
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(case.root().join("ruff.toml"))
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"
 # longer than 80, but less than 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
 # longer than 100
@@ -370,11 +361,10 @@ _ = "---------------------------------------------------------------------------
     Found 1 error.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'select' -> 'lint.select'
       - 'pycodestyle' -> 'lint.pycodestyle'
     ");
-    });
 
     Ok(())
 }
