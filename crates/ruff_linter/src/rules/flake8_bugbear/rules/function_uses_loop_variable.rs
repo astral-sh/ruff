@@ -58,10 +58,19 @@ impl Violation for FunctionUsesLoopVariable {
 struct LoadedNamesVisitor<'a> {
     loaded: Vec<&'a ast::ExprName>,
     stored: Vec<&'a ast::ExprName>,
+    lambda_parameters: Vec<&'a str>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        // Don't visit nested function definitions
+        if stmt.is_function_def_stmt() {
+            return;
+        }
+        visitor::walk_stmt(self, stmt);
+    }
+
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(name) => match &name.ctx {
@@ -69,6 +78,15 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
                 ExprContext::Store => self.stored.push(name),
                 _ => {}
             },
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                if let Some(parameters) = parameters {
+                    for param in parameters {
+                        self.lambda_parameters.push(param.name().as_str());
+                    }
+                }
+                // Still visit the lambda body to collect any loaded variables
+                visitor::walk_expr(self, expr);
+            }
             _ => visitor::walk_expr(self, expr),
         }
     }
@@ -88,7 +106,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters, body, ..
             }) => {
-                // Collect all loaded variable names.
+                // Collect all loaded variable names and lambda parameters.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
 
@@ -103,10 +121,16 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
+                        // Check if the variable is a lambda parameter
+                        if visitor.lambda_parameters.contains(&loaded.id.as_str()) {
+                            return false;
+                        }
+
                         true
                     }));
 
-                return;
+                // Continue visiting nested functions
+                visitor::walk_stmt(self, stmt);
             }
             Stmt::Return(ast::StmtReturn {
                 value: Some(value),
@@ -152,6 +176,13 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                     }
                                 }
                             }
+                        } else if attr == "apply" {
+                            // pandas apply is safe like map/filter
+                            for arg in &*arguments.args {
+                                if arg.is_lambda_expr() {
+                                    self.safe_functions.push(arg);
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -172,7 +203,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 node_index: _,
             }) => {
                 if !self.safe_functions.contains(&expr) {
-                    // Collect all loaded variable names.
+                    // Collect all loaded variable names and lambda parameters.
                     let mut visitor = LoadedNamesVisitor::default();
                     visitor.visit_expr(body);
 
@@ -187,6 +218,11 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 .as_ref()
                                 .is_some_and(|parameters| parameters.includes(&loaded.id))
                             {
+                                return false;
+                            }
+
+                            // Check if the variable is a lambda parameter
+                            if visitor.lambda_parameters.contains(&loaded.id.as_str()) {
                                 return false;
                             }
 
