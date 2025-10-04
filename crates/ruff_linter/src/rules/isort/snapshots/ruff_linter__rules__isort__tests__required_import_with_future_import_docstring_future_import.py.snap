@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I002 [*] Missing required import: `import this`
+--> docstring_future_import.py:1:1
+help: Insert required import: `import this`
+1 | "a docstring"
+2 | from __future__ import annotations
+3 + import this
+4 | # EOF
