@@ -132,7 +132,8 @@ impl TypedDictAssignmentKind {
 }
 
 /// Validates assignment of a value to a specific key on a `TypedDict`.
-/// Returns true if the assignment is valid, false otherwise.
+///
+/// Returns true if the assignment is valid, or false otherwise.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
@@ -157,6 +158,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
             Type::string_literal(db, key),
             &items,
         );
+
         return false;
     };
 
@@ -240,13 +242,16 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 }
 
 /// Validates that all required keys are provided in a `TypedDict` construction.
+///
 /// Reports errors for any keys that are required but not provided.
+///
+/// Returns true if the assignment is valid, or false otherwise.
 pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     provided_keys: &OrderSet<&str>,
     error_node: AnyNodeRef<'ast>,
-) {
+) -> bool {
     let db = context.db();
     let items = typed_dict.items(db);
 
@@ -255,7 +260,12 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
         .filter_map(|(key_name, field)| field.is_required().then_some(key_name.as_str()))
         .collect();
 
-    for missing_key in required_keys.difference(provided_keys) {
+    let missing_keys = required_keys.difference(provided_keys);
+
+    let mut has_missing_key = false;
+    for missing_key in missing_keys {
+        has_missing_key = true;
+
         report_missing_typed_dict_key(
             context,
             error_node,
@@ -263,6 +273,8 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
             missing_key,
         );
     }
+
+    !has_missing_key
 }
 
 pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
@@ -373,7 +385,7 @@ fn validate_from_keywords<'db, 'ast>(
     provided_keys
 }
 
-/// Validates a `TypedDict` dictionary literal assignment
+/// Validates a `TypedDict` dictionary literal assignment,
 /// e.g. `person: Person = {"name": "Alice", "age": 30}`
 pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
@@ -381,7 +393,8 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
     dict_expr: &'ast ast::ExprDict,
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
-) -> OrderSet<&'ast str> {
+) -> Result<OrderSet<&'ast str>, OrderSet<&'ast str>> {
+    let mut valid = true;
     let mut provided_keys = OrderSet::new();
 
     // Validate each key-value pair in the dictionary literal
@@ -392,7 +405,8 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
                 provided_keys.insert(key_str);
 
                 let value_type = expression_type_fn(&item.value);
-                validate_typed_dict_key_assignment(
+
+                valid &= validate_typed_dict_key_assignment(
                     context,
                     typed_dict,
                     key_str,
@@ -406,7 +420,11 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
         }
     }
 
-    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
+    valid &= validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 
-    provided_keys
+    if valid {
+        Ok(provided_keys)
+    } else {
+        Err(provided_keys)
+    }
 }

@@ -32,11 +32,11 @@ use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeMapping, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
@@ -1701,10 +1701,6 @@ impl<'db> CallableBinding<'db> {
                             parameter_type =
                                 parameter_type.apply_specialization(db, specialization);
                         }
-                        if let Some(inherited_specialization) = overload.inherited_specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, inherited_specialization);
-                        }
                         union_parameter_types[parameter_index.saturating_sub(skipped_parameters)]
                             .add_in_place(parameter_type);
                     }
@@ -1780,7 +1776,7 @@ impl<'db> CallableBinding<'db> {
     }
 
     /// Returns the index of the matching overload in the form of [`MatchingOverloadIndex`].
-    fn matching_overload_index(&self) -> MatchingOverloadIndex {
+    pub(crate) fn matching_overload_index(&self) -> MatchingOverloadIndex {
         let mut matching_overloads = self.matching_overloads();
         match matching_overloads.next() {
             None => MatchingOverloadIndex::None,
@@ -1798,8 +1794,15 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    /// Returns all overloads for this call binding, including overloads that did not match.
+    pub(crate) fn overloads(&self) -> &[Binding<'db>] {
+        self.overloads.as_slice()
+    }
+
     /// Returns an iterator over all the overloads that matched for this call binding.
-    pub(crate) fn matching_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> {
+    pub(crate) fn matching_overloads(
+        &self,
+    ) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
         self.overloads
             .iter()
             .enumerate()
@@ -1983,7 +1986,7 @@ impl<'db> CallableBinding<'db> {
                     for overload in overloads.iter().take(MAXIMUM_OVERLOADS) {
                         diag.info(format_args!(
                             "  {}",
-                            overload.signature(context.db(), None).display(context.db())
+                            overload.signature(context.db()).display(context.db())
                         ));
                     }
                     if overloads.len() > MAXIMUM_OVERLOADS {
@@ -2030,7 +2033,7 @@ enum OverloadCallReturnType<'db> {
 }
 
 #[derive(Debug)]
-enum MatchingOverloadIndex {
+pub(crate) enum MatchingOverloadIndex {
     /// No matching overloads found.
     None,
 
@@ -2444,7 +2447,6 @@ struct ArgumentTypeChecker<'a, 'db> {
     errors: &'a mut Vec<BindingError<'db>>,
 
     specialization: Option<Specialization<'db>>,
-    inherited_specialization: Option<Specialization<'db>>,
 }
 
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
@@ -2466,7 +2468,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             call_expression_tcx,
             errors,
             specialization: None,
-            inherited_specialization: None,
         }
     }
 
@@ -2498,9 +2499,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn infer_specialization(&mut self) {
-        if self.signature.generic_context.is_none()
-            && self.signature.inherited_generic_context.is_none()
-        {
+        if self.signature.generic_context.is_none() {
             return;
         }
 
@@ -2512,9 +2511,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Some(return_ty) = self.signature.return_ty
             && let Some(call_expression_tcx) = self.call_expression_tcx.annotation
         {
-            // Ignore any specialization errors here, because the type context is only used to
-            // optionally widen the return type.
-            let _ = builder.infer(return_ty, call_expression_tcx);
+            match call_expression_tcx {
+                // A type variable is not a useful type-context for expression inference, and applying it
+                // to the return type can lead to confusing unions in nested generic calls.
+                Type::TypeVar(_) => {}
+
+                _ => {
+                    // Ignore any specialization errors here, because the type context is only used as a hint
+                    // to infer a more assignable return type.
+                    let _ = builder.infer(return_ty, call_expression_tcx);
+                }
+            }
         }
 
         let parameters = self.signature.parameters();
@@ -2542,14 +2549,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         self.specialization = self.signature.generic_context.map(|gc| builder.build(gc));
-        self.inherited_specialization = self.signature.inherited_generic_context.map(|gc| {
-            // The inherited generic context is used when inferring the specialization of a generic
-            // class from a constructor call. In this case (only), we promote any typevars that are
-            // inferred as a literal to the corresponding instance type.
-            builder
-                .build(gc)
-                .apply_type_mapping(self.db, &TypeMapping::PromoteLiterals)
-        });
     }
 
     fn check_argument_type(
@@ -2565,11 +2564,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             if let Some(specialization) = self.specialization {
                 argument_type = argument_type.apply_specialization(self.db, specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, specialization);
-            }
-            if let Some(inherited_specialization) = self.inherited_specialization {
-                argument_type =
-                    argument_type.apply_specialization(self.db, inherited_specialization);
-                expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
             // This is one of the few places where we want to check if there's _any_ specialization
             // where assignability holds; normally we want to check that assignability holds for
@@ -2742,8 +2736,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
-    fn finish(self) -> (Option<Specialization<'db>>, Option<Specialization<'db>>) {
-        (self.specialization, self.inherited_specialization)
+    fn finish(self) -> Option<Specialization<'db>> {
+        self.specialization
     }
 }
 
@@ -2807,10 +2801,6 @@ pub(crate) struct Binding<'db> {
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
 
-    /// The specialization that was inferred for a class method's containing generic class, if it
-    /// is being used to infer a specialization for the class.
-    inherited_specialization: Option<Specialization<'db>>,
-
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -2835,7 +2825,6 @@ impl<'db> Binding<'db> {
             signature_type,
             return_ty: Type::unknown(),
             specialization: None,
-            inherited_specialization: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -2906,14 +2895,9 @@ impl<'db> Binding<'db> {
         checker.infer_specialization();
 
         checker.check_argument_types();
-        (self.specialization, self.inherited_specialization) = checker.finish();
+        self.specialization = checker.finish();
         if let Some(specialization) = self.specialization {
             self.return_ty = self.return_ty.apply_specialization(db, specialization);
-        }
-        if let Some(inherited_specialization) = self.inherited_specialization {
-            self.return_ty = self
-                .return_ty
-                .apply_specialization(db, inherited_specialization);
         }
     }
 
@@ -2925,8 +2909,8 @@ impl<'db> Binding<'db> {
         self.return_ty
     }
 
-    pub(crate) fn inherited_specialization(&self) -> Option<Specialization<'db>> {
-        self.inherited_specialization
+    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
+        self.specialization
     }
 
     /// Returns the bound types for each parameter, in parameter source order, or `None` if no
@@ -2988,7 +2972,6 @@ impl<'db> Binding<'db> {
         BindingSnapshot {
             return_ty: self.return_ty,
             specialization: self.specialization,
-            inherited_specialization: self.inherited_specialization,
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
@@ -2999,7 +2982,6 @@ impl<'db> Binding<'db> {
         let BindingSnapshot {
             return_ty,
             specialization,
-            inherited_specialization,
             argument_matches,
             parameter_tys,
             errors,
@@ -3007,7 +2989,6 @@ impl<'db> Binding<'db> {
 
         self.return_ty = return_ty;
         self.specialization = specialization;
-        self.inherited_specialization = inherited_specialization;
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
@@ -3027,7 +3008,6 @@ impl<'db> Binding<'db> {
     fn reset(&mut self) {
         self.return_ty = Type::unknown();
         self.specialization = None;
-        self.inherited_specialization = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
@@ -3038,7 +3018,6 @@ impl<'db> Binding<'db> {
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     specialization: Option<Specialization<'db>>,
-    inherited_specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
@@ -3078,7 +3057,6 @@ impl<'db> CallableBindingSnapshot<'db> {
                 // ... and update the snapshot with the current state of the binding.
                 snapshot.return_ty = binding.return_ty;
                 snapshot.specialization = binding.specialization;
-                snapshot.inherited_specialization = binding.inherited_specialization;
                 snapshot
                     .argument_matches
                     .clone_from(&binding.argument_matches);
@@ -3326,6 +3304,23 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
+                // Re-infer the argument type of call expressions, ignoring the type context for more
+                // precise error messages.
+                let provided_ty = match Self::get_argument_node(node, *argument_index) {
+                    None => *provided_ty,
+
+                    // Ignore starred arguments, as those are difficult to re-infer.
+                    Some(
+                        ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
+                        | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }),
+                    ) => *provided_ty,
+
+                    Some(
+                        ast::ArgOrKeyword::Arg(value)
+                        | ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }),
+                    ) => infer_isolated_expression(context.db(), context.scope(), value),
+                };
+
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
 
@@ -3373,7 +3368,7 @@ impl<'db> BindingError<'db> {
                             }
                             diag.info(format_args!(
                                 "  {}",
-                                overload.signature(context.db(), None).display(context.db())
+                                overload.signature(context.db()).display(context.db())
                             ));
                         }
                         if overloads.len() > MAXIMUM_OVERLOADS {
@@ -3661,22 +3656,29 @@ impl<'db> BindingError<'db> {
         }
     }
 
-    fn get_node(node: ast::AnyNodeRef, argument_index: Option<usize>) -> ast::AnyNodeRef {
+    fn get_node(node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> ast::AnyNodeRef<'_> {
         // If we have a Call node and an argument index, report the diagnostic on the correct
         // argument node; otherwise, report it on the entire provided node.
+        match Self::get_argument_node(node, argument_index) {
+            Some(ast::ArgOrKeyword::Arg(expr)) => expr.into(),
+            Some(ast::ArgOrKeyword::Keyword(expr)) => expr.into(),
+            None => node,
+        }
+    }
+
+    fn get_argument_node(
+        node: ast::AnyNodeRef<'_>,
+        argument_index: Option<usize>,
+    ) -> Option<ArgOrKeyword<'_>> {
         match (node, argument_index) {
-            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => {
-                match call_node
+            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
+                call_node
                     .arguments
                     .arguments_source_order()
                     .nth(argument_index)
-                    .expect("argument index should not be out of range")
-                {
-                    ast::ArgOrKeyword::Arg(expr) => expr.into(),
-                    ast::ArgOrKeyword::Keyword(keyword) => keyword.into(),
-                }
-            }
-            _ => node,
+                    .expect("argument index should not be out of range"),
+            ),
+            _ => None,
         }
     }
 }
