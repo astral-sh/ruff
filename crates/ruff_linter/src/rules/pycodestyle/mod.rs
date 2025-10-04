@@ -16,7 +16,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::rules::{isort, pycodestyle};
+    use crate::rules::isort;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
@@ -415,9 +415,9 @@ mod tests {
             Path::new("pycodestyle/E501_2.py"),
             &settings::LinterSettings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
-                pycodestyle: pycodestyle::settings::Settings {
+                pycodestyle: Settings {
                     max_line_length: LineLength::try_from(6).unwrap(),
-                    ..pycodestyle::settings::Settings::default()
+                    ..Settings::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },
