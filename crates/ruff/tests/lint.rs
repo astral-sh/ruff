@@ -562,7 +562,7 @@ fn too_many_config_files() -> Result<()> {
     ruff failed
       Cause: You cannot specify more than one configuration file on the command line.
 
-      tip: remove either `--config=<temp_dir>/ruff.toml` or `--config=<temp_dir>/ruff2.toml`.
+      tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
            For more information, try `--help`.
     ");
     Ok(())
@@ -612,8 +612,8 @@ extend = "ruff3.toml"
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load extended configuration `<temp_dir>/ruff3.toml` (`<temp_dir>/ruff.toml` extends `<temp_dir>/ruff2.toml` extends `<temp_dir>/ruff3.toml`)
-          Cause: Failed to read <temp_dir>/ruff3.toml
+          Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
+          Cause: Failed to read [TMP]/ruff3.toml
           Cause: No such file or directory (os error 2)
         ");
 
@@ -652,7 +652,7 @@ extend = "ruff.toml"
 
     ----- stderr -----
     ruff failed
-      Cause: Circular configuration detected: `<temp_dir>/ruff.toml` extends `<temp_dir>/ruff2.toml` extends `<temp_dir>/ruff3.toml` extends `<temp_dir>/ruff.toml`
+      Cause: Circular configuration detected: `[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml` extends `[TMP]/ruff.toml`
     ");
 
     Ok(())
@@ -685,8 +685,8 @@ select = [E501]
 
     ----- stderr -----
     ruff failed
-      Cause: Failed to load extended configuration `<temp_dir>/ruff2.toml` (`<temp_dir>/ruff.toml` extends `<temp_dir>/ruff2.toml`)
-      Cause: Failed to parse <temp_dir>/ruff2.toml
+      Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
+      Cause: Failed to parse [TMP]/ruff2.toml
       Cause: TOML parse error at line 2, column 11
       |
     2 | select = [E501]
@@ -715,7 +715,7 @@ fn config_file_and_isolated() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: The argument `--config=<temp_dir>/ruff.toml` cannot be used with `--isolated`
+      Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
 
       tip: You cannot specify a configuration file and also specify `--isolated`,
            as `--isolated` causes ruff to ignore all configuration files.
@@ -2002,10 +2002,10 @@ requires-python = ">= 3.11"
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/test.py"
+    Resolved settings for: "[TMP]/test.py"
 
     # General Settings
-    cache_dir = "<temp_dir>/.ruff_cache"
+    cache_dir = "[TMP]/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -2050,11 +2050,11 @@ requires-python = ">= 3.11"
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/"
+    file_resolver.project_root = "[TMP]/"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/"
+    linter.project_root = "[TMP]/"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -2077,8 +2077,8 @@ requires-python = ">= 3.11"
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/",
-    	"<temp_dir>/src",
+    	"[TMP]/",
+    	"[TMP]/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -2293,10 +2293,10 @@ requires-python = ">= 3.11"
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/test.py"
+    Resolved settings for: "[TMP]/test.py"
 
     # General Settings
-    cache_dir = "<temp_dir>/.ruff_cache"
+    cache_dir = "[TMP]/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -2342,11 +2342,11 @@ requires-python = ">= 3.11"
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/"
+    file_resolver.project_root = "[TMP]/"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/"
+    linter.project_root = "[TMP]/"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -2369,8 +2369,8 @@ requires-python = ">= 3.11"
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/",
-    	"<temp_dir>/src",
+    	"[TMP]/",
+    	"[TMP]/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -2586,10 +2586,10 @@ requires-python = ">= 3.11"
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/test.py"
+    Resolved settings for: "[TMP]/test.py"
 
     # General Settings
-    cache_dir = "<temp_dir>/.ruff_cache"
+    cache_dir = "[TMP]/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -2634,11 +2634,11 @@ requires-python = ">= 3.11"
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/"
+    file_resolver.project_root = "[TMP]/"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/"
+    linter.project_root = "[TMP]/"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -2661,8 +2661,8 @@ requires-python = ">= 3.11"
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/",
-    	"<temp_dir>/src",
+    	"[TMP]/",
+    	"[TMP]/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -2921,11 +2921,11 @@ from typing import Union;foo: Union[int, str] = 1
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/test.py"
-    Settings path: "<temp_dir>/ruff.toml"
+    Resolved settings for: "[TMP]/test.py"
+    Settings path: "[TMP]/ruff.toml"
 
     # General Settings
-    cache_dir = "<temp_dir>/.ruff_cache"
+    cache_dir = "[TMP]/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -2970,11 +2970,11 @@ from typing import Union;foo: Union[int, str] = 1
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/"
+    file_resolver.project_root = "[TMP]/"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/"
+    linter.project_root = "[TMP]/"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -2997,8 +2997,8 @@ from typing import Union;foo: Union[int, str] = 1
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/",
-    	"<temp_dir>/src",
+    	"[TMP]/",
+    	"[TMP]/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -3267,10 +3267,10 @@ from typing import Union;foo: Union[int, str] = 1
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "<temp_dir>/foo/test.py"
+        Resolved settings for: "[TMP]/foo/test.py"
 
         # General Settings
-        cache_dir = "<temp_dir>/.ruff_cache"
+        cache_dir = "[TMP]/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -3315,11 +3315,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "<temp_dir>/"
+        file_resolver.project_root = "[TMP]/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "<temp_dir>/"
+        linter.project_root = "[TMP]/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -3342,8 +3342,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"<temp_dir>/",
-        	"<temp_dir>/src",
+        	"[TMP]/",
+        	"[TMP]/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -3585,10 +3585,10 @@ from typing import Union;foo: Union[int, str] = 1
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/foo/test.py"
+    Resolved settings for: "[TMP]/foo/test.py"
 
     # General Settings
-    cache_dir = "<temp_dir>/foo/.ruff_cache"
+    cache_dir = "[TMP]/foo/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -3633,11 +3633,11 @@ from typing import Union;foo: Union[int, str] = 1
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/foo"
+    file_resolver.project_root = "[TMP]/foo"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/foo"
+    linter.project_root = "[TMP]/foo"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -3660,8 +3660,8 @@ from typing import Union;foo: Union[int, str] = 1
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/foo",
-    	"<temp_dir>/foo/src",
+    	"[TMP]/foo",
+    	"[TMP]/foo/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -3901,11 +3901,11 @@ from typing import Union;foo: Union[int, str] = 1
         success: true
         exit_code: 0
         ----- stdout -----
-        Resolved settings for: "<temp_dir>/foo/test.py"
-        Settings path: "<temp_dir>/ruff.toml"
+        Resolved settings for: "[TMP]/foo/test.py"
+        Settings path: "[TMP]/ruff.toml"
 
         # General Settings
-        cache_dir = "<temp_dir>/.ruff_cache"
+        cache_dir = "[TMP]/.ruff_cache"
         fix = false
         fix_only = false
         output_format = concise
@@ -3950,11 +3950,11 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         file_resolver.extend_include = []
         file_resolver.respect_gitignore = true
-        file_resolver.project_root = "<temp_dir>/"
+        file_resolver.project_root = "[TMP]/"
 
         # Linter Settings
         linter.exclude = []
-        linter.project_root = "<temp_dir>/"
+        linter.project_root = "[TMP]/"
         linter.rules.enabled = [
         	non-pep604-annotation-union (UP007),
         ]
@@ -3977,8 +3977,8 @@ from typing import Union;foo: Union[int, str] = 1
         linter.logger_objects = []
         linter.namespace_packages = []
         linter.src = [
-        	"<temp_dir>/",
-        	"<temp_dir>/src",
+        	"[TMP]/",
+        	"[TMP]/src",
         ]
         linter.tab_size = 4
         linter.line_length = 88
@@ -4184,11 +4184,11 @@ from typing import Union;foo: Union[int, str] = 1
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/foo/test.py"
-    Settings path: "<temp_dir>/ruff.toml"
+    Resolved settings for: "[TMP]/foo/test.py"
+    Settings path: "[TMP]/ruff.toml"
 
     # General Settings
-    cache_dir = "<temp_dir>/.ruff_cache"
+    cache_dir = "[TMP]/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -4233,11 +4233,11 @@ from typing import Union;foo: Union[int, str] = 1
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/"
+    file_resolver.project_root = "[TMP]/"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/"
+    linter.project_root = "[TMP]/"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -4260,8 +4260,8 @@ from typing import Union;foo: Union[int, str] = 1
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/",
-    	"<temp_dir>/src",
+    	"[TMP]/",
+    	"[TMP]/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -4511,11 +4511,11 @@ from typing import Union;foo: Union[int, str] = 1
     success: true
     exit_code: 0
     ----- stdout -----
-    Resolved settings for: "<temp_dir>/test.py"
-    Settings path: "<temp_dir>/ruff.toml"
+    Resolved settings for: "[TMP]/test.py"
+    Settings path: "[TMP]/ruff.toml"
 
     # General Settings
-    cache_dir = "<temp_dir>/.ruff_cache"
+    cache_dir = "[TMP]/.ruff_cache"
     fix = false
     fix_only = false
     output_format = concise
@@ -4560,11 +4560,11 @@ from typing import Union;foo: Union[int, str] = 1
     ]
     file_resolver.extend_include = []
     file_resolver.respect_gitignore = true
-    file_resolver.project_root = "<temp_dir>/"
+    file_resolver.project_root = "[TMP]/"
 
     # Linter Settings
     linter.exclude = []
-    linter.project_root = "<temp_dir>/"
+    linter.project_root = "[TMP]/"
     linter.rules.enabled = [
     	non-pep604-annotation-union (UP007),
     ]
@@ -4587,8 +4587,8 @@ from typing import Union;foo: Union[int, str] = 1
     linter.logger_objects = []
     linter.namespace_packages = []
     linter.src = [
-    	"<temp_dir>/",
-    	"<temp_dir>/src",
+    	"[TMP]/",
+    	"[TMP]/src",
     ]
     linter.tab_size = 4
     linter.line_length = 88
@@ -4920,8 +4920,8 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Failed to load configuration `<temp_dir>/ruff.toml`
-      Cause: Failed to parse <temp_dir>/ruff.toml
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Failed to parse [TMP]/ruff.toml
       Cause: TOML parse error at line 2, column 17
       |
     2 | "module.name" = "invalid.alias"
@@ -4955,8 +4955,8 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
 
     ----- stderr -----
     ruff failed
-      Cause: Failed to load configuration `<temp_dir>/ruff.toml`
-      Cause: Failed to parse <temp_dir>/ruff.toml
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Failed to parse [TMP]/ruff.toml
       Cause: TOML parse error at line 2, column 17
       |
     2 | "module.name" = "__debug__"
@@ -4990,8 +4990,8 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Failed to load configuration `<temp_dir>/ruff.toml`
-      Cause: Failed to parse <temp_dir>/ruff.toml
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Failed to parse [TMP]/ruff.toml
       Cause: TOML parse error at line 2, column 1
       |
     2 | "module..invalid" = "alias"
