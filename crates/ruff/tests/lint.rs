@@ -1034,18 +1034,16 @@ fn deprecated_config_option_overridden_via_cli() {
 
 #[test]
 fn extension() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::new()?;
+    fixture.write_file(
+        "ruff.toml",
         r#"
 include = ["*.ipy"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.ipy"),
+    fixture.write_file(
+        "main.ipy",
         r#"
 {
  "cells": [
@@ -1085,13 +1083,10 @@ include = ["*.ipy"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
         .arg("."), @r"
     success: false
@@ -1103,7 +1098,6 @@ include = ["*.ipy"]
 
     ----- stderr -----
     ");
-    });
 
     Ok(())
 }
@@ -1128,23 +1122,19 @@ print("Hello world!")
 
 #[test]
 fn file_noqa_external() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 [lint]
 external = ["AAA"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"
 # flake8: noqa: AAA101, BBB102
@@ -1160,7 +1150,6 @@ import os
     ----- stderr -----
     warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
     ");
-    });
 
     Ok(())
 }
@@ -1169,22 +1158,21 @@ import os
 fn required_version_exact_mismatch() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
         r#"
 required-version = "0.1.0"
 "#,
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+        filters => vec![(version, "[VERSION]")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"
 import os
@@ -1206,11 +1194,9 @@ import os
 fn required_version_exact_match() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
-        format!(
+    let fixture = RuffTestFixture::with_file(
+        "ruff.toml",
+        &format!(
             r#"
 required-version = "{version}"
 "#
@@ -1218,12 +1204,13 @@ required-version = "{version}"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+        filters => vec![(version, "[VERSION]")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(fixture
+        .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"
 import os
