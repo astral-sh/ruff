@@ -136,3 +136,22 @@ help: Add trailing slash
    -     path("also-bad", views.also_bad_view),  # DJ014
 39 +     path("also-bad/", views.also_bad_view),  # DJ014
 40 | ]
+41 | 
+42 | # Error - missing trail slash and argument should stay in message
+
+DJ014 [*] URL route `bad/<slug:slug>` is missing a trailing slash
+  --> DJ014.py:44:10
+   |
+42 | # Error - missing trail slash and argument should stay in message
+43 | urlpatterns_params_bad = [
+44 |     path("bad/<slug:slug>", views.bad_view),  # DJ014
+   |          ^^^^^^^^^^^^^^^^^
+45 | ]
+   |
+help: Add trailing slash
+41 | 
+42 | # Error - missing trail slash and argument should stay in message
+43 | urlpatterns_params_bad = [
+   -     path("bad/<slug:slug>", views.bad_view),  # DJ014
+44 +     path("bad/<slug:slug>/", views.bad_view),  # DJ014
+45 | ]
