@@ -91,7 +91,6 @@ mod tests {
     #[test_case(Rule::IsLiteral, Path::new("F632.py"))]
     #[test_case(Rule::InvalidPrintSyntax, Path::new("F633.py"))]
     #[test_case(Rule::IfTuple, Path::new("F634.py"))]
-    #[test_case(Rule::BreakOutsideLoop, Path::new("F701.py"))]
     #[test_case(Rule::ContinueOutsideLoop, Path::new("F702.py"))]
     #[test_case(Rule::YieldOutsideFunction, Path::new("F704.py"))]
     #[test_case(Rule::ReturnOutsideFunction, Path::new("F706.py"))]

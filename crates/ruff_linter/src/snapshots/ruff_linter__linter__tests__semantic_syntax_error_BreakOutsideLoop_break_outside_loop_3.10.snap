@@ -1,0 +1,37 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: `break` outside loop
+ --> <filename>:5:5
+  |
+3 |     break
+4 | else:
+5 |     break
+  |     ^^^^^
+6 |
+7 | i = 0
+  |
+
+invalid-syntax: `break` outside loop
+  --> <filename>:17:5
+   |
+15 |         break
+16 |
+17 |     break
+   |     ^^^^^
+   |
+
+invalid-syntax: `break` outside loop
+  --> <filename>:21:5
+   |
+20 | class Foo:
+21 |     break
+   |     ^^^^^
+   |
+
+invalid-syntax: `break` outside loop
+  --> <filename>:24:1
+   |
+24 | break
+   | ^^^^^
+   |

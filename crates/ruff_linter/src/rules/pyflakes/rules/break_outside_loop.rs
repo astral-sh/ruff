@@ -29,28 +29,3 @@ impl Violation for BreakOutsideLoop {
         "`break` outside loop".to_string()
     }
 }
-
-/// F701
-pub(crate) fn break_outside_loop<'a>(
-    checker: &Checker,
-    stmt: &'a Stmt,
-    parents: &mut impl Iterator<Item = &'a Stmt>,
-) {
-    let mut child = stmt;
-    for parent in parents {
-        match parent {
-            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                if !orelse.contains(child) {
-                    return;
-                }
-            }
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
-                break;
-            }
-            _ => {}
-        }
-        child = parent;
-    }
-
-    checker.report_diagnostic(BreakOutsideLoop, stmt.range());
-}

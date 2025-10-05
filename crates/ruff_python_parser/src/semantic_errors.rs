@@ -35,30 +35,11 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
-    loop_stack: Vec<LoopContext>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct LoopContext {
-    inside_orelse: bool,
 }
 
 impl SemanticSyntaxChecker {
     pub fn new() -> Self {
         Self::default()
-    }
-    fn in_loop_context(&self) -> bool {
-        self.loop_stack.iter().any(|ctx| !ctx.inside_orelse)
-    }
-    fn enter_loop_orelse(&mut self) {
-        if let Some(ctx) = self.loop_stack.last_mut() {
-            ctx.inside_orelse = true;
-        }
-    }
-    fn exit_loop_orelse(&mut self) {
-        if let Some(ctx) = self.loop_stack.last_mut() {
-            ctx.inside_orelse = false;
-        }
     }
 }
 
@@ -244,16 +225,7 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::Break(ast::StmtBreak { range, .. }) => {
-                // test_ok break_outside_loop_in_function
-                // def f():
-                //     if True:
-                //         break
-
-                // test_err break_outside_loop
-                // break
-                // if True:
-                //     break
-                if !self.in_loop_context() {
+                if !ctx.in_loop_context() {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
                 }
             }
@@ -701,23 +673,7 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                self.loop_stack.push(LoopContext {
-                    inside_orelse: false,
-                });
-                for stmt in body {
-                    self.visit_stmt(stmt, ctx);
-                }
-                if !orelse.is_empty() {
-                    self.enter_loop_orelse();
-                    for stmt in orelse {
-                        self.visit_stmt(stmt, ctx);
-                    }
-                    self.exit_loop_orelse();
-                }
-                self.loop_stack.pop();
-            }
+
             Stmt::FunctionDef(_) => {
                 self.seen_futures_boundary = true;
             }
@@ -2038,6 +1994,8 @@ pub trait SemanticSyntaxContext {
     fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
+
+    fn in_loop_context(&self) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
