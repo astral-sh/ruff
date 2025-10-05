@@ -12,7 +12,7 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr,
+    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
     InterpolatedStringElement, MatchCase, Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
@@ -1219,6 +1219,8 @@ impl Truthiness {
         F: Fn(&str) -> bool,
     {
         match expr {
+            Expr::Lambda(_) => Self::Truthy,
+            Expr::Generator(_) => Self::Truthy,
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if value.is_empty() {
                     Self::Falsey
@@ -1388,7 +1390,9 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::FString(f_string) => is_non_empty_f_string(f_string),
             // These literals may or may not be empty.
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+            // Confusingly, f"{b""}" renders as the string 'b""', which is non-empty.
+            // Therefore, any bytes interpolation is guaranteed non-empty when stringified.
+            Expr::BytesLiteral(_) => true,
         }
     }
 
@@ -1397,7 +1401,11 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
+                InterpolatedStringElement::Interpolation(f_string) => {
+                    f_string.debug_text.is_some()
+                        || !matches!(f_string.conversion, ast::ConversionFlag::None)
+                        || inner(&f_string.expression)
+                }
             })
         }
     })
@@ -1493,7 +1501,7 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
     ast::ExprBinOp {
         left: Box::new(expr.clone()),
         op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        right: Box::new(Expr::NoneLiteral(ExprNoneLiteral::default())),
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
     }
@@ -1647,9 +1655,12 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        AtomicNodeIndex, Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number,
-        Stmt, StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
-        TypeParamTypeVarTuple, TypeParams,
+        AtomicNodeIndex, BytesLiteral, ConversionFlag, DebugText, Expr, ExprBytesLiteral,
+        ExprContext, ExprFString, ExprGenerator, ExprLambda, ExprName, ExprNoneLiteral,
+        ExprNumberLiteral, ExprStringLiteral, FString, Identifier, Int, InterpolatedElement,
+        InterpolatedStringElement, InterpolatedStringElements, Number, Stmt, StmtTypeAlias,
+        StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+        TypeParams,
     };
 
     #[test]
@@ -1683,6 +1694,120 @@ mod tests {
         assert_eq!(
             resolve_imported_module_path(2, Some("foo"), Some(&["bar".to_string()])),
             None
+        );
+    }
+
+    #[test]
+    fn truthiness_lambda_is_truthy() {
+        let expr = Expr::Lambda(ExprLambda {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            parameters: None,
+            body: Box::new(Expr::NoneLiteral(ExprNoneLiteral::default())),
+        });
+        assert_eq!(
+            super::Truthiness::from_expr(&expr, |_| true),
+            super::Truthiness::Truthy
+        );
+    }
+
+    #[test]
+    fn truthiness_generator_is_truthy() {
+        let expr = Expr::Generator(ExprGenerator {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            elt: Box::new(Expr::NumberLiteral(ExprNumberLiteral {
+                value: Number::Int(Int::ONE),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+            })),
+            generators: vec![],
+            parenthesized: true,
+        });
+        assert_eq!(
+            super::Truthiness::from_expr(&expr, |_| true),
+            super::Truthiness::Truthy
+        );
+    }
+
+    #[test]
+    fn truthiness_fstring_with_bytes_is_truthy() {
+        // Build f"{b''}" which should be non-empty when stringified
+        let interpolation = InterpolatedElement {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            expression: Box::new(Expr::BytesLiteral(ExprBytesLiteral {
+                node_index: AtomicNodeIndex::NONE,
+                range: TextRange::default(),
+                value: crate::BytesLiteralValue::single(BytesLiteral {
+                    range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
+                    value: Vec::<u8>::new().into_boxed_slice(),
+                    flags: crate::BytesLiteralFlags::empty(),
+                }),
+            })),
+            debug_text: None,
+            conversion: ConversionFlag::None,
+            format_spec: None,
+        };
+        let fstring = FString {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            elements: InterpolatedStringElements::from(vec![
+                InterpolatedStringElement::Interpolation(interpolation),
+            ]),
+            flags: crate::FStringFlags::empty(),
+        };
+        let expr = Expr::FString(ExprFString {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            value: crate::FStringValue::single(fstring),
+        });
+        assert_eq!(
+            super::Truthiness::from_expr(&expr, |_| true),
+            super::Truthiness::Truthy
+        );
+    }
+
+    #[test]
+    fn truthiness_fstring_with_debug_text_is_truthy() {
+        // Build f"{x=}" which is guaranteed non-empty due to debug text
+        let interpolation = InterpolatedElement {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            expression: Box::new(Expr::StringLiteral(ExprStringLiteral {
+                node_index: AtomicNodeIndex::NONE,
+                range: TextRange::default(),
+                value: crate::StringLiteralValue::single(StringLiteral {
+                    range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
+                    value: String::new().into_boxed_str(),
+                    flags: crate::StringLiteralFlags::empty(),
+                }),
+            })),
+            debug_text: Some(DebugText {
+                leading: String::new(),
+                trailing: String::new(),
+            }),
+            conversion: ConversionFlag::None,
+            format_spec: None,
+        };
+        let fstring = FString {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            elements: InterpolatedStringElements::from(vec![
+                InterpolatedStringElement::Interpolation(interpolation),
+            ]),
+            flags: crate::FStringFlags::empty(),
+        };
+        let expr = Expr::FString(ExprFString {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            value: crate::FStringValue::single(fstring),
+        });
+        assert_eq!(
+            super::Truthiness::from_expr(&expr, |_| true),
+            super::Truthiness::Truthy
         );
     }
 
