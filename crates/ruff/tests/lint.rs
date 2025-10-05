@@ -2,24 +2,33 @@
 
 #![cfg(not(target_family = "wasm"))]
 
-mod test_fixture;
-
-use std::fs;
+use regex::escape;
 use std::process::Command;
+use std::str;
+use std::{fs, path::Path};
 
 use anyhow::Result;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use tempfile::TempDir;
+
+mod test_fixture;
 
 use test_fixture::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
+}
+
 #[test]
 fn top_level_options() -> Result<()> {
-    let case = RuffTestFixture::with_file(
-        "ruff.toml",
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
         r#"
 extend-select = ["B", "Q"]
 
@@ -28,28 +37,31 @@ inline-quotes = "single"
 "#,
     )?;
 
-    assert_cmd_snapshot!(
-        case.command()
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
-            .arg(case.root().join("ruff.toml"))
+            .arg(&ruff_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
             .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-    test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
-    [*] 2 fixable with the `--fix` option.
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
+        test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
+        test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
+        Found 3 errors.
+        [*] 2 fixable with the `--fix` option.
 
-    ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
-      - 'flake8-quotes' -> 'lint.flake8-quotes'
-    ");
+        ----- stderr -----
+        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
+          - 'extend-select' -> 'lint.extend-select'
+          - 'flake8-quotes' -> 'lint.flake8-quotes'
+        ");
+    });
 
     Ok(())
 }
@@ -92,8 +104,10 @@ inline-quotes = "single"
 /// Tests that configurations from the top-level and `lint` section are merged together.
 #[test]
 fn mixed_levels() -> Result<()> {
-    let case = RuffTestFixture::with_file(
-        "ruff.toml",
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
         r#"
 extend-select = ["B", "Q"]
 
@@ -102,13 +116,15 @@ inline-quotes = "single"
 "#,
     )?;
 
-    assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(case.root().join("ruff.toml"))
-            .arg("-")
-            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -119,9 +135,10 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
     ");
+    });
 
     Ok(())
 }
@@ -129,8 +146,10 @@ inline-quotes = "single"
 /// Tests that options in the `lint` section have higher precedence than top-level options (because they are more specific).
 #[test]
 fn precedence() -> Result<()> {
-    let case = RuffTestFixture::with_file(
-        "ruff.toml",
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
         r#"
 [lint]
 extend-select = ["B", "Q"]
@@ -143,13 +162,15 @@ inline-quotes = "single"
 "#,
     )?;
 
-    assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(case.root().join("ruff.toml"))
-            .arg("-")
-            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -160,9 +181,10 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'flake8-quotes' -> 'lint.flake8-quotes'
     ");
+    });
 
     Ok(())
 }
@@ -323,8 +345,10 @@ if __name__ == "__main__":
 
 #[test]
 fn line_too_long_width_override() -> Result<()> {
-    let case = RuffTestFixture::with_file(
-        "ruff.toml",
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
         r#"
 line-length = 80
 select = ["E501"]
@@ -334,14 +358,16 @@ max-line-length = 100
 "#,
     )?;
 
-    assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(case.root().join("ruff.toml"))
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"
 # longer than 80, but less than 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
 # longer than 100
@@ -354,10 +380,11 @@ _ = "---------------------------------------------------------------------------
     Found 1 error.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'select' -> 'lint.select'
       - 'pycodestyle' -> 'lint.pycodestyle'
     ");
+    });
 
     Ok(())
 }
