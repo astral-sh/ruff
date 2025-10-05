@@ -1,9 +1,6 @@
-use ruff_python_ast::{self as ast, Stmt};
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
 
-use crate::{Violation, checkers::ast::Checker};
+use crate::Violation;
 
 /// ## What it does
 /// Checks for `break` statements outside of loops.

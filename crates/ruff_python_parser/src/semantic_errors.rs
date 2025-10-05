@@ -1360,10 +1360,7 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1381,10 +1378,7 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1512,6 +1506,7 @@ pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
 
+    /// Represents the use of a `break` statement outside of a loop.
     BreakOutsideLoop,
 }
 
