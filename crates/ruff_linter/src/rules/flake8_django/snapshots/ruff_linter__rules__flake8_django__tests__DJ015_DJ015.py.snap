@@ -197,6 +197,7 @@ help: Remove leading slash
 46 +     path('''triple-single/''', views.triple_single_view),  # DJ015
 47 |     path("""/triple-double/""", views.triple_double_view),  # DJ015
 48 | ]
+49 | 
 
 DJ015 [*] URL route `/triple-double/` has an unnecessary leading slash
   --> DJ015.py:47:10
@@ -214,3 +215,22 @@ help: Remove leading slash
    -     path("""/triple-double/""", views.triple_double_view),  # DJ015
 47 +     path("""triple-double/""", views.triple_double_view),  # DJ015
 48 | ]
+49 | 
+50 | # Error - leading trail slash and argument should stay in message
+
+DJ015 [*] URL route `/bad/<slug:slug>/` has an unnecessary leading slash
+  --> DJ015.py:52:10
+   |
+50 | # Error - leading trail slash and argument should stay in message
+51 | urlpatterns_params_bad = [
+52 |     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
+   |          ^^^^^^^^^^^^^^^^^^^
+53 | ]
+   |
+help: Remove leading slash
+49 | 
+50 | # Error - leading trail slash and argument should stay in message
+51 | urlpatterns_params_bad = [
+   -     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
+52 +     path("bad/<slug:slug>/", views.bad_view),  # DJ015
+53 | ]

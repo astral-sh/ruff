@@ -38,3 +38,8 @@ urlpatterns_mixed = [
     path("also-good/", views.also_good_view),
     path("also-bad", views.also_bad_view),  # DJ014
 ]
+
+# Error - missing trail slash and argument should stay in message
+urlpatterns_params_bad = [
+    path("bad/<slug:slug>", views.bad_view),  # DJ014
+]
