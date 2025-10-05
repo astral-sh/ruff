@@ -1,10 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks that all Django URL route definitions using `django.urls.path()`
@@ -47,11 +47,15 @@ pub(crate) struct DjangoURLPathWithoutTrailingSlash {
     url_pattern: String,
 }
 
-impl Violation for DjangoURLPathWithoutTrailingSlash {
+impl AlwaysFixableViolation for DjangoURLPathWithoutTrailingSlash {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DjangoURLPathWithoutTrailingSlash { url_pattern } = self;
         format!("URL route `{url_pattern}` is missing a trailing slash")
+    }
+
+    fn fix_title(&self) -> String {
+        "Add trailing slash".to_string()
     }
 }
 
@@ -94,11 +98,35 @@ pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::Exp
         }
 
         // Report diagnostic for routes without trailing slash
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             DjangoURLPathWithoutTrailingSlash {
                 url_pattern: route.to_string(),
             },
             route_arg.range(),
         );
+
+        // Generate fix: add trailing slash to the string content
+        // We need to find the position of the closing quote and insert "/" before it
+        let string_range = route_arg.range();
+        let locator = checker.locator();
+        let string_content = locator.slice(string_range);
+
+        // Find the closing quote(s) by working backwards from the end
+        // Handle both single quotes, double quotes, and their triple variants
+        let quote_len = if string_content.ends_with("'''") || string_content.ends_with("\"\"\"") {
+            3
+        } else if string_content.ends_with('\'') || string_content.ends_with('"') {
+            1
+        } else {
+            // Shouldn't happen for a valid string literal
+            return;
+        };
+
+        // Insert "/" before the closing quote(s)
+        let insertion_point = string_range.end() - TextSize::new(quote_len);
+        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+            "/".to_string(),
+            insertion_point,
+        )));
     }
 }
