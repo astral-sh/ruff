@@ -136,7 +136,7 @@ impl RuffTestFixture {
     /// Returns a regex filter pattern for replacing temporary directory paths in snapshots.
     ///
     /// This provides the tempdir filter pattern that can be used in
-    /// insta::with_settings! filters array for tests that need custom filtering
+    /// `insta::with_settings!` filters array for tests that need custom filtering
     /// beyond what the global fixture filters provide.
     ///
     /// # Example
