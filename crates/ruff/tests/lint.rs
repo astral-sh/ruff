@@ -5,11 +5,9 @@
 mod test_fixture;
 
 use std::fs;
-use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
-use regex::escape;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 
@@ -17,12 +15,6 @@ use test_fixture::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
-
-fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    let path_str = path.as_ref().to_str().unwrap();
-    // Escape the full path and handle both forward and backward slashes for Windows compatibility
-    format!(r"{}[/\\]?", escape(path_str).replace(r"\\", r"[/\\]"))
-}
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -5783,7 +5775,7 @@ match 42:  # invalid-syntax
 
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(fixture.root()).as_str(), "[TMP]/"),
+            (fixture.tempdir_filter().as_str(), "[TMP]/"),
             (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
             (ruff_linter::VERSION, "[VERSION]"),
         ]
@@ -5900,6 +5892,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
 
     insta::with_settings!({
         filters => vec![
+            (fixture.tempdir_filter().as_str(), "[TMP]/"),
             (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {
@@ -5940,6 +5933,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     insta::with_settings!({
         filters => vec![
+            (fixture.tempdir_filter().as_str(), "[TMP]/"),
             (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
         ]
     }, {

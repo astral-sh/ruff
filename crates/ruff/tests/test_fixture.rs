@@ -20,9 +20,7 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    let path_str = path.as_ref().to_str().unwrap();
-    // Escape the full path and handle both forward and backward slashes for Windows compatibility
-    format!(r"{}[/\\]?", escape(path_str).replace(r"\\", r"[/\\]"))
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -133,6 +131,28 @@ impl RuffTestFixture {
     /// Returns the path to the test directory root.
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
+    }
+
+    /// Returns a regex filter pattern for replacing temporary directory paths in snapshots.
+    ///
+    /// This provides the tempdir filter pattern that can be used in
+    /// insta::with_settings! filters array for tests that need custom filtering
+    /// beyond what the global fixture filters provide.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// insta::with_settings!({
+    ///     filters => vec![
+    ///         (fixture.tempdir_filter().as_str(), "[TMP]/"),
+    ///         (r"some_other_pattern", "replacement")
+    ///     ]
+    /// }, {
+    ///     assert_cmd_snapshot!(fixture.command().args(["check", "."]));
+    /// });
+    /// ```
+    pub(crate) fn tempdir_filter(&self) -> String {
+        tempdir_filter(self.root())
     }
 
     /// Creates a pre-configured ruff command for testing.
