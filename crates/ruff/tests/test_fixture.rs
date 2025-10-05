@@ -22,9 +22,8 @@ const BIN_NAME: &str = "ruff";
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
     let path_str = path.as_ref().to_str().unwrap();
 
-    // Handle Windows UNC paths like \\?\C:\... by normalizing to regular paths
+    // Strip UNC prefix if present to normalize the path
     let normalized_path = if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
-        // Strip the UNC prefix and use the regular path
         stripped
     } else {
         path_str
@@ -34,7 +33,10 @@ pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
     let escaped_path = escape(normalized_path);
     // Replace literal backslashes in the escaped pattern with a character class that matches both
     let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
-    format!(r"{cross_platform_pattern}[\\/]?")
+
+    // Always add optional UNC prefix to match both \\?\C:\... and C:\... patterns
+    // This ensures compatibility regardless of whether input or output contains UNC prefix
+    format!(r"(?:[\\/][\\/]\?[\\/])?{cross_platform_pattern}[\\/]?")
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
