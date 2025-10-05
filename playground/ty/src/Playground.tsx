@@ -100,6 +100,10 @@ export default function Playground() {
       setError("File names cannot start with '/'.");
       return;
     }
+    if (newName.startsWith("vendored:")) {
+      setError("File names cannot start with 'vendored:'.");
+      return;
+    }
 
     const handle = files.handles[file];
     let newHandle: FileHandle | null = null;
