@@ -2886,6 +2886,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
     let fixture = RuffTestFixture::new()?;
+    eprintln!("DEBUG: Fixture root path: {:?}", fixture.root());
     fixture.write_file(
         "ruff.toml",
         r#"[lint]
