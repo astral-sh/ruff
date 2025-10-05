@@ -46,3 +46,8 @@ urlpatterns_quotes = [
     path('''/triple-single/''', views.triple_single_view),  # DJ015
     path("""/triple-double/""", views.triple_double_view),  # DJ015
 ]
+
+# Error - leading trail slash and argument should stay in message
+urlpatterns_params_bad = [
+    path("/bad/<slug:slug>/", views.bad_view),  # DJ015
+]
