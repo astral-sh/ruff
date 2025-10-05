@@ -2436,6 +2436,16 @@ requires-python = ">= 3.11"
         	str,
         	bytes,
         ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
+        ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
         linter.pylint.max_positional_args = 5
@@ -3063,6 +3073,16 @@ requires-python = ">= 3.11"
         	str,
         	bytes,
         ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
+        ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
         linter.pylint.max_positional_args = 5
@@ -3427,6 +3447,16 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_value_types = [
         	str,
         	bytes,
+        ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3809,6 +3839,16 @@ from typing import Union;foo: Union[int, str] = 1
         	str,
         	bytes,
         ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
+        ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
         linter.pylint.max_positional_args = 5
@@ -4137,6 +4177,16 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_value_types = [
         	str,
         	bytes,
+        ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4467,6 +4517,16 @@ from typing import Union;foo: Union[int, str] = 1
         	str,
         	bytes,
         ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
+        ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
         linter.pylint.max_positional_args = 5
@@ -4752,6 +4812,16 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_value_types = [
         	str,
         	bytes,
+        ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -5091,6 +5161,16 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_value_types = [
         	str,
         	bytes,
+        ]
+        linter.pylint.allow_magic_values = [
+        	0,
+        	1,
+        	-1,
+        	0.0,
+        	1.0,
+        	-1.0,
+        	"",
+        	"__main__",
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
