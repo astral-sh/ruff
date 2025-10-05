@@ -23,9 +23,9 @@ pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
     let path_str = path.as_ref().to_str().unwrap();
 
     // Handle Windows UNC paths like \\?\C:\... by normalizing to regular paths
-    let normalized_path = if path_str.starts_with(r"\\?\") {
+    let normalized_path = if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
         // Strip the UNC prefix and use the regular path
-        &path_str[4..]
+        stripped
     } else {
         path_str
     };
@@ -34,7 +34,7 @@ pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
     let escaped_path = escape(normalized_path);
     // Replace literal backslashes in the escaped pattern with a character class that matches both
     let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
-    format!(r"{}[\\/]?", cross_platform_pattern)
+    format!(r"{cross_platform_pattern}[\\/]?")
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
