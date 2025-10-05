@@ -20,7 +20,12 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
+    let path_str = path.as_ref().to_str().unwrap();
+    // Escape the path and create a pattern that matches both forward and back slashes
+    let escaped_path = escape(path_str);
+    // Replace literal backslashes in the escaped pattern with a character class that matches both
+    let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
+    format!(r"{}[\\/]?", cross_platform_pattern)
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
