@@ -90,9 +90,7 @@ pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::Exp
             return;
         }
 
-        // Skip route parameters (routes with angle brackets like "<int:id>")
-        // These are often at the end and shouldn't require trailing slashes
-        // Also skip routes that are just "/" or already end with "/"
+        // Skip routes that are just "/" or already end with "/"
         if route == "/" || route.ends_with('/') {
             return;
         }
@@ -105,25 +103,19 @@ pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::Exp
             route_arg.range(),
         );
 
-        // Generate fix: add trailing slash to the string content
-        // We need to find the position of the closing quote and insert "/" before it
-        let string_range = route_arg.range();
-        let locator = checker.locator();
-        let string_content = locator.slice(string_range);
-
-        // Find the closing quote(s) by working backwards from the end
-        // Handle both single quotes, double quotes, and their triple variants
+        // Determine the quote style to find the insertion point for the slash
+        // (just before the closing quotes)
+        let string_content = checker.locator().slice(route_arg.range());
         let quote_len = if string_content.ends_with("'''") || string_content.ends_with("\"\"\"") {
             3
         } else if string_content.ends_with('\'') || string_content.ends_with('"') {
             1
         } else {
-            // Shouldn't happen for a valid string literal
-            return;
+            return; // Invalid string format
         };
 
-        // Insert "/" before the closing quote(s)
-        let insertion_point = string_range.end() - TextSize::new(quote_len);
+        // Insert "/" just before the closing quote(s)
+        let insertion_point = route_arg.range().end() - TextSize::new(quote_len);
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             "/".to_string(),
             insertion_point,
