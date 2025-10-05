@@ -21,8 +21,17 @@ const BIN_NAME: &str = "ruff";
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
     let path_str = path.as_ref().to_str().unwrap();
-    // Escape the path and create a pattern that matches both forward and back slashes
-    let escaped_path = escape(path_str);
+
+    // Handle Windows UNC paths like \\?\C:\... by normalizing to regular paths
+    let normalized_path = if path_str.starts_with(r"\\?\") {
+        // Strip the UNC prefix and use the regular path
+        &path_str[4..]
+    } else {
+        path_str
+    };
+
+    // Escape the normalized path
+    let escaped_path = escape(normalized_path);
     // Replace literal backslashes in the escaped pattern with a character class that matches both
     let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
     format!(r"{}[\\/]?", cross_platform_pattern)
