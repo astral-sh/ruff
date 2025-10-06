@@ -115,7 +115,7 @@ AIR301 `airflow.datasets.DatasetEvent` is removed in Airflow 3.0
 51 | DatasetEvent()
    | ^^^^^^^^^^^^
    |
-help: It has been made private in Airflow 3. An AssetEvent type will be added to the apache-airflow-task-sdk in a future version.
+help: `DatasetEvent` has been made private in Airflow 3. Use `dict[str, Any]` for the time being. An `AssetEvent` type will be added to the apache-airflow-task-sdk in a future version.
 
 AIR301 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
   --> AIR301_names.py:55:1
