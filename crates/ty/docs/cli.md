@@ -69,7 +69,7 @@ over all configuration files.</p>
 <p>All <code>pyproject.toml</code> files will be discovered by walking up the directory tree from the given project directory, as will the project's virtual environment (<code>.venv</code>) unless the <code>venv-path</code> option is set.</p>
 <p>Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.</p>
 </dd><dt id="ty-check--python"><a href="#ty-check--python"><code>--python</code></a>, <code>--venv</code> <i>path</i></dt><dd><p>Path to your project's Python environment or interpreter.</p>
-<p>Ty uses your Python environment to resolve third-party imports in your code.</p>
+<p>ty uses your Python environment to resolve third-party imports in your code.</p>
 <p>If you're using a project management tool such as uv or you have an activated Conda or virtual environment, you should not generally need to specify this option.</p>
 <p>This option can be used to point to virtual or system Python environments.</p>
 </dd><dt id="ty-check--python-platform"><a href="#ty-check--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types.</p>
