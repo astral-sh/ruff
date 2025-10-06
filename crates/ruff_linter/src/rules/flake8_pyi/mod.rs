@@ -132,10 +132,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -149,7 +146,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 pep8_naming: pep8_naming::settings::Settings {
                     classmethod_decorators: vec!["foo_classmethod".to_string()],
                     ..pep8_naming::settings::Settings::default()
@@ -189,7 +185,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
@@ -202,13 +197,10 @@ mod tests {
     fn pyi021_pie790_isolation_check(path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rules([
-                    Rule::DocstringInStub,
-                    Rule::UnnecessaryPlaceholder,
-                ])
-            },
+            &settings::LinterSettings::for_rules([
+                Rule::DocstringInStub,
+                Rule::UnnecessaryPlaceholder,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

@@ -26,35 +26,32 @@ mod tests {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rules(vec![
-                    Rule::OsPathAbspath,
-                    Rule::OsChmod,
-                    Rule::OsMkdir,
-                    Rule::OsMakedirs,
-                    Rule::OsRename,
-                    Rule::OsReplace,
-                    Rule::OsRmdir,
-                    Rule::OsRemove,
-                    Rule::OsUnlink,
-                    Rule::OsGetcwd,
-                    Rule::OsPathExists,
-                    Rule::OsPathExpanduser,
-                    Rule::OsPathIsdir,
-                    Rule::OsPathIsfile,
-                    Rule::OsPathIslink,
-                    Rule::OsReadlink,
-                    Rule::OsStat,
-                    Rule::OsPathIsabs,
-                    Rule::OsPathJoin,
-                    Rule::OsPathBasename,
-                    Rule::OsPathDirname,
-                    Rule::OsPathSamefile,
-                    Rule::OsPathSplitext,
-                    Rule::BuiltinOpen,
-                ])
-            },
+            &settings::LinterSettings::for_rules(vec![
+                Rule::OsPathAbspath,
+                Rule::OsChmod,
+                Rule::OsMkdir,
+                Rule::OsMakedirs,
+                Rule::OsRename,
+                Rule::OsReplace,
+                Rule::OsRmdir,
+                Rule::OsRemove,
+                Rule::OsUnlink,
+                Rule::OsGetcwd,
+                Rule::OsPathExists,
+                Rule::OsPathExpanduser,
+                Rule::OsPathIsdir,
+                Rule::OsPathIsfile,
+                Rule::OsPathIslink,
+                Rule::OsReadlink,
+                Rule::OsStat,
+                Rule::OsPathIsabs,
+                Rule::OsPathJoin,
+                Rule::OsPathBasename,
+                Rule::OsPathDirname,
+                Rule::OsPathSamefile,
+                Rule::OsPathSplitext,
+                Rule::BuiltinOpen,
+            ]),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -79,10 +76,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -97,7 +91,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::OsPathAbspath,
@@ -147,7 +140,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },

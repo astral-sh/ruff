@@ -53,7 +53,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_builtins: flake8_builtins::settings::Settings {
                     strict_checking: true,
                     ..Default::default()
@@ -75,7 +74,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: PreviewMode::Enabled,
                 flake8_builtins: flake8_builtins::settings::Settings {
                     strict_checking: true,
@@ -107,7 +105,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_builtins: flake8_builtins::settings::Settings {
                     strict_checking: strict,
                     ..Default::default()
@@ -130,7 +127,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 src: vec![test_resource_path(src.join(path.parent().unwrap()))],
                 flake8_builtins: flake8_builtins::settings::Settings {
                     strict_checking: false,
@@ -155,7 +151,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 project_root: test_resource_path(src.join(path.parent().unwrap())),
                 flake8_builtins: flake8_builtins::settings::Settings {
                     strict_checking: false,
@@ -183,7 +178,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_builtins: super::settings::Settings {
                     ignorelist: vec!["id".to_string(), "dir".to_string()],
                     ..Default::default()
@@ -227,7 +221,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_builtins: super::settings::Settings {
                     allowed_modules: vec!["xml".to_string(), "logging".to_string()],
                     strict_checking: true,

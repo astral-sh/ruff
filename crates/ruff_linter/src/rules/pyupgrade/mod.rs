@@ -119,10 +119,7 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -134,7 +131,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
@@ -151,7 +147,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
                 future_annotations: true,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
