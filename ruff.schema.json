@@ -297,6 +297,18 @@
       ],
       "deprecated": true
     },
+    "flake8-django": {
+      "description": "Options for the `flake8-django` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8DjangoOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
@@ -1134,6 +1146,23 @@
             "string",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8DjangoOptions": {
+      "description": "Options for the `flake8-django` plugin.",
+      "type": "object",
+      "properties": {
+        "additional-path-functions": {
+          "description": "Additional qualified paths to Django URL path functions beyond the default `django.urls.path`. This allows the rule to check URL patterns defined using custom path functions or re-exported path functions from other modules.\n\nFor example, if you have a custom module `mytools` that re-exports Django's path function, you can add `\"mytools.path\"` to this list.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -2154,6 +2183,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8CopyrightOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-django": {
+          "description": "Options for the `flake8-django` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8DjangoOptions"
             },
             {
               "type": "null"

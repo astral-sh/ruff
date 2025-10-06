@@ -22,7 +22,7 @@ use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_copyright, flake8_django, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
@@ -900,6 +900,10 @@ pub struct LintCommonOptions {
     #[option_group]
     pub flake8_copyright: Option<Flake8CopyrightOptions>,
 
+    /// Options for the `flake8-django` plugin.
+    #[option_group]
+    pub flake8_django: Option<Flake8DjangoOptions>,
+
     /// Options for the `flake8-errmsg` plugin.
     #[option_group]
     pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
@@ -1428,6 +1432,39 @@ impl Flake8CopyrightOptions {
             author: self.author,
             min_file_size: self.min_file_size.unwrap_or_default(),
         })
+    }
+}
+
+/// Options for the `flake8-django` plugin.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8DjangoOptions {
+    /// Additional qualified paths to Django URL path functions beyond
+    /// the default `django.urls.path`. This allows the rule to check
+    /// URL patterns defined using custom path functions or re-exported
+    /// path functions from other modules.
+    ///
+    /// For example, if you have a custom module `mytools` that re-exports
+    /// Django's path function, you can add `"mytools.path"` to this list.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # Allow checking URL patterns from custom path functions
+            additional-path-functions = ["mytools.path", "myapp.urls.custom_path"]
+        "#
+    )]
+    pub additional_path_functions: Option<Vec<String>>,
+}
+
+impl Flake8DjangoOptions {
+    pub fn into_settings(self) -> flake8_django::settings::Settings {
+        flake8_django::settings::Settings {
+            additional_path_functions: self.additional_path_functions.unwrap_or_default(),
+        }
     }
 }
 
@@ -3925,6 +3962,7 @@ pub struct LintOptionsWire {
     flake8_builtins: Option<Flake8BuiltinsOptions>,
     flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
     flake8_copyright: Option<Flake8CopyrightOptions>,
+    flake8_django: Option<Flake8DjangoOptions>,
     flake8_errmsg: Option<Flake8ErrMsgOptions>,
     flake8_quotes: Option<Flake8QuotesOptions>,
     flake8_self: Option<Flake8SelfOptions>,
@@ -3982,6 +4020,7 @@ impl From<LintOptionsWire> for LintOptions {
             flake8_builtins,
             flake8_comprehensions,
             flake8_copyright,
+            flake8_django,
             flake8_errmsg,
             flake8_quotes,
             flake8_self,
@@ -4038,6 +4077,7 @@ impl From<LintOptionsWire> for LintOptions {
                 flake8_builtins,
                 flake8_comprehensions,
                 flake8_copyright,
+                flake8_django,
                 flake8_errmsg,
                 flake8_quotes,
                 flake8_self,
