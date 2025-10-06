@@ -4754,20 +4754,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        let annotated_return_type = |_| {
-            nearest_enclosing_function(self.db(), self.index, self.scope()).map(|func| {
-                // When inferring expressions within a function body,
-                // the expected type passed should be the "raw" type,
-                // i.e. type variables in the return type are non-inferable,
-                // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                TypeContext::new(func.last_definition_raw_signature(self.db()).return_ty)
-            })
+        let tcx = if ret.value.is_some() {
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+                .map(|func| {
+                    // When inferring expressions within a function body,
+                    // the expected type passed should be the "raw" type,
+                    // i.e. type variables in the return type are non-inferable,
+                    // and the return types of async functions are not wrapped in `CoroutineType[...]`.
+                    TypeContext::new(func.last_definition_raw_signature(self.db()).return_ty)
+                })
+                .unwrap_or_default()
+        } else {
+            TypeContext::default()
         };
-        let tcx = ret
-            .value
-            .as_ref()
-            .and_then(annotated_return_type)
-            .unwrap_or_default();
         if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
             let range = ret
                 .value
