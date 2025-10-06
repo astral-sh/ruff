@@ -298,7 +298,6 @@ impl<'db> GenericContext<'db> {
             (Some(legacy_ctx), Some(ctx)) => {
                 if legacy_ctx
                     .variables(db)
-                    .iter()
                     .exactly_one()
                     .is_ok_and(|bound_typevar| bound_typevar.typevar(db).is_self(db))
                 {
