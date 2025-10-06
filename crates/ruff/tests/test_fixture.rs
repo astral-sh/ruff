@@ -14,21 +14,18 @@ use std::{
 };
 use tempfile::TempDir;
 
+use dunce;
+
 const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    let path_str = path.as_ref().to_str().unwrap();
+    // Use dunce to normalize the path by converting UNC paths to regular paths when possible
+    let normalized_path = dunce::simplified(path.as_ref());
+    let path_str = normalized_path.to_str().unwrap();
 
-    // Strip UNC prefix if present to normalize the path
-    let normalized_path = if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
-        stripped
-    } else {
-        path_str
-    };
-
-    // Escape the normalized path
-    let escaped_path = escape(normalized_path);
+    // Escape the normalized path for regex
+    let escaped_path = escape(path_str);
     // Replace literal backslashes in the escaped pattern with a character class that matches both
     let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
 
