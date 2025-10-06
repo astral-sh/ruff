@@ -119,7 +119,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                         filename: SourceCodeSnippet::from_str(
                             &self.checker.generator().expr(open.filename),
                         ),
-                        suggestion: suggestion.clone(),
+                        suggestion: SourceCodeSnippet::from_str(&suggestion),
                     },
                     open.item.range(),
                 );
@@ -169,7 +169,7 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
     Some(&*attr.value)
 }
 
-fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnippet {
+fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
     let name = ast::ExprName {
         id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
@@ -187,7 +187,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
+    generator.expr(&call.into())
 }
 
 fn generate_fix(
@@ -195,20 +195,14 @@ fn generate_fix(
     open: &FileOpen,
     target: Option<&str>,
     with_stmt: &ast::StmtWith,
-    suggestion: &SourceCodeSnippet,
+    suggestion: &str,
 ) -> Option<Fix> {
-    let is_valid_block =
-        with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)]);
-
-    if !is_valid_block {
+    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)])) {
         return None;
     }
 
     let locator = checker.locator();
     let filename_code = locator.slice(open.filename.range());
-    let call = suggestion
-        .full_display()
-        .unwrap_or(suggestion.truncated_display());
 
     let (import_edit, binding) = checker
         .importer()
@@ -220,12 +214,8 @@ fn generate_fix(
         .ok()?;
 
     let replacement = match target {
-        Some(var) => {
-            format!("{var} = {binding}({filename_code}).{call}")
-        }
-        None => {
-            format!("{binding}({filename_code}).{call}")
-        }
+        Some(var) => format!("{var} = {binding}({filename_code}).{suggestion}"),
+        None => format!("{binding}({filename_code}).{suggestion}"),
     };
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {

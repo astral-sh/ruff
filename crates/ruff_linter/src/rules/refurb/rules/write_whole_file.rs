@@ -205,7 +205,7 @@ fn generate_fix(
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)]) {
+    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
         return None;
     }
 
