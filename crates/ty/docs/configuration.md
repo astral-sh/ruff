@@ -32,9 +32,14 @@ division-by-zero = "ignore"
 
 ### `extra-paths`
 
-List of user-provided paths that should take first priority in the module resolution.
-Examples in other type checkers are mypy's `MYPYPATH` environment variable,
-or pyright's `stubPath` configuration setting.
+User-provided paths that should take first priority in module resolution.
+
+This is an advanced option that should usually only be used for first-party or third-party
+modules that are not installed into your Python environment in a conventional way.
+Use the `python` option to specify the location of your Python environment.
+
+This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
+configuration setting.
 
 **Default value**: `[]`
 
@@ -51,12 +56,21 @@ extra-paths = ["./shared/my-search-path"]
 
 ### `python`
 
-Path to the Python installation from which ty resolves type information and third-party dependencies.
+Path to your project's Python environment or interpreter.
 
-ty will search in the path's `site-packages` directories for type information and
-third-party imports.
+Ty uses the `site-packages` directory of your project's Python environment
+to resolve third-party (and, in some cases, first-party) imports in your code.
 
-This option is commonly used to specify the path to a virtual environment.
+If you're using a project management tool such as uv, you should not generally need
+to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
+environment variable to point to your project's virtual environment. Ty can also infer
+the location of your environment from an activated Conda environment, and will look for
+a `.venv` directory in the project root if none of the above apply.
+
+Passing a path to a Python executable is supported, but passing a path to a dynamic executable
+(such as a shim) is not currently supported.
+
+This option can be used to point to virtual or system Python environments.
 
 **Default value**: `null`
 
@@ -66,7 +80,7 @@ This option is commonly used to specify the path to a virtual environment.
 
 ```toml
 [tool.ty.environment]
-python = "./.venv"
+python = "./custom-venv-location/.venv"
 ```
 
 ---
