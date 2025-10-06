@@ -36,3 +36,8 @@ pub(crate) const fn is_remove_parens_around_except_types_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`fix_fmt_skip_in_one_liners`]() preview style is enabled.
+pub(crate) const fn is_fix_fmt_skip_in_one_liners_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
