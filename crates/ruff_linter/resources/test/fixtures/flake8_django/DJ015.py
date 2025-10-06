@@ -50,5 +50,5 @@ urlpatterns_quotes = [
 # Error - leading trail slash and argument should stay in message
 urlpatterns_params_bad = [
     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
-    path("/<slug:slug>", views.bad_view),  # DJ014
+    path("/<slug:slug>", views.bad_view),  # DJ015
 ]
