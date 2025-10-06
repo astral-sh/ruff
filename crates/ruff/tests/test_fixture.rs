@@ -3,8 +3,6 @@
 //! The core concept is borrowed from ty/tests/cli/main.rs and can be extended
 //! with more functionality from there in the future if needed.
 
-#![allow(dead_code)]
-
 use anyhow::{Context as _, Result};
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::get_cargo_bin;
@@ -197,5 +195,63 @@ impl RuffTestFixture {
         command.env_clear();
 
         command
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_tempdir_filter() {
+        let path = "/tmp/test/path";
+        let filter = tempdir_filter(path);
+        assert!(filter.contains("test"));
+        assert!(filter.contains("path"));
+    }
+
+    #[test]
+    fn test_fixture_new() -> Result<()> {
+        let fixture = RuffTestFixture::new()?;
+        assert!(fixture.root().exists());
+        Ok(())
+    }
+
+    #[test]
+    fn test_fixture_with_file() -> Result<()> {
+        let fixture = RuffTestFixture::with_file("test.py", "print('hello')")?;
+        let file_path = fixture.root().join("test.py");
+        assert!(file_path.exists());
+        let content = fs::read_to_string(file_path)?;
+        assert_eq!(content, "print('hello')");
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_file() -> Result<()> {
+        let fixture = RuffTestFixture::new()?;
+        fixture.write_file("nested/dir/file.py", "test content")?;
+        let file_path = fixture.root().join("nested/dir/file.py");
+        assert!(file_path.exists());
+        let content = fs::read_to_string(file_path)?;
+        assert_eq!(content, "test content");
+        Ok(())
+    }
+
+    #[test]
+    fn test_tempdir_filter_method() -> Result<()> {
+        let fixture = RuffTestFixture::new()?;
+        let filter = fixture.tempdir_filter();
+        assert!(!filter.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_command_creation() -> Result<()> {
+        let fixture = RuffTestFixture::new()?;
+        let command = fixture.command();
+        assert_eq!(command.get_current_dir(), Some(fixture.root()));
+        Ok(())
     }
 }
