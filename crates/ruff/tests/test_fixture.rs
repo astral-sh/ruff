@@ -68,10 +68,14 @@ impl RuffTestFixture {
 
         // Canonicalize the tempdir path because macOS uses symlinks for tempdirs
         // and that doesn't play well with our snapshot filtering.
-        let project_dir = temp_dir
-            .path()
-            .canonicalize()
-            .context("Failed to canonicalize project path")?;
+        // Simplify with dunce because otherwise we get UNC paths on Windows.
+        let project_dir = dunce::simplified(
+            &temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalize project path")?,
+        )
+        .to_path_buf();
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "[TMP]/");
