@@ -1,4 +1,5 @@
 pub(crate) use and_or_ternary::*;
+pub(crate) use assignment_from_none::*;
 pub(crate) use assert_on_string_literal::*;
 pub(crate) use await_outside_async::*;
 pub(crate) use bad_dunder_method_name::*;
@@ -109,6 +110,7 @@ pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
 
 mod and_or_ternary;
+mod assignment_from_none;
 mod assert_on_string_literal;
 mod await_outside_async;
 mod bad_dunder_method_name;

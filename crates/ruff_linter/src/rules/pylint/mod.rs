@@ -184,6 +184,7 @@ mod tests {
         Path::new("repeated_equality_comparison.py")
     )]
     #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
+    #[test_case(Rule::AssignmentFromNone, Path::new("assignment_from_none.py"))]
     #[test_case(
         Rule::SubprocessPopenPreexecFn,
         Path::new("subprocess_popen_preexec_fn.py")

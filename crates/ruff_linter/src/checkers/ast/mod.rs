@@ -73,7 +73,7 @@ use crate::rules::pyflakes::rules::{
     UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
-    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+    AssignmentFromNone, AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
 };
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;

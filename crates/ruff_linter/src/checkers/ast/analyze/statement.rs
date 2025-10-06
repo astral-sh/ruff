@@ -1432,6 +1432,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_assignment(checker, assign);
             }
+            if checker.is_rule_enabled(Rule::AssignmentFromNone) {
+                pylint::rules::assignment_from_none(checker, assign);
+            }
             if checker.is_rule_enabled(Rule::TypeParamNameMismatch) {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
             }
@@ -1514,6 +1517,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_annotated_assignment(checker, assign_stmt);
+            }
+            if checker.is_rule_enabled(Rule::AssignmentFromNone) {
+                pylint::rules::annotated_assignment_from_none(checker, assign_stmt);
             }
             if checker.is_rule_enabled(Rule::UnintentionalTypeAnnotation) {
                 flake8_bugbear::rules::unintentional_type_annotation(
