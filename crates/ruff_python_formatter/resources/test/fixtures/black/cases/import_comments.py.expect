@@ -5,6 +5,25 @@ from x import a, b  # comment
 from x import a as b  # comment
 from x import a as b, b as c  # comment
 
+from x import (
+    a,  # comment
+)
+from x import (
+    a,  # comment
+    b,
+)
+
+# ensure comma is added
+from x import (
+    a,  # comment
+)
+
+# follow black style by merging cases without own-line comments
+from x import (
+    a,  # alpha  # beta
+    b,
+)
+
 # ensure intermixed comments are all preserved
 from x import (  # one
     # two
