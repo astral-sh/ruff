@@ -179,7 +179,11 @@ impl NeedsParentheses for ExprAttribute {
             context.comments().ranges(),
             context.source(),
         ) {
-            OptionalParentheses::Never
+            if context.comments().has_trailing(self.value.as_ref()) {
+                OptionalParentheses::Multiline
+            } else {
+                OptionalParentheses::Never
+            }
         } else {
             self.value.needs_parentheses(self.into(), context)
         }
