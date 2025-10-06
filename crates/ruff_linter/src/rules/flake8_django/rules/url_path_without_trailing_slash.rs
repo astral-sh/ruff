@@ -65,14 +65,29 @@ pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::Exp
         return;
     }
 
-    // Check if this is a call to django.urls.path
-    if !checker
+    // Check if this is a call to django.urls.path or any additional configured path functions
+    let is_path_function = checker
         .semantic()
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["django", "urls", "path"])
-        })
-    {
+            let segments = qualified_name.segments();
+
+            // Check if it's the default django.urls.path
+            if matches!(segments, ["django", "urls", "path"]) {
+                return true;
+            }
+
+            // Check if it matches any additional configured path functions
+            let qualified_name_str = segments.join(".");
+            checker
+                .settings()
+                .flake8_django
+                .additional_path_functions
+                .iter()
+                .any(|path| path == &qualified_name_str)
+        });
+
+    if !is_path_function {
         return;
     }
 
