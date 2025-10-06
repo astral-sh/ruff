@@ -362,6 +362,8 @@ impl<'db> OverloadLiteral<'db> {
             signature.parameters(),
             signature.return_ty,
         );
+        // We need to update `signature.generic_context` here,
+        // because type variables in `GenericContext::variables` are still non-inferable.
         signature.generic_context =
             GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
 
