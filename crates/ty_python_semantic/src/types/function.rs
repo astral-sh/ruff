@@ -370,7 +370,6 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Typed internally-visible "raw" signature for this function.
     /// That is, type variables in parameter types and the return type remain non-inferable,
-    /// the generic context is not set,
     /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
     ///
     /// ## Warning
@@ -441,6 +440,9 @@ impl<'db> OverloadLiteral<'db> {
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
+        let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(db, index, definition, type_params)
+        });
         let file_scope_id = scope.file_scope_id(db);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
@@ -453,6 +455,7 @@ impl<'db> OverloadLiteral<'db> {
 
         Signature::from_function(
             db,
+            pep695_ctx,
             definition,
             function_stmt_node,
             has_implicitly_positional_first_parameter,

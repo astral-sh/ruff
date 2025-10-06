@@ -386,9 +386,9 @@ impl<'db> Signature<'db> {
     }
 
     /// Return a typed signature from a function definition.
-    /// Note that `Signature::generic_context` is not set here.
     pub(super) fn from_function(
         db: &'db dyn Db,
+        pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
@@ -403,9 +403,16 @@ impl<'db> Signature<'db> {
             .returns
             .as_ref()
             .map(|returns| definition_expression_type(db, definition, returns.as_ref()));
+        let legacy_generic_context =
+            GenericContext::from_function_params(db, definition, &parameters, return_ty);
+        let full_generic_context = GenericContext::merge_pep695_and_legacy(
+            db,
+            pep695_generic_context,
+            legacy_generic_context,
+        );
 
         Self {
-            generic_context: None,
+            generic_context: full_generic_context,
             definition: Some(definition),
             parameters,
             return_ty,
