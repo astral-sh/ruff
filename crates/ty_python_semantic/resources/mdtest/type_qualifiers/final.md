@@ -97,7 +97,8 @@ reveal_type(C().FINAL_A)  # revealed: int
 reveal_type(C().FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_C)  # revealed: int
 reveal_type(C().FINAL_D)  # revealed: Literal[1]
-reveal_type(C().FINAL_E)  # revealed: Literal[1]
+# TODO: Should be `Literal[1]`
+reveal_type(C().FINAL_E)  # revealed: @Todo(implicit instance attribute)
 ```
 
 ## Not modifiable

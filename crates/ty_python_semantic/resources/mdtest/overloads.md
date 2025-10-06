@@ -155,11 +155,13 @@ class Foo:
 
 foo = Foo()
 reveal_type(foo)  # revealed: Foo
-reveal_type(foo.x)  # revealed: Unknown | int | None
+# TODO: Should be `Unknown | int | None`
+reveal_type(foo.x)  # revealed: Unknown
 
 foo1 = Foo(1)
 reveal_type(foo1)  # revealed: Foo
-reveal_type(foo1.x)  # revealed: Unknown | int | None
+# TODO: Should be `Unknown | int | None`
+reveal_type(foo1.x)  # revealed: Unknown
 ```
 
 ## Version specific

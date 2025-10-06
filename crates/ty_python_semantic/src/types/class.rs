@@ -4,7 +4,7 @@ use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    function::FunctionType, infer_expression_type, infer_unpack_types,
+    function::FunctionType, infer_expression_type,
 };
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
@@ -31,7 +31,7 @@ use crate::types::{
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
     TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    infer_definition_types,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -41,10 +41,7 @@ use crate::{
         known_module_symbol, place_from_bindings, place_from_declarations,
     },
     semantic_index::{
-        attribute_assignments,
-        definition::{DefinitionKind, TargetKind},
-        place_table,
-        scope::ScopeId,
+        attribute_assignments, definition::DefinitionKind, place_table, scope::ScopeId,
         semantic_index, use_def_map,
     },
     types::{
@@ -3089,131 +3086,16 @@ impl<'db> ClassLiteral<'db> {
                         // unreachable (because of the `continue` above), but there is
                         // nothing to do here.
                     }
-                    DefinitionKind::Assignment(assign) => {
-                        match assign.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     .., self.name, .. = <value>
-                                //     (.., self.name, ..) = <value>
-                                //     [.., self.name, ..] = <value>
+                    DefinitionKind::Assignment(_)
+                    | DefinitionKind::For(_)
+                    | DefinitionKind::WithItem(_)
+                    | DefinitionKind::Comprehension(_) => {
+                        // TODO: Type inference for unannotated implicit instance attributes leads
+                        // to combinatorial explosion of runtime in some cases, so it is currently
+                        // disabled. See https://github.com/astral-sh/ty/issues/1111 for details.
+                        let inferred_ty = todo_type!("implicit instance attribute");
 
-                                let unpacked = infer_unpack_types(db, unpack);
-
-                                let inferred_ty = unpacked.expression_type(assign.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an un-annotated attribute assignment of the form:
-                                //
-                                //     self.name = <value>
-
-                                let inferred_ty = infer_expression_type(
-                                    db,
-                                    index.expression(assign.value(&module)),
-                                    TypeContext::default(),
-                                );
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                        }
-                    }
-                    DefinitionKind::For(for_stmt) => {
-                        match for_stmt.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     for .., self.name, .. in <iterable>:
-
-                                let unpacked = infer_unpack_types(db, unpack);
-                                let inferred_ty =
-                                    unpacked.expression_type(for_stmt.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     for self.name in <iterable>:
-
-                                let iterable_ty = infer_expression_type(
-                                    db,
-                                    index.expression(for_stmt.iterable(&module)),
-                                    TypeContext::default(),
-                                );
-                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty =
-                                    iterable_ty.iterate(db).homogeneous_element_type(db);
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                        }
-                    }
-                    DefinitionKind::WithItem(with_item) => {
-                        match with_item.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     with <context_manager> as .., self.name, ..:
-
-                                let unpacked = infer_unpack_types(db, unpack);
-                                let inferred_ty =
-                                    unpacked.expression_type(with_item.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     with <context_manager> as self.name:
-
-                                let context_ty = infer_expression_type(
-                                    db,
-                                    index.expression(with_item.context_expr(&module)),
-                                    TypeContext::default(),
-                                );
-                                let inferred_ty = if with_item.is_async() {
-                                    context_ty.aenter(db)
-                                } else {
-                                    context_ty.enter(db)
-                                };
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                        }
-                    }
-                    DefinitionKind::Comprehension(comprehension) => {
-                        match comprehension.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     [... for .., self.name, .. in <iterable>]
-
-                                let unpacked = infer_unpack_types(db, unpack);
-
-                                let inferred_ty =
-                                    unpacked.expression_type(comprehension.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     [... for self.name in <iterable>]
-
-                                let iterable_ty = infer_expression_type(
-                                    db,
-                                    index.expression(comprehension.iterable(&module)),
-                                    TypeContext::default(),
-                                );
-                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty =
-                                    iterable_ty.iterate(db).homogeneous_element_type(db);
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                        }
+                        union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                     }
                     DefinitionKind::AugmentedAssignment(_) => {
                         // TODO:

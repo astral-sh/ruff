@@ -1640,9 +1640,9 @@ quux.<CURSOR>
         );
 
         assert_snapshot!(test.completions_without_builtins_with_types(), @r"
-        bar :: Unknown | Literal[2]
-        baz :: Unknown | Literal[3]
-        foo :: Unknown | Literal[1]
+        bar :: Unknown
+        baz :: Unknown
+        foo :: Unknown
         __annotations__ :: dict[str, Any]
         __class__ :: type[Quux]
         __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
@@ -1685,9 +1685,9 @@ quux.b<CURSOR>
         );
 
         assert_snapshot!(test.completions_without_builtins_with_types(), @r"
-        bar :: Unknown | Literal[2]
-        baz :: Unknown | Literal[3]
-        foo :: Unknown | Literal[1]
+        bar :: Unknown
+        baz :: Unknown
+        foo :: Unknown
         __annotations__ :: dict[str, Any]
         __class__ :: type[Quux]
         __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None

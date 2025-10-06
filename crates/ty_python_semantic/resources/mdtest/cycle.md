@@ -28,6 +28,49 @@ class Point:
         self.x, self.y = other.x, other.y
 
 p = Point()
-reveal_type(p.x)  # revealed: Unknown | int
-reveal_type(p.y)  # revealed: Unknown | int
+# TODO: Should be `Unknown | int`
+reveal_type(p.x)  # revealed: Unknown
+# TODO: Should be `Unknown | int`
+reveal_type(p.y)  # revealed: Unknown
+```
+
+## Implicit instance attributes
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1111>:
+
+```py
+def combine(*args) -> int:
+    return 0
+
+class C:
+    def __init__(self: "C"):
+        self.x1 = 0
+        self.x2 = 0
+        self.x3 = 0
+        self.x4 = 0
+        self.x5 = 0
+
+    def f1(self: "C"):
+        self.x1 = combine(self.x2, self.x3, self.x4, self.x5)
+        self.x2 = combine(self.x1, self.x3, self.x4, self.x5)
+        self.x3 = combine(self.x1, self.x2, self.x4, self.x5)
+        self.x4 = combine(self.x1, self.x2, self.x3, self.x5)
+        self.x5 = combine(self.x1, self.x2, self.x3, self.x4)
+
+    def f2(self: "C"):
+        self.x1 = combine(self.x2, self.x3, self.x4, self.x5)
+        self.x2 = combine(self.x1, self.x3, self.x4, self.x5)
+        self.x3 = combine(self.x1, self.x2, self.x4, self.x5)
+        self.x4 = combine(self.x1, self.x2, self.x3, self.x5)
+        self.x5 = combine(self.x1, self.x2, self.x3, self.x4)
+
+    def f3(self: "C"):
+        self.x1 = combine(self.x2, self.x3, self.x4, self.x5)
+        self.x2 = combine(self.x1, self.x3, self.x4, self.x5)
+        self.x3 = combine(self.x1, self.x2, self.x4, self.x5)
+        self.x4 = combine(self.x1, self.x2, self.x3, self.x5)
+        self.x5 = combine(self.x1, self.x2, self.x3, self.x4)
+
+# TODO: should be `Unknown | int`
+reveal_type(C().x1)  # revealed: Unknown
 ```
