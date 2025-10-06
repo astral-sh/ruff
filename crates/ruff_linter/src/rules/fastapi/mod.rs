@@ -8,6 +8,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use ruff_python_ast::PythonVersion;
+
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
@@ -20,7 +22,10 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -35,7 +40,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY38.into(),
+                unresolved_target_version: PythonVersion::PY38.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

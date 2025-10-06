@@ -59,7 +59,10 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -84,6 +87,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 future_annotations: true,
                 // also enable quoting annotations to check the interaction. the future import
                 // should take precedence.
@@ -107,10 +111,13 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::UnquotedTypeAlias,
-                Rule::QuotedTypeAlias,
-            ]),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnquotedTypeAlias,
+                    Rule::QuotedTypeAlias,
+                ])
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -141,6 +148,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     quote_annotations: true,
                     ..Default::default()
@@ -160,6 +168,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     strict: true,
                     ..Default::default()
@@ -176,6 +185,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     exempt_modules: vec!["pandas".to_string()],
                     ..Default::default()
@@ -204,6 +214,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     exempt_modules: vec![],
                     strict: true,
@@ -241,6 +252,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_base_classes: vec![
                         "pydantic.BaseModel".to_string(),
@@ -272,6 +284,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_decorators: vec![
                         "attrs.define".to_string(),
@@ -298,6 +311,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
                     ..Default::default()
@@ -316,6 +330,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_decorators: vec![
                         "fastapi.FastAPI.get".to_string(),
@@ -551,7 +566,10 @@ mod tests {
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules()),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
+            },
         );
         assert_diagnostics!(snapshot, diagnostics);
     }
@@ -601,6 +619,7 @@ mod tests {
         let diagnostics = test_snippet(
             contents,
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: settings::types::PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
             },

@@ -120,7 +120,10 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -131,6 +134,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF031_prefer_parens.py"),
             &LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
                 },
@@ -233,6 +237,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
@@ -250,6 +255,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
             &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 preview: PreviewMode::Enabled,
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::LinterSettings::for_rules(vec![

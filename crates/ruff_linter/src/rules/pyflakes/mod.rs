@@ -183,7 +183,10 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY313.into(),
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -198,6 +201,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY313.into(),
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
                     runtime_required_base_classes: vec![
                         "pydantic.BaseModel".to_string(),
@@ -906,7 +910,10 @@ mod tests {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
-        let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
+        let settings = LinterSettings {
+            unresolved_target_version: ruff_python_ast::PythonVersion::PY313.into(),
+            ..LinterSettings::for_rules(Linter::Pyflakes.rules())
+        };
         let target_version = settings.unresolved_target_version;
         let options =
             ParseOptions::from(source_type).with_target_version(target_version.parser_version());
