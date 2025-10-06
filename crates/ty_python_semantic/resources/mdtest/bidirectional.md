@@ -36,8 +36,8 @@ l3: list[int] = intermediate
 reveal_type(intermediate)  # revealed: list[Literal[1]]
 reveal_type(l3)  # revealed: list[int]
 
-l4: list[int] | None = list1(1)
-reveal_type(l4)  # revealed: list[int]
+l4: list[int | str] | None = list1(1)
+reveal_type(l4)  # revealed: list[int | str]
 
 def _(l: list[int] | None = None):
     l1 = l or list()
@@ -129,7 +129,7 @@ def f(x: int | str) -> list[int] | list[str]:
 reveal_type(f(1))  # revealed: list[int]
 reveal_type(f("a"))  # revealed: list[str]
 
-async def g() -> list[int]:
+async def g() -> list[int | str]:
     return list1(1)
 
 def h[T](x: T, cond: bool) -> T | list[T]:
