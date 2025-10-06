@@ -96,6 +96,8 @@ impl Symbol {
     /// declared (anywhere) in a class body, but used before it's bound (at runtime), resolves
     /// (unbelievably) to the global scope. For example:
     /// ```py
+    /// import secrets
+    ///
     /// x = 42
     /// def f():
     ///     x = 43
