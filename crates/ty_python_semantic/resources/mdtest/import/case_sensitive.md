@@ -48,7 +48,7 @@ search paths if the file name's casing does not match.
 
 ```toml
 [environment]
-extra-paths = ["/search-1", "/search-2"]
+non-environment-paths = ["/search-1", "/search-2"]
 ```
 
 `/search-1/A.py`:

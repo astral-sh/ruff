@@ -40,7 +40,7 @@ neither.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/py.typed`:
@@ -99,7 +99,7 @@ Omitting the partial `py.typed`, we see "impl" now cannot be found.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/__init__.pyi`:
@@ -152,7 +152,7 @@ Including a blank py.typed we still don't conclude it's partial.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/py.typed`:
@@ -210,7 +210,7 @@ reveal_type(Fake().fake)  # revealed: Unknown
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/py.typed`:
@@ -280,7 +280,7 @@ reveal_type(Fake().fake)  # revealed: Unknown
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/py.typed`:
@@ -355,7 +355,7 @@ reveal_type(Fake().fake)  # revealed: Unknown
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/py.typed`:
@@ -433,7 +433,7 @@ This is a regression test for <https://github.com/astral-sh/ty/issues/520>.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/parent-stubs/foo/both.pyi`:

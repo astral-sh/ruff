@@ -72,7 +72,7 @@ pub(crate) struct CheckCommand {
     /// modules that are not installed into your Python environment in a conventional way.
     /// Use `--python` to point ty to your Python environment if it is in an unusual location.
     #[arg(long, value_name = "PATH")]
-    pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
+    pub(crate) non_environment_search_path: Option<Vec<SystemPathBuf>>,
 
     /// Python version to assume when resolving types.
     ///
@@ -184,12 +184,14 @@ impl CheckCommand {
                     .map(|platform| RangedValue::cli(platform.into())),
                 python: self.python.map(RelativePathBuf::cli),
                 typeshed: self.typeshed.map(RelativePathBuf::cli),
-                extra_paths: self.extra_search_path.map(|extra_search_paths| {
-                    extra_search_paths
-                        .into_iter()
-                        .map(RelativePathBuf::cli)
-                        .collect()
-                }),
+                non_environment_paths: self.non_environment_search_path.map(
+                    |non_environment_paths| {
+                        non_environment_paths
+                            .into_iter()
+                            .map(RelativePathBuf::cli)
+                            .collect()
+                    },
+                ),
                 ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {

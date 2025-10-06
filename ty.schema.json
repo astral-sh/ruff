@@ -61,7 +61,7 @@
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
-        "extra-paths": {
+        "non-environment-paths": {
           "description": "User-provided paths that should take first priority in module resolution.\n\nThis is an advanced option that should usually only be used for first-party or third-party modules that are not installed into your Python environment in a conventional way. Use the `python` option to specify the location of your Python environment.\n\nThis option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath` configuration setting.",
           "type": [
             "array",

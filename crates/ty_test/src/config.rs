@@ -44,8 +44,8 @@ impl MarkdownTestConfig {
         self.environment.as_ref()?.typeshed.as_deref()
     }
 
-    pub(crate) fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
-        self.environment.as_ref()?.extra_paths.as_deref()
+    pub(crate) fn non_environment_paths(&self) -> Option<&[SystemPathBuf]> {
+        self.environment.as_ref()?.non_environment_paths.as_deref()
     }
 
     pub(crate) fn python(&self) -> Option<&SystemPath> {
@@ -75,7 +75,7 @@ pub(crate) struct Environment {
     pub(crate) typeshed: Option<SystemPathBuf>,
 
     /// Additional search paths to consider when resolving modules.
-    pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
+    pub(crate) non_environment_paths: Option<Vec<SystemPathBuf>>,
 
     /// Path to the Python environment.
     ///

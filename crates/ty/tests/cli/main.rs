@@ -275,7 +275,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--non-environment-search-path").arg("../libs"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -290,7 +290,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
 
 /// Paths specified in a configuration file are relative to the project root.
 ///
-/// We test this by adding `libs` (as a relative path) to the extra search path in the configuration and run
+/// We test this by adding `libs` (as a relative path) to `non-environment-paths` in the configuration and run
 /// the CLI from a subdirectory.
 ///
 /// Project layout:
@@ -309,7 +309,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
             r#"
             [tool.ty.environment]
             python-version = "3.11"
-            extra-paths = ["libs"]
+            non-environment-paths = ["libs"]
             "#,
         ),
         (

@@ -32,25 +32,25 @@ use ty_python_semantic::PythonPlatform;
 ///
 /// The main downside of this approach is that the ordering can be surprising in cases
 /// where the option has a "first match" semantic and not a "last match" wins.
-/// One such example is `extra-paths` where the semantics is given by Python:
+/// One such example is `non-environment-paths` where the semantics is given by Python:
 /// the module on the first matching search path wins.
 ///
 /// ```toml
 /// [environment]
-/// extra-paths = ["b", "c"]
+/// non-environment-paths = ["b", "c"]
 /// ```
 ///
 /// ```bash
-/// ty --extra-paths a
+/// ty --non-environment-search-path=a
 /// ```
 ///
 /// That's why a user might expect that this configuration results in `["a", "b", "c"]`,
 /// because the CLI has higher precedence. However, the current implementation results in a
-/// resolved extra search path of `["b", "c", "a"]`, which means `a` will be tried last.
+/// resolved `non-environment-paths` of `["b", "c", "a"]`, which means `a` will be tried last.
 ///
 /// There's an argument here that the user should be able to specify the order of the paths,
-/// because only then is the user in full control of where to insert the path when specifying `extra-paths`
-/// in multiple sources.
+/// because only then is the user in full control of where to insert the path when specifying
+/// `non-environment-paths` in multiple sources.
 ///
 /// ## Macro
 /// You can automatically derive `Combine` for structs with named fields by using `derive(ruff_macros::Combine)`.

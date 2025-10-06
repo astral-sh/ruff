@@ -110,7 +110,7 @@ pub enum PythonVersionSource {
     InstallationDirectoryLayout { site_packages_parent_dir: Box<str> },
 
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
-    /// long argument (`--extra-paths`) or `--config key=value`.
+    /// long argument (`--non-environment-search-path`) or `--config key=value`.
     Cli,
 
     /// The value comes from the Python VS Code extension (the selected interpreter).
@@ -163,10 +163,10 @@ impl Default for PythonVersionWithSource {
 /// Configures the search paths for module resolution.
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct SearchPathSettings {
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's MYPYPATH environment variable,
-    /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<SystemPathBuf>,
+    /// List of user-provided paths that should take first priority in module resolution.
+    /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
+    /// or pyright's `stubPath` configuration setting.
+    pub non_environment_paths: Vec<SystemPathBuf>,
 
     /// The root of the project, used for finding first-party modules.
     pub src_roots: Vec<SystemPathBuf>,
@@ -197,7 +197,7 @@ impl SearchPathSettings {
     pub fn empty() -> Self {
         SearchPathSettings {
             src_roots: vec![],
-            extra_paths: vec![],
+            non_environment_paths: vec![],
             custom_typeshed: None,
             site_packages_paths: vec![],
             real_stdlib_path: None,

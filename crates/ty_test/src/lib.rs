@@ -303,7 +303,10 @@ fn run_test(
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
-            extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
+            non_environment_paths: configuration
+                .non_environment_paths()
+                .unwrap_or_default()
+                .to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,

@@ -422,7 +422,7 @@ where
     // We need a chance to create the directories here.
     if let Some(environment) = project.options().environment.as_ref() {
         for path in environment
-            .extra_paths
+            .non_environment_paths
             .as_deref()
             .unwrap_or_default()
             .iter()
@@ -542,7 +542,7 @@ fn new_non_project_file() -> anyhow::Result<()> {
         context.write_project_file("bar.py", "")?;
         context.set_options(Options {
             environment: Some(EnvironmentOptions {
-                extra_paths: Some(vec![RelativePathBuf::cli(
+                non_environment_paths: Some(vec![RelativePathBuf::cli(
                     context.join_root_path("site_packages"),
                 )]),
                 ..EnvironmentOptions::default()
@@ -986,7 +986,7 @@ fn search_path() -> anyhow::Result<()> {
 
         context.set_options(Options {
             environment: Some(EnvironmentOptions {
-                extra_paths: Some(vec![RelativePathBuf::cli(
+                non_environment_paths: Some(vec![RelativePathBuf::cli(
                     context.join_root_path("site_packages"),
                 )]),
                 ..EnvironmentOptions::default()
@@ -1027,7 +1027,7 @@ fn add_search_path() -> anyhow::Result<()> {
     // Register site-packages as a search path.
     case.update_options(Options {
         environment: Some(EnvironmentOptions {
-            extra_paths: Some(vec![RelativePathBuf::cli("site_packages")]),
+            non_environment_paths: Some(vec![RelativePathBuf::cli("site_packages")]),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -1051,7 +1051,7 @@ fn remove_search_path() -> anyhow::Result<()> {
         context.write_project_file("bar.py", "import sub.a")?;
         context.set_options(Options {
             environment: Some(EnvironmentOptions {
-                extra_paths: Some(vec![RelativePathBuf::cli(
+                non_environment_paths: Some(vec![RelativePathBuf::cli(
                     context.join_root_path("site_packages"),
                 )]),
                 ..EnvironmentOptions::default()
@@ -1579,7 +1579,7 @@ mod unix {
 
             context.set_options(Options {
                 environment: Some(EnvironmentOptions {
-                    extra_paths: Some(vec![RelativePathBuf::cli(
+                    non_environment_paths: Some(vec![RelativePathBuf::cli(
                         ".venv/lib/python3.12/site-packages",
                     )]),
                     python_version: Some(RangedValue::cli(PythonVersion::PY312)),

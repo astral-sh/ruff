@@ -301,18 +301,19 @@ impl Options {
         };
 
         // collect the existing site packages
-        let mut extra_paths: Vec<SystemPathBuf> = environment
-            .extra_paths
+        let mut non_environment_paths: Vec<SystemPathBuf> = environment
+            .non_environment_paths
             .as_deref()
             .unwrap_or_default()
             .iter()
             .map(|path| path.absolute(project_root, system))
             .collect();
 
-        // read all the paths off the PYTHONPATH environment variable, check
-        // they exist as a directory, and add them to the vec of extra_paths
-        // as they should be checked before site-packages just like python
-        // interpreter does
+        // Read all the paths off the `PYTHONPATH` environment variable, check
+        // each exists as a directory, and add each to the vec of `non_environment_paths`.
+        // This emulates the way `PYTHONPATH` entries will appear in `sys.path` prior to
+        // `site-packages` (the "environment search path") from a virtual environment at
+        // runtime.
         if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
             for path in std::env::split_paths(python_path.as_str()) {
                 let path = match SystemPathBuf::from_path_buf(path) {
@@ -336,15 +337,15 @@ impl Options {
                 }
 
                 tracing::debug!(
-                    "Adding `{abspath}` from the `PYTHONPATH` environment variable to `extra_paths`"
+                    "Adding `{abspath}` from the `PYTHONPATH` environment variable to `non_environment_paths`"
                 );
 
-                extra_paths.push(abspath);
+                non_environment_paths.push(abspath);
             }
         }
 
         let settings = SearchPathSettings {
-            extra_paths,
+            non_environment_paths,
             src_roots,
             custom_typeshed: environment
                 .typeshed
@@ -563,10 +564,10 @@ pub struct EnvironmentOptions {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            extra-paths = ["./shared/my-search-path"]
+            non-environment-paths = ["./shared/my-search-path"]
         "#
     )]
-    pub extra_paths: Option<Vec<RelativePathBuf>>,
+    pub non_environment_paths: Option<Vec<RelativePathBuf>>,
 
     /// Optional path to a "typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,

@@ -30,7 +30,7 @@ division-by-zero = "ignore"
 
 ## `environment`
 
-### `extra-paths`
+### `non-environment-paths`
 
 User-provided paths that should take first priority in module resolution.
 
@@ -49,7 +49,7 @@ configuration setting.
 
 ```toml
 [tool.ty.environment]
-extra-paths = ["./shared/my-search-path"]
+non-environment-paths = ["./shared/my-search-path"]
 ```
 
 ---

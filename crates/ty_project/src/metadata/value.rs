@@ -25,7 +25,7 @@ pub enum ValueSource {
     File(Arc<SystemPathBuf>),
 
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
-    /// long argument (`--extra-paths`) or `--config key=value`.
+    /// long argument (`--non-environment-search-path`) or `--config key=value`.
     Cli,
 
     /// The value comes from an LSP client configuration.

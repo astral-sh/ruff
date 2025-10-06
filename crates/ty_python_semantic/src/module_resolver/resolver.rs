@@ -228,7 +228,7 @@ impl SearchPaths {
         }
 
         let SearchPathSettings {
-            extra_paths,
+            non_environment_paths,
             src_roots,
             custom_typeshed: typeshed,
             site_packages_paths,
@@ -237,11 +237,11 @@ impl SearchPaths {
 
         let mut static_paths = vec![];
 
-        for path in extra_paths {
+        for path in non_environment_paths {
             let path = canonicalize(path, system);
-            tracing::debug!("Adding extra search-path `{path}`");
+            tracing::debug!("Adding non-environment search path `{path}`");
 
-            static_paths.push(SearchPath::extra(system, path)?);
+            static_paths.push(SearchPath::non_environment(system, path)?);
         }
 
         for src_root in src_roots {

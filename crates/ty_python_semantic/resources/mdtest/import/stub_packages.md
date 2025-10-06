@@ -7,7 +7,7 @@ Stub packages are packages named `<package>-stubs` that provide typing stubs for
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/__init__.pyi`:
@@ -38,7 +38,7 @@ The regular package isn't required for type checking.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs/__init__.pyi`:
@@ -63,7 +63,7 @@ A module named `<module>-stubs` isn't a stub package.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/foo-stubs.pyi`:
@@ -88,7 +88,7 @@ A namespace package with multiple stub packages spread over multiple search path
 
 ```toml
 [environment]
-extra-paths = ["/stubs1", "/stubs2", "/packages"]
+non-environment-paths = ["/stubs1", "/stubs2", "/packages"]
 ```
 
 `/stubs1/shapes-stubs/polygons/pentagon.pyi`:
@@ -136,7 +136,7 @@ should stop after the first non-namespace stub package. This matches Pyright's b
 
 ```toml
 [environment]
-extra-paths = ["/stubs1", "/stubs2", "/packages"]
+non-environment-paths = ["/stubs1", "/stubs2", "/packages"]
 ```
 
 `/stubs1/shapes-stubs/__init__.pyi`:
@@ -196,7 +196,7 @@ fewer lookups.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/shapes-stubs/polygons/pentagon.pyi`:
@@ -254,7 +254,7 @@ to be an enforced convention. At least, Pyright is fine with the following.
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/shapes-stubs/__init__.py`:
@@ -291,7 +291,7 @@ Regression test for <https://github.com/astral-sh/ty/issues/408>
 
 ```toml
 [environment]
-extra-paths = ["/packages"]
+non-environment-paths = ["/packages"]
 ```
 
 `/packages/yaml-stubs/__init__.pyi`:

@@ -93,7 +93,7 @@ impl ModulePath {
             relative_path,
         } = self;
         match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
+            SearchPathInner::NonEnvironment(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path)
@@ -131,7 +131,7 @@ impl ModulePath {
         } = self;
 
         match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
+            SearchPathInner::NonEnvironment(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
@@ -199,7 +199,7 @@ impl ModulePath {
             relative_path,
         } = self;
         match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
+            SearchPathInner::NonEnvironment(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => Some(search_path.join(relative_path)),
@@ -219,7 +219,7 @@ impl ModulePath {
             relative_path,
         } = self;
         match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
+            SearchPathInner::NonEnvironment(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
@@ -451,7 +451,7 @@ type SearchPathResult<T> = Result<T, SearchPathValidationError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum SearchPathInner {
-    Extra(SystemPathBuf),
+    NonEnvironment(SystemPathBuf),
     FirstParty(SystemPathBuf),
     StandardLibraryCustom(SystemPathBuf),
     StandardLibraryVendored(VendoredPathBuf),
@@ -464,7 +464,7 @@ enum SearchPathInner {
 /// that can be used to locate Python modules.
 ///
 /// The different kinds of search paths are:
-/// - "Extra" search paths: these go at the start of the module resolution order
+/// - "Non-environment" search paths: these go at the start of the module resolution order
 /// - First-party search paths: the user code that we are directly invoked on.
 /// - Standard-library search paths: these come in three different forms:
 ///   - Custom standard-library search paths: paths provided by the user
@@ -499,9 +499,12 @@ impl SearchPath {
         }
     }
 
-    /// Create a new "Extra" search path
-    pub(crate) fn extra(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
-        Ok(Self(Arc::new(SearchPathInner::Extra(
+    /// Create a new non-environment search path
+    pub(crate) fn non_environment(
+        system: &dyn System,
+        root: SystemPathBuf,
+    ) -> SearchPathResult<Self> {
+        Ok(Self(Arc::new(SearchPathInner::NonEnvironment(
             Self::directory_path(system, root)?,
         ))))
     }
@@ -616,7 +619,7 @@ impl SearchPath {
         }
 
         match &*self.0 {
-            SearchPathInner::Extra(search_path)
+            SearchPathInner::NonEnvironment(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::StandardLibraryCustom(search_path)
             | SearchPathInner::StandardLibraryReal(search_path)
@@ -643,7 +646,7 @@ impl SearchPath {
         }
 
         match &*self.0 {
-            SearchPathInner::Extra(_)
+            SearchPathInner::NonEnvironment(_)
             | SearchPathInner::FirstParty(_)
             | SearchPathInner::StandardLibraryCustom(_)
             | SearchPathInner::StandardLibraryReal(_)
@@ -662,7 +665,7 @@ impl SearchPath {
     #[must_use]
     pub(super) fn as_path(&self) -> SystemOrVendoredPathRef<'_> {
         match *self.0 {
-            SearchPathInner::Extra(ref path)
+            SearchPathInner::NonEnvironment(ref path)
             | SearchPathInner::FirstParty(ref path)
             | SearchPathInner::StandardLibraryCustom(ref path)
             | SearchPathInner::StandardLibraryReal(ref path)
@@ -691,7 +694,7 @@ impl SearchPath {
     #[must_use]
     pub(crate) fn debug_kind(&self) -> &'static str {
         match *self.0 {
-            SearchPathInner::Extra(_) => "extra",
+            SearchPathInner::NonEnvironment(_) => "extra",
             SearchPathInner::FirstParty(_) => "first-party",
             SearchPathInner::StandardLibraryCustom(_) => "std-custom",
             SearchPathInner::StandardLibraryReal(_) => "std-real",
@@ -706,8 +709,8 @@ impl SearchPath {
     #[must_use]
     pub(crate) fn describe_kind(&self) -> &'static str {
         match *self.0 {
-            SearchPathInner::Extra(_) => {
-                "extra search path specified on the CLI or in your config file"
+            SearchPathInner::NonEnvironment(_) => {
+                "non-environment search path specified on the CLI or in your config file"
             }
             SearchPathInner::FirstParty(_) => "first-party code",
             SearchPathInner::StandardLibraryCustom(_) => {
@@ -772,7 +775,7 @@ impl PartialEq<SearchPath> for VendoredPathBuf {
 impl fmt::Display for SearchPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &*self.0 {
-            SearchPathInner::Extra(system_path_buf)
+            SearchPathInner::NonEnvironment(system_path_buf)
             | SearchPathInner::FirstParty(system_path_buf)
             | SearchPathInner::SitePackages(system_path_buf)
             | SearchPathInner::Editable(system_path_buf)
@@ -1073,7 +1076,7 @@ mod tests {
     fn relativize_non_stdlib_path_errors() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
 
-        let root = SearchPath::extra(db.system(), src.clone()).unwrap();
+        let root = SearchPath::non_environment(db.system(), src.clone()).unwrap();
         // Must have a `.py` extension, a `.pyi` extension, or no extension:
         let bad_absolute_path = src.join("x.rs");
         assert_eq!(root.relativize_system_path(&bad_absolute_path), None);
