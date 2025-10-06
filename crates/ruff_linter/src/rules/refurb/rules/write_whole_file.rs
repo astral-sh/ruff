@@ -136,7 +136,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                             filename: SourceCodeSnippet::from_str(
                                 &self.checker.generator().expr(open.filename),
                             ),
-                            suggestion: suggestion.clone(),
+                            suggestion: SourceCodeSnippet::from_str(&suggestion),
                         },
                         open.item.range(),
                     );
@@ -176,7 +176,7 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
     Some((&*attr.value, call.arguments.args.first()?))
 }
 
-fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> SourceCodeSnippet {
+fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> String {
     let name = ast::ExprName {
         id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
@@ -196,27 +196,21 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> Sou
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
+    generator.expr(&call.into())
 }
 
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
     with_stmt: &ast::StmtWith,
-    suggestion: &SourceCodeSnippet,
+    suggestion: &str,
 ) -> Option<Fix> {
-    let is_valid_block =
-        with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)]);
-
-    if !is_valid_block {
+    if !with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)]) {
         return None;
     }
 
     let locator = checker.locator();
     let filename_code = locator.slice(open.filename.range());
-    let call = suggestion
-        .full_display()
-        .unwrap_or(suggestion.truncated_display());
 
     let (import_edit, binding) = checker
         .importer()
@@ -227,7 +221,7 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = format!("{binding}({filename_code}).{call}");
+    let replacement = format!("{binding}({filename_code}).{suggestion}");
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
         Applicability::Unsafe
