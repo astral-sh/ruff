@@ -225,7 +225,7 @@ DJ015 [*] URL route `/bad/<slug:slug>/` has an unnecessary leading slash
 51 | urlpatterns_params_bad = [
 52 |     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
    |          ^^^^^^^^^^^^^^^^^^^
-53 |     path("/<slug:slug>", views.bad_view),  # DJ014
+53 |     path("/<slug:slug>", views.bad_view),  # DJ015
 54 | ]
    |
 help: Remove leading slash
@@ -234,7 +234,7 @@ help: Remove leading slash
 51 | urlpatterns_params_bad = [
    -     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
 52 +     path("bad/<slug:slug>/", views.bad_view),  # DJ015
-53 |     path("/<slug:slug>", views.bad_view),  # DJ014
+53 |     path("/<slug:slug>", views.bad_view),  # DJ015
 54 | ]
 
 DJ015 [*] URL route `/<slug:slug>` has an unnecessary leading slash
@@ -242,7 +242,7 @@ DJ015 [*] URL route `/<slug:slug>` has an unnecessary leading slash
    |
 51 | urlpatterns_params_bad = [
 52 |     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
-53 |     path("/<slug:slug>", views.bad_view),  # DJ014
+53 |     path("/<slug:slug>", views.bad_view),  # DJ015
    |          ^^^^^^^^^^^^^^
 54 | ]
    |
@@ -250,6 +250,6 @@ help: Remove leading slash
 50 | # Error - leading trail slash and argument should stay in message
 51 | urlpatterns_params_bad = [
 52 |     path("/bad/<slug:slug>/", views.bad_view),  # DJ015
-   -     path("/<slug:slug>", views.bad_view),  # DJ014
-53 +     path("<slug:slug>", views.bad_view),  # DJ014
+   -     path("/<slug:slug>", views.bad_view),  # DJ015
+53 +     path("<slug:slug>", views.bad_view),  # DJ015
 54 | ]
