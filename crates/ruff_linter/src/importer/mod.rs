@@ -534,10 +534,8 @@ impl<'a> Importer<'a> {
 
     /// Find the last `from __future__` import statement in the AST.
     fn find_last_future_import(&self) -> Option<&'a Stmt> {
-        use ruff_python_ast::helpers::is_docstring_stmt;
-
         let mut body = self.python_ast.iter().peekable();
-        let _docstring = body.next_if(|stmt| is_docstring_stmt(stmt));
+        let _docstring = body.next_if(|stmt| ast::helpers::is_docstring_stmt(stmt));
 
         body.take_while(|stmt| {
             stmt.as_import_from_stmt()
