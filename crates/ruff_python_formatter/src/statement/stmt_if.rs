@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -26,22 +26,18 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::If(item),
-                    trailing_colon_comment,
-                    &format_args![
-                        token("if"),
-                        space(),
-                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                    ],
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(elif_else_clauses.is_empty()),
-                    trailing_colon_comment
-                ),
-            ]
+            [clause(
+                ClauseHeader::If(item),
+                trailing_colon_comment,
+                &format_args![
+                    token("if"),
+                    space(),
+                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                ],
+                body,
+                SuiteKind::other(elif_else_clauses.is_empty()),
+                trailing_colon_comment
+            )]
         )?;
 
         let mut last_node = body.last().unwrap().into();
@@ -81,7 +77,7 @@ pub(crate) fn format_elif_else_clause(
     write!(
         f,
         [
-            clause_header(
+            clause(
                 ClauseHeader::ElifElse(item),
                 trailing_colon_comment,
                 &format_with(|f: &mut PyFormatter| {
@@ -103,9 +99,11 @@ pub(crate) fn format_elif_else_clause(
                         token("else").fmt(f)
                     }
                 }),
+                body,
+                suite_kind,
+                trailing_colon_comment
             )
             .with_leading_comments(leading_comments, last_node),
-            clause_body(body, suite_kind, trailing_colon_comment),
             f.options()
                 .source_map_generation()
                 .is_enabled()
