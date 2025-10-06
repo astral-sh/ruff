@@ -670,7 +670,7 @@ struct ModuleNameIngredient<'db> {
 /// certain other modules that are involved in an import cycle with `builtins` (`types`,
 /// `typing_extensions`, etc.). This latter set of modules cannot be allowed to be shadowed by
 /// first-party or "extra-path" modules, or we risk panics in unexpected places due to being
-/// unable to resolve builtin symbols. This is similar behaviour other other type checkers such
+/// unable to resolve builtin symbols. This is similar behaviour to other type checkers such
 /// as mypy: <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
 pub(super) fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
     matches!(module_name, "types" | "typing_extensions")
