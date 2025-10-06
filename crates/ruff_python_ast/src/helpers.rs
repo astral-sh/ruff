@@ -1655,12 +1655,9 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        AtomicNodeIndex, BytesLiteral, ConversionFlag, DebugText, Expr, ExprBytesLiteral,
-        ExprContext, ExprFString, ExprGenerator, ExprLambda, ExprName, ExprNoneLiteral,
-        ExprNumberLiteral, ExprStringLiteral, FString, Identifier, Int, InterpolatedElement,
-        InterpolatedStringElement, InterpolatedStringElements, Number, Stmt, StmtTypeAlias,
-        StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-        TypeParams,
+        AtomicNodeIndex, Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number,
+        Stmt, StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+        TypeParamTypeVarTuple, TypeParams,
     };
 
     #[test]
