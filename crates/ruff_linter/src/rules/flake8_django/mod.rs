@@ -1,6 +1,7 @@
 //! Rules from [django-flake8](https://pypi.org/project/flake8-django/)
 mod helpers;
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -29,6 +30,27 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn test_additional_path_functions_dj014() -> Result<()> {
+        let mut settings =
+            settings::LinterSettings::for_rule(Rule::DjangoURLPathWithoutTrailingSlash);
+        settings.flake8_django.additional_path_functions = vec!["mytools.path".to_string()];
+
+        let diagnostics = test_path(Path::new("flake8_django/DJ014_custom_paths.py"), &settings)?;
+        assert_diagnostics!("DJ014_custom_paths.py", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn test_additional_path_functions_dj015() -> Result<()> {
+        let mut settings = settings::LinterSettings::for_rule(Rule::DjangoURLPathWithLeadingSlash);
+        settings.flake8_django.additional_path_functions = vec!["mytools.path".to_string()];
+
+        let diagnostics = test_path(Path::new("flake8_django/DJ015_custom_paths.py"), &settings)?;
+        assert_diagnostics!("DJ015_custom_paths.py", diagnostics);
         Ok(())
     }
 }
