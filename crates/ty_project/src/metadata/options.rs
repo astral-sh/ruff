@@ -583,12 +583,12 @@ pub struct EnvironmentOptions {
 
     /// Path to your project's Python environment or interpreter.
     ///
-    /// Ty uses the `site-packages` directory of your project's Python environment
+    /// ty uses the `site-packages` directory of your project's Python environment
     /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
     /// If you're using a project management tool such as uv, you should not generally need
     /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
-    /// environment variable to point to your project's virtual environment. Ty can also infer
+    /// environment variable to point to your project's virtual environment. ty can also infer
     /// the location of your environment from an activated Conda environment, and will look for
     /// a `.venv` directory in the project root if none of the above apply.
     ///

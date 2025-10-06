@@ -53,7 +53,7 @@ pub(crate) struct CheckCommand {
 
     /// Path to your project's Python environment or interpreter.
     ///
-    /// Ty uses your Python environment to resolve third-party imports in your code.
+    /// ty uses your Python environment to resolve third-party imports in your code.
     ///
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
