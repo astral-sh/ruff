@@ -390,6 +390,12 @@ impl<'db> TypeContext<'db> {
         self.annotation
             .and_then(|ty| ty.known_specialization(known_class, db))
     }
+
+    pub(crate) fn map_annotation(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            annotation: self.annotation.map(f),
+        }
+    }
 }
 
 /// Returns the statically-known truthiness of a given expression.

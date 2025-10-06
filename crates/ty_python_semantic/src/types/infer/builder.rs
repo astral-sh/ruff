@@ -5560,6 +5560,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             panic!("Typeshed should always have a `{name}` class in `builtins.pyi`")
         });
 
+        let tcx = tcx.map_annotation(|annotation| {
+            // Remove any union elements of `annotation` that are not related to `collection_ty`.
+            // e.g. `annotation: list[int] | None => list[int]` if `collection_ty: list`
+            let collection_ty = collection_class.to_instance(self.db());
+            annotation.filter_disjoint_elements(self.db(), collection_ty)
+        });
+
         // Extract the annotated type of `T`, if provided.
         let annotated_elt_tys = tcx
             .known_specialization(collection_class, self.db())

@@ -150,7 +150,81 @@ r: dict[int | str, int | str] = {1: 1, 2: 2, 3: 3}
 reveal_type(r)  # revealed: dict[int | str, int | str]
 ```
 
-## Incorrect collection literal assignments are complained aobut
+## Optional collection literal annotations are understood
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+import typing
+
+a: list[int] | None = [1, 2, 3]
+reveal_type(a)  # revealed: list[int]
+
+b: list[int | str] | None = [1, 2, 3]
+reveal_type(b)  # revealed: list[int | str]
+
+c: typing.List[int] | None = [1, 2, 3]
+reveal_type(c)  # revealed: list[int]
+
+d: list[typing.Any] | None = []
+reveal_type(d)  # revealed: list[Any]
+
+e: set[int] | None = {1, 2, 3}
+reveal_type(e)  # revealed: set[int]
+
+f: set[int | str] | None = {1, 2, 3}
+reveal_type(f)  # revealed: set[int | str]
+
+g: typing.Set[int] | None = {1, 2, 3}
+reveal_type(g)  # revealed: set[int]
+
+h: list[list[int]] | None = [[], [42]]
+reveal_type(h)  # revealed: list[list[int]]
+
+i: list[typing.Any] | None = [1, 2, "3", ([4],)]
+reveal_type(i)  # revealed: list[Any | int | str | tuple[list[Unknown | int]]]
+
+j: list[tuple[str | int, ...]] | None = [(1, 2), ("foo", "bar"), ()]
+reveal_type(j)  # revealed: list[tuple[str | int, ...]]
+
+k: list[tuple[list[int], ...]] | None = [([],), ([1, 2], [3, 4]), ([5], [6], [7])]
+reveal_type(k)  # revealed: list[tuple[list[int], ...]]
+
+l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] | None = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
+# TODO: this should be `tuple[list[int], list[Any | int], list[Any | int], list[str]]`
+reveal_type(l)  # revealed: tuple[list[Unknown | int], list[Unknown | int], list[Unknown | int], list[Unknown | str]]
+
+type IntList = list[int]
+
+m: IntList | None = [1, 2, 3]
+reveal_type(m)  # revealed: list[int]
+
+# TODO: this should type-check and avoid literal promotion
+# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[Literal[1, 2, 3]] | None`"
+n: list[typing.Literal[1, 2, 3]] | None = [1, 2, 3]
+# TODO: this should be `list[Literal[1, 2, 3]]` at this scope
+reveal_type(n)  # revealed: list[Literal[1, 2, 3]] | None
+
+# TODO: this should type-check and avoid literal promotion
+# error: [invalid-assignment] "Object of type `list[Unknown | str]` is not assignable to `list[LiteralString] | None`"
+o: list[typing.LiteralString] | None = ["a", "b", "c"]
+# TODO: this should be `list[LiteralString]` at this scope
+reveal_type(o)  # revealed: list[LiteralString] | None
+
+p: dict[int, int] | None = {}
+reveal_type(p)  # revealed: dict[int, int]
+
+q: dict[int | str, int] | None = {1: 1, 2: 2, 3: 3}
+reveal_type(q)  # revealed: dict[int | str, int]
+
+r: dict[int | str, int | str] | None = {1: 1, 2: 2, 3: 3}
+reveal_type(r)  # revealed: dict[int | str, int | str]
+```
+
+## Incorrect collection literal assignments are complained about
 
 ```py
 # error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[str]`"

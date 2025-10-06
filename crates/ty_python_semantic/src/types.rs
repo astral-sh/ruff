@@ -1140,6 +1140,15 @@ impl<'db> Type<'db> {
         if yes { self.negate(db) } else { *self }
     }
 
+    /// Remove the union elements that are not related to `target`.
+    pub(crate) fn filter_disjoint_elements(self, db: &'db dyn Db, target: Type<'db>) -> Type<'db> {
+        if let Type::Union(union) = self {
+            union.filter(db, |elem| !elem.is_disjoint_from(db, target))
+        } else {
+            self
+        }
+    }
+
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type
     /// is not a literal.
     pub(crate) fn literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {

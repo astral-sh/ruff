@@ -1159,13 +1159,9 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
-        if let Type::Union(union) = actual {
-            // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
-            // So, here we remove the union elements that are not related to `formal`.
-            actual = union.filter(self.db, |actual_elem| {
-                !actual_elem.is_disjoint_from(self.db, formal)
-            });
-        }
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
+        // So, here we remove the union elements that are not related to `formal`.
+        actual = actual.filter_disjoint_elements(self.db, formal);
 
         match (formal, actual) {
             (Type::Union(_), Type::Union(_)) => {
