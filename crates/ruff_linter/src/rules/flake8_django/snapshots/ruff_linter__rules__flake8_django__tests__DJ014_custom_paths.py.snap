@@ -1,0 +1,60 @@
+---
+source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+---
+DJ014 [*] URL route `help` is missing a trailing slash
+ --> DJ014_custom_paths.py:7:12
+  |
+5 | # Test that custom path functions are also checked
+6 | urlpatterns_custom = [
+7 |     mypath("help", views.help_view),  # DJ014
+  |            ^^^^^^
+8 |     mypath("about", views.about_view),  # DJ014
+9 | ]
+  |
+help: Add trailing slash
+4  | 
+5  | # Test that custom path functions are also checked
+6  | urlpatterns_custom = [
+   -     mypath("help", views.help_view),  # DJ014
+7  +     mypath("help/", views.help_view),  # DJ014
+8  |     mypath("about", views.about_view),  # DJ014
+9  | ]
+10 | 
+
+DJ014 [*] URL route `about` is missing a trailing slash
+ --> DJ014_custom_paths.py:8:12
+  |
+6 | urlpatterns_custom = [
+7 |     mypath("help", views.help_view),  # DJ014
+8 |     mypath("about", views.about_view),  # DJ014
+  |            ^^^^^^^
+9 | ]
+  |
+help: Add trailing slash
+5  | # Test that custom path functions are also checked
+6  | urlpatterns_custom = [
+7  |     mypath("help", views.help_view),  # DJ014
+   -     mypath("about", views.about_view),  # DJ014
+8  +     mypath("about/", views.about_view),  # DJ014
+9  | ]
+10 | 
+11 | # OK - custom path with trailing slash
+
+DJ014 [*] URL route `contact` is missing a trailing slash
+  --> DJ014_custom_paths.py:19:10
+   |
+17 | # Test that default django.urls.path still works
+18 | urlpatterns_default = [
+19 |     path("contact", views.contact_view),  # DJ014
+   |          ^^^^^^^^^
+20 |     path("contact/", views.contact_ok),  # OK
+21 | ]
+   |
+help: Add trailing slash
+16 | 
+17 | # Test that default django.urls.path still works
+18 | urlpatterns_default = [
+   -     path("contact", views.contact_view),  # DJ014
+19 +     path("contact/", views.contact_view),  # DJ014
+20 |     path("contact/", views.contact_ok),  # OK
+21 | ]

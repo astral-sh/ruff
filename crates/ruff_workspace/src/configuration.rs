@@ -47,7 +47,7 @@ use ruff_python_formatter::{
 use crate::options::{
     AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
     Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
-    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    Flake8CopyrightOptions, Flake8DjangoOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
@@ -363,6 +363,10 @@ impl Configuration {
                     .map(Flake8CopyrightOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
+                flake8_django: lint
+                    .flake8_django
+                    .map(Flake8DjangoOptions::into_settings)
+                    .unwrap_or_default(),
                 flake8_errmsg: lint
                     .flake8_errmsg
                     .map(Flake8ErrMsgOptions::into_settings)
@@ -659,6 +663,7 @@ pub struct LintConfiguration {
     pub flake8_builtins: Option<Flake8BuiltinsOptions>,
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
     pub flake8_copyright: Option<Flake8CopyrightOptions>,
+    pub flake8_django: Option<Flake8DjangoOptions>,
     pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
     pub flake8_gettext: Option<Flake8GetTextOptions>,
     pub flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
@@ -776,6 +781,7 @@ impl LintConfiguration {
             flake8_builtins: options.common.flake8_builtins,
             flake8_comprehensions: options.common.flake8_comprehensions,
             flake8_copyright: options.common.flake8_copyright,
+            flake8_django: options.common.flake8_django,
             flake8_errmsg: options.common.flake8_errmsg,
             flake8_gettext: options.common.flake8_gettext,
             flake8_implicit_str_concat: options.common.flake8_implicit_str_concat,
@@ -1165,6 +1171,7 @@ impl LintConfiguration {
                 .flake8_comprehensions
                 .combine(config.flake8_comprehensions),
             flake8_copyright: self.flake8_copyright.combine(config.flake8_copyright),
+            flake8_django: self.flake8_django.combine(config.flake8_django),
             flake8_errmsg: self.flake8_errmsg.combine(config.flake8_errmsg),
             flake8_gettext: self.flake8_gettext.combine(config.flake8_gettext),
             flake8_implicit_str_concat: self
@@ -1388,6 +1395,7 @@ fn warn_about_deprecated_top_level_lint_options(
         flake8_builtins,
         flake8_comprehensions,
         flake8_copyright,
+        flake8_django,
         flake8_errmsg,
         flake8_quotes,
         flake8_self,
@@ -1509,6 +1517,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if flake8_copyright.is_some() {
         used_options.push("flake8-copyright");
+    }
+
+    if flake8_django.is_some() {
+        used_options.push("flake8-django");
     }
 
     if flake8_errmsg.is_some() {
