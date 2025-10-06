@@ -259,3 +259,13 @@ pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
 ) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_read_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_write_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
