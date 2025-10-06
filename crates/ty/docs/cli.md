@@ -67,7 +67,7 @@ over all configuration files.</p>
 </ul></dd><dt id="ty-check--project"><a href="#ty-check--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory.</p>
 <p>All <code>pyproject.toml</code> files will be discovered by walking up the directory tree from the given project directory, as will the project's virtual environment (<code>.venv</code>) unless the <code>venv-path</code> option is set.</p>
 <p>Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.</p>
-</dd><dt id="ty-check--python"><a href="#ty-check--python"><code>--python</code></a> <i>path</i></dt><dd><p>Path to the Python environment.</p>
+</dd><dt id="ty-check--python"><a href="#ty-check--python"><code>--python</code></a>, <code>--venv</code> <i>path</i></dt><dd><p>Path to the Python environment.</p>
 <p>ty uses the Python environment to resolve type information and third-party dependencies.</p>
 <p>If not specified, ty will attempt to infer it from the <code>VIRTUAL_ENV</code> or <code>CONDA_PREFIX</code> environment variables, or discover a <code>.venv</code> directory in the project root or working directory.</p>
 <p>If a path to a Python interpreter is provided, e.g., <code>.venv/bin/python3</code>, ty will attempt to find an environment two directories up from the interpreter's path, e.g., <code>.venv</code>. At this time, ty does not invoke the interpreter to determine the location of the environment. This means that ty will not resolve dynamic executables such as a shim.</p>

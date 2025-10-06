@@ -66,7 +66,7 @@ pub(crate) struct CheckCommand {
     ///
     /// ty will search in the resolved environment's `site-packages` directories for type
     /// information and third-party imports.
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,
 
     /// Custom directory to use for stdlib typeshed stubs.
