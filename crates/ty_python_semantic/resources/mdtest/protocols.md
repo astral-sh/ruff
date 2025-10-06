@@ -893,8 +893,10 @@ class LotsOfBindings(Protocol):
     match object():
         case l:  # error: [ambiguous-protocol-member]
             ...
+    # error: [ambiguous-protocol-member] "Consider adding an annotation, e.g. `m: int | str = ...`"
+    m = 1 if 1.2 > 3.4 else "a"
 
-# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]]
+# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"]]
 reveal_type(get_protocol_members(LotsOfBindings))
 
 class Foo(Protocol):
@@ -1977,12 +1979,12 @@ from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
 class NewStyleClassScoped[T](Protocol):
-    def method(self: Self, input: T) -> None: ...
+    def method(self, input: T) -> None: ...
 
 S = TypeVar("S")
 
 class LegacyClassScoped(Protocol[S]):
-    def method(self: Self, input: S) -> None: ...
+    def method(self, input: S) -> None: ...
 
 # TODO: these should pass
 static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [static-assert-error]

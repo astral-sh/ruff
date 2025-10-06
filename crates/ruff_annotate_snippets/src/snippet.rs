@@ -23,6 +23,7 @@ pub struct Message<'a> {
     pub(crate) snippets: Vec<Snippet<'a>>,
     pub(crate) footer: Vec<Message<'a>>,
     pub(crate) is_fixable: bool,
+    pub(crate) lineno_offset: usize,
 }
 
 impl<'a> Message<'a> {
@@ -57,6 +58,16 @@ impl<'a> Message<'a> {
     /// annotation also has `Level::None`.
     pub fn is_fixable(mut self, yes: bool) -> Self {
         self.is_fixable = yes;
+        self
+    }
+
+    /// Add an offset used for aligning the header sigil (`-->`) with the line number separators.
+    ///
+    /// For normal diagnostics this is computed automatically based on the lines to be rendered.
+    /// This is intended only for use in the formatter, where we don't render a snippet directly but
+    /// still want the header to align with the diff.
+    pub fn lineno_offset(mut self, offset: usize) -> Self {
+        self.lineno_offset = offset;
         self
     }
 }
@@ -144,7 +155,7 @@ impl<'a> Annotation<'a> {
         self
     }
 
-    pub fn is_file_level(mut self, yes: bool) -> Self {
+    pub fn hide_snippet(mut self, yes: bool) -> Self {
         self.is_file_level = yes;
         self
     }
@@ -173,6 +184,7 @@ impl Level {
             snippets: vec![],
             footer: vec![],
             is_fixable: false,
+            lineno_offset: 0,
         }
     }
 
