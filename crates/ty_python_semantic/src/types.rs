@@ -52,8 +52,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
+    GenericContext, PartialSpecialization, Specialization, bind_typevar, typing_self,
+    walk_generic_context,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
@@ -1159,21 +1159,26 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If this type is a literal, promote it to a type that this literal is an instance of.
+    /// Promote (possibly nested) literals to types that these literals are instances of.
     ///
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn literal_promotion_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+    }
+
+    /// Like [`Type::promote_literals`], but does not recurse into nested types.
+    fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
-            Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
-            Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
-            Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
-            Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
-            Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
-            Type::FunctionLiteral(literal) => Some(Type::Callable(literal.into_callable_type(db))),
-            _ => None,
+            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_instance(db),
+            Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db),
+            Type::IntLiteral(_) => KnownClass::Int.to_instance(db),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
+            Type::EnumLiteral(literal) => literal.enum_class_instance(db),
+            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            _ => self,
         }
     }
 
@@ -1408,43 +1413,9 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is a [subtype of] type `target`.
+    /// Return true if this type is a subtype of type `target`.
     ///
-    /// For fully static types, this means that the set of objects represented by `self` is a
-    /// subset of the objects represented by `target`.
-    ///
-    /// For gradual types, it means that the union of all possible sets of values represented by
-    /// `self` (the "top materialization" of `self`) is a subtype of the intersection of all
-    /// possible sets of values represented by `target` (the "bottom materialization" of
-    /// `target`). In other words, for all possible pairs of materializations `self'` and
-    /// `target'`, `self'` is always a subtype of `target'`.
-    ///
-    /// Note that this latter expansion of the subtyping relation to non-fully-static types is not
-    /// described in the typing spec, but the primary use of the subtyping relation is for
-    /// simplifying unions and intersections, and this expansion to gradual types is sound and
-    /// allows us to better simplify many unions and intersections. This definition does mean the
-    /// subtyping relation is not reflexive for non-fully-static types (e.g. `Any` is not a subtype
-    /// of `Any`).
-    ///
-    /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
-    ///
-    /// There would be an even more general definition of subtyping for gradual types, allowing a
-    /// type `S` to be a subtype of a type `T` if the top materialization of `S` (`S+`) is a
-    /// subtype of `T+`, and the bottom materialization of `S` (`S-`) is a subtype of `T-`. This
-    /// definition is attractive in that it would restore reflexivity of subtyping for all types,
-    /// and would mean that gradual equivalence of `S` and `T` could be defined simply as `S <: T
-    /// && T <: S`. It would also be sound, in that simplifying unions or intersections according
-    /// to this definition of subtyping would still result in an equivalent type.
-    ///
-    /// Unfortunately using this definition would break transitivity of subtyping when both nominal
-    /// and structural types are involved, because Liskov enforcement for nominal types is based on
-    /// assignability, so we can have class `A` with method `def meth(self) -> Any` and a subclass
-    /// `B(A)` with method `def meth(self) -> int`. In this case, `A` would be a subtype of a
-    /// protocol `P` with method `def meth(self) -> Any`, but `B` would not be a subtype of `P`,
-    /// and yet `B` is (by nominal subtyping) a subtype of `A`, so we would have `B <: A` and `A <:
-    /// P`, but not `B <: P`. Losing transitivity of subtyping is not tenable (it makes union and
-    /// intersection simplification dependent on the order in which elements are added), so we do
-    /// not use this more general definition of subtyping.
+    /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_subtype_of(db, target).is_always_satisfied()
     }
@@ -1453,15 +1424,23 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, TypeRelation::Subtyping)
     }
 
-    /// Return true if this type is [assignable to] type `target`.
+    /// Return true if this type is assignable to type `target`.
     ///
-    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target).is_always_satisfied()
     }
 
     fn when_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
+    }
+
+    /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
+    ///
+    /// See [`TypeRelation::Redundancy`] for more details.
+    pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        self.has_relation_to(db, other, TypeRelation::Redundancy)
+            .is_always_satisfied()
     }
 
     fn has_relation_to(
@@ -1485,7 +1464,7 @@ impl<'db> Type<'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
+        if (!relation.is_subtyping() || self.subtyping_is_always_reflexive()) && self == target {
             return ConstraintSet::from(true);
         }
 
@@ -1502,9 +1481,11 @@ impl<'db> Type<'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => ConstraintSet::from(true),
 
-            // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
-            // handled above. It's always assignable, though.
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
+            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
+            // but this is not true for divergent types (and moving this case any lower down appears to cause
+            // "too many cycle iterations" panics).
+            (Type::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
                 ConstraintSet::from(relation.is_assignability())
             }
 
@@ -1529,10 +1510,33 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(db, right, relation, visitor)
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                ConstraintSet::from(relation.is_assignability())
-            }
+            // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
+            // handled above. It's always assignable, though.
+            //
+            // Union simplification sits in between subtyping and assignability. `Any <: T` only
+            // holds true if `T` is also a dynamic type or a union that contains a dynamic type.
+            // Similarly, `T <: Any` only holds true if `T` is a dynamic type or an intersection
+            // that contains a dynamic type.
+            (Type::Dynamic(_), _) => ConstraintSet::from(match relation {
+                TypeRelation::Subtyping => false,
+                TypeRelation::Assignability => true,
+                TypeRelation::Redundancy => match target {
+                    Type::Dynamic(_) => true,
+                    Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                    _ => false,
+                },
+            }),
+            (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
+                TypeRelation::Subtyping => false,
+                TypeRelation::Assignability => true,
+                TypeRelation::Redundancy => match self {
+                    Type::Dynamic(_) => true,
+                    Type::Intersection(intersection) => {
+                        intersection.positive(db).iter().any(Type::is_dynamic)
+                    }
+                    _ => false,
+                },
+            }),
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -1555,7 +1559,7 @@ impl<'db> Type<'db> {
             (Type::Intersection(intersection), Type::NonInferableTypeVar(_))
                 if intersection.negative(db).contains(&target) =>
             {
-                ConstraintSet::from(true)
+                ConstraintSet::from(false)
             }
 
             // Two identical typevars must always solve to the same type, so they are always
@@ -1679,6 +1683,11 @@ impl<'db> Type<'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement assignability and subtyping for TypedDict
+                ConstraintSet::from(relation.is_assignability())
+            }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -3145,7 +3154,7 @@ impl<'db> Type<'db> {
         );
         match self {
             Type::Callable(callable) if callable.is_function_like(db) => {
-                // For "function-like" callables, model the the behavior of `FunctionType.__get__`.
+                // For "function-like" callables, model the behavior of `FunctionType.__get__`.
                 //
                 // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
                 // we should instead return a new method-wrapper type variant for the synthesized `__get__`
@@ -4185,20 +4194,26 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownFunction::AssertType) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("type")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(Type::none(db)),
-                    ),
-                )
-                .into(),
+                Some(KnownFunction::AssertType) => {
+                    let val_ty =
+                        BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Invariant);
+
+                    Binding::single(
+                        self,
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [val_ty])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::TypeVar(val_ty)),
+                                Parameter::positional_only(Some(Name::new_static("type")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::TypeVar(val_ty)),
+                        ),
+                    )
+                    .into()
+                }
 
                 Some(KnownFunction::AssertNever) => {
                     Binding::single(
@@ -5349,12 +5364,10 @@ impl<'db> Type<'db> {
                 Some(generic_context) => (
                     Some(class),
                     Some(generic_context),
-                    Type::from(class.apply_specialization(db, |_| {
-                        // It is important that identity_specialization specializes the class with
-                        // _inferable_ typevars, so that our specialization inference logic will
-                        // try to find a specialization for them.
-                        generic_context.identity_specialization(db)
-                    })),
+                    // It is important that identity_specialization specializes the class with
+                    // _inferable_ typevars, so that our specialization inference logic will
+                    // try to find a specialization for them.
+                    Type::from(class.identity_specialization(db, &Type::TypeVar)),
                 ),
                 _ => (None, None, self),
             },
@@ -5449,28 +5462,19 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                let new_specialization = new_call_outcome
-                    .and_then(Result::ok)
-                    .as_ref()
-                    .and_then(Bindings::single_element)
-                    .into_iter()
-                    .flat_map(CallableBinding::matching_overloads)
-                    .next()
-                    .and_then(|(_, binding)| binding.inherited_specialization())
-                    .filter(|specialization| {
-                        Some(specialization.generic_context(db)) == generic_context
-                    });
-                let init_specialization = init_call_outcome
-                    .and_then(Result::ok)
-                    .as_ref()
-                    .and_then(Bindings::single_element)
-                    .into_iter()
-                    .flat_map(CallableBinding::matching_overloads)
-                    .next()
-                    .and_then(|(_, binding)| binding.inherited_specialization())
-                    .filter(|specialization| {
-                        Some(specialization.generic_context(db)) == generic_context
-                    });
+                let specialize_constructor = |outcome: Option<Bindings<'db>>| {
+                    let (_, binding) = outcome
+                        .as_ref()?
+                        .single_element()?
+                        .matching_overloads()
+                        .next()?;
+                    binding.specialization()?.restrict(db, generic_context?)
+                };
+
+                let new_specialization =
+                    specialize_constructor(new_call_outcome.and_then(Result::ok));
+                let init_specialization =
+                    specialize_constructor(init_call_outcome.and_then(Result::ok));
                 let specialization =
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
@@ -5626,11 +5630,9 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::TypeVar(typevar) => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
-                        &module,
                         index,
                         scope_id.file_scope_id(db),
                         typevar_binding_context,
@@ -5703,7 +5705,6 @@ impl<'db> Type<'db> {
                     .build()),
 
                 SpecialFormType::TypingSelf => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -5714,40 +5715,13 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    let upper_bound = Type::instance(
+                    Ok(typing_self(
                         db,
-                        class.apply_specialization(db, |generic_context| {
-                            let types = generic_context
-                                .variables(db)
-                                .iter()
-                                .map(|typevar| Type::NonInferableTypeVar(*typevar));
-
-                            generic_context.specialize(db, types.collect())
-                        }),
-                    );
-
-                    let class_definition = class.definition(db);
-                    let typevar = TypeVarInstance::new(
-                        db,
-                        ast::name::Name::new_static("Self"),
-                        Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
-                        // According to the [spec], we can consider `Self`
-                        // equivalent to an invariant type variable
-                        // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
-                        Some(TypeVarVariance::Invariant),
-                        None,
-                        TypeVarKind::TypingSelf,
-                    );
-                    Ok(bind_typevar(
-                        db,
-                        &module,
-                        index,
-                        scope_id.file_scope_id(db),
+                        scope_id,
                         typevar_binding_context,
-                        typevar,
+                        class,
+                        &Type::NonInferableTypeVar,
                     )
-                    .map(Type::NonInferableTypeVar)
                     .unwrap_or(*self))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
@@ -6102,19 +6076,18 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                let function = Type::FunctionLiteral(function.with_type_mapping(db, type_mapping));
+                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, visitor));
 
                 match type_mapping {
-                    TypeMapping::PromoteLiterals => function.literal_promotion_type(db)
-                        .expect("function literal should have a promotion type"),
+                    TypeMapping::PromoteLiterals => function.promote_literals_impl(db),
                     _ => function
                 }
             }
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).with_type_mapping(db, type_mapping),
-                method.self_instance(db).apply_type_mapping(db, type_mapping),
+                method.function(db).apply_type_mapping_impl(db, type_mapping, visitor),
+                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, visitor),
             )),
 
             Type::NominalInstance(instance) =>
@@ -6133,13 +6106,13 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.with_type_mapping(db, type_mapping),
+                    function.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.with_type_mapping(db, type_mapping),
+                    function.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
@@ -6214,8 +6187,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
-                TypeMapping::PromoteLiterals => self.literal_promotion_type(db)
-                    .expect("literal type should have a promotion type"),
+                TypeMapping::PromoteLiterals => self.promote_literals_impl(db)
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6775,84 +6747,7 @@ pub enum TypeMapping<'a, 'db> {
     Materialize(MaterializationKind),
 }
 
-fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    mapping: &TypeMapping<'_, 'db>,
-    visitor: &V,
-) {
-    match mapping {
-        TypeMapping::Specialization(specialization) => {
-            walk_specialization(db, *specialization, visitor);
-        }
-        TypeMapping::PartialSpecialization(specialization) => {
-            walk_partial_specialization(db, specialization, visitor);
-        }
-        TypeMapping::BindSelf(self_type) => {
-            visitor.visit_type(db, *self_type);
-        }
-        TypeMapping::ReplaceSelf { new_upper_bound } => {
-            visitor.visit_type(db, *new_upper_bound);
-        }
-        TypeMapping::PromoteLiterals
-        | TypeMapping::BindLegacyTypevars(_)
-        | TypeMapping::MarkTypeVarsInferable(_)
-        | TypeMapping::Materialize(_) => {}
-    }
-}
-
 impl<'db> TypeMapping<'_, 'db> {
-    fn to_owned(&self) -> TypeMapping<'db, 'db> {
-        match self {
-            TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(*specialization)
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.to_owned())
-            }
-            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
-            TypeMapping::BindLegacyTypevars(binding_context) => {
-                TypeMapping::BindLegacyTypevars(*binding_context)
-            }
-            TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
-            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
-                new_upper_bound: *new_upper_bound,
-            },
-            TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                TypeMapping::MarkTypeVarsInferable(*binding_context)
-            }
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(*materialization_kind)
-            }
-        }
-    }
-
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(specialization.normalized_impl(db, visitor))
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
-            }
-            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
-            TypeMapping::BindLegacyTypevars(binding_context) => {
-                TypeMapping::BindLegacyTypevars(*binding_context)
-            }
-            TypeMapping::BindSelf(self_type) => {
-                TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
-            }
-            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
-                new_upper_bound: new_upper_bound.normalized_impl(db, visitor),
-            },
-            TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                TypeMapping::MarkTypeVarsInferable(*binding_context)
-            }
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(*materialization_kind)
-            }
-        }
-    }
-
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
@@ -6870,13 +6765,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 db,
                 context
                     .variables(db)
-                    .iter()
-                    .filter(|var| !var.typevar(db).is_self(db))
-                    .copied(),
+                    .filter(|var| !var.typevar(db).is_self(db)),
             ),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
-                context.variables(db).iter().map(|typevar| {
+                context.variables(db).map(|typevar| {
                     if typevar.typevar(db).is_self(db) {
                         BoundTypeVarInstance::synthetic_self(
                             db,
@@ -6884,7 +6777,7 @@ impl<'db> TypeMapping<'_, 'db> {
                             typevar.binding_context(db),
                         )
                     } else {
-                        *typevar
+                        typevar
                     }
                 }),
             ),
@@ -7058,7 +6951,11 @@ impl<'db> KnownInstanceType<'db> {
                         if let Some(specialization) = alias.specialization(self.db) {
                             f.write_str(alias.name(self.db))?;
                             specialization
-                                .display_short(self.db, TupleSpecialization::No)
+                                .display_short(
+                                    self.db,
+                                    TupleSpecialization::No,
+                                    DisplaySettings::default(),
+                                )
                                 .fmt(f)
                         } else {
                             f.write_str("typing.TypeAliasType")
@@ -9088,15 +8985,137 @@ impl<'db> ConstructorCallError<'db> {
     }
 }
 
+/// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
+    /// The "subtyping" relation.
+    ///
+    /// A [fully static] type `B` is a subtype of a fully static type `A` if and only if
+    /// the set of possible runtime values represented by `B` is a subset of the set
+    /// of possible runtime values represented by `A`.
+    ///
+    /// For a pair of types `C` and `D` that may or may not be fully static,
+    /// `D` can be said to be a subtype of `C` if every possible fully static
+    /// [materialization] of `D` is a subtype of every possible fully static
+    /// materialization of `C`. Another way of saying this is that `D` will be a
+    /// subtype of `C` if and only if the union of all possible sets of values
+    /// represented by `D` (the "top materialization" of `D`) is a subtype of the
+    /// intersection of all possible sets of values represented by `C` (the "bottom
+    /// materialization" of `C`). More concisely: `D <: C` iff `Top[D] <: Bottom[C]`.
+    ///
+    /// For example, `list[Any]` can be said to be a subtype of `Sequence[object]`,
+    /// because every possible fully static materialization of `list[Any]` (`list[int]`,
+    /// `list[str]`, `list[bytes | bool]`, `list[SupportsIndex]`, etc.) would be
+    /// considered a subtype of `Sequence[object]`.
+    ///
+    /// Note that this latter expansion of the subtyping relation to non-fully-static
+    /// types is not described in the typing spec, but this expansion to gradual types is
+    /// sound and consistent with the principles laid out in the spec. This definition
+    /// does mean the subtyping relation is not reflexive for non-fully-static types
+    /// (e.g. `Any` is not a subtype of `Any`).
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Subtyping,
+
+    /// The "assignability" relation.
+    ///
+    /// The assignability relation between two types `A` and `B` dictates whether a
+    /// type checker should emit an error when a value of type `B` is assigned to a
+    /// variable declared as having type `A`.
+    ///
+    /// For a pair of [fully static] types `A` and `B`, the assignability relation
+    /// between `A` and `B` is the same as the subtyping relation.
+    ///
+    /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
+    /// assignability relation may be more permissive than the subtyping relation. `D`
+    /// can be said to be assignable to `C` if *some* possible fully static [materialization]
+    /// of `D` is a subtype of *some* possible fully static materialization of `C`.
+    /// Another way of saying this is that `D` will be assignable to `C` if and only if the
+    /// intersection of all possible sets of values represented by `D` (the "bottom
+    /// materialization" of `D`) is a subtype of the union of all possible sets of values
+    /// represented by `C` (the "top materialization" of `C`).
+    /// More concisely: `D <: C` iff `Bottom[D] <: Top[C]`.
+    ///
+    /// For example, `Any` is not a subtype of `int`, because there are possible
+    /// materializations of `Any` (e.g., `str`) that are not subtypes of `int`.
+    /// `Any` is *assignable* to `int`, however, as there are *some* possible materializations
+    /// of `Any` (such as `int` itself!) that *are* subtypes of `int`. `Any` cannot even
+    /// be considered a subtype of itself, as two separate uses of `Any` in the same scope
+    /// might materialize to different types between which there would exist no subtyping
+    /// relation; nor is `Any` a subtype of `int | Any`, for the same reason. Nonetheless,
+    /// `Any` is assignable to both `Any` and `int | Any`.
+    ///
+    /// While `Any` can materialize to anything, the presence of `Any` in a type does not
+    /// necessarily make it assignable to everything. For example, `list[Any]` is not
+    /// assignable to `int`, because there are no possible fully static types we could
+    /// substitute for `Any` in this type that would make it a subtype of `int`. For the
+    /// same reason, a union such as `str | Any` is not assignable to `int`.
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Assignability,
+
+    /// The "redundancy" relation.
+    ///
+    /// The redundancy relation dictates whether the union `A | B` can be safely simplified
+    /// to the type `A` without downstream consequences on ty's inference of types elsewhere.
+    ///
+    /// For a pair of [fully static] types `A` and `B`, the redundancy relation between `A`
+    /// and `B` is the same as the subtyping relation.
+    ///
+    /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
+    /// redundancy relation sits in between the subtyping relation and the assignability relation.
+    /// `D` can be said to be redundant in a union with `C` if the top materialization of the type
+    /// `C | D` is equivalent to the top materialization of `C`, *and* the bottom materialization
+    /// of `C | D` is equivalent to the bottom materialization of `C`.
+    /// More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
+    ///
+    /// Practically speaking, in most respects the redundancy relation is the same as the subtyping
+    /// relation. It is redundant to add `bool` to a union that includes `int`, because `bool` is a
+    /// subtype of `int`, so inference of attribute access or binary expressions on the union
+    /// `int | bool` would always produce a type that represents the same set of possible sets of
+    /// runtime values as if ty had inferred the attribute access or binary expression on `int`
+    /// alone.
+    ///
+    /// Where the redundancy relation differs from the subtyping relation is that there are a
+    /// number of simplifications that can be made when simplifying unions that are not
+    /// strictly permitted by the subtyping relation. For example, it is safe to avoid adding
+    /// `Any` to a union that already includes `Any`, because `Any` already represents an
+    /// unknown set of possible sets of runtime values that can materialize to any type in a
+    /// gradual, permissive way. Inferring attribute access or binary expressions over
+    /// `Any | Any` could never conceivably yield a type that represents a different set of
+    /// possible sets of runtime values to inferring the same expression over `Any` alone;
+    /// although `Any` is not a subtype of `Any`, top materialization of both `Any` and
+    /// `Any | Any` is `object`, and the bottom materialization of both types is `Never`.
+    ///
+    /// The same principle also applies to intersections that include `Any` being added to
+    /// unions that include `Any`: for any type `A`, although naively distributing
+    /// type-inference operations over `(Any & A) | Any` could produce types that have
+    /// different displays to `Any`, `(Any & A) | Any` nonetheless has the same top
+    /// materialization as `Any` and the same bottom materialization as `Any`, and thus it is
+    /// redundant to add `Any & A` to a union that already includes `Any`.
+    ///
+    /// Union simplification cannot use the assignability relation, meanwhile, as it is
+    /// trivial to produce examples of cases where adding a type `B` to a union that includes
+    /// `A` would impact downstream type inference, even where `B` is assignable to `A`. For
+    /// example, `int` is assignable to `Any`, but attribute access over the union `int | Any`
+    /// will yield very different results to attribute access over `Any` alone. The top
+    /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
+    /// two differ in their bottom materializations (`Never` and `int`, respectively).
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
+    Redundancy,
 }
 
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
+    }
+
+    pub(crate) const fn is_subtyping(self) -> bool {
+        matches!(self, TypeRelation::Subtyping)
     }
 }
 

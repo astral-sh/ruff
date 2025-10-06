@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.13.3
+
+Released on 2025-10-02.
+
+### Preview features
+
+- Display diffs for `ruff format --check` and add support for different output formats ([#20443](https://github.com/astral-sh/ruff/pull/20443))
+- \[`pyflakes`\] Handle some common submodule import situations for `unused-import` (`F401`) ([#20200](https://github.com/astral-sh/ruff/pull/20200))
+- \[`ruff`\] Do not flag `%r` + `repr()` combinations (`RUF065`) ([#20600](https://github.com/astral-sh/ruff/pull/20600))
+
+### Bug fixes
+
+- \[`cli`\] Add conflict between `--add-noqa` and `--diff` options ([#20642](https://github.com/astral-sh/ruff/pull/20642))
+- \[`pylint`\] Exempt required imports from `PLR0402` ([#20381](https://github.com/astral-sh/ruff/pull/20381))
+- \[`pylint`\] Fix missing `max-nested-blocks` in settings display ([#20574](https://github.com/astral-sh/ruff/pull/20574))
+- \[`pyupgrade`\] Prevent infinite loop with `I002` and `UP026` ([#20634](https://github.com/astral-sh/ruff/pull/20634))
+
+### Rule changes
+
+- \[`flake8-simplify`\] Improve help message clarity (`SIM105`) ([#20548](https://github.com/astral-sh/ruff/pull/20548))
+
+### Documentation
+
+- Add the *The Basics* title back to CONTRIBUTING.md ([#20624](https://github.com/astral-sh/ruff/pull/20624))
+- Fixed documentation for try_consider_else ([#20587](https://github.com/astral-sh/ruff/pull/20587))
+- \[`isort`\] Clarify dependency between `order-by-type` and `case-sensitive` settings ([#20559](https://github.com/astral-sh/ruff/pull/20559))
+- \[`pylint`\] Clarify fix safety to include left-hand hashability (`PLR6201`) ([#20518](https://github.com/astral-sh/ruff/pull/20518))
+
+### Other changes
+
+- \[`playground`\] Fix quick fixes for empty ranges in playground ([#20599](https://github.com/astral-sh/ruff/pull/20599))
+
+### Contributors
+
+- [@TaKO8Ki](https://github.com/TaKO8Ki)
+- [@ntBre](https://github.com/ntBre)
+- [@dylwil3](https://github.com/dylwil3)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@danparizher](https://github.com/danparizher)
+- [@LilMonk](https://github.com/LilMonk)
+- [@mgiovani](https://github.com/mgiovani)
+- [@IDrokin117](https://github.com/IDrokin117)
+
 ## 0.13.2
 
 Released on 2025-09-25.

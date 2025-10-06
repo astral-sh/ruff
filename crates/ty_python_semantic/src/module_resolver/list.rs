@@ -1765,4 +1765,45 @@ not_a_directory
         "#,
         );
     }
+
+    /// This is a regression test for mishandling of file root matching.
+    ///
+    /// In particular, in some cases, `/` is added as a search root. This
+    /// should in turn match everything. But the way we were setting up the
+    /// wildcard for matching was incorrect for this one specific case. That in
+    /// turn meant that the module resolver couldn't find an appropriate file
+    /// root which in turn caused a panic.
+    ///
+    /// See: <https://github.com/astral-sh/ty/issues/1277>
+    #[test]
+    fn root_directory_for_search_path_is_okay() {
+        let project_directory = SystemPathBuf::from("/project");
+        let installed_foo_module = project_directory.join("foo/__init__.py");
+
+        let mut db = TestDb::new();
+        db.write_file(&installed_foo_module, "").unwrap();
+
+        db.files()
+            .try_add_root(&db, SystemPath::new("/"), FileRootKind::Project);
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings::new(vec![project_directory])
+                    .to_search_paths(db.system(), db.vendored())
+                    .unwrap(),
+            },
+        );
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |m| m.name(&db).as_str() == "foo"),
+            @r#"
+        [
+            Module::File("foo", "first-party", "/project/foo/__init__.py", Package, None),
+        ]
+        "#,
+        );
+    }
 }

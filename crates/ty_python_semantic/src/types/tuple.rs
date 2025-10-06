@@ -757,8 +757,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                if relation == TypeRelation::Subtyping || !matches!(self.variable, Type::Dynamic(_))
-                {
+                if !relation.is_assignability() || !self.variable.is_dynamic() {
                     return ConstraintSet::from(false);
                 }
 

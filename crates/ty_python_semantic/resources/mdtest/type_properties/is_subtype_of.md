@@ -830,6 +830,42 @@ static_assert(not is_subtype_of(object, Any))
 static_assert(is_subtype_of(int, Any | int))
 static_assert(is_subtype_of(Intersection[Any, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Any]))
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Covariant[Any], Covariant[Any]))
+static_assert(not is_subtype_of(Covariant[Any], Covariant[int]))
+static_assert(not is_subtype_of(Covariant[int], Covariant[Any]))
+static_assert(is_subtype_of(Covariant[Any], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[Any]))
+
+class Contravariant[T]:
+    def receive(self, input: T): ...
+
+static_assert(not is_subtype_of(Contravariant[Any], Contravariant[Any]))
+static_assert(not is_subtype_of(Contravariant[Any], Contravariant[int]))
+static_assert(not is_subtype_of(Contravariant[int], Contravariant[Any]))
+static_assert(not is_subtype_of(Contravariant[Any], Contravariant[object]))
+static_assert(is_subtype_of(Contravariant[object], Contravariant[Any]))
+
+class Invariant[T]:
+    mutable_attribute: T
+
+static_assert(not is_subtype_of(Invariant[Any], Invariant[Any]))
+static_assert(not is_subtype_of(Invariant[Any], Invariant[int]))
+static_assert(not is_subtype_of(Invariant[int], Invariant[Any]))
+static_assert(not is_subtype_of(Invariant[Any], Invariant[object]))
+static_assert(not is_subtype_of(Invariant[object], Invariant[Any]))
+
+class Bivariant[T]: ...
+
+static_assert(is_subtype_of(Bivariant[Any], Bivariant[Any]))
+static_assert(is_subtype_of(Bivariant[Any], Bivariant[int]))
+static_assert(is_subtype_of(Bivariant[int], Bivariant[Any]))
+static_assert(is_subtype_of(Bivariant[Any], Bivariant[object]))
+static_assert(is_subtype_of(Bivariant[object], Bivariant[Any]))
 ```
 
 The same for `Unknown`:
@@ -1948,8 +1984,6 @@ static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
 static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
-# TODO: This assertion should be true
-# error: [static-assert-error] "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 

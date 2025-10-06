@@ -69,6 +69,7 @@ impl Diagnostic {
             parent: None,
             noqa_offset: None,
             secondary_code: None,
+            header_offset: 0,
         });
         Diagnostic { inner }
     }
@@ -432,14 +433,23 @@ impl Diagnostic {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_ruff_url(&self) -> Option<String> {
-        if self.is_invalid_syntax() {
-            None
-        } else {
-            Some(format!(
-                "{}/rules/{}",
-                env!("CARGO_PKG_HOMEPAGE"),
-                self.name()
-            ))
+        match self.id() {
+            DiagnosticId::Panic
+            | DiagnosticId::Io
+            | DiagnosticId::InvalidSyntax
+            | DiagnosticId::RevealedType
+            | DiagnosticId::UnknownRule
+            | DiagnosticId::InvalidGlob
+            | DiagnosticId::EmptyInclude
+            | DiagnosticId::UnnecessaryOverridesSection
+            | DiagnosticId::UselessOverridesSection
+            | DiagnosticId::DeprecatedSetting
+            | DiagnosticId::Unformatted
+            | DiagnosticId::InvalidCliOption
+            | DiagnosticId::InternalError => None,
+            DiagnosticId::Lint(lint_name) => {
+                Some(format!("{}/rules/{lint_name}", env!("CARGO_PKG_HOMEPAGE")))
+            }
         }
     }
 
@@ -512,6 +522,11 @@ impl Diagnostic {
 
         a.cmp(&b)
     }
+
+    /// Add an offset for aligning the header sigil with the line number separators in a diff.
+    pub fn set_header_offset(&mut self, offset: usize) {
+        Arc::make_mut(&mut self.inner).header_offset = offset;
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -525,6 +540,7 @@ struct DiagnosticInner {
     parent: Option<TextSize>,
     noqa_offset: Option<TextSize>,
     secondary_code: Option<SecondaryCode>,
+    header_offset: usize,
 }
 
 struct RenderingSortKey<'a> {
@@ -742,11 +758,11 @@ pub struct Annotation {
     is_primary: bool,
     /// The diagnostic tags associated with this annotation.
     tags: Vec<DiagnosticTag>,
-    /// Whether this annotation is a file-level or full-file annotation.
+    /// Whether the snippet for this annotation should be hidden.
     ///
     /// When set, rendering will only include the file's name and (optional) range. Everything else
     /// is omitted, including any file snippet or message.
-    is_file_level: bool,
+    hide_snippet: bool,
 }
 
 impl Annotation {
@@ -765,7 +781,7 @@ impl Annotation {
             message: None,
             is_primary: true,
             tags: Vec::new(),
-            is_file_level: false,
+            hide_snippet: false,
         }
     }
 
@@ -782,7 +798,7 @@ impl Annotation {
             message: None,
             is_primary: false,
             tags: Vec::new(),
-            is_file_level: false,
+            hide_snippet: false,
         }
     }
 
@@ -849,19 +865,20 @@ impl Annotation {
         self.tags.push(tag);
     }
 
-    /// Set whether or not this annotation is file-level.
+    /// Set whether or not the snippet on this annotation should be suppressed when rendering.
     ///
-    /// File-level annotations are only rendered with their file name and range, if available. This
-    /// is intended for backwards compatibility with Ruff diagnostics, which historically used
+    /// Such annotations are only rendered with their file name and range, if available. This is
+    /// intended for backwards compatibility with Ruff diagnostics, which historically used
     /// `TextRange::default` to indicate a file-level diagnostic. In the new diagnostic model, a
     /// [`Span`] with a range of `None` should be used instead, as mentioned in the `Span`
     /// documentation.
     ///
     /// TODO(brent) update this usage in Ruff and remove `is_file_level` entirely. See
     /// <https://github.com/astral-sh/ruff/issues/19688>, especially my first comment, for more
-    /// details.
-    pub fn set_file_level(&mut self, yes: bool) {
-        self.is_file_level = yes;
+    /// details. As of 2025-09-26 we also use this to suppress snippet rendering for formatter
+    /// diagnostics, which also need to have a range, so we probably can't eliminate this entirely.
+    pub fn hide_snippet(&mut self, yes: bool) {
+        self.hide_snippet = yes;
     }
 }
 
@@ -1016,6 +1033,17 @@ pub enum DiagnosticId {
 
     /// Use of a deprecated setting.
     DeprecatedSetting,
+
+    /// The code needs to be formatted.
+    Unformatted,
+
+    /// Use of an invalid command-line option.
+    InvalidCliOption,
+
+    /// An internal assumption was violated.
+    ///
+    /// This indicates a bug in the program rather than a user error.
+    InternalError,
 }
 
 impl DiagnosticId {
@@ -1055,6 +1083,9 @@ impl DiagnosticId {
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            DiagnosticId::Unformatted => "unformatted",
+            DiagnosticId::InvalidCliOption => "invalid-cli-option",
+            DiagnosticId::InternalError => "internal-error",
         }
     }
 
@@ -1353,7 +1384,7 @@ impl DisplayDiagnosticConfig {
     }
 
     /// Whether to show a fix's availability or not.
-    pub fn show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
+    pub fn with_show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             show_fix_status: yes,
             ..self
@@ -1374,11 +1405,19 @@ impl DisplayDiagnosticConfig {
     /// availability for unsafe or display-only fixes.
     ///
     /// Note that this option is currently ignored when `hide_severity` is false.
-    pub fn fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
+    pub fn with_fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             fix_applicability: applicability,
             ..self
         }
+    }
+
+    pub fn show_fix_status(&self) -> bool {
+        self.show_fix_status
+    }
+
+    pub fn fix_applicability(&self) -> Applicability {
+        self.fix_applicability
     }
 }
 
