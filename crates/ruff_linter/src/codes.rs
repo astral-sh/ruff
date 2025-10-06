@@ -1184,6 +1184,16 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "014") => (RuleGroup::Stable, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
         (Flake8Logging, "015") => (RuleGroup::Stable, rules::flake8_logging::rules::RootLoggerCall),
 
+        // flake8-mock-spec
+        (Flake8MockSpec, "010") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::Mock),
+        (Flake8MockSpec, "011") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::MagicMock),
+        (Flake8MockSpec, "012") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::NonCallableMock),
+        (Flake8MockSpec, "013") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::AsyncMock),
+        (Flake8MockSpec, "014") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::ThreadingMock),
+        (Flake8MockSpec, "020") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::Patch),
+        (Flake8MockSpec, "021") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::PatchObject),
+        (Flake8MockSpec, "022") => (RuleGroup::Preview, rules::flake8_mock_spec::rules::PatchMultiple),
+
         _ => return None,
     })
 }
