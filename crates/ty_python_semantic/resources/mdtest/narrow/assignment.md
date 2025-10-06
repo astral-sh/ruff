@@ -36,7 +36,8 @@ class _:
 def _():
     reveal_type(a.x)  # revealed: Unknown | int | None
     reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    # TODO: Should be `Unknown | None`
+    reveal_type(a.z)  # revealed: Unknown
 
 if False:
     a = A()
@@ -48,7 +49,8 @@ if True:
     a = A()
 reveal_type(a.x)  # revealed: int | None
 reveal_type(a.y)  # revealed: Unknown | None
-reveal_type(a.z)  # revealed: Unknown | None
+# TODO: Should be `Unknown | None`
+reveal_type(a.z)  # revealed: Unknown
 
 a.x = 0
 a.y = 0
@@ -61,7 +63,8 @@ class _:
     a = A()
     reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    # TODO: Should be `Unknown | None`
+    reveal_type(a.z)  # revealed: Unknown
 
 def cond() -> bool:
     return True
@@ -77,7 +80,8 @@ class _:
         a = A()
     reveal_type(a.x)  # revealed: int | None | Unknown
     reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    # TODO: Should be `Unknown | None`
+    reveal_type(a.z)  # revealed: Unknown
 
 class _:
     a = A()
@@ -85,7 +89,8 @@ class _:
     class Inner:
         reveal_type(a.x)  # revealed: int | None
         reveal_type(a.y)  # revealed: Unknown | None
-        reveal_type(a.z)  # revealed: Unknown | None
+        # TODO: Should be `Unknown | None`
+        reveal_type(a.z)  # revealed: Unknown
 
 a = A()
 # error: [unresolved-attribute]

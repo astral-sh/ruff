@@ -61,7 +61,6 @@ pub use crate::types::ide_support::{
     definitions_for_keyword_argument, definitions_for_name, find_active_signature_from_details,
     inlay_hint_function_argument_details,
 };
-use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
@@ -5198,15 +5197,6 @@ impl<'db> Type<'db> {
     /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
     fn enter(self, db: &'db dyn Db) -> Type<'db> {
         self.try_enter_with_mode(db, EvaluationMode::Sync)
-            .unwrap_or_else(|err| err.fallback_enter_type(db))
-    }
-
-    /// Returns the type bound from a context manager with type `self`.
-    ///
-    /// This method should only be used outside of type checking because it omits any errors.
-    /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
-    fn aenter(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_enter_with_mode(db, EvaluationMode::Async)
             .unwrap_or_else(|err| err.fallback_enter_type(db))
     }
 
