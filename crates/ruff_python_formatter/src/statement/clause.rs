@@ -45,40 +45,29 @@ impl<'a> ClauseHeader<'a> {
     /// the primary body. For clauses like `try`, it specifically returns the last child
     /// in the `try` body, not the `except`/`else`/`finally` clauses.
     ///
-    /// Compare [`ruff_python_ast::AnyNodeRef::last_child_in_body`].
+    /// This is similar to [`ruff_python_ast::AnyNodeRef::last_child_in_body`]
+    /// but restricted to the clause.
     pub(crate) fn last_child_in_clause(self) -> Option<AnyNodeRef<'a>> {
         match self {
-            ClauseHeader::Class(StmtClassDef { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::Function(StmtFunctionDef { body, .. }) => {
-                body.last().map(AnyNodeRef::from)
-            }
-            ClauseHeader::If(StmtIf { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::ElifElse(ElifElseClause { body, .. }) => {
-                body.last().map(AnyNodeRef::from)
-            }
-            ClauseHeader::Try(StmtTry { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. }) => {
-                body.last().map(AnyNodeRef::from)
-            }
+            ClauseHeader::Class(StmtClassDef { body, .. })
+            | ClauseHeader::Function(StmtFunctionDef { body, .. })
+            | ClauseHeader::If(StmtIf { body, .. })
+            | ClauseHeader::ElifElse(ElifElseClause { body, .. })
+            | ClauseHeader::Try(StmtTry { body, .. })
+            | ClauseHeader::MatchCase(MatchCase { body, .. })
+            | ClauseHeader::For(StmtFor { body, .. })
+            | ClauseHeader::While(StmtWhile { body, .. })
+            | ClauseHeader::With(StmtWith { body, .. })
+            | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
+            | ClauseHeader::OrElse(ElseClause::Try(StmtTry { orelse: body, .. }))
+            | ClauseHeader::OrElse(ElseClause::For(StmtFor { orelse: body, .. }))
+            | ClauseHeader::OrElse(ElseClause::While(StmtWhile { orelse: body, .. }))
+            | ClauseHeader::TryFinally(StmtTry {
+                finalbody: body, ..
+            }) => body.last().map(AnyNodeRef::from),
             ClauseHeader::Match(StmtMatch { cases, .. }) => cases
                 .last()
                 .and_then(|case| case.body.last().map(AnyNodeRef::from)),
-            ClauseHeader::MatchCase(MatchCase { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::For(StmtFor { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::While(StmtWhile { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::With(StmtWith { body, .. }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::TryFinally(StmtTry { finalbody, .. }) => {
-                finalbody.last().map(AnyNodeRef::from)
-            }
-            ClauseHeader::OrElse(ElseClause::Try(StmtTry { orelse, .. })) => {
-                orelse.last().map(AnyNodeRef::from)
-            }
-            ClauseHeader::OrElse(ElseClause::For(StmtFor { orelse, .. })) => {
-                orelse.last().map(AnyNodeRef::from)
-            }
-            ClauseHeader::OrElse(ElseClause::While(StmtWhile { orelse, .. })) => {
-                orelse.last().map(AnyNodeRef::from)
-            }
         }
     }
 
