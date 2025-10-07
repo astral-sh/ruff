@@ -285,6 +285,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1702") => (RuleGroup::Preview, rules::pylint::rules::TooManyNestedBlocks),
         (Pylint, "R1704") => (RuleGroup::Stable, rules::pylint::rules::RedefinedArgumentFromLocal),
         (Pylint, "R1706") => (RuleGroup::Removed, rules::pylint::rules::AndOrTernary),
+        (Pylint, "R1708") => (RuleGroup::Stable, rules::pylint::rules::StopIterationReturn),
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
