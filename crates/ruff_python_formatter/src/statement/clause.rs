@@ -662,22 +662,22 @@ fn write_suppressed_clause(
 ) -> FormatResult<()> {
     let header = clause.format_header.header;
 
-    let range_start = header.first_keyword_range(f.context().source())?.start();
+    let clause_start = header.first_keyword_range(f.context().source())?.start();
 
     let comments = f.context().comments().clone();
 
     let last_child = header
         .last_child_in_clause()
         .expect("last child to exist if `should_suppress_clause` is `Ok(true)`");
-    let range_end = last_child.end();
+    let clause_end = last_child.end();
 
     // Write the outer comments and format the node as verbatim
     write!(
         f,
         [
-            source_position(range_start),
-            verbatim_text(TextRange::new(range_start, range_end)),
-            source_position(range_end),
+            source_position(clause_start),
+            verbatim_text(TextRange::new(clause_start, clause_end)),
+            source_position(clause_end),
             trailing_comments(comments.trailing(last_child)),
             hard_line_break()
         ]
