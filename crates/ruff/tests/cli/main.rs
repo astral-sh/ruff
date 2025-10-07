@@ -8,7 +8,6 @@
 use anyhow::{Context as _, Result};
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::get_cargo_bin;
-use regex::escape;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -22,17 +21,7 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    // Path is already normalized by dunce::simplified() in new(), so no need to call it again
-    let path_str = path.as_ref().to_str().unwrap();
-
-    // Escape the path for regex
-    let escaped_path = escape(path_str);
-    // Replace literal backslashes in the escaped pattern with a character class that matches both
-    let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
-
-    // Always add optional UNC prefix to match both \\?\C:\... and C:\... patterns
-    // This ensures compatibility regardless of whether input or output contains UNC prefix
-    format!(r"(?:[\\/][\\/]\?[\\/])?{cross_platform_pattern}[\\/]?")
+    format!(r"{}\\?/?", regex::escape(path.as_ref().to_str().unwrap()))
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -51,13 +40,13 @@ pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
 /// let fixture = RuffTestFixture::with_file("ruff.toml", "select = ['E']")?;
 /// let output = fixture.command().args(["check", "."]).output()?;
 /// ```
-pub(crate) struct RuffTestFixture {
+pub(crate) struct CliTest {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,
     project_dir: PathBuf,
 }
 
-impl RuffTestFixture {
+impl CliTest {
     /// Creates a new test fixture with an empty temporary directory.
     ///
     /// This sets up:
@@ -80,7 +69,9 @@ impl RuffTestFixture {
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "[TMP]/");
-        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
+        settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
+        settings.add_filter(ruff_linter::VERSION, "[VERSION]");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",
@@ -147,28 +138,6 @@ impl RuffTestFixture {
     /// Returns the path to the test directory root.
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
-    }
-
-    /// Returns a regex filter pattern for replacing temporary directory paths in snapshots.
-    ///
-    /// This provides the tempdir filter pattern that can be used in
-    /// `insta::with_settings!` filters array for tests that need custom filtering
-    /// beyond what the global fixture filters provide.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// insta::with_settings!({
-    ///     filters => vec![
-    ///         (fixture.tempdir_filter().as_str(), "[TMP]/"),
-    ///         (r"some_other_pattern", "replacement")
-    ///     ]
-    /// }, {
-    ///     assert_cmd_snapshot!(fixture.command().args(["check", "."]));
-    /// });
-    /// ```
-    pub(crate) fn tempdir_filter(&self) -> String {
-        tempdir_filter(self.root())
     }
 
     /// Creates a pre-configured ruff command for testing.

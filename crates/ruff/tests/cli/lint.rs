@@ -10,7 +10,7 @@ use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
-use crate::RuffTestFixture;
+use crate::CliTest;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
@@ -64,7 +64,7 @@ inline-quotes = "single"
 
 #[test]
 fn lint_options() -> Result<()> {
-    let case = RuffTestFixture::with_file(
+    let case = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint]
@@ -187,7 +187,7 @@ inline-quotes = "single"
 
 #[test]
 fn exclude() -> Result<()> {
-    let case = RuffTestFixture::new()?;
+    let case = CliTest::new()?;
 
     case.write_file(
         "ruff.toml",
@@ -260,7 +260,7 @@ OTHER = "OTHER"
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {
-    let case = RuffTestFixture::new()?;
+    let case = CliTest::new()?;
 
     case.write_file(
         "ruff.toml",
@@ -297,7 +297,7 @@ exclude = ["main.py"]
 
 #[test]
 fn exclude_stdin() -> Result<()> {
-    let case = RuffTestFixture::with_file(
+    let case = CliTest::with_file(
         "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
@@ -387,7 +387,7 @@ _ = "---------------------------------------------------------------------------
 
 #[test]
 fn per_file_ignores_stdin() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
@@ -429,7 +429,7 @@ if __name__ == "__main__":
 
 #[test]
 fn extend_per_file_ignores_stdin() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
@@ -472,7 +472,7 @@ if __name__ == "__main__":
 /// Regression test for [#8858](https://github.com/astral-sh/ruff/issues/8858)
 #[test]
 fn parent_configuration_override() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -559,7 +559,7 @@ fn config_override_rejected_if_invalid_toml() {
 
 #[test]
 fn too_many_config_files() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file("ruff.toml", "")?;
     fixture.write_file("ruff2.toml", "")?;
 
@@ -605,7 +605,7 @@ fn extend_passed_via_config_argument() {
 
 #[test]
 fn nonexistent_extend_file() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -639,7 +639,7 @@ extend = "ruff3.toml"
 
 #[test]
 fn circular_extend() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -677,7 +677,7 @@ extend = "ruff.toml"
 
 #[test]
 fn parse_error_extends() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -716,7 +716,7 @@ select = [E501]
 
 #[test]
 fn config_file_and_isolated() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file("ruff.toml", "")?;
 
     assert_cmd_snapshot!(fixture
@@ -743,7 +743,7 @@ fn config_file_and_isolated() -> Result<()> {
 
 #[test]
 fn config_override_via_cli() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 line-length = 100
@@ -971,7 +971,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
 
 #[test]
 fn config_doubly_overridden_via_cli() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 line-length = 100
@@ -1006,7 +1006,7 @@ select=["E501"]
 
 #[test]
 fn complex_config_setting_overridden_via_cli() -> Result<()> {
-    let fixture = RuffTestFixture::with_file("ruff.toml", "lint.select = ['N801']")?;
+    let fixture = CliTest::with_file("ruff.toml", "lint.select = ['N801']")?;
     let test_code = "class violates_n801: pass";
     assert_cmd_snapshot!(fixture
         .command()
@@ -1048,7 +1048,7 @@ fn deprecated_config_option_overridden_via_cli() {
 
 #[test]
 fn extension() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1136,7 +1136,7 @@ print("Hello world!")
 
 #[test]
 fn file_noqa_external() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint]
@@ -1172,7 +1172,7 @@ import os
 fn required_version_exact_mismatch() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 required-version = "0.1.0"
@@ -1208,7 +1208,7 @@ import os
 fn required_version_exact_match() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         &format!(
             r#"
@@ -1247,7 +1247,7 @@ import os
 fn required_version_bound_mismatch() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         &format!(
             r#"
@@ -1285,7 +1285,7 @@ import os
 fn required_version_bound_match() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 required-version = ">=0.1.0"
@@ -1321,7 +1321,7 @@ import os
 /// Expand environment variables in `--config` paths provided via the CLI.
 #[test]
 fn config_expand() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint]
@@ -1359,7 +1359,7 @@ def func():
 /// Per-file selects via ! negation in per-file-ignores
 #[test]
 fn negated_per_file_ignores() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1392,7 +1392,7 @@ fn negated_per_file_ignores() -> Result<()> {
 
 #[test]
 fn negated_per_file_ignores_absolute() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1428,7 +1428,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
 /// patterns are additive, can't use negative patterns to "un-ignore"
 #[test]
 fn negated_per_file_ignores_overlap() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1460,7 +1460,7 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
 
 #[test]
 fn unused_interaction() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint]
@@ -1501,7 +1501,7 @@ def function():
 
 #[test]
 fn add_noqa() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1549,7 +1549,7 @@ def first_square():
 
 #[test]
 fn add_noqa_multiple_codes() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1598,7 +1598,7 @@ def unused(x):
 
 #[test]
 fn add_noqa_multiline_diagnostic() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1648,7 +1648,7 @@ import a
 
 #[test]
 fn add_noqa_existing_noqa() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1697,7 +1697,7 @@ def unused(x):  # noqa: ANN001, ARG001, D103
 
 #[test]
 fn add_noqa_multiline_comment() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1756,7 +1756,7 @@ print(
 
 #[test]
 fn add_noqa_exclude() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -1800,7 +1800,7 @@ def first_square():
 /// Regression test for <https://github.com/astral-sh/ruff/issues/2253>
 #[test]
 fn add_noqa_parent() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "noqa.py",
         r#"
@@ -1829,7 +1829,7 @@ from foo import (  # noqa: F401
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11"
@@ -1857,7 +1857,7 @@ select = ["UP006"]
     ----- stderr -----
     ");
 
-    let fixture2 = RuffTestFixture::with_file(
+    let fixture2 = CliTest::with_file(
         "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.8"
@@ -1889,7 +1889,7 @@ select = ["UP006"]
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python_patch() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "pyproject.toml",
         r#"[project]
 requires-python = ">= 3.11.4"
@@ -1923,7 +1923,7 @@ select = ["UP006"]
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python_equals() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "pyproject.toml",
         r#"[project]
 requires-python = "== 3.11"
@@ -1957,7 +1957,7 @@ select = ["UP006"]
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python_equals_patch() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "pyproject.toml",
         r#"[project]
 requires-python = "== 3.11.4"
@@ -1995,7 +1995,7 @@ select = ["UP006"]
 /// ```
 #[test]
 fn requires_python_no_tool() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -2908,7 +2908,7 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"[lint]
@@ -3253,7 +3253,7 @@ from typing import Union;foo: Union[int, str] = 1"#,
 /// ```
 #[test]
 fn requires_python_pyproject_toml_above() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -3569,7 +3569,7 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_pyproject_toml_above_with_tool() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -3886,7 +3886,7 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_ruff_toml_above() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -4487,7 +4487,7 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 #[test]
 fn requires_python_extend_from_shared_config() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "ruff.toml",
         r#"
@@ -4806,7 +4806,7 @@ from typing import Union;foo: Union[int, str] = 1
 
 #[test]
 fn checks_notebooks_in_stable() -> anyhow::Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file(
         "main.ipynb",
         r#"
@@ -4872,7 +4872,7 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
 /// See: <https://github.com/astral-sh/ruff/issues/13519>
 #[test]
 fn nested_implicit_namespace_package() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
 
     fixture.write_file("foo/__init__.py", "")?;
     fixture.write_file("foo/bar/baz/__init__.py", "")?;
@@ -4915,7 +4915,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
 
 #[test]
 fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint.flake8-import-conventions.aliases]
@@ -4950,7 +4950,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 
 #[test]
 fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint.flake8-import-conventions.extend-aliases]
@@ -4985,7 +4985,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
 
 #[test]
 fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint.flake8-import-conventions.aliases]
@@ -5020,7 +5020,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
 #[test]
 fn flake8_import_convention_nfkc_normalization() -> Result<()> {
-    let fixture = RuffTestFixture::with_file(
+    let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
 [lint.flake8-import-conventions.aliases]
@@ -5285,7 +5285,7 @@ class Foo[_T, __T]:
 /// ├── ruff.toml
 /// └── urlparse
 ///     └── __init__.py
-fn create_a005_module_structure(fixture: &RuffTestFixture) -> Result<()> {
+fn create_a005_module_structure(fixture: &CliTest) -> Result<()> {
     // Create module structure
     fixture.write_file("abc/__init__.py", "")?;
     fixture.write_file("collections/__init__.py", "")?;
@@ -5305,7 +5305,7 @@ fn create_a005_module_structure(fixture: &RuffTestFixture) -> Result<()> {
 /// Test A005 with `strict-checking = true`
 #[test]
 fn a005_module_shadowing_strict() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     create_a005_module_structure(&fixture)?;
 
     assert_cmd_snapshot!(fixture.command()
@@ -5334,7 +5334,7 @@ fn a005_module_shadowing_strict() -> Result<()> {
 /// Test A005 with `strict-checking = false`
 #[test]
 fn a005_module_shadowing_non_strict() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     create_a005_module_structure(&fixture)?;
 
     assert_cmd_snapshot!(fixture.command()
@@ -5362,7 +5362,7 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
 /// Test A005 with `strict-checking` default (should be `false`)
 #[test]
 fn a005_module_shadowing_strict_default() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     create_a005_module_structure(&fixture)?;
 
     assert_cmd_snapshot!(fixture.command()
@@ -5559,7 +5559,7 @@ match 2:
 /// Regression test for <https://github.com/astral-sh/ruff/issues/16417>
 #[test]
 fn cache_syntax_errors() -> Result<()> {
-    let fixture = RuffTestFixture::with_file("main.py", "match 2:\n    case 1: ...")?;
+    let fixture = CliTest::with_file("main.py", "match 2:\n    case 1: ...")?;
 
     let mut cmd = fixture.command();
     // inline STDIN_BASE_OPTIONS to remove --no-cache
@@ -5604,7 +5604,7 @@ fn cookiecutter_globbing() -> Result<()> {
     // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
     // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
     // user's glob does not.
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
 
     fixture.write_file(
         "{{cookiecutter.repo_name}}/pyproject.toml",
@@ -5656,7 +5656,7 @@ fn cookiecutter_globbing() -> Result<()> {
 /// Like the test above but exercises the non-absolute path case in `PerFile::new`
 #[test]
 fn cookiecutter_globbing_no_project_root() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
 
     // Create the nested directory structure
     fs::create_dir(fixture.root().join("{{cookiecutter.repo_name}}"))?;
@@ -5683,7 +5683,7 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
 /// disabling all AST-based rules).
 #[test]
 fn semantic_syntax_errors() -> Result<()> {
-    let fixture = RuffTestFixture::with_file("main.py", "[(x := 1) for x in foo]")?;
+    let fixture = CliTest::with_file("main.py", "[(x := 1) for x in foo]")?;
     let contents = "[(x := 1) for x in foo]";
 
     let mut cmd = fixture.command();
@@ -5792,32 +5792,24 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let fixture = RuffTestFixture::with_file("input.py", CONTENT)?;
+    let fixture = CliTest::with_file("input.py", CONTENT)?;
+
     let snapshot = format!("output_format_{output_format}");
 
-    insta::with_settings!({
-        filters => vec![
-            (fixture.tempdir_filter().as_str(), "[TMP]/"),
-            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
-            (ruff_linter::VERSION, "[VERSION]"),
-        ]
-    }, {
-        assert_cmd_snapshot!(
-            snapshot,
-            fixture.command()
-                .args([
-                    "check",
-                    "--no-cache",
-                    "--output-format",
-                    output_format,
-                    "--select",
-                    "F401,F821",
-                    "--target-version",
-                    "py39",
-                    "input.py",
-                ])
-        );
-    });
+    assert_cmd_snapshot!(
+        snapshot,
+        fixture.command().args([
+            "check",
+            "--no-cache",
+            "--output-format",
+            output_format,
+            "--select",
+            "F401,F821",
+            "--target-version",
+            "py39",
+            "input.py",
+        ])
+    );
 
     Ok(())
 }
@@ -5826,7 +5818,7 @@ match 42:  # invalid-syntax
 #[test_case::test_case("full"; "full_show_fixes")]
 #[test_case::test_case("grouped"; "grouped_show_fixes")]
 fn output_format_show_fixes(output_format: &str) -> Result<()> {
-    let fixture = RuffTestFixture::with_file("input.py", "import os  # F401")?;
+    let fixture = CliTest::with_file("input.py", "import os  # F401")?;
     let snapshot = format!("output_format_show_fixes_{output_format}");
 
     assert_cmd_snapshot!(
@@ -5908,16 +5900,10 @@ fn show_fixes_in_full_output_with_preview_enabled() {
 
 #[test]
 fn rule_panic_mixed_results_concise() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file("normal.py", "import os")?;
     fixture.write_file("panic.py", "print('hello, world!')")?;
 
-    insta::with_settings!({
-        filters => vec![
-            (fixture.tempdir_filter().as_str(), "[TMP]/"),
-            (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
-        ]
-    }, {
     assert_cmd_snapshot!(
         fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=concise", "--no-cache"])
@@ -5943,22 +5929,16 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
     ");
-    });
+
     Ok(())
 }
 
 #[test]
 fn rule_panic_mixed_results_full() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
     fixture.write_file("normal.py", "import os")?;
     fixture.write_file("panic.py", "print('hello, world!')")?;
 
-    insta::with_settings!({
-        filters => vec![
-            (fixture.tempdir_filter().as_str(), "[TMP]/"),
-            (r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>")
-        ]
-    }, {
     assert_cmd_snapshot!(
         fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
@@ -6003,14 +5983,14 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
     ");
-    });
+
     Ok(())
 }
 
 /// Test that the same rule fires across all supported extensions, but not on unsupported files
 #[test]
 fn supported_file_extensions() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
 
     // Create files of various types
     // text file
@@ -6090,7 +6070,7 @@ fn supported_file_extensions() -> Result<()> {
 /// Test that the same rule fires across all supported extensions, but not on unsupported files
 #[test]
 fn supported_file_extensions_preview_enabled() -> Result<()> {
-    let fixture = RuffTestFixture::new()?;
+    let fixture = CliTest::new()?;
 
     // Create files of various types
     // text file

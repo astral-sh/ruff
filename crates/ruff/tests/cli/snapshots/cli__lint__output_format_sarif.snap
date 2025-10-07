@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/lint.rs
+source: crates/ruff/tests/cli/lint.rs
 info:
   program: ruff
   args:
@@ -27,7 +27,7 @@ exit_code: 1
               "artifactChanges": [
                 {
                   "artifactLocation": {
-                    "uri": "[TMP]/input.py"
+                    "uri": "file://[TMP]/input.py"
                   },
                   "replacements": [
                     {
@@ -51,7 +51,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[TMP]/input.py"
+                  "uri": "file://[TMP]/input.py"
                 },
                 "region": {
                   "endColumn": 10,
@@ -73,7 +73,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[TMP]/input.py"
+                  "uri": "file://[TMP]/input.py"
                 },
                 "region": {
                   "endColumn": 6,
@@ -95,7 +95,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[TMP]/input.py"
+                  "uri": "file://[TMP]/input.py"
                 },
                 "region": {
                   "endColumn": 6,
