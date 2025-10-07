@@ -38,28 +38,6 @@ pub(crate) enum ClauseHeader<'a> {
     OrElse(ElseClause<'a>),
 }
 
-impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
-    fn from(value: ClauseHeader<'a>) -> Self {
-        match value {
-            ClauseHeader::Class(stmt_class_def) => stmt_class_def.into(),
-            ClauseHeader::Function(stmt_function_def) => stmt_function_def.into(),
-            ClauseHeader::If(stmt_if) => stmt_if.into(),
-            ClauseHeader::ElifElse(elif_else_clause) => elif_else_clause.into(),
-            ClauseHeader::Try(stmt_try) => stmt_try.into(),
-            ClauseHeader::ExceptHandler(except_handler_except_handler) => {
-                except_handler_except_handler.into()
-            }
-            ClauseHeader::TryFinally(stmt_try) => stmt_try.into(),
-            ClauseHeader::Match(stmt_match) => stmt_match.into(),
-            ClauseHeader::MatchCase(match_case) => match_case.into(),
-            ClauseHeader::For(stmt_for) => stmt_for.into(),
-            ClauseHeader::While(stmt_while) => stmt_while.into(),
-            ClauseHeader::With(stmt_with) => stmt_with.into(),
-            ClauseHeader::OrElse(else_clause) => else_clause.into(),
-        }
-    }
-}
-
 impl<'a> ClauseHeader<'a> {
     /// Returns the last child in the clause body immediately following this clause header.
     ///
@@ -401,6 +379,28 @@ impl<'a> ClauseHeader<'a> {
                     source,
                 ),
             },
+        }
+    }
+}
+
+impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
+    fn from(value: ClauseHeader<'a>) -> Self {
+        match value {
+            ClauseHeader::Class(stmt_class_def) => stmt_class_def.into(),
+            ClauseHeader::Function(stmt_function_def) => stmt_function_def.into(),
+            ClauseHeader::If(stmt_if) => stmt_if.into(),
+            ClauseHeader::ElifElse(elif_else_clause) => elif_else_clause.into(),
+            ClauseHeader::Try(stmt_try) => stmt_try.into(),
+            ClauseHeader::ExceptHandler(except_handler_except_handler) => {
+                except_handler_except_handler.into()
+            }
+            ClauseHeader::TryFinally(stmt_try) => stmt_try.into(),
+            ClauseHeader::Match(stmt_match) => stmt_match.into(),
+            ClauseHeader::MatchCase(match_case) => match_case.into(),
+            ClauseHeader::For(stmt_for) => stmt_for.into(),
+            ClauseHeader::While(stmt_while) => stmt_while.into(),
+            ClauseHeader::With(stmt_with) => stmt_with.into(),
+            ClauseHeader::OrElse(else_clause) => else_clause.into(),
         }
     }
 }
