@@ -5479,7 +5479,7 @@ mod tests {
         Program::get(&db)
             .set_python_version_with_source(&mut db)
             .to(PythonVersionWithSource {
-                version: PythonVersion::latest(),
+                version: PythonVersion::latest_preview(),
                 source: PythonVersionSource::default(),
             });
         for class in KnownClass::iter() {
