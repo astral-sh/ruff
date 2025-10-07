@@ -18,3 +18,9 @@ urlpatterns_default = [
     path("contact", views.contact_view),  # DJ014
     path("contact/", views.contact_ok),  # OK
 ]
+
+# OK - root path and empty string
+urlpatterns_edge_cases = [
+    mypath("/", views.root_view),  # OK - root path
+    mypath("", views.empty_view),  # OK - empty string
+]
