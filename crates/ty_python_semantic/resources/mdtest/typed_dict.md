@@ -172,7 +172,6 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
-
 ## Nested `TypedDict`
 
 Nested `TypedDict` fields are also supported.
