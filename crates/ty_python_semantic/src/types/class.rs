@@ -1286,7 +1286,7 @@ pub(crate) enum FieldKind<'db> {
     /// `TypedDict` field metadata
     TypedDict {
         /// Whether this field is required
-        is_required: Truthiness,
+        is_required: bool,
         /// Whether this field is marked read-only
         is_read_only: bool,
     },
@@ -1313,7 +1313,7 @@ impl<'db> Field<'db> {
             FieldKind::Dataclass {
                 init, default_ty, ..
             } => default_ty.is_none() && *init,
-            FieldKind::TypedDict { is_required, .. } => is_required.is_always_true(),
+            FieldKind::TypedDict { is_required, .. } => *is_required,
         }
     }
 
@@ -2566,7 +2566,7 @@ impl<'db> ClassLiteral<'db> {
                         };
 
                         FieldKind::TypedDict {
-                            is_required: Truthiness::from(is_required),
+                            is_required,
                             is_read_only: attr.is_read_only(),
                         }
                     }

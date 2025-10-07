@@ -97,8 +97,16 @@ from typing import TypedDict
 from typing_extensions import Required, NotRequired
 
 Person = TypedDict("Person", {"name": Required[str], "age": int | None})
-
 reveal_type(Person)  # revealed: typing.TypedDict
+```
+
+The `TypedDict` schema must be passed directly as the second argument:
+
+```py
+fields = {"name": str}
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `_TypedDictSchema`, found `dict[Unknown | str, Unknown | <class 'str'>]`"
+Other = TypedDict("Other", fields)
 ```
 
 New inhabitants can be created from dict literals. When accessing keys, the correct types should be

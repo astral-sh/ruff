@@ -769,6 +769,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::TypedDictSchema(_) => {
+                    self.infer_type_expression(slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`_TypedDictSchema` is not allowed in type expressions",
+                        ));
+                    }
+                    Type::unknown()
+                }
                 KnownInstanceType::TypeVar(_) => {
                     self.infer_type_expression(slice);
                     todo_type!("TypeVar annotations")
@@ -1383,7 +1392,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Tuple => {
                 Type::tuple(self.infer_tuple_type_expression(arguments_slice))
             }
-            SpecialFormType::Generic | SpecialFormType::Protocol => {
+            SpecialFormType::Generic
+            | SpecialFormType::Protocol
+            | SpecialFormType::TypedDictSchema => {
                 self.infer_expression(arguments_slice, TypeContext::default());
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(

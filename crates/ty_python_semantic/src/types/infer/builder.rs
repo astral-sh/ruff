@@ -46,9 +46,7 @@ use crate::semantic_index::{
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{
-    CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, MethodDecorator,
-};
+use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -86,7 +84,8 @@ use crate::types::signatures::Signature;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
+    TypedDictAssignmentKind, TypedDictSchema, TypedDictSchemaField,
+    validate_typed_dict_constructor, validate_typed_dict_dict_literal,
     validate_typed_dict_key_assignment,
 };
 use crate::types::visitor::any_over_type;
@@ -97,7 +96,7 @@ use crate::types::{
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
+    UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -5478,8 +5477,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        // Infer the dictionary literal passed to the `TypedDict` constructor.
-        if let Some(ty) = self.infer_typed_dict_constructor_literal(dict, tcx) {
+        // Infer the dictionary literal passed to the functional `TypedDict` constructor.
+        if let Some(ty) = self.infer_typed_dict_schema(dict, tcx) {
             return ty;
         }
 
@@ -5631,8 +5630,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .map(|_| Type::TypedDict(typed_dict))
     }
 
-    // Infer the dictionary literal passed to the `TypedDict` constructor.
-    fn infer_typed_dict_constructor_literal(
+    // Infer the dictionary literal passed to the functional `TypedDict` constructor.
+    fn infer_typed_dict_schema(
         &mut self,
         dict: &ast::ExprDict,
         tcx: TypeContext<'db>,
@@ -5643,7 +5642,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             items,
         } = dict;
 
-        let Some(Type::SpecialForm(SpecialFormType::TypedDict)) = tcx.annotation else {
+        let Some(Type::SpecialForm(SpecialFormType::TypedDictSchema)) = tcx.annotation else {
             return None;
         };
 
@@ -5673,22 +5672,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Truthiness::Ambiguous
             };
 
-            let field = Field {
-                single_declaration: None,
+            let field = TypedDictSchemaField {
+                is_required,
                 declared_ty: field_ty.inner_type(),
-                kind: FieldKind::TypedDict {
-                    is_required,
-                    is_read_only: field_ty.qualifiers.contains(TypeQualifiers::READ_ONLY),
-                },
+                is_read_only: field_ty.qualifiers.contains(TypeQualifiers::READ_ONLY),
             };
 
             typed_dict_items.insert(ast::name::Name::new(key.value(self.db())), field);
         }
 
-        // Create an anonymous `TypedDict` from the items, to be completed by the `TypedDict` constructor binding.
-        Some(Type::TypedDict(TypedDictType::from_items(
-            self.db(),
-            typed_dict_items,
+        Some(Type::KnownInstance(KnownInstanceType::TypedDictSchema(
+            TypedDictSchema::new(self.db(), typed_dict_items),
         )))
     }
 

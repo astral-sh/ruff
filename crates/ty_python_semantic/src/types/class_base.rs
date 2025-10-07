@@ -170,6 +170,7 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypedDictType(_)
+                | KnownInstanceType::TypedDictSchema(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_) => None,
@@ -201,7 +202,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::TypedDictSchema => None,
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),

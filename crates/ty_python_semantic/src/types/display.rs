@@ -517,13 +517,7 @@ impl Display for DisplayRepresentation<'_> {
                     .0
                     .display_with(self.db, self.settings.clone())
                     .fmt(f),
-                TypedDictType::Synthesized(synthesized) => {
-                    let name = synthesized
-                        .name(self.db)
-                        .expect("cannot have incomplete `TypedDict` in type expression");
-
-                    write!(f, "{name}")
-                }
+                TypedDictType::Synthesized(synthesized) => synthesized.name(self.db).fmt(f),
             },
 
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),

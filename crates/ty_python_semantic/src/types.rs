@@ -66,7 +66,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::typed_dict::SynthesizedTypedDictType;
+use crate::types::typed_dict::{SynthesizedTypedDictType, TypedDictSchema};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
@@ -1522,6 +1522,11 @@ impl<'db> Type<'db> {
                     .default_type(db)
                     .has_relation_to_impl(db, right, relation, visitor)
             }
+
+            (
+                Type::KnownInstance(KnownInstanceType::TypedDictSchema(_)),
+                Type::SpecialForm(SpecialFormType::TypedDictSchema),
+            ) => ConstraintSet::from(true),
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
@@ -4767,10 +4772,9 @@ impl<'db> Type<'db> {
                             Parameter::positional_only(Some(Name::new_static("typename")))
                                 .with_annotated_type(KnownClass::Str.to_instance(db)),
                             Parameter::positional_only(Some(Name::new_static("fields")))
-                                // We infer this type as an anonymous `TypedDict` instance, such that the
-                                // complete `TypeDict` instance can be constructed from it after. Note that
-                                // `typing.TypedDict` is not otherwise allowed in type-form expressions.
-                                .with_annotated_type(Type::SpecialForm(SpecialFormType::TypedDict))
+                                .with_annotated_type(Type::SpecialForm(
+                                    SpecialFormType::TypedDictSchema,
+                                ))
                                 .with_default_type(Type::any()),
                             Parameter::keyword_only(Name::new_static("total"))
                                 .with_annotated_type(KnownClass::Bool.to_instance(db))
@@ -5678,6 +5682,12 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypedDictType(typed_dict) => {
                     Ok(Type::TypedDict(TypedDictType::Synthesized(*typed_dict)))
                 }
+                KnownInstanceType::TypedDictSchema(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
@@ -5765,6 +5775,12 @@ impl<'db> Type<'db> {
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypedDict
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+                SpecialFormType::TypedDictSchema => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::InvalidType(*self, scope_id)
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -6875,6 +6891,10 @@ pub enum KnownInstanceType<'db> {
     /// A single instance of `typing.TypedDict`.
     TypedDictType(SynthesizedTypedDictType<'db>),
 
+    /// An internal type representing the dictionary literal argument to the functional `TypedDict`
+    /// constructor.
+    TypedDictSchema(TypedDictSchema<'db>),
+
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
 
@@ -6905,7 +6925,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypedDictType(typed_dict) => {
             visitor.visit_typed_dict_type(db, TypedDictType::Synthesized(typed_dict));
         }
-        KnownInstanceType::Deprecated(_) | KnownInstanceType::ConstraintSet(_) => {
+        KnownInstanceType::Deprecated(_)
+        | KnownInstanceType::ConstraintSet(_)
+        | KnownInstanceType::TypedDictSchema(_) => {
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
@@ -6930,15 +6952,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypedDictType(typed_dict) => {
                 Self::TypedDictType(typed_dict.normalized_impl(db, visitor))
             }
-            Self::Deprecated(deprecated) => {
-                // Nothing to normalize
-                Self::Deprecated(deprecated)
-            }
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
-            Self::ConstraintSet(set) => {
-                // Nothing to normalize
-                Self::ConstraintSet(set)
-            }
+            Self::Deprecated(_) | Self::TypedDictSchema(_) | Self::ConstraintSet(_) => self,
         }
     }
 
@@ -6951,6 +6966,7 @@ impl<'db> KnownInstanceType<'db> {
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypedDictType(_) => KnownClass::TypedDictFallback,
+            Self::TypedDictSchema(_) => KnownClass::Object,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
@@ -7008,6 +7024,7 @@ impl<'db> KnownInstanceType<'db> {
                         }
                     }
                     KnownInstanceType::TypedDictType(_) => f.write_str("typing.TypedDict"),
+                    KnownInstanceType::TypedDictSchema(_) => f.write_str("_TypedDictSchema"),
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.

@@ -127,6 +127,10 @@ pub enum SpecialFormType {
     /// Typeshed defines this symbol as a class, but this isn't accurate: it's actually a factory function
     /// at runtime. We therefore represent it as a special form internally.
     NamedTuple,
+
+    /// An internal type representing the dictionary literal argument to the functional `TypedDict`
+    /// constructor.
+    TypedDictSchema,
 }
 
 impl SpecialFormType {
@@ -179,7 +183,9 @@ impl SpecialFormType {
             | Self::ChainMap
             | Self::OrderedDict => KnownClass::StdlibAlias,
 
-            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
+            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy | Self::TypedDictSchema => {
+                KnownClass::Object
+            }
 
             Self::NamedTuple => KnownClass::FunctionType,
         }
@@ -264,6 +270,8 @@ impl SpecialFormType {
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf => module.is_ty_extensions(),
+
+            Self::TypedDictSchema => false,
         }
     }
 
@@ -324,7 +332,8 @@ impl SpecialFormType {
             | Self::ReadOnly
             | Self::Protocol
             | Self::Any
-            | Self::Generic => false,
+            | Self::Generic
+            | Self::TypedDictSchema => false,
         }
     }
 
@@ -375,6 +384,7 @@ impl SpecialFormType {
             SpecialFormType::Protocol => "typing.Protocol",
             SpecialFormType::Generic => "typing.Generic",
             SpecialFormType::NamedTuple => "typing.NamedTuple",
+            SpecialFormType::TypedDictSchema => "_TypedDictSchema",
         }
     }
 }

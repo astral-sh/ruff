@@ -18,7 +18,7 @@ use crate::types::generics::GenericContext;
 use crate::types::variance::TypeVarVariance;
 use crate::types::{
     BoundTypeVarInstance, CallableSignature, CallableType, KnownClass, NormalizedVisitor,
-    Parameter, Parameters, Signature, StringLiteralType, SubclassOfType, UnionType,
+    Parameter, Parameters, Signature, StringLiteralType, SubclassOfType, Truthiness, UnionType,
 };
 use crate::{Db, FxOrderMap};
 
@@ -60,19 +60,6 @@ pub enum TypedDictType<'db> {
 impl<'db> TypedDictType<'db> {
     pub(crate) fn from_class(class: ClassType<'db>) -> Self {
         TypedDictType::FromClass(class)
-    }
-
-    /// Returns an anonymous (incomplete) `TypedDictType` from its items.
-    ///
-    /// This is used to instantiate a `TypedDictType` from the dictionary literal passed to a
-    /// `typing.TypedDict` constructor (functional form for creating `TypedDict`s).
-    pub(crate) fn from_items(db: &'db dyn Db, items: FxOrderMap<Name, Field<'db>>) -> Self {
-        TypedDictType::Synthesized(SynthesizedTypedDictType::new(
-            db,
-            None,
-            TypedDictParams::default(),
-            items,
-        ))
     }
 
     pub(crate) fn items(&self, db: &'db dyn Db) -> Cow<'db, FxOrderMap<Name, Field<'db>>> {
@@ -393,12 +380,39 @@ impl<'db> TypedDictType<'db> {
     }
 }
 
+/// An internal type representing the dictionary literal argument to the functional `TypedDict`
+/// constructor.
+#[salsa::interned(debug, heap_size=TypedDictSchema::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypedDictSchema<'db> {
+    pub(crate) items: FxOrderMap<Name, TypedDictSchemaField<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypedDictSchema<'_> {}
+
+impl<'db> TypedDictSchema<'db> {
+    fn heap_size((items,): &(FxOrderMap<Name, TypedDictSchemaField<'db>>,)) -> usize {
+        ruff_memory_usage::order_map_heap_size(items)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+pub struct TypedDictSchemaField<'db> {
+    /// The declared type of the field
+    pub(crate) declared_ty: Type<'db>,
+
+    /// Whether this field is required.
+    pub(crate) is_required: Truthiness,
+
+    /// Whether this field is marked read-only.
+    pub(crate) is_read_only: bool,
+}
+
 #[salsa::interned(debug, heap_size=SynthesizedTypedDictType::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct SynthesizedTypedDictType<'db> {
-    // The dictionary literal passed to the `TypedDict` constructor is inferred as
-    // an anonymous (incomplete) `SynthesizedTypedDictType`.
-    pub(crate) name: Option<Name>,
+    pub(crate) name: Name,
 
     pub(crate) params: TypedDictParams,
 
@@ -441,7 +455,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
     }
 
     fn heap_size(
-        (name, params, items): &(Option<Name>, TypedDictParams, FxOrderMap<Name, Field<'db>>),
+        (name, params, items): &(Name, TypedDictParams, FxOrderMap<Name, Field<'db>>),
     ) -> usize {
         ruff_memory_usage::heap_size(name)
             + ruff_memory_usage::heap_size(params)

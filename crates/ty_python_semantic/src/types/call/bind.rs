@@ -1098,8 +1098,12 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        let [Some(name), Some(Type::TypedDict(typed_dict)), total, ..] =
-                            overload.parameter_types()
+                        let [
+                            Some(name),
+                            Some(Type::KnownInstance(KnownInstanceType::TypedDictSchema(schema))),
+                            total,
+                            ..,
+                        ] = overload.parameter_types()
                         else {
                             continue;
                         };
@@ -1113,26 +1117,19 @@ impl<'db> Bindings<'db> {
                         let is_total = to_bool(total, true);
                         params.set(TypedDictParams::TOTAL, is_total);
 
-                        let items = typed_dict.items(db);
-                        let items = items
+                        let items = schema
+                            .items(db)
                             .iter()
                             .map(|(name, field)| {
-                                let FieldKind::TypedDict {
-                                    is_required,
-                                    is_read_only,
-                                } = field.kind
-                                else {
-                                    unreachable!()
-                                };
-
                                 let field = Field {
+                                    single_declaration: None,
+                                    declared_ty: field.declared_ty,
                                     kind: FieldKind::TypedDict {
-                                        is_read_only,
-                                        // If there is no explicit `Required`/`NotRequired` qualifier, use
+                                        is_read_only: field.is_read_only,
+                                        // If there is no explicit `Required` or `NotRequired` qualifier, use
                                         // the `total` parameter.
-                                        is_required: is_required.unwrap_or(is_total).into(),
+                                        is_required: field.is_required.unwrap_or(is_total),
                                     },
-                                    ..field.clone()
                                 };
 
                                 (name.clone(), field)
@@ -1142,7 +1139,7 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::TypedDictType(SynthesizedTypedDictType::new(
                                 db,
-                                Some(Name::new(name.value(db))),
+                                Name::new(name.value(db)),
                                 params,
                                 items,
                             )),
