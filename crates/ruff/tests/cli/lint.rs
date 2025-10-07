@@ -1,7 +1,5 @@
 //! Tests the interaction of the `lint` configuration section
 
-#![cfg(not(target_family = "wasm"))]
-
 use regex::escape;
 use std::process::Command;
 use std::str;
@@ -12,9 +10,7 @@ use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
-mod test_fixture;
-
-use test_fixture::RuffTestFixture;
+use crate::RuffTestFixture;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
