@@ -315,12 +315,34 @@ Person(name="Alice", age=30, extra=True)  # type: ignore
 The positional dictionary constructor pattern (used by libraries like strawberry) should work
 correctly:
 
+`class.py`:
+
 ```py
 from typing import TypedDict
 
 class User(TypedDict):
     name: str
     age: int
+
+# Valid usage - all required fields provided
+user1 = User({"name": "Alice", "age": 30})
+
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `User` constructor"
+user2 = User({"name": "Bob"})
+
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `User`: value of type `None`"
+user3 = User({"name": None, "age": 25})
+
+# error: [invalid-key] "Invalid key access on TypedDict `User`: Unknown key "extra""
+user4 = User({"name": "Charlie", "age": 30, "extra": True})
+```
+
+`functional.py`:
+
+```py
+from typing import TypedDict
+
+User = TypedDict("User", {"name": str, "age": int})
 
 # Valid usage - all required fields provided
 user1 = User({"name": "Alice", "age": 30})

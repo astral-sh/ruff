@@ -4865,16 +4865,21 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
 
-            Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => Binding::single(
-                self,
-                Signature::new(
-                    // TODO: List more specific parameter types here for better code completion.
-                    Parameters::new([Parameter::keyword_variadic(Name::new_static("kwargs"))
-                        .with_annotated_type(Type::any())]),
-                    Some(Type::TypedDict(TypedDictType::Synthesized(typed_dict))),
-                ),
-            )
-            .into(),
+            Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => {
+                CallableBinding::from_overloads(
+                    self,
+                    [Signature::new(
+                        // TODO: List more specific parameter types here for better code completion.
+                        Parameters::new([
+                            Parameter::variadic(Name::new_static("args")),
+                            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::TypedDict(TypedDictType::Synthesized(typed_dict))),
+                    )],
+                )
+                .into()
+            }
 
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
