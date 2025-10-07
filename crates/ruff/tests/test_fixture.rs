@@ -18,11 +18,10 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    // Use dunce to normalize the path by converting UNC paths to regular paths when possible
-    let normalized_path = dunce::simplified(path.as_ref());
-    let path_str = normalized_path.to_str().unwrap();
+    // Path is already normalized by dunce::simplified() in new(), so no need to call it again
+    let path_str = path.as_ref().to_str().unwrap();
 
-    // Escape the normalized path for regex
+    // Escape the path for regex
     let escaped_path = escape(path_str);
     // Replace literal backslashes in the escaped pattern with a character class that matches both
     let cross_platform_pattern = escaped_path.replace(r"\\", r"[\\/]");
