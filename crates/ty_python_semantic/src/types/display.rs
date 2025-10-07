@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use ruff_db::display::FormatterJoinExtension;
 use ruff_db::files::FilePath;
+use ruff_db::source::line_index;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
@@ -335,7 +336,8 @@ impl Display for ClassDisplay<'_> {
         }
         f.write_str(self.class.name(self.db))?;
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            let path = self.class.file(self.db).path(self.db);
+            let file = self.class.file(self.db);
+            let path = file.path(self.db);
             let path = match path {
                 FilePath::System(path) => Cow::Owned(FilePath::System(
                     path.strip_prefix(self.db.system().current_directory())
@@ -344,8 +346,10 @@ impl Display for ClassDisplay<'_> {
                 )),
                 FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
             };
-            let class_offset = usize::from(self.class.header_range(self.db).start());
-            write!(f, " @ ({path}, offset {class_offset})")?;
+            let line_index = line_index(self.db, file);
+            let class_offset = self.class.header_range(self.db).start();
+            let line_number = line_index.line_index(class_offset);
+            write!(f, " @ {path}:{line_number}")?;
         }
         Ok(())
     }
