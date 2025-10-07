@@ -75,8 +75,9 @@ use crate::types::diagnostic::{
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{GenericContext, bind_typevar, typing_self};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -2398,25 +2399,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         parameter: &ast::Parameter,
     ) -> Option<Type<'db>> {
-        let current_scope = self.scope().scope(self.db());
-        let method = current_scope.node().as_function()?;
+        let db = self.db();
+        let scope_id = self.scope();
+        let file = scope_id.file(db);
+        let function_scope = scope_id.scope(db);
+        let method = function_scope.node().as_function()?;
 
-        let parent_scope_id = current_scope.parent()?;
+        let parent_scope_id = function_scope.parent()?;
         let parent_scope = self.index.scope(parent_scope_id);
         parent_scope.node().as_class()?;
 
         let method_definition = self.index.expect_single_definition(method);
-        let DefinitionKind::Function(func_def) = method_definition.kind(self.db()) else {
+        let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
             return None;
         };
 
-        let func_type = infer_definition_types(self.db(), method_definition)
+        let func_type = infer_definition_types(db, method_definition)
             .declaration_type(method_definition)
             .inner_type()
             .into_function_literal()?;
 
-        let module = parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
-        if func_def
+        let module = parsed_module(db, file).load(db);
+        if function_definition
             .node(&module)
             .parameters
             .index(parameter.name())
@@ -2425,16 +2429,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        if func_type.is_classmethod(self.db()) {
+        if func_type.is_classmethod(db) {
             // TODO: set the type for `cls` argument
             return None;
-        } else if func_type.is_staticmethod(self.db()) {
+        } else if func_type.is_staticmethod(db) {
             return None;
         }
 
-        Type::SpecialForm(SpecialFormType::TypingSelf)
-            .in_type_expression(self.db(), self.scope(), Some(method_definition))
-            .ok()
+        let class = nearest_enclosing_class(db, self.index, scope_id).unwrap();
+
+        typing_self(
+            db,
+            self.scope(),
+            Some(method_definition),
+            class,
+            &Type::NonInferableTypeVar,
+        )
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
