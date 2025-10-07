@@ -1,11 +1,13 @@
 //! Display implementations for types.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
 use ruff_db::display::FormatterJoinExtension;
+use ruff_db::files::FilePath;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
@@ -334,8 +336,16 @@ impl Display for ClassDisplay<'_> {
         f.write_str(self.class.name(self.db))?;
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let path = self.class.file(self.db).path(self.db);
+            let path = match path {
+                FilePath::System(path) => Cow::Owned(FilePath::System(
+                    path.strip_prefix(self.db.system().current_directory())
+                        .unwrap_or(path)
+                        .to_path_buf(),
+                )),
+                FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
+            };
             let class_offset = usize::from(self.class.header_range(self.db).start());
-            write!(f, " ({path}, offset {class_offset})")?;
+            write!(f, " @ ({path}, offset {class_offset})")?;
         }
         Ok(())
     }
