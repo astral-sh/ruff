@@ -75,11 +75,7 @@ impl CliTest {
 
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
-        settings.add_filter(
-            &dbg!(tempdir_filter(project_dir.to_str().unwrap())),
-            "[TMP]/",
-        );
-
+        settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
