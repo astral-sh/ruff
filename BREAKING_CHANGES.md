@@ -4,10 +4,12 @@
 
 - **Default to Python 3.10**
 
-    Ruff now defaults to Python 3.10 instead of 3.9 if no explicit Python version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version)
-    or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) ([#20725](https://github.com/astral-sh/ruff/pull/20725))
+    Ruff now defaults to Python 3.10 instead of 3.9 if no explicit Python
+    version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version)
+    or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires)
+    ([#20725](https://github.com/astral-sh/ruff/pull/20725))
 
-- **New default Python version handling for syntax errors**
+- **Default to Python 3.14 for syntax errors**
 
     Ruff will default to the _latest_ supported Python version (3.14) when
     checking for syntax errors without a Python version configured. The default
