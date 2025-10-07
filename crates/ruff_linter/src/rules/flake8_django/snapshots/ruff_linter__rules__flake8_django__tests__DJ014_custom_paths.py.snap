@@ -2,60 +2,80 @@
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 ---
 DJ014 [*] URL route `help` is missing a trailing slash
- --> DJ014_custom_paths.py:7:12
+ --> DJ014_custom_paths.py:6:12
   |
-5 | # Test that custom path functions are also checked
-6 | urlpatterns_custom = [
-7 |     mypath("help", views.help_view),  # DJ014
+4 | # Test that custom path functions are also checked
+5 | urlpatterns_custom = [
+6 |     mypath("help", views.help_view),  # DJ014
   |            ^^^^^^
-8 |     mypath("about", views.about_view),  # DJ014
-9 | ]
+7 |     mypath("about", views.about_view),  # DJ014
+8 | ]
   |
 help: Add trailing slash
-4  | 
-5  | # Test that custom path functions are also checked
-6  | urlpatterns_custom = [
-   -     mypath("help", views.help_view),  # DJ014
-7  +     mypath("help/", views.help_view),  # DJ014
-8  |     mypath("about", views.about_view),  # DJ014
-9  | ]
-10 | 
+3 | 
+4 | # Test that custom path functions are also checked
+5 | urlpatterns_custom = [
+  -     mypath("help", views.help_view),  # DJ014
+6 +     mypath("help/", views.help_view),  # DJ014
+7 |     mypath("about", views.about_view),  # DJ014
+8 | ]
+9 | 
 
 DJ014 [*] URL route `about` is missing a trailing slash
- --> DJ014_custom_paths.py:8:12
+ --> DJ014_custom_paths.py:7:12
   |
-6 | urlpatterns_custom = [
-7 |     mypath("help", views.help_view),  # DJ014
-8 |     mypath("about", views.about_view),  # DJ014
+5 | urlpatterns_custom = [
+6 |     mypath("help", views.help_view),  # DJ014
+7 |     mypath("about", views.about_view),  # DJ014
   |            ^^^^^^^
-9 | ]
+8 | ]
   |
 help: Add trailing slash
-5  | # Test that custom path functions are also checked
-6  | urlpatterns_custom = [
-7  |     mypath("help", views.help_view),  # DJ014
+4  | # Test that custom path functions are also checked
+5  | urlpatterns_custom = [
+6  |     mypath("help", views.help_view),  # DJ014
    -     mypath("about", views.about_view),  # DJ014
-8  +     mypath("about/", views.about_view),  # DJ014
-9  | ]
-10 | 
-11 | # OK - custom path with trailing slash
+7  +     mypath("about/", views.about_view),  # DJ014
+8  | ]
+9  | 
+10 | # OK - custom path with trailing slash
 
-DJ014 [*] URL route `contact` is missing a trailing slash
-  --> DJ014_custom_paths.py:19:10
+DJ014 [*] URL route `api/users` is missing a trailing slash
+  --> DJ014_custom_paths.py:18:12
    |
-17 | # Test that default django.urls.path still works
-18 | urlpatterns_default = [
-19 |     path("contact", views.contact_view),  # DJ014
-   |          ^^^^^^^^^
-20 |     path("contact/", views.contact_ok),  # OK
+16 | # Test multiple violations in same list
+17 | urlpatterns_multiple = [
+18 |     mypath("api/users", views.users_view),  # DJ014
+   |            ^^^^^^^^^^^
+19 |     mypath("api/posts", views.posts_view),  # DJ014
+20 |     mypath("api/comments/", views.comments_view),  # OK
+   |
+help: Add trailing slash
+15 | 
+16 | # Test multiple violations in same list
+17 | urlpatterns_multiple = [
+   -     mypath("api/users", views.users_view),  # DJ014
+18 +     mypath("api/users/", views.users_view),  # DJ014
+19 |     mypath("api/posts", views.posts_view),  # DJ014
+20 |     mypath("api/comments/", views.comments_view),  # OK
+21 | ]
+
+DJ014 [*] URL route `api/posts` is missing a trailing slash
+  --> DJ014_custom_paths.py:19:12
+   |
+17 | urlpatterns_multiple = [
+18 |     mypath("api/users", views.users_view),  # DJ014
+19 |     mypath("api/posts", views.posts_view),  # DJ014
+   |            ^^^^^^^^^^^
+20 |     mypath("api/comments/", views.comments_view),  # OK
 21 | ]
    |
 help: Add trailing slash
-16 | 
-17 | # Test that default django.urls.path still works
-18 | urlpatterns_default = [
-   -     path("contact", views.contact_view),  # DJ014
-19 +     path("contact/", views.contact_view),  # DJ014
-20 |     path("contact/", views.contact_ok),  # OK
+16 | # Test multiple violations in same list
+17 | urlpatterns_multiple = [
+18 |     mypath("api/users", views.users_view),  # DJ014
+   -     mypath("api/posts", views.posts_view),  # DJ014
+19 +     mypath("api/posts/", views.posts_view),  # DJ014
+20 |     mypath("api/comments/", views.comments_view),  # OK
 21 | ]
 22 |

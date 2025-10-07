@@ -1,4 +1,3 @@
-from django.urls import path
 from mytools import path as mypath
 from . import views
 
@@ -14,16 +13,17 @@ urlpatterns_custom_ok = [
     mypath("about/", views.about_view),
 ]
 
-# Test that default django.urls.path still works
-urlpatterns_default = [
-    path("/contact/", views.contact_view),  # DJ015
-    path("contact/", views.contact_ok),  # OK
+# Test multiple violations in same list
+urlpatterns_multiple = [
+    mypath("/api/users/", views.users_view),  # DJ015
+    mypath("/api/posts/", views.posts_view),  # DJ015
+    mypath("api/comments/", views.comments_view),  # OK
 ]
+
 
 # OK - root path and empty string
 urlpatterns_edge_cases = [
-    path("/", views.root_view),  # OK - root path
+
     mypath("/", views.root_view),  # OK - root path
-    path("", views.empty_view),  # OK - empty string
     mypath("", views.empty_view),  # OK - empty string
 ]
