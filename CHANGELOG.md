@@ -11,28 +11,21 @@ Released on 2025-10-07.
 ### Preview features
 
 - \[`flake8-bugbear`\] Include certain guaranteed-mutable expressions: tuples, generators, and assignment expressions (`B006`) ([#20024](https://github.com/astral-sh/ruff/pull/20024))
-- \[`refurb`\] Add fixes for `FURB101`, `FURB103` ([#20520](https://github.com/astral-sh/ruff/pull/20520))
-- \[`ruff`\] Extend FA102 with listed PEP 585-compatible APIs ([#20659](https://github.com/astral-sh/ruff/pull/20659))
+- \[`refurb`\] Add fixes for `FURB101` and `FURB103` ([#20520](https://github.com/astral-sh/ruff/pull/20520))
+- \[`ruff`\] Extend `FA102` with listed PEP 585-compatible APIs ([#20659](https://github.com/astral-sh/ruff/pull/20659))
 
 ### Bug fixes
 
 - \[`flake8-annotations`\] Fix return type annotations to handle shadowed builtin symbols (`ANN201`, `ANN202`, `ANN204`, `ANN205`, `ANN206`) ([#20612](https://github.com/astral-sh/ruff/pull/20612))
 - \[`flynt`\] Fix f-string quoting for mixed quote joiners (`FLY002`) ([#20662](https://github.com/astral-sh/ruff/pull/20662))
+- \[`isort`\] Fix inserting required imports before future imports (`I002`) ([#20676](https://github.com/astral-sh/ruff/pull/20676))
 - \[`ruff`\] Handle argfile expansion errors gracefully ([#20691](https://github.com/astral-sh/ruff/pull/20691))
 - \[`ruff`\] Skip `RUF051` if `else`/`elif` block is present ([#20705](https://github.com/astral-sh/ruff/pull/20705))
 - \[`ruff`\] Improve handling of intermixed comments inside from-imports ([#20561](https://github.com/astral-sh/ruff/pull/20561))
 
-### Rule changes
-
-- \[`isort`\] Fix inserting required imports before future imports (`I002`) ([#20676](https://github.com/astral-sh/ruff/pull/20676))
-
 ### Documentation
 
 - \[`flake8-comprehensions`\] Clarify fix safety documentation (`C413`) ([#20640](https://github.com/astral-sh/ruff/pull/20640))
-
-### Other changes
-
-- \[`ty`\] Fix playground crashes when accessing vendored files with leading slashes ([#20661](https://github.com/astral-sh/ruff/pull/20661))
 
 ### Contributors
 
