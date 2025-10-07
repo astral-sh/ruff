@@ -17,7 +17,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
     NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionType, any_over_type, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1164,10 +1164,37 @@ impl<'db> SpecializationBuilder<'db> {
         actual = actual.filter_disjoint_elements(self.db, formal);
 
         match (formal, actual) {
-            (Type::Union(_), Type::Union(_)) => {
+            (Type::Union(formal), Type::Union(actual)) => {
                 // TODO: We need to infer specializations appropriately.
                 // e.g.
                 // `formal: list[T] | T | U, actual: V | int | list[V]` => `T = V, U = int`
+
+                let has_typevar =
+                    |ty| any_over_type(self.db, ty, &|ty| matches!(ty, Type::TypeVar(_)), false);
+
+                // Here we do a simplified operation, we use concrete types (types that don't contain type variables) in `formal`
+                // to reduce the elements of `actual`. When `formal` or `actual` is no longer a union type, we can fall back to the cases below.
+                let mut actual = actual;
+                for concrete in formal
+                    .elements(self.db)
+                    .iter()
+                    .filter(|ty| !has_typevar(**ty))
+                {
+                    match actual.filter(self.db, |ty| !ty.is_assignable_to(self.db, *concrete)) {
+                        Type::Union(union) => {
+                            actual = union;
+                        }
+                        other => {
+                            let formal = formal.filter(self.db, |ty| has_typevar(**ty));
+                            self.infer(formal, other)?;
+                            return Ok(());
+                        }
+                    }
+                }
+                let formal = formal.filter(self.db, |ty| has_typevar(**ty));
+                if !matches!(formal, Type::Union(_)) {
+                    self.infer(formal, Type::Union(actual))?;
+                }
             }
             (Type::Union(formal), _) => {
                 // TODO: We haven't implemented a full unification solver yet. If typevars appear

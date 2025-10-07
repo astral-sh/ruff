@@ -285,11 +285,35 @@ def union_param[T](x: T | None) -> T:
 
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
+# TODO: it would be better if this were `Never`
 reveal_type(union_param(None))  # revealed: Unknown
 
 def _(x: int | None):
-    # TODO: should be `int`
-    reveal_type(union_param(x))  # revealed: Unknown
+    reveal_type(union_param(x))  # revealed: int
+```
+
+```py
+def union_param2[T](x: T | int | str) -> T:
+    if isinstance(x, (int, str)):
+        raise ValueError
+    return x
+
+# TODO: it would be better if this were `Never`
+reveal_type(union_param2("a"))  # revealed: Unknown
+# TODO: it would be better if this were `Never`
+reveal_type(union_param2(1))  # revealed: Unknown
+reveal_type(union_param2(None))  # revealed: None
+
+def _(
+    a: None | int | str,
+    b: None | int,
+    c: None | str,
+    d: list[int] | None | int | str,
+):
+    reveal_type(union_param2(a))  # revealed: None
+    reveal_type(union_param2(b))  # revealed: None
+    reveal_type(union_param2(c))  # revealed: None
+    reveal_type(union_param2(d))  # revealed: list[int] | None
 ```
 
 ```py
