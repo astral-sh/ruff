@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -61,10 +60,6 @@ impl AlwaysFixableViolation for DjangoURLPathWithLeadingSlash {
 
 /// DJ015
 pub(crate) fn url_path_with_leading_slash(checker: &Checker, call: &ast::ExprCall) {
-    if !checker.semantic().seen_module(Modules::DJANGO) {
-        return;
-    }
-
     // Check if this is a call to django.urls.path or any additional configured path functions
     let is_path_function = checker
         .semantic()
