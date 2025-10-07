@@ -327,17 +327,17 @@ b: Self
 
 # TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
-    # TODO: should be rejected Self because self has a different type
+    # TODO: This `self: T` annotation should be rejected because `T` is not `Self`
     def has_existing_self_annotation(self: T) -> Self:
         return self  # error: [invalid-return-type]
 
     def return_concrete_type(self) -> Self:
-        # TODO: tell user to annotate with "Foo" instead of "Self"
+        # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
         # error: [invalid-return-type]
         return Foo()
 
     @staticmethod
-    # TODO: should be reject because of staticmethod
+    # TODO: The usage of `Self` here should be rejected because this is a static method
     def make() -> Self:
         # error: [invalid-return-type]
         return Foo()
