@@ -11,7 +11,6 @@ info:
     - "--select"
     - UP007
     - foo/test.py
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -181,6 +180,7 @@ linter.flake8_self.ignore_names = [
 	_name_,
 	_value_,
 ]
+linter.flake8_django.additional_path_functions = []
 linter.flake8_tidy_imports.ban_relative_imports = "parents"
 linter.flake8_tidy_imports.banned_api = {}
 linter.flake8_tidy_imports.banned_module_level_imports = []
