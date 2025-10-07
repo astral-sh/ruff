@@ -1164,30 +1164,59 @@ impl<'db> SpecializationBuilder<'db> {
         actual = actual.filter_disjoint_elements(self.db, formal);
 
         match (formal, actual) {
-            (Type::Union(_), Type::Union(_)) => {
-                // TODO: We need to infer specializations appropriately.
-                // e.g.
-                // `formal: list[T] | T | U, actual: V | int | list[V]` => `T = V, U = int`
+            // TODO: We haven't implemented a full unification solver yet. If typevars appear in
+            // multiple union elements, we ideally want to express that _only one_ of them needs to
+            // match, and that we should infer the smallest type mapping that allows that.
+            //
+            // For now, we punt on fully handling multiple typevar elements. Instead, we handle two
+            // common cases specially:
+            (Type::Union(formal_union), Type::Union(actual_union)) => {
+                // First, if both formal and actual are unions, and precisely one formal union
+                // element _is_ a typevar (not _contains_ a typevar), then we remove any actual
+                // union elements that are a subtype of the formal (as a whole), and map the formal
+                // typevar to any remaining actual union elements.
+                //
+                // In particular, this handles cases like
+                //
+                // ```py
+                // def f[T](t: T | None) -> T: ...
+                // def g[T](t: T | int | None) -> T | int: ...
+                //
+                // def _(x: str | None):
+                //     reveal_type(f(x))  # revealed: str
+                //
+                // def _(y: str | int | None):
+                //     reveal_type(g(x))  # revealed: str | int
+                // ```
+                // We do not handle cases where the `formal` types contain other types that contain type variables
+                // to prevent incorrect specialization: e.g. `T = int | list[int]` for `formal: T | list[T], actual: int | list[int]`
+                // (the correct specialization is `T = int`).
+                let types_have_typevars = formal_union
+                    .elements(self.db)
+                    .iter()
+                    .filter(|ty| ty.has_type_var(self.db));
+                let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
+                else {
+                    return Ok(());
+                };
+                if (actual_union.elements(self.db).iter()).any(|ty| ty.is_type_var()) {
+                    return Ok(());
+                }
+                let remaining_actual =
+                    actual_union.filter(self.db, |ty| !ty.is_subtype_of(self.db, formal));
+                if remaining_actual.is_never() {
+                    return Ok(());
+                }
+                self.add_type_mapping(*formal_bound_typevar, remaining_actual);
             }
             (Type::Union(formal), _) => {
-                // TODO: We haven't implemented a full unification solver yet. If typevars appear
-                // in multiple union elements, we ideally want to express that _only one_ of them
-                // needs to match, and that we should infer the smallest type mapping that allows
-                // that.
-                //
-                // For now, we punt on handling multiple typevar elements. Instead, if _precisely
-                // one_ union element _is_ a typevar (not _contains_ a typevar), then we go ahead
-                // and add a mapping between that typevar and the actual type. (Note that we've
-                // already handled above the case where the actual is assignable to a _non-typevar_
-                // union element.)
-                let mut bound_typevars =
-                    formal.elements(self.db).iter().filter_map(|ty| match ty {
-                        Type::TypeVar(bound_typevar) => Some(*bound_typevar),
-                        _ => None,
-                    });
-                let bound_typevar = bound_typevars.next();
-                let additional_bound_typevars = bound_typevars.next();
-                if let (Some(bound_typevar), None) = (bound_typevar, additional_bound_typevars) {
+                // Second, if the formal is a union, and precisely one union element _is_ a typevar (not
+                // _contains_ a typevar), then we add a mapping between that typevar and the actual
+                // type. (Note that we've already handled above the case where the actual is
+                // assignable to any _non-typevar_ union element.)
+                let bound_typevars =
+                    (formal.elements(self.db).iter()).filter_map(|ty| ty.into_type_var());
+                if let Ok(bound_typevar) = bound_typevars.exactly_one() {
                     self.add_type_mapping(bound_typevar, actual);
                 }
             }

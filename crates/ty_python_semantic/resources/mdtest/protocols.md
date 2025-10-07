@@ -964,11 +964,14 @@ class Foo(Protocol):
 
     def __init__(self) -> None:
         self.x = 42  # fine
+
         self.a = 56  # TODO: should emit diagnostic
         self.b: int = 128  # TODO: should emit diagnostic
 
     def non_init_method(self) -> None:
-        self.y = 64  # fine
+        self.x = 64  # fine
+        self.y = "bar"  # fine
+
         self.c = 72  # TODO: should emit diagnostic
 
 # Note: the list of members does not include `a`, `b` or `c`,

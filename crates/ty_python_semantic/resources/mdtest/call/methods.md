@@ -651,7 +651,7 @@ static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
 reveal_type(MyClass.my_property.__set__)
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
 
-# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = EllipsisType, end: SupportsIndex | None = EllipsisType, /) -> bool
 reveal_type(str.startswith)
 static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
 
@@ -707,7 +707,7 @@ def _(
     # revealed: (instance: object, value: object, /) -> Unknown
     reveal_type(j)
 
-    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = EllipsisType, end: SupportsIndex | None = EllipsisType, /) -> bool
     reveal_type(k)
 
     # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool

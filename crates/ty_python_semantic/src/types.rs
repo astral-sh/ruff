@@ -943,6 +943,21 @@ impl<'db> Type<'db> {
         self.apply_type_mapping_impl(db, &TypeMapping::Materialize(materialization_kind), visitor)
     }
 
+    pub(crate) const fn is_type_var(self) -> bool {
+        matches!(self, Type::TypeVar(_))
+    }
+
+    pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
+        match self {
+            Type::TypeVar(bound_typevar) => Some(bound_typevar),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn has_type_var(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
+    }
+
     pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),

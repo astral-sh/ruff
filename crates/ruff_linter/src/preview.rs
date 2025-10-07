@@ -7,10 +7,6 @@
 
 use crate::settings::LinterSettings;
 
-pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // Rule-specific behavior
 
 // https://github.com/astral-sh/ruff/pull/15541
@@ -257,5 +253,15 @@ pub(crate) const fn is_b006_check_guaranteed_mutable_expr_enabled(
 pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
     settings: &LinterSettings,
 ) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_read_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_write_whole_file_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

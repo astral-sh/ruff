@@ -26,7 +26,7 @@ use crate::types::function::FunctionType;
 use crate::types::generics::{GenericContext, typing_self, walk_generic_context};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
     MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
     todo_type,
@@ -37,7 +37,8 @@ use ruff_python_ast::{self as ast, name::Name};
 #[derive(Clone, Copy, Debug)]
 struct MethodInformation<'db> {
     method: FunctionType<'db>,
-    class: ClassType<'db>,
+    class_literal: ClassLiteral<'db>,
+    class_is_generic: bool,
 }
 
 fn infer_method_information<'db>(
@@ -57,12 +58,22 @@ fn infer_method_information<'db>(
         .into_function_literal()?;
 
     let class_def = index.expect_single_definition(class_node);
-    let class_literal = infer_definition_types(db, class_def)
+    let (class_literal, class_is_generic) = match infer_definition_types(db, class_def)
         .declaration_type(class_def)
-        .inner_type();
-    let class = class_literal.to_class_type(db)?;
+        .inner_type()
+    {
+        Type::ClassLiteral(class_literal) => {
+            (class_literal, class_literal.generic_context(db).is_some())
+        }
+        Type::GenericAlias(alias) => (alias.origin(db), true),
+        _ => return None,
+    };
 
-    Some(MethodInformation { method, class })
+    Some(MethodInformation {
+        method,
+        class_literal,
+        class_is_generic,
+    })
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -1214,7 +1225,11 @@ impl<'db> Parameters<'db> {
             .is_some_and(|f| f.method.is_staticmethod(db) || f.method.is_classmethod(db));
 
         let inferred_annotation = |arg: &ParameterWithDefault| {
-            if let Some(MethodInformation { method, class }) = method_info
+            if let Some(MethodInformation {
+                method,
+                class_literal,
+                class_is_generic,
+            }) = method_info
                 && !is_static_or_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
@@ -1227,8 +1242,10 @@ impl<'db> Parameters<'db> {
                     });
 
                 if method_has_self_in_generic_context
-                    || class.is_generic()
-                    || class.known(db).is_some_and(KnownClass::is_fallback_class)
+                    || class_is_generic
+                    || class_literal
+                        .known(db)
+                        .is_some_and(KnownClass::is_fallback_class)
                 {
                     let scope_id = definition.scope(db);
                     let typevar_binding_context = Some(definition);
@@ -1243,7 +1260,7 @@ impl<'db> Parameters<'db> {
                     // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
                     // have additional type parameters), the implicit `Self` type of the `self` parameter would
                     // be the only type variable, so we can just use the class directly.
-                    Some(Type::instance(db, class))
+                    Some(class_literal.to_non_generic_instance(db))
                 }
             } else {
                 None
