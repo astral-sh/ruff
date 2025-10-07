@@ -514,6 +514,12 @@ macro_rules! assert_diagnostics_diff {
             insta::assert_snapshot!($snapshot, format!("{}", diff));
         });
     }};
+    ($path:expr, $settings_before:expr, $settings_after:expr $(,)?) => {{
+        let diff = $crate::test::test_path_with_settings_diff($path, $settings_before, $settings_after)?;
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!(format!("{}", diff));
+        });
+    }};
 }
 
 #[cfg(test)]
