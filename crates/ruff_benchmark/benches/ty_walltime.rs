@@ -232,7 +232,7 @@ static STATIC_FRAME: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLo
             max_dep_date: "2025-08-09",
             python_version: PythonVersion::PY311,
         },
-        600,
+        700,
     )
 });
 
