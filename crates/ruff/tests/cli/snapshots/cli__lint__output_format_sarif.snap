@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/lint.rs
+source: crates/ruff/tests/cli/lint.rs
 info:
   program: ruff
   args:
@@ -12,6 +12,7 @@ info:
     - "--target-version"
     - py39
     - input.py
+snapshot_kind: text
 ---
 success: false
 exit_code: 1
