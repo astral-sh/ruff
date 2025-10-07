@@ -324,7 +324,6 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                 specialization
                     .generic_context(db)
                     .variables(db)
-                    .iter()
                     .zip(specialization.types(db))
                     .map(|(generic_typevar, ty)| {
                         if let Some(explicit_variance) =
@@ -346,7 +345,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                             let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
                             origin
                                 .with_polarity(typevar_variance_in_substituted_type)
-                                .variance_of(db, *generic_typevar)
+                                .variance_of(db, generic_typevar)
                         }
                     }),
             )
@@ -551,7 +550,9 @@ impl<'db> ClassType<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => ConstraintSet::from(other.is_object(db)),
+                    TypeRelation::Subtyping | TypeRelation::Redundancy => {
+                        ConstraintSet::from(other.is_object(db))
+                    }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
                 },
 
@@ -1011,8 +1012,7 @@ impl<'db> ClassType<'db> {
 
                 let synthesized_dunder = CallableType::function_like(
                     db,
-                    Signature::new(parameters, None)
-                        .with_inherited_generic_context(inherited_generic_context),
+                    Signature::new_generic(inherited_generic_context, parameters, None),
                 );
 
                 Place::bound(synthesized_dunder).into()
@@ -1450,6 +1450,16 @@ impl<'db> ClassLiteral<'db> {
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
         )
+    }
+
+    /// Returns the generic context that should be inherited by any constructor methods of this
+    /// class.
+    ///
+    /// When inferring a specialization of the class's generic context from a constructor call, we
+    /// promote any typevars that are inferred as a literal to the corresponding instance type.
+    fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.generic_context(db)
+            .map(|generic_context| generic_context.promote_literals(db))
     }
 
     fn file(self, db: &dyn Db) -> File {
@@ -1994,7 +2004,7 @@ impl<'db> ClassLiteral<'db> {
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(
                             db,
-                            class.own_class_member(db, self.generic_context(db), name),
+                            class.own_class_member(db, self.inherited_generic_context(db), name),
                         )
                     });
                 }
@@ -2244,8 +2254,14 @@ impl<'db> ClassLiteral<'db> {
             // so that the keyword-only parameters appear after positional parameters.
             parameters.sort_by_key(Parameter::is_keyword_only);
 
-            let mut signature = Signature::new(Parameters::new(parameters), return_ty);
-            signature.inherited_generic_context = self.generic_context(db);
+            let signature = match name {
+                "__new__" | "__init__" => Signature::new_generic(
+                    self.inherited_generic_context(db),
+                    Parameters::new(parameters),
+                    return_ty,
+                ),
+                _ => Signature::new(Parameters::new(parameters), return_ty),
+            };
             Some(CallableType::function_like(db, signature))
         };
 
@@ -2293,7 +2309,7 @@ impl<'db> ClassLiteral<'db> {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
                     .into_class_literal()?
-                    .own_class_member(db, self.generic_context(db), None, name)
+                    .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .place
                     .ignore_possibly_unbound()
                     .map(|ty| {
@@ -4403,14 +4419,22 @@ impl KnownClass {
         KnownClassDisplay { db, class: self }
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing all possible instances of the class.
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing all possible instances of
+    /// the class. If this class is generic, this will use the default specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
+    /// parameter is specialized to `Unknown`.
+    pub(crate) fn to_instance_unknown(self, db: &dyn Db) -> Type<'_> {
+        self.try_to_class_literal(db)
+            .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -5411,7 +5435,7 @@ enum SlotsKind {
 impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
         let Place::Type(slots_ty, bound) = base
-            .own_class_member(db, base.generic_context(db), None, "__slots__")
+            .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
             .place
         else {
             return Self::NotSpecified;

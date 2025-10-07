@@ -893,8 +893,10 @@ class LotsOfBindings(Protocol):
     match object():
         case l:  # error: [ambiguous-protocol-member]
             ...
+    # error: [ambiguous-protocol-member] "Consider adding an annotation, e.g. `m: int | str = ...`"
+    m = 1 if 1.2 > 3.4 else "a"
 
-# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]]
+# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"]]
 reveal_type(get_protocol_members(LotsOfBindings))
 
 class Foo(Protocol):
@@ -962,12 +964,14 @@ class Foo(Protocol):
 
     def __init__(self) -> None:
         self.x = 42  # fine
+
         self.a = 56  # TODO: should emit diagnostic
         self.b: int = 128  # TODO: should emit diagnostic
 
     def non_init_method(self) -> None:
-        # TODO: should be fine
-        self.y = 64  # error: [invalid-assignment] "Object of type `Literal[64]` is not assignable to attribute `y` of type `str`"
+        self.x = 64  # fine
+        self.y = "bar"  # fine
+
         self.c = 72  # TODO: should emit diagnostic
 
 # Note: the list of members does not include `a`, `b` or `c`,

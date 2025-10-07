@@ -2738,7 +2738,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2777,6 +2777,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_parser",
+ "ruff_python_trivia",
  "ruff_server",
  "ruff_source_file",
  "ruff_text_size",
@@ -2994,7 +2995,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3348,7 +3349,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4449,6 +4450,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "serde-wasm-bindgen",
+ "tracing",
  "ty_ide",
  "ty_project",
  "ty_python_semantic",

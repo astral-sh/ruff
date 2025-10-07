@@ -237,15 +237,16 @@ impl Options {
                 .map(|root| root.absolute(project_root, system))
                 .collect()
         } else {
+            let mut roots = vec![];
             let src = project_root.join("src");
 
-            let mut roots = if system.is_directory(&src) {
+            if system.is_directory(&src) {
                 // Default to `src` and the project root if `src` exists and the root hasn't been specified.
                 // This corresponds to the `src-layout`
                 tracing::debug!(
                     "Including `.` and `./src` in `environment.root` because a `./src` directory exists"
                 );
-                vec![project_root.to_path_buf(), src]
+                roots.push(src);
             } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
                 // `src-layout` but when the folder isn't called `src` but has the same name as the project.
                 // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
@@ -253,12 +254,11 @@ impl Options {
                     "Including `.` and `/{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists"
                 );
 
-                vec![project_root.to_path_buf(), project_root.join(project_name)]
+                roots.push(project_root.join(project_name));
             } else {
                 // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
                 tracing::debug!("Including `.` in `environment.root`");
-                vec![project_root.to_path_buf()]
-            };
+            }
 
             let python = project_root.join("python");
             if system.is_directory(&python)
@@ -292,6 +292,10 @@ impl Options {
 
                 roots.push(tests_dir);
             }
+
+            // The project root should always be included, and should always come
+            // after any subdirectories such as `./src`, `./tests` and/or `./python`.
+            roots.push(project_root.to_path_buf());
 
             roots
         };
@@ -546,9 +550,14 @@ pub struct EnvironmentOptions {
     )]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
-    /// or pyright's `stubPath` configuration setting.
+    /// User-provided paths that should take first priority in module resolution.
+    ///
+    /// This is an advanced option that should usually only be used for first-party or third-party
+    /// modules that are not installed into your Python environment in a conventional way.
+    /// Use the `python` option to specify the location of your Python environment.
+    ///
+    /// This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
+    /// configuration setting.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
@@ -572,18 +581,27 @@ pub struct EnvironmentOptions {
     )]
     pub typeshed: Option<RelativePathBuf>,
 
-    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
+    /// Path to your project's Python environment or interpreter.
     ///
-    /// ty will search in the path's `site-packages` directories for type information and
-    /// third-party imports.
+    /// ty uses the `site-packages` directory of your project's Python environment
+    /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
-    /// This option is commonly used to specify the path to a virtual environment.
+    /// If you're using a project management tool such as uv, you should not generally need
+    /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
+    /// environment variable to point to your project's virtual environment. ty can also infer
+    /// the location of your environment from an activated Conda environment, and will look for
+    /// a `.venv` directory in the project root if none of the above apply.
+    ///
+    /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
+    /// (such as a shim) is not currently supported.
+    ///
+    /// This option can be used to point to virtual or system Python environments.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
         example = r#"
-            python = "./.venv"
+            python = "./custom-venv-location/.venv"
         "#
     )]
     pub python: Option<RelativePathBuf>,

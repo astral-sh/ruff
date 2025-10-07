@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
 UP029 [*] Unnecessary builtin import: `*`
- --> UP029.py:1:1
+ --> UP029_0.py:1:1
   |
 1 | from builtins import *
   | ^^^^^^^^^^^^^^^^^^^^^^
@@ -17,7 +17,7 @@ help: Remove unnecessary builtin import
 note: This is an unsafe fix and may change runtime behavior
 
 UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
- --> UP029.py:2:1
+ --> UP029_0.py:2:1
   |
 1 | from builtins import *
 2 | from builtins import ascii, bytes, compile
@@ -35,7 +35,7 @@ help: Remove unnecessary builtin import
 note: This is an unsafe fix and may change runtime behavior
 
 UP029 [*] Unnecessary builtin imports: `filter`, `zip`
- --> UP029.py:4:1
+ --> UP029_0.py:4:1
   |
 2 | from builtins import ascii, bytes, compile
 3 | from builtins import str as _str
@@ -56,7 +56,7 @@ help: Remove unnecessary builtin import
 note: This is an unsafe fix and may change runtime behavior
 
 UP029 [*] Unnecessary builtin import: `open`
- --> UP029.py:5:1
+ --> UP029_0.py:5:1
   |
 3 | from builtins import str as _str
 4 | from six.moves import filter, zip, zip_longest

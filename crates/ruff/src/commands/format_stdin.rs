@@ -4,10 +4,10 @@ use std::path::Path;
 use anyhow::Result;
 use log::error;
 
-use ruff_linter::source_kind::SourceKind;
+use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{Resolver, match_exclusion, python_file_at_path};
+use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, python_file_at_path};
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -15,17 +15,15 @@ use crate::commands::format::{
     FormatCommandError, FormatMode, FormatResult, FormattedSource, format_source,
     warn_incompatible_formatter_settings,
 };
-use crate::resolve::resolve;
 use crate::stdin::{parrot_stdin, read_from_stdin};
 
 /// Run the formatter over a single file, read from `stdin`.
 pub(crate) fn format_stdin(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
+    pyproject_config: &PyprojectConfig,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
-
-    let mut resolver = Resolver::new(&pyproject_config);
+    let mut resolver = Resolver::new(pyproject_config);
     warn_incompatible_formatter_settings(&resolver);
 
     let mode = FormatMode::from_cli(cli);
@@ -124,7 +122,9 @@ fn format_source_code(
                     "{}",
                     source_kind.diff(formatted, path).unwrap()
                 )
-                .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
+                .map_err(|err| {
+                    FormatCommandError::Write(path.map(Path::to_path_buf), SourceError::Io(err))
+                })?;
             }
         },
         FormattedSource::Unchanged => {
