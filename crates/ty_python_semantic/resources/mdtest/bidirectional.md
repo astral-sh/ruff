@@ -70,6 +70,13 @@ d3: dict[str, int] = {"x": 1}
 reveal_type(d1)  # revealed: dict[Unknown | str, Unknown | int]
 reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
+
+def _() -> TD:
+    return {"x": 1}
+
+def _() -> TD:
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    return {}
 ```
 
 ## Propagating return type annotation

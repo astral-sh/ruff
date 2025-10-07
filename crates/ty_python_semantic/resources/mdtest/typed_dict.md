@@ -284,7 +284,7 @@ qualifiers override the class-level `total` setting, which sets the default (`to
 all keys are required by default, `total=False` means that all keys are non-required by default):
 
 ```py
-from typing_extensions import TypedDict, Required, NotRequired
+from typing_extensions import TypedDict, Required, NotRequired, Final
 
 # total=False by default, but id is explicitly Required
 class Message(TypedDict, total=False):
@@ -298,10 +298,20 @@ class User(TypedDict):
     email: Required[str]  # Explicitly required (redundant here)
     bio: NotRequired[str]  # Optional despite total=True
 
+ID: Final = "id"
+
 # Valid Message constructions
 msg1 = Message(id=1)  # id required, content optional
 msg2 = Message(id=2, content="Hello")  # both provided
 msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
+msg4: Message = {"id": 4}  # id required, content optional
+# TODO: no error
+# error: [missing-typed-dict-key]
+msg5: Message = {ID: 5}  # id required, content optional
+
+def msg() -> Message:
+    # TODO: no error
+    return {ID: 1}  # error: [missing-typed-dict-key]
 
 # Valid User constructions
 user1 = User(name="Alice", email="alice@example.com")  # required fields
