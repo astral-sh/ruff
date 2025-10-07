@@ -1265,6 +1265,9 @@ struct DisplayUnionType<'db> {
     settings: DisplaySettings<'db>,
 }
 
+const MAX_DISPLAYED_UNION_ITEMS: usize = 5;
+const MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED: usize = 3;
+
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fn is_condensable(ty: Type<'_>) -> bool {
@@ -1286,12 +1289,33 @@ impl Display for DisplayUnionType<'_> {
             .filter(|element| is_condensable(*element))
             .collect::<Vec<_>>();
 
+        let total_entries =
+            usize::from(!condensed_types.is_empty()) + elements.len() - condensed_types.len();
+
+        if total_entries == 0 {
+            return Ok(());
+        }
+
         let mut join = f.join(" | ");
 
+        let display_limit = (if total_entries > MAX_DISPLAYED_UNION_ITEMS {
+            MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED
+        } else {
+            MAX_DISPLAYED_UNION_ITEMS
+        })
+        .min(total_entries);
+
         let mut condensed_types = Some(condensed_types);
+        let mut displayed_entries = 0usize;
+
         for element in elements {
+            if displayed_entries >= display_limit {
+                break;
+            }
+
             if is_condensable(*element) {
                 if let Some(condensed_types) = condensed_types.take() {
+                    displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
                         db: self.db,
@@ -1299,12 +1323,20 @@ impl Display for DisplayUnionType<'_> {
                     });
                 }
             } else {
+                displayed_entries += 1;
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
                     settings: self.settings.singleline(),
                 });
             }
+        }
+
+        let omitted_entries = total_entries.saturating_sub(displayed_entries);
+        if omitted_entries > 0 {
+            join.entry(&DisplayUnionOmitted {
+                count: omitted_entries,
+            });
         }
 
         join.finish()?;
@@ -1316,6 +1348,21 @@ impl Display for DisplayUnionType<'_> {
 impl fmt::Debug for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
+    }
+}
+
+struct DisplayUnionOmitted {
+    count: usize,
+}
+
+impl Display for DisplayUnionOmitted {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let plural = if self.count == 1 {
+            "element"
+        } else {
+            "elements"
+        };
+        write!(f, "... omitted {} union {}", self.count, plural)
     }
 }
 

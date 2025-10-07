@@ -225,7 +225,7 @@ class Test2:
 
 def _(flag: bool):
     for x in Test() if flag else Test2():
-        reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
+        reveal_type(x)  # revealed: Result1A | Result1B | Result2A | ... omitted 3 union elements
 ```
 
 ## Union type as iterable where `Iterator[]` is used as the return type of `__iter__`
