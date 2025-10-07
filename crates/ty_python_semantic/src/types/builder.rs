@@ -1077,7 +1077,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // don't need to worry about finding any particular constraint more than once.
             let constraints = constraints.elements(db);
             let mut positive_constraint_count = 0;
-            for positive in &self.positive {
+            for (i, positive) in self.positive.iter().enumerate() {
+                if i == typevar_index {
+                    continue;
+                }
+
                 // This linear search should be fine as long as we don't encounter typevars with
                 // thousands of constraints.
                 positive_constraint_count += constraints

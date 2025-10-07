@@ -152,7 +152,7 @@ Person(name="Alice")
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 Person({"name": "Alice"})
 
-# TODO: this should be an error, similar to the above
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 accepts_person({"name": "Alice"})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": "Alice"}
@@ -171,7 +171,7 @@ Person(name=None, age=30)
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 Person({"name": None, "age": 30})
 
-# TODO: this should be an error, similar to the above
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 accepts_person({"name": None, "age": 30})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": None, "age": 30}
@@ -190,7 +190,7 @@ Person(name="Alice", age=30, extra=True)
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 Person({"name": "Alice", "age": 30, "extra": True})
 
-# TODO: this should be an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 # TODO: this should be an error
 house.owner = {"name": "Alice", "age": 30, "extra": True}
