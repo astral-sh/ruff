@@ -1015,6 +1015,16 @@
             }
           ]
         },
+        "useless-overload-body": {
+          "title": "detects `@overload`-decorated functions with non-stub bodies",
+          "description": "## What it does\nChecks for various `@overload`-decorated functions that have non-stub bodies.\n\n## Why is this bad?\nFunctions decorated with `@overload` are ignored at runtime; they are overridden\nby the implementation function that follows the series of overloads. While it is\nnot illegal to provide a body for an `@overload`-decorated function, it may indicate\na misunderstanding of how the `@overload` decorator works.\n\n## Example\n\n```py\nfrom typing import overload\n\n@overload\ndef foo(x: int) -> int:\n    return x + 1\n\n@overload\ndef foo(x: str) -> str:\n    return \"Oh no, got a string\"\n\ndef foo(x: int | str) -> int | str:\n    raise Exception(\"unexpected type encountered\")\n```\n\nUse instead:\n\n```py\nfrom typing import assert_never, overload\n\n@overload\ndef foo(x: int) -> int: ...\n\n@overload\ndef foo(x: str) -> str: ...\n\ndef foo(x: int | str) -> int | str:\n    if isinstance(x, int):\n        return x + 1\n    elif isinstance(x, str):\n        return \"Oh no, got a string\"\n    else:\n        assert_never(x)\n```\n\n## References\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "zero-stepsize-in-slice": {
           "title": "detects a slice step size of zero",
           "description": "## What it does\nChecks for step size 0 in slices.\n\n## Why is this bad?\nA slice with a step size of zero will raise a `ValueError` at runtime.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
