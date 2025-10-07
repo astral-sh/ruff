@@ -708,9 +708,9 @@ select = [E501]
     ruff failed
       Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
       Cause: Failed to parse [TMP]/ruff2.toml
-      Cause: TOML parse error at line 2, column 11
+      Cause: TOML parse error at line 3, column 11
       |
-    2 | select = [E501]
+    3 | select = [E501]
       |           ^^^^
     string values must be quoted, expected literal string
     ");
@@ -3239,7 +3239,7 @@ from typing import Union;foo: Union[int, str] = 1"#,
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:31: UP007 [*] Use `X | Y` for type annotations
+    test.py:2:31: UP007 [*] Use `X | Y` for type annotations
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -4934,7 +4934,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
         .arg("ruff.toml")
         .arg("-")
         .pass_stdin("")
-        , @r###"
+        , @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -4943,12 +4943,12 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
     ruff failed
       Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Failed to parse [TMP]/ruff.toml
-      Cause: TOML parse error at line 2, column 17
+      Cause: TOML parse error at line 3, column 17
       |
-    2 | "module.name" = "invalid.alias"
+    3 | "module.name" = "invalid.alias"
       |                 ^^^^^^^^^^^^^^^
     invalid value: string "invalid.alias", expected a Python identifier
-    "###);
+    "#);
     Ok(())
 }
 
@@ -4969,7 +4969,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
         .arg("ruff.toml")
         .arg("-")
         .pass_stdin("")
-        , @r###"
+        , @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -4978,12 +4978,12 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
     ruff failed
       Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Failed to parse [TMP]/ruff.toml
-      Cause: TOML parse error at line 2, column 17
+      Cause: TOML parse error at line 3, column 17
       |
-    2 | "module.name" = "__debug__"
+    3 | "module.name" = "__debug__"
       |                 ^^^^^^^^^^^
     invalid value: string "__debug__", expected an assignable Python identifier
-    "###);
+    "#);
     Ok(())
 }
 
@@ -5004,7 +5004,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
         .arg("ruff.toml")
         .arg("-")
         .pass_stdin("")
-        , @r###"
+        , @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -5013,13 +5013,12 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
     ruff failed
       Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Failed to parse [TMP]/ruff.toml
-      Cause: TOML parse error at line 2, column 1
+      Cause: TOML parse error at line 3, column 1
       |
-    2 | "module..invalid" = "alias"
+    3 | "module..invalid" = "alias"
       | ^^^^^^^^^^^^^^^^^
     invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
-
-    "###);
+    "#);
     Ok(())
 }
 
