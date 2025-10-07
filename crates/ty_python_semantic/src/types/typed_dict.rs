@@ -62,10 +62,10 @@ impl<'db> TypedDictType<'db> {
         TypedDictType::FromClass(class)
     }
 
-    /// Returns an incomplete `TypedDictType` from its items.
+    /// Returns an anonymous (incomplete) `TypedDictType` from its items.
     ///
     /// This is used to instantiate a `TypedDictType` from the dictionary literal passed to a
-    /// `TypedDict` constructor.
+    /// `typing.TypedDict` constructor (functional form for creating `TypedDict`s).
     pub(crate) fn from_items(db: &'db dyn Db, items: FxOrderMap<Name, Field<'db>>) -> Self {
         TypedDictType::Synthesized(SynthesizedTypedDictType::new(
             db,
@@ -397,7 +397,7 @@ impl<'db> TypedDictType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct SynthesizedTypedDictType<'db> {
     // The dictionary literal passed to the `TypedDict` constructor is inferred as
-    // a nameless `SynthesizedTypedDictType`.
+    // an anonymous (incomplete) `SynthesizedTypedDictType`.
     pub(crate) name: Option<Name>,
 
     pub(crate) params: TypedDictParams,

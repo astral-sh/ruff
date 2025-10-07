@@ -5473,8 +5473,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             items,
         } = dict;
 
-        // Validate `TypedDict` dictionary literal assignments.
+        // Infer `TypedDict` dictionary literal assignments.
         if let Some(ty) = self.infer_typed_dict_expression(dict, tcx) {
+            return ty;
+        }
+
+        // Infer the dictionary literal passed to the `TypedDict` constructor.
+        if let Some(ty) = self.infer_typed_dict_constructor_literal(dict, tcx) {
             return ty;
         }
 
@@ -5603,52 +5608,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             items,
         } = dict;
 
-        // Evaluate the dictionary literal passed to the `TypedDict` constructor.
-        if let Some(Type::SpecialForm(SpecialFormType::TypedDict)) = tcx.annotation {
-            let mut typed_dict_items = FxOrderMap::default();
-
-            for item in items {
-                let Some(Type::StringLiteral(key)) =
-                    self.infer_optional_expression(item.key.as_ref(), TypeContext::default())
-                else {
-                    // Emit a diagnostic here? We seem to support non-string literals.
-                    unimplemented!()
-                };
-
-                let field_ty = self.infer_typed_dict_field_type_expression(&item.value);
-
-                let is_required = if field_ty.qualifiers.contains(TypeQualifiers::REQUIRED) {
-                    // Explicit Required[T] annotation - always required
-                    Truthiness::AlwaysTrue
-                } else if field_ty.qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
-                    // Explicit NotRequired[T] annotation - never required
-                    Truthiness::AlwaysFalse
-                } else {
-                    // No explicit qualifier - we don't have access to the `total` qualifier here,
-                    // so we leave this to be filled in by the `TypedDict` constructor.
-                    Truthiness::Ambiguous
-                };
-
-                let field = Field {
-                    single_declaration: None,
-                    declared_ty: field_ty.inner_type(),
-                    kind: FieldKind::TypedDict {
-                        is_required,
-                        is_read_only: field_ty.qualifiers.contains(TypeQualifiers::READ_ONLY),
-                    },
-                };
-
-                typed_dict_items.insert(ast::name::Name::new(key.value(self.db())), field);
-            }
-
-            // Create an incomplete synthesized `TypedDictType`, to be completed by the `TypedDict`
-            // constructor binding.
-            return Some(Type::TypedDict(TypedDictType::from_items(
-                self.db(),
-                typed_dict_items,
-            )));
-        }
-
         let typed_dict = tcx.annotation.and_then(Type::into_typed_dict)?;
         let typed_dict_items = typed_dict.items(self.db());
 
@@ -5670,6 +5629,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
+    }
+
+    // Infer the dictionary literal passed to the `TypedDict` constructor.
+    fn infer_typed_dict_constructor_literal(
+        &mut self,
+        dict: &ast::ExprDict,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let ast::ExprDict {
+            range: _,
+            node_index: _,
+            items,
+        } = dict;
+
+        let Some(Type::SpecialForm(SpecialFormType::TypedDict)) = tcx.annotation else {
+            return None;
+        };
+
+        let mut typed_dict_items = FxOrderMap::default();
+
+        for item in items {
+            let Some(Type::StringLiteral(key)) =
+                self.infer_optional_expression(item.key.as_ref(), TypeContext::default())
+            else {
+                continue;
+            };
+
+            let field_ty = self.infer_typed_dict_field_type_expression(&item.value);
+
+            let is_required = if field_ty.qualifiers.contains(TypeQualifiers::REQUIRED) {
+                // Explicit Required[T] annotation - always required
+                Truthiness::AlwaysTrue
+            } else if field_ty.qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+                // Explicit NotRequired[T] annotation - never required
+                Truthiness::AlwaysFalse
+            } else {
+                // No explicit qualifier - we don't have access to the `total` qualifier here,
+                // so we leave this to be filled in by the `TypedDict` constructor.
+                Truthiness::Ambiguous
+            };
+
+            let field = Field {
+                single_declaration: None,
+                declared_ty: field_ty.inner_type(),
+                kind: FieldKind::TypedDict {
+                    is_required,
+                    is_read_only: field_ty.qualifiers.contains(TypeQualifiers::READ_ONLY),
+                },
+            };
+
+            typed_dict_items.insert(ast::name::Name::new(key.value(self.db())), field);
+        }
+
+        // Create an anonymous `TypedDict` from the items, to be completed by the `TypedDict` constructor binding.
+        Some(Type::TypedDict(TypedDictType::from_items(
+            self.db(),
+            typed_dict_items,
+        )))
     }
 
     fn infer_typed_dict_field_type_expression(

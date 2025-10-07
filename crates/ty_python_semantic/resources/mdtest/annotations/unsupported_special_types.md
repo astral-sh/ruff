@@ -1,6 +1,6 @@
 # Unsupported special types
 
-We do not understand the functional syntax for creating `NamedTuple`s, `TypedDict`s or `Enum`s yet.
+We do not understand the functional syntax for creating `NamedTuple`s or `Enum`s yet.
 But we also do not emit false positives when these are used in type expressions.
 
 ```py

@@ -4764,6 +4764,9 @@ impl<'db> Type<'db> {
                             Parameter::positional_only(Some(Name::new_static("typename")))
                                 .with_annotated_type(KnownClass::Str.to_instance(db)),
                             Parameter::positional_only(Some(Name::new_static("fields")))
+                                // We infer this type as an anonymous `TypedDict` instance, such that the
+                                // complete `TypeDict` instance can be constructed from it after. Note that
+                                // `typing.TypedDict` is not otherwise allowed in type-form expressions.
                                 .with_annotated_type(Type::SpecialForm(SpecialFormType::TypedDict))
                                 .with_default_type(Type::any()),
                             Parameter::keyword_only(Name::new_static("total"))
@@ -4858,6 +4861,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => Binding::single(
                 self,
                 Signature::new(
+                    // TODO: List more specific parameter types here for better code completion.
                     Parameters::new([Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(Type::any())]),
                     Some(Type::TypedDict(typed_dict)),
