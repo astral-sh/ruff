@@ -1,30 +1,31 @@
 //! Tests the interaction of the `lint` configuration section
 
-use regex::escape;
+use std::fs;
 use std::process::Command;
 use std::str;
-use std::{fs, path::Path};
 
 use anyhow::Result;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use tempfile::TempDir;
 
 use crate::CliTest;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
-fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
+impl CliTest {
+    fn check_command(&self) -> Command {
+        let mut command = self.command();
+        command.args(STDIN_BASE_OPTIONS);
+        command
+    }
 }
 
 #[test]
 fn top_level_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 
@@ -33,31 +34,26 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
             .arg("--config")
-            .arg(&ruff_toml)
+            .arg("ruff.toml")
             .args(["--stdin-filename", "test.py"])
             .arg("-")
             .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-        test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-        Found 3 errors.
-        [*] 2 fixable with the `--fix` option.
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
+    test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
+    test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 3 errors.
+    [*] 2 fixable with the `--fix` option.
 
-        ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
-          - 'extend-select' -> 'lint.extend-select'
-          - 'flake8-quotes' -> 'lint.flake8-quotes'
-        ");
-    });
+    ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+      - 'extend-select' -> 'lint.extend-select'
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
+    ");
 
     Ok(())
 }
@@ -76,8 +72,7 @@ inline-quotes = "single"
     )?;
 
     assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
+        case.check_command()
             .arg("--config")
             .arg("ruff.toml")
             .arg("-")
@@ -100,10 +95,9 @@ inline-quotes = "single"
 /// Tests that configurations from the top-level and `lint` section are merged together.
 #[test]
 fn mixed_levels() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 
@@ -112,13 +106,9 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
@@ -131,10 +121,9 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
     ");
-    });
 
     Ok(())
 }
@@ -142,10 +131,9 @@ inline-quotes = "single"
 /// Tests that options in the `lint` section have higher precedence than top-level options (because they are more specific).
 #[test]
 fn precedence() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 extend-select = ["B", "Q"]
@@ -158,13 +146,9 @@ inline-quotes = "single"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .arg("-")
         .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
@@ -177,10 +161,9 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'flake8-quotes' -> 'lint.flake8-quotes'
     ");
-    });
 
     Ok(())
 }
@@ -232,8 +215,7 @@ OTHER = "OTHER"
     case.write_file("out/a.py", r#"a = "a""#)?;
 
     assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
+        case.check_command()
             .args(["--config", "ruff.toml"])
             // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
             .arg("test.py")
@@ -272,8 +254,7 @@ exclude = ["main.py"]
     case.write_file("main.py", "import os\n")?;
 
     assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
+        case.check_command()
             .args(["--config", "ruff.toml"])
             .arg(".")
             // Explicitly pass main.py, should be linted regardless of it being excluded by lint.exclude
@@ -309,8 +290,7 @@ inline-quotes = "single"
     )?;
 
     assert_cmd_snapshot!(
-        case.command()
-            .args(STDIN_BASE_OPTIONS)
+        case.check_command()
             .args(["--config", "ruff.toml"])
             .args(["--stdin-filename", "generated.py"])
             .arg("-")
@@ -338,10 +318,9 @@ if __name__ == "__main__":
 
 #[test]
 fn line_too_long_width_override() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 line-length = 80
 select = ["E501"]
@@ -351,13 +330,9 @@ max-line-length = 100
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .arg("--config")
-        .arg(&ruff_toml)
+        .arg("ruff.toml")
         .args(["--stdin-filename", "test.py"])
         .arg("-")
         .pass_stdin(r#"
@@ -373,11 +348,10 @@ _ = "---------------------------------------------------------------------------
     Found 1 error.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'select' -> 'lint.select'
       - 'pycodestyle' -> 'lint.pycodestyle'
     ");
-    });
 
     Ok(())
 }
@@ -395,8 +369,7 @@ inline-quotes = "single"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .args(["--stdin-filename", "generated.py"])
         .args(["--per-file-ignores", "generated.py:Q"])
@@ -437,8 +410,7 @@ inline-quotes = "single"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .args(["--stdin-filename", "generated.py"])
         .args(["--extend-per-file-ignores", "generated.py:Q"])
@@ -487,9 +459,8 @@ ignore = ["D203", "D212"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
+        .check_command()
         .current_dir(fixture.root().join("subdirectory"))
-        .args(STDIN_BASE_OPTIONS)
         , @r"
     success: true
     exit_code: 0
@@ -561,8 +532,7 @@ fn too_many_config_files() -> Result<()> {
     fixture.write_file("ruff2.toml", "")?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("--config")
@@ -618,8 +588,7 @@ extend = "ruff3.toml"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(["check"]), @r"
+        .check_command(), @r"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -657,8 +626,7 @@ extend = "ruff.toml"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(["check"]),
+        .check_command(),
         @r"
     success: false
     exit_code: 2
@@ -689,9 +657,8 @@ select = [E501]
 "#,
     )?;
 
-    assert_cmd_snapshot!(fixture
-        .command()
-        .args(["check"]),
+    assert_cmd_snapshot!(
+        fixture.check_command(),
         @r"
     success: false
     exit_code: 2
@@ -717,8 +684,7 @@ fn config_file_and_isolated() -> Result<()> {
     fixture.write_file("ruff.toml", "")?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("--isolated")
@@ -769,8 +735,7 @@ from foo import (
 x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
 "#;
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .args(["--config", "line-length=90"])
@@ -979,8 +944,7 @@ select=["E501"]
     )?;
     let test_code = "x = 'longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss'";
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         // The --line-length flag takes priority over both the config file
         // and the `--config="line-length=110"` flag,
         // despite them both being specified after this flag on the command line:
@@ -1006,8 +970,7 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
     let fixture = CliTest::with_file("ruff.toml", "lint.select = ['N801']")?;
     let test_code = "class violates_n801: pass";
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .args(["--config", "lint.per-file-ignores = {'generated.py' = ['N801']}"])
@@ -1095,8 +1058,7 @@ include = ["*.ipy"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
         .arg("."), @r"
@@ -1142,8 +1104,7 @@ external = ["AAA"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -1180,8 +1141,7 @@ required-version = "0.1.0"
         filters => vec![(version, "[VERSION]")]
     }, {
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -1218,8 +1178,7 @@ required-version = "{version}"
         filters => vec![(version, "[VERSION]")]
     }, {
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -1257,8 +1216,7 @@ required-version = ">{version}"
         filters => vec![(version, "[VERSION]")]
     }, {
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -1280,8 +1238,6 @@ import os
 
 #[test]
 fn required_version_bound_match() -> Result<()> {
-    let version = env!("CARGO_PKG_VERSION");
-
     let fixture = CliTest::with_file(
         "ruff.toml",
         r#"
@@ -1289,12 +1245,8 @@ required-version = ">=0.1.0"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(version, "[VERSION]")]
-    }, {
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -1310,7 +1262,6 @@ import os
 
     ----- stderr -----
     ");
-    });
 
     Ok(())
 }
@@ -1328,8 +1279,7 @@ ignore = ["F841"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("${NAME}.toml")
         .env("NAME", "ruff")
@@ -1368,8 +1318,7 @@ fn negated_per_file_ignores() -> Result<()> {
     fixture.write_file("ignored.py", "")?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("--select")
@@ -1400,25 +1349,22 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
     fixture.write_file("src/selected.py", "")?;
     fixture.write_file("ignored.py", "")?;
 
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(fixture
-            .command()
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg("ruff.toml")
-            .arg("--select")
-            .arg("RUF901")
-            , @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        src/selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("--select")
+        .arg("RUF901")
+        , @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    src/selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
-    });
+    ----- stderr -----
+    ");
     Ok(())
 }
 
@@ -1438,8 +1384,7 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
     fixture.write_file("bar.py", "")?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("--select")
@@ -1466,8 +1411,7 @@ select = ["F"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .args(["--stdin-filename", "test.py"])
@@ -1516,8 +1460,7 @@ def first_square():
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .args(["--add-noqa"])
@@ -1534,7 +1477,7 @@ def first_square():
     ");
 
     let test_code =
-        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     def first_square():
@@ -1564,8 +1507,7 @@ def unused(x):
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .arg("--preview")
@@ -1583,7 +1525,7 @@ def unused(x):
     ");
 
     let test_code =
-        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     def unused(x):  # noqa: ANN001, ANN201, D103
@@ -1614,8 +1556,7 @@ import a
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .args(["--add-noqa"])
@@ -1632,7 +1573,7 @@ import a
     ");
 
     let test_code =
-        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     import z  # noqa: I001
@@ -1663,8 +1604,7 @@ def unused(x):  # noqa: ANN001, ARG001, D103
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .arg("--preview")
@@ -1682,7 +1622,7 @@ def unused(x):  # noqa: ANN001, ARG001, D103
     ");
 
     let test_code =
-        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r"
     def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
@@ -1717,8 +1657,7 @@ print(
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .arg("--preview")
@@ -1736,7 +1675,7 @@ print(
     ");
 
     let test_code =
-        std::fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r#"
     print(
@@ -1780,8 +1719,7 @@ def first_square():
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--add-noqa"]), @r"
     success: true
     exit_code: 0
@@ -1808,8 +1746,7 @@ from foo import (  # noqa: F401
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--add-noqa")
         .arg("--select=F401")
         .arg("noqa.py"), @r"
@@ -1837,8 +1774,7 @@ select = ["UP006"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
@@ -1865,8 +1801,7 @@ select = ["UP006"]
     )?;
 
     assert_cmd_snapshot!(fixture2
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
@@ -1897,8 +1832,7 @@ select = ["UP006"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
@@ -1931,8 +1865,7 @@ select = ["UP006"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
@@ -1965,8 +1898,7 @@ select = ["UP006"]
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
@@ -2006,8 +1938,7 @@ requires-python = ">= 3.11"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .args(["--select","UP007"])
         .arg("test.py")
@@ -2314,8 +2245,7 @@ requires-python = ">= 3.11"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--preview")
         .arg("--show-settings")
         .args(["--select","UP007"])
@@ -2624,8 +2554,7 @@ requires-python = ">= 3.11"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .args(["--select","UP007"])
         .args(["--target-version","py310"])
@@ -2933,8 +2862,7 @@ requires-python = ">= 3.11"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .args(["--select","UP007"])
         .arg(".")
         , @r###"
@@ -2981,8 +2909,7 @@ from typing import Union;foo: Union[int, str] = 1
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("test.py")
         .arg("--show-settings"), @r#"
     success: true
@@ -3296,8 +3223,7 @@ from typing import Union;foo: Union[int, str] = 1"#,
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("test.py")
         , @r"
     success: false
@@ -3343,8 +3269,7 @@ from typing import Union;foo: Union[int, str] = 1
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .args(["--select","UP007"])
         .arg("foo/test.py"), @r###"
@@ -3660,8 +3585,7 @@ from typing import Union;foo: Union[int, str] = 1
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .args(["--select","UP007"])
         .arg("foo/test.py"), @r#"
@@ -3976,8 +3900,7 @@ from typing import Union;foo: Union[int, str] = 1
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .arg("foo/test.py"), @r###"
         success: true
@@ -4258,8 +4181,7 @@ from typing import Union;foo: Union[int, str] = 1
         "###);
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .arg("test.py")
         .current_dir(fixture.root().join("foo")), @r#"
@@ -4584,8 +4506,7 @@ from typing import Union;foo: Union[int, str] = 1
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--show-settings")
         .arg("test.py"), @r#"
     success: true
@@ -4912,8 +4833,7 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--select")
         .arg("F401")
         , @r"
@@ -4941,8 +4861,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
     fixture.write_file("foo/bar/baz/bop.py", "")?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--select")
         .arg("INP")
         , @r"
@@ -4955,8 +4874,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
     ");
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--select")
         .arg("INP")
         .arg("--preview")
@@ -4984,8 +4902,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -5019,8 +4936,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -5054,8 +4970,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -5089,8 +5004,7 @@ fn flake8_import_convention_nfkc_normalization() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
@@ -5368,8 +5282,7 @@ fn a005_module_shadowing_strict() -> Result<()> {
     let fixture = CliTest::new()?;
     create_a005_module_structure(&fixture)?;
 
-    assert_cmd_snapshot!(fixture.command()
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(fixture.check_command()
         .arg("--config")
         .arg(r#"lint.flake8-builtins.strict-checking = true"#)
         .args(["--select", "A005"]),
@@ -5397,8 +5310,7 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
     let fixture = CliTest::new()?;
     create_a005_module_structure(&fixture)?;
 
-    assert_cmd_snapshot!(fixture.command()
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(fixture.check_command()
         .arg("--config")
         .arg(r#"lint.flake8-builtins.strict-checking = false"#)
         .args(["--select", "A005"]),
@@ -5425,8 +5337,7 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     let fixture = CliTest::new()?;
     create_a005_module_structure(&fixture)?;
 
-    assert_cmd_snapshot!(fixture.command()
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(fixture.check_command()
         .args(["--select", "A005"]),
         @r"
     success: false
@@ -5678,8 +5589,7 @@ fn cookiecutter_globbing() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--select=F811"), @r"
 		success: true
 		exit_code: 0
@@ -5697,8 +5607,7 @@ fn cookiecutter_globbing() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(fixture
-        .command()
-        .args(STDIN_BASE_OPTIONS)
+        .check_command()
         .arg("--select=F811"), @r"
     success: false
     exit_code: 1
@@ -5722,9 +5631,8 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
     fs::create_dir(fixture.root().join("{{cookiecutter.repo_name}}"))?;
 
     assert_cmd_snapshot!(fixture
-        .command()
+        .check_command()
         .current_dir(fixture.root().join("{{cookiecutter.repo_name}}"))
-        .args(STDIN_BASE_OPTIONS)
         .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
 	success: true
 	exit_code: 0
@@ -5781,8 +5689,7 @@ fn semantic_syntax_errors() -> Result<()> {
 
     // ensure semantic errors are caught even without AST-based rules selected
     assert_cmd_snapshot!(
-        fixture.command()
-            .args(STDIN_BASE_OPTIONS)
+        fixture.check_command()
             .args(["--config", "lint.select = []"])
             .arg("--preview")
             .arg("-")
@@ -5965,8 +5872,8 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     fixture.write_file("panic.py", "print('hello, world!')")?;
 
     assert_cmd_snapshot!(
-        fixture.command()
-            .args(["check", "--select", "RUF9", "--preview", "--output-format=concise", "--no-cache"])
+        fixture.check_command()
+            .args(["--select", "RUF9", "--preview"])
             .args(["normal.py", "panic.py"]),
         @r"
     success: false
@@ -6109,8 +6016,8 @@ fn supported_file_extensions() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(
-        fixture.command()
-            .args(["check", "--select", "F401", "--output-format=concise", "--no-cache"])
+        fixture.check_command()
+            .args(["--select", "F401"])
             .arg("src"),
         @r"
     success: false
@@ -6189,8 +6096,8 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     )?;
 
     assert_cmd_snapshot!(
-        fixture.command()
-            .args(["check", "--select", "F401", "--preview", "--output-format=concise", "--no-cache"])
+        fixture.check_command()
+            .args(["--select", "F401", "--preview"])
             .arg("src"),
         @r"
     success: false

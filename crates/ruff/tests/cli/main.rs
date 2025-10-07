@@ -68,6 +68,13 @@ impl CliTest {
         .to_path_buf();
 
         let mut settings = insta::Settings::clone_current();
+        settings.add_filter(
+            &format!(
+                "file://{path}",
+                path = regex::escape(&project_dir.to_str().unwrap().replace("\\", "/"))
+            ),
+            "file://[TMP]",
+        );
         settings.add_filter(&tempdir_filter(&project_dir), "[TMP]/");
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
