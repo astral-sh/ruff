@@ -1624,16 +1624,20 @@ impl<'db> Type<'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
-            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => {
-                ConstraintSet::from(true)
-            }
-            (Type::Intersection(intersection), Type::TypeVar(_))
-                if intersection.positive(db).contains(&target) =>
+            (Type::TypeVar(bound_typevar), Type::Union(union))
+                if !inferable.is_inferable(bound_typevar) && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
-            (Type::Intersection(intersection), Type::TypeVar(_))
-                if intersection.negative(db).contains(&target) =>
+            (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
+                if !inferable.is_inferable(bound_typevar)
+                    && intersection.positive(db).contains(&target) =>
+            {
+                ConstraintSet::from(true)
+            }
+            (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
+                if !inferable.is_inferable(bound_typevar)
+                    && intersection.negative(db).contains(&target) =>
             {
                 ConstraintSet::from(false)
             }
@@ -1834,7 +1838,8 @@ impl<'db> Type<'db> {
             }
 
             (_, Type::TypeVar(typevar))
-                if relation.is_assignability()
+                if inferable.is_inferable(typevar)
+                    && relation.is_assignability()
                     && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
                         !self
                             .has_relation_to_impl(
@@ -1863,7 +1868,11 @@ impl<'db> Type<'db> {
             }
 
             // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
+            (Type::TypeVar(bound_typevar), _) | (_, Type::TypeVar(bound_typevar))
+                if inferable.is_inferable(bound_typevar) =>
+            {
+                ConstraintSet::from(false)
+            }
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
                 // TODO: Implement assignability and subtyping for TypedDict
@@ -2298,6 +2307,11 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
+            (Type::TypeVar(bound_typevar), _) => {
+                // All inferable cases should have been handled above
+                debug_assert!(!inferable.is_inferable(bound_typevar));
+                ConstraintSet::from(false)
+            }
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
         }
     }
