@@ -14,8 +14,6 @@ use std::{
 };
 use tempfile::TempDir;
 
-use dunce;
-
 const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
@@ -124,7 +122,7 @@ impl RuffTestFixture {
     /// Writes a file to the test directory.
     ///
     /// Parent directories are created automatically if they don't exist.
-    /// Leading newlines are trimmed from the content for cleaner test code.
+    /// Content is dedented to remove common leading whitespace for cleaner test code.
     ///
     /// # Arguments
     ///
@@ -136,8 +134,8 @@ impl RuffTestFixture {
 
         Self::ensure_parent_directory(&file_path)?;
 
-        let content = content.trim_start_matches('\n');
-        fs::write(&file_path, content)
+        let content = ruff_python_trivia::textwrap::dedent(content);
+        fs::write(&file_path, content.as_ref())
             .with_context(|| format!("Failed to write file `{}`", file_path.display()))?;
 
         Ok(())
@@ -253,6 +251,24 @@ mod tests {
         let fixture = RuffTestFixture::new()?;
         let command = fixture.command();
         assert_eq!(command.get_current_dir(), Some(fixture.root()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_dedent_functionality() -> Result<()> {
+        let fixture = RuffTestFixture::new()?;
+        let indented_content = "
+            def hello():
+                print('hello')
+                return True
+        ";
+        fixture.write_file("test_dedent.py", indented_content)?;
+        let file_path = fixture.root().join("test_dedent.py");
+        let content = fs::read_to_string(file_path)?;
+        // Verify that the indentation was removed
+        assert!(content.trim().starts_with("def hello():"));
+        assert!(content.contains("    print('hello')")); // Still has relative indentation
+        assert!(content.contains("    return True"));
         Ok(())
     }
 }
