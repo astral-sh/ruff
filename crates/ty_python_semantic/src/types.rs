@@ -66,6 +66,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::TupleSpec;
+use crate::types::typed_dict::SynthesizedTypedDictType;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
@@ -1015,7 +1016,9 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => Some(
                 TypedDictType::from_class(ClassType::NonGeneric(class_literal)),
             ),
-            Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => Some(typed_dict),
+            Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => {
+                Some(TypedDictType::Synthesized(typed_dict))
+            }
             _ => None,
         }
     }
@@ -4864,7 +4867,7 @@ impl<'db> Type<'db> {
                     // TODO: List more specific parameter types here for better code completion.
                     Parameters::new([Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(Type::any())]),
-                    Some(Type::TypedDict(typed_dict)),
+                    Some(Type::TypedDict(TypedDictType::Synthesized(typed_dict))),
                 ),
             )
             .into(),
@@ -5672,7 +5675,9 @@ impl<'db> Type<'db> {
                     .map(Type::NonInferableTypeVar)
                     .unwrap_or(*self))
                 }
-                KnownInstanceType::TypedDictType(typed_dict) => Ok(Type::TypedDict(*typed_dict)),
+                KnownInstanceType::TypedDictType(typed_dict) => {
+                    Ok(Type::TypedDict(TypedDictType::Synthesized(*typed_dict)))
+                }
                 KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
@@ -6868,7 +6873,7 @@ pub enum KnownInstanceType<'db> {
     TypeAliasType(TypeAliasType<'db>),
 
     /// A single instance of `typing.TypedDict`.
-    TypedDictType(TypedDictType<'db>),
+    TypedDictType(SynthesizedTypedDictType<'db>),
 
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
@@ -6898,7 +6903,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             visitor.visit_type_alias_type(db, type_alias);
         }
         KnownInstanceType::TypedDictType(typed_dict) => {
-            visitor.visit_typed_dict_type(db, typed_dict);
+            visitor.visit_typed_dict_type(db, TypedDictType::Synthesized(typed_dict));
         }
         KnownInstanceType::Deprecated(_) | KnownInstanceType::ConstraintSet(_) => {
             // Nothing to visit

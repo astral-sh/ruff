@@ -431,6 +431,15 @@ impl<'db> SynthesizedTypedDictType<'db> {
         SynthesizedTypedDictType::new(db, self.name(db), self.params(db), items)
     }
 
+    pub(crate) fn normalized_impl(
+        self,
+        _db: &'db dyn Db,
+        _visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        // TODO: Normalize typed dicts.
+        self
+    }
+
     fn heap_size(
         (name, params, items): &(Option<Name>, TypedDictParams, FxOrderMap<Name, Field<'db>>),
     ) -> usize {

@@ -33,8 +33,8 @@ use crate::types::typed_dict::SynthesizedTypedDictType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypedDictParams, TypedDictType, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypedDictParams, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
 };
 use crate::{FxOrderMap, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -1140,13 +1140,11 @@ impl<'db> Bindings<'db> {
                             .collect::<FxOrderMap<_, _>>();
 
                         overload.set_return_type(Type::KnownInstance(
-                            KnownInstanceType::TypedDictType(TypedDictType::Synthesized(
-                                SynthesizedTypedDictType::new(
-                                    db,
-                                    Some(Name::new(name.value(db))),
-                                    params,
-                                    items,
-                                ),
+                            KnownInstanceType::TypedDictType(SynthesizedTypedDictType::new(
+                                db,
+                                Some(Name::new(name.value(db))),
+                                params,
+                                items,
                             )),
                         ));
                     }
