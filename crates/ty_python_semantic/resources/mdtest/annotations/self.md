@@ -247,18 +247,18 @@ class LinkedList:
 reveal_type(LinkedList().next())  # revealed: LinkedList
 ```
 
-Or attributes can have a type var type:
+Attributes can also refer to a generic parameter:
 
 ```py
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-class Bar(Generic[T]):
+class C(Generic[T]):
     foo: T
-    def bar(self) -> T:
-        reveal_type(self)  # revealed: Self@bar
-        return self.foo
+    def method(self) -> None:
+        reveal_type(self)  # revealed: Self@method
+        reveal_type(self.foo)  # revealed: T@C
 ```
 
 ## Generic Classes
