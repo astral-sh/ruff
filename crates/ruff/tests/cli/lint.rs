@@ -79,7 +79,7 @@ inline-quotes = "single"
         case.command()
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
-            .arg(case.root().join("ruff.toml"))
+            .arg("ruff.toml")
             .arg("-")
             .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
         success: false
@@ -233,7 +233,6 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(
         case.command()
-            .current_dir(case.root())
             .args(STDIN_BASE_OPTIONS)
             .args(["--config", "ruff.toml"])
             // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
@@ -274,7 +273,6 @@ exclude = ["main.py"]
 
     assert_cmd_snapshot!(
         case.command()
-            .current_dir(case.root())
             .args(STDIN_BASE_OPTIONS)
             .args(["--config", "ruff.toml"])
             .arg(".")
@@ -312,7 +310,6 @@ inline-quotes = "single"
 
     assert_cmd_snapshot!(
         case.command()
-            .current_dir(case.root())
             .args(STDIN_BASE_OPTIONS)
             .args(["--config", "ruff.toml"])
             .args(["--stdin-filename", "generated.py"])
@@ -567,9 +564,9 @@ fn too_many_config_files() -> Result<()> {
         .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(fixture.root().join("ruff.toml"))
+        .arg("ruff.toml")
         .arg("--config")
-        .arg(fixture.root().join("ruff2.toml"))
+        .arg("ruff2.toml")
         .arg("."), @r"
     success: false
     exit_code: 2
@@ -579,7 +576,7 @@ fn too_many_config_files() -> Result<()> {
     ruff failed
       Cause: You cannot specify more than one configuration file on the command line.
 
-      tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+      tip: remove either `--config=ruff.toml` or `--config=ruff2.toml`.
            For more information, try `--help`.
     ");
     Ok(())
@@ -723,7 +720,7 @@ fn config_file_and_isolated() -> Result<()> {
         .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
-        .arg(fixture.root().join("ruff.toml"))
+        .arg("ruff.toml")
         .arg("--isolated")
         .arg("."), @r"
     success: false
@@ -732,7 +729,7 @@ fn config_file_and_isolated() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+      Cause: The argument `--config=ruff.toml` cannot be used with `--isolated`
 
       tip: You cannot specify a configuration file and also specify `--isolated`,
            as `--isolated` causes ruff to ignore all configuration files.
@@ -2293,6 +2290,24 @@ requires-python = ">= 3.11"
     "#,
     );
 
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_no_tool_preview_enabled() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
     fixture.write_file(
         "test.py",
         r#"from typing import Union;foo: Union[int, str] = 1"#,
@@ -2585,6 +2600,24 @@ requires-python = ">= 3.11"
     "#,
     );
 
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_no_tool_target_version_override() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
     fixture.write_file(
         "test.py",
         r#"from typing import Union;foo: Union[int, str] = 1"#,
@@ -2593,10 +2626,9 @@ requires-python = ">= 3.11"
     assert_cmd_snapshot!(fixture
         .command()
         .args(STDIN_BASE_OPTIONS)
-        .arg("--target-version")
-        .arg("py38")
         .arg("--show-settings")
         .args(["--select","UP007"])
+        .args(["--target-version","py310"])
         .arg("test.py")
         .arg("-")
             , @r#"
@@ -2665,7 +2697,7 @@ requires-python = ">= 3.11"
     linter.per_file_ignores = {}
     linter.safety_table.forced_safe = []
     linter.safety_table.forced_unsafe = []
-    linter.unresolved_target_version = 3.8
+    linter.unresolved_target_version = 3.10
     linter.per_file_target_version = {}
     linter.preview = disabled
     linter.explicit_preview_rules = false
@@ -2853,7 +2885,7 @@ requires-python = ">= 3.11"
 
     # Formatter Settings
     formatter.exclude = []
-    formatter.unresolved_target_version = 3.8
+    formatter.unresolved_target_version = 3.10
     formatter.per_file_target_version = {}
     formatter.preview = disabled
     formatter.line_width = 88
@@ -2868,7 +2900,7 @@ requires-python = ">= 3.11"
     # Analyze Settings
     analyze.exclude = []
     analyze.preview = disabled
-    analyze.target_version = 3.8
+    analyze.target_version = 3.10
     analyze.string_imports = disabled
     analyze.extension = ExtensionMapping({})
     analyze.include_dependencies = {}
@@ -2876,6 +2908,24 @@ requires-python = ">= 3.11"
     ----- stderr -----
     "#,
     );
+
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_no_tool_with_check() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
 
     fixture.write_file(
         "test.py",
@@ -3213,6 +3263,25 @@ from typing import Union;foo: Union[int, str] = 1
     "#,
     );
 
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// ├── ruff.toml #<-- no `target-version`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_ruff_toml_no_target_fallback_check() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"[lint]
+select = ["UP007"]
+"#,
+    )?;
+
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -3229,7 +3298,6 @@ from typing import Union;foo: Union[int, str] = 1"#,
     assert_cmd_snapshot!(fixture
         .command()
         .args(STDIN_BASE_OPTIONS)
-        .args(["--select", "UP007"])
         .arg("test.py")
         , @r"
     success: false
@@ -3279,8 +3347,7 @@ from typing import Union;foo: Union[int, str] = 1
         .args(STDIN_BASE_OPTIONS)
         .arg("--show-settings")
         .args(["--select","UP007"])
-        .arg("foo/test.py")
-        .arg("-"), @r###"
+        .arg("foo/test.py"), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3597,8 +3664,7 @@ from typing import Union;foo: Union[int, str] = 1
         .args(STDIN_BASE_OPTIONS)
         .arg("--show-settings")
         .args(["--select","UP007"])
-        .arg("foo/test.py")
-        .arg("-"), @r#"
+        .arg("foo/test.py"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3913,8 +3979,7 @@ from typing import Union;foo: Union[int, str] = 1
         .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--show-settings")
-        .arg("foo/test.py")
-        .arg("-"), @r###"
+        .arg("foo/test.py"), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -4522,9 +4587,7 @@ from typing import Union;foo: Union[int, str] = 1
         .command()
         .args(STDIN_BASE_OPTIONS)
         .arg("--show-settings")
-        .args(["--select","UP007"])
-        .arg("test.py")
-        .arg("-"), @r#"
+        .arg("test.py"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4853,7 +4916,6 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
         .args(STDIN_BASE_OPTIONS)
         .arg("--select")
         .arg("F401")
-        .arg(".")
         , @r"
     success: false
     exit_code: 1
@@ -4883,7 +4945,6 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .args(STDIN_BASE_OPTIONS)
         .arg("--select")
         .arg("INP")
-        .arg(".")
         , @r"
     success: true
     exit_code: 0
@@ -4899,7 +4960,6 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .arg("--select")
         .arg("INP")
         .arg("--preview")
-        .arg(".")
         , @r"
     success: false
     exit_code: 1
