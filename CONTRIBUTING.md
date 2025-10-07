@@ -389,7 +389,7 @@ Commit each step of this process separately for easier review.
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
-    1. Run `uv run --only-dev --no-sync scripts/transform_readme.py --proto <https|ssh>`
+    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
