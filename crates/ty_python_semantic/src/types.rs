@@ -7735,6 +7735,12 @@ pub enum BindingContext<'db> {
     Synthetic,
 }
 
+impl<'db> From<Definition<'db>> for BindingContext<'db> {
+    fn from(definition: Definition<'db>) -> Self {
+        BindingContext::Definition(definition)
+    }
+}
+
 impl<'db> BindingContext<'db> {
     fn name(self, db: &'db dyn Db) -> Option<String> {
         match self {
