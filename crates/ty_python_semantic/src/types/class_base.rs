@@ -169,11 +169,12 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
-                | KnownInstanceType::TypedDictType(_)
                 | KnownInstanceType::TypedDictSchema(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_) => None,
+                // TODO: Inherit the fields of synthesized `TypedDict`s.
+                KnownInstanceType::TypedDictType(_) => Some(Self::TypedDict),
             },
 
             Type::SpecialForm(special_form) => match special_form {

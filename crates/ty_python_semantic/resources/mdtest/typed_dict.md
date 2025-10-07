@@ -1100,6 +1100,20 @@ emp_invalid1 = Employee(department="HR")
 emp_invalid2 = Employee(id=3)
 ```
 
+Fields from functional `TypedDict`s are not currently inherited:
+
+```py
+from typing import TypedDict
+
+class X(TypedDict("Y", {"y": int})):
+    x: int
+
+x: X = {"x": 0}
+
+# error: [invalid-key] "Invalid key access on TypedDict `X`: Unknown key "y""
+x: X = {"y": 0, "x": 0}
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
