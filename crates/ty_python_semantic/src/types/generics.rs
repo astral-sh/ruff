@@ -17,7 +17,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
     NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1170,14 +1170,11 @@ impl<'db> SpecializationBuilder<'db> {
                 if (actual_union.elements(self.db).iter()).any(|ty| ty.is_type_var()) {
                     return Ok(());
                 }
-                let actual_non_subtypes = (actual_union.elements(self.db).iter().copied())
-                    .filter(|ty| !ty.is_subtype_of(self.db, formal))
-                    .fold(UnionBuilder::new(self.db), |builder, element| {
-                        builder.add(element)
-                    });
-                let Some(remaining_actual) = actual_non_subtypes.try_build() else {
+                let remaining_actual =
+                    actual_union.filter(self.db, |ty| !ty.is_subtype_of(self.db, formal));
+                if remaining_actual.is_never() {
                     return Ok(());
-                };
+                }
                 self.add_type_mapping(formal_bound_typevar, remaining_actual);
             }
             (Type::Union(formal), _) => {
