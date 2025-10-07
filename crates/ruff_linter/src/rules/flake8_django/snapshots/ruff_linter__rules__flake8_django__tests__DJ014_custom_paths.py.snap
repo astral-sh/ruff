@@ -58,3 +58,4 @@ help: Add trailing slash
 19 +     path("contact/", views.contact_view),  # DJ014
 20 |     path("contact/", views.contact_ok),  # OK
 21 | ]
+22 |
