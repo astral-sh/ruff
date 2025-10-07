@@ -1462,7 +1462,7 @@ impl<'db> ClassLiteral<'db> {
             .map(|generic_context| generic_context.promote_literals(db))
     }
 
-    fn file(self, db: &dyn Db) -> File {
+    pub(super) fn file(self, db: &dyn Db) -> File {
         self.body_scope(db).file(db)
     }
 
