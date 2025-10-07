@@ -215,14 +215,14 @@ class Shape:
 
     @classmethod
     def bar(cls: type[Self]) -> Self:
-        # TODO(cls): type[Shape]
+        # TODO: type[Shape]
         reveal_type(cls)  # revealed: @Todo(unsupported type[X] special form)
         return cls()
 
 class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
-# TODO(cls): Shape
+# TODO: Shape
 reveal_type(Shape.bar())  # revealed: Unknown
 ```
 
