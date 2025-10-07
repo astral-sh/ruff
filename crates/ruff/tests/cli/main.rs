@@ -20,8 +20,8 @@ mod lint;
 const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
-pub(crate) fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", regex::escape(path.as_ref().to_str().unwrap()))
+pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
+    format!(r"{}[\\/]?", regex::escape(path.as_ref()))
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -54,6 +54,12 @@ impl CliTest {
     /// - Insta snapshot filters for cross-platform path compatibility
     /// - Environment isolation for consistent test behavior
     pub(crate) fn new() -> Result<Self> {
+        Self::with_settings(|_, settings| settings)
+    }
+
+    pub(crate) fn with_settings(
+        setup_settings: impl FnOnce(&Path, insta::Settings) -> insta::Settings,
+    ) -> Result<Self> {
         let temp_dir = TempDir::new()?;
 
         // Canonicalize the tempdir path because macOS uses symlinks for tempdirs
@@ -67,16 +73,13 @@ impl CliTest {
         )
         .to_path_buf();
 
-        let mut settings = insta::Settings::clone_current();
+        let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
         settings.add_filter(
-            &format!(
-                "file:///{path}",
-                path = regex::escape(&project_dir.to_str().unwrap().replace('\\', "/"))
-            ),
-            "file://[TMP]",
+            &dbg!(tempdir_filter(project_dir.to_str().unwrap())),
+            "[TMP]/",
         );
-        settings.add_filter(&tempdir_filter(&project_dir), "[TMP]/");
+
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");

@@ -5759,7 +5759,14 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let fixture = CliTest::with_file("input.py", CONTENT)?;
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // JSON double escapes backslashes
+        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+
+        settings
+    })?;
+
+    fixture.write_file("input.py", CONTENT)?;
 
     let snapshot = format!("output_format_{output_format}");
 
