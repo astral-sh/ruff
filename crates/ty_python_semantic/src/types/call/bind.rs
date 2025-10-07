@@ -3042,6 +3042,7 @@ impl<'db> Binding<'db> {
     fn snapshot(&self) -> BindingSnapshot<'db> {
         BindingSnapshot {
             return_ty: self.return_ty,
+            inferable_typevars: self.inferable_typevars,
             specialization: self.specialization,
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
@@ -3052,6 +3053,7 @@ impl<'db> Binding<'db> {
     fn restore(&mut self, snapshot: BindingSnapshot<'db>) {
         let BindingSnapshot {
             return_ty,
+            inferable_typevars,
             specialization,
             argument_matches,
             parameter_tys,
@@ -3059,6 +3061,7 @@ impl<'db> Binding<'db> {
         } = snapshot;
 
         self.return_ty = return_ty;
+        self.inferable_typevars = inferable_typevars;
         self.specialization = specialization;
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
@@ -3078,6 +3081,7 @@ impl<'db> Binding<'db> {
     /// Resets the state of this binding to its initial state.
     fn reset(&mut self) {
         self.return_ty = Type::unknown();
+        self.inferable_typevars = InferableTypeVars::None;
         self.specialization = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
@@ -3088,6 +3092,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
+    inferable_typevars: InferableTypeVars<'db, 'db>,
     specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
@@ -3127,6 +3132,7 @@ impl<'db> CallableBindingSnapshot<'db> {
 
                 // ... and update the snapshot with the current state of the binding.
                 snapshot.return_ty = binding.return_ty;
+                snapshot.inferable_typevars = binding.inferable_typevars;
                 snapshot.specialization = binding.specialization;
                 snapshot
                     .argument_matches
