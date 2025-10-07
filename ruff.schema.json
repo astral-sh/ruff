@@ -841,6 +841,13 @@
         "type": "string"
       }
     },
+    "ComprehensionLineBreak": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "preserve"
+      ]
+    },
     "ConstantType": {
       "type": "string",
       "enum": [
@@ -1528,6 +1535,17 @@
       "description": "Configures the way Ruff formats your code.",
       "type": "object",
       "properties": {
+        "comprehension-line-break": {
+          "description": "How to handle line breaks in comprehensions.\n\n* `auto`: (Default) Collapse comprehensions to a single line if they fit within the configured line width. * `preserve`: Preserve the original line breaks in comprehensions from the source code.\n\nWhen set to `preserve`, if a comprehension spans multiple lines in the source, it will be formatted with multiple lines even if it would fit on a single line. This is useful for maintaining readability in complex comprehensions.\n\nFor example, with `comprehension-line-break = \"preserve\"`:\n\n```python # Input { obj[\"key\"]: obj[\"value\"] for obj in get_fields() if obj[\"key\"] != \"name\" }\n\n# Output (preserved) { obj[\"key\"]: obj[\"value\"] for obj in get_fields() if obj[\"key\"] != \"name\" } ```\n\nWith `comprehension-line-break = \"auto\"` (default), the same comprehension would be collapsed:\n\n```python # Output {obj[\"key\"]: obj[\"value\"] for obj in get_fields() if obj[\"key\"] != \"name\"} ```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ComprehensionLineBreak"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "docstring-code-format": {
           "description": "Whether to format code snippets in docstrings.\n\nWhen this is enabled, Python code examples within docstrings are automatically reformatted.\n\nFor example, when this is enabled, the following code:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(  x  )\n\nMarkdown is also supported:\n\n```py f(  x  ) ```\n\nAs are reStructuredText literal blocks::\n\nf(  x  )\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(  x  ) \"\"\" pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(x)\n\nMarkdown is also supported:\n\n```py f(x) ```\n\nAs are reStructuredText literal blocks::\n\nf(x)\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(x) \"\"\" pass ```\n\nIf a code snippet in a docstring contains invalid Python code or if the formatter would otherwise write invalid Python code, then the code example is ignored by the formatter and kept as-is.\n\nCurrently, doctest, Markdown, reStructuredText literal blocks, and reStructuredText code blocks are all supported and automatically recognized. In the case of unlabeled fenced code blocks in Markdown and reStructuredText literal blocks, the contents are assumed to be Python and reformatted. As with any other format, if the contents aren't valid Python, then the block is left untouched automatically.",
           "type": [

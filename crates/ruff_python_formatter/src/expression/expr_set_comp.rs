@@ -1,8 +1,10 @@
-use ruff_formatter::{Buffer, FormatResult, format_args, write};
+use ruff_formatter::{Buffer, FormatResult, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprSetComp;
 
+use crate::expression::comprehension_helpers::is_comprehension_multiline;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
+use crate::options::ComprehensionLineBreak;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -26,15 +28,30 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
+        // Check if we should preserve multi-line formatting
+        let should_preserve_multiline =
+            f.options().comprehension_line_break() == ComprehensionLineBreak::Preserve
+            && is_comprehension_multiline(item, f.context());
+
+        let formatted_content = format_with(|f| {
+            write!(f, [
+                group(&elt.format()),
+                soft_line_break_or_space(),
+                joined
+            ])
+        });
+
         write!(
             f,
             [parenthesized(
                 "{",
-                &group(&format_args!(
-                    group(&elt.format()),
-                    soft_line_break_or_space(),
-                    joined
-                )),
+                &if should_preserve_multiline {
+                    // Force expansion to preserve multi-line format
+                    group(&formatted_content).should_expand(true)
+                } else {
+                    // Default behavior - try to fit on one line
+                    group(&formatted_content)
+                },
                 "}"
             )
             .with_dangling_comments(dangling)]

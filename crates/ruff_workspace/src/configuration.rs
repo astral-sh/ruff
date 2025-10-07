@@ -41,7 +41,8 @@ use ruff_linter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+    ComprehensionLineBreak, DocstringCode, DocstringCodeLineWidth, MagicTrailingComma,
+    QuoteStyle,
 };
 
 use crate::options::{
@@ -204,6 +205,9 @@ impl Configuration {
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),
+            comprehension_line_break: format
+                .comprehension_line_break
+                .unwrap_or(format_defaults.comprehension_line_break),
             docstring_code_format: format
                 .docstring_code_format
                 .unwrap_or(format_defaults.docstring_code_format),
@@ -1208,6 +1212,7 @@ pub struct FormatConfiguration {
     pub indent_style: Option<IndentStyle>,
     pub quote_style: Option<QuoteStyle>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
+    pub comprehension_line_break: Option<ComprehensionLineBreak>,
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
     pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
@@ -1238,6 +1243,7 @@ impl FormatConfiguration {
                     MagicTrailingComma::Respect
                 }
             }),
+            comprehension_line_break: options.comprehension_line_break,
             line_ending: options.line_ending,
             docstring_code_format: options.docstring_code_format.map(|yes| {
                 if yes {
@@ -1259,6 +1265,7 @@ impl FormatConfiguration {
             indent_style: self.indent_style.or(config.indent_style),
             quote_style: self.quote_style.or(config.quote_style),
             magic_trailing_comma: self.magic_trailing_comma.or(config.magic_trailing_comma),
+            comprehension_line_break: self.comprehension_line_break.or(config.comprehension_line_break),
             line_ending: self.line_ending.or(config.line_ending),
             docstring_code_format: self.docstring_code_format.or(config.docstring_code_format),
             docstring_code_line_width: self

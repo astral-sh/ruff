@@ -22,6 +22,7 @@ use crate::prelude::*;
 use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
+pub(crate) mod comprehension_helpers;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;

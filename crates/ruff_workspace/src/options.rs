@@ -34,7 +34,7 @@ use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
-use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
+use ruff_python_formatter::{ComprehensionLineBreak, DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -3633,6 +3633,50 @@ pub struct FormatOptions {
         example = "skip-magic-trailing-comma = true"
     )]
     pub skip_magic_trailing_comma: Option<bool>,
+
+    /// How to handle line breaks in comprehensions.
+    ///
+    /// * `auto`: (Default) Collapse comprehensions to a single line if they fit within the configured line width.
+    /// * `preserve`: Preserve the original line breaks in comprehensions from the source code.
+    ///
+    /// When set to `preserve`, if a comprehension spans multiple lines in the source, it will be
+    /// formatted with multiple lines even if it would fit on a single line. This is useful for
+    /// maintaining readability in complex comprehensions.
+    ///
+    /// For example, with `comprehension-line-break = "preserve"`:
+    ///
+    /// ```python
+    /// # Input
+    /// {
+    ///     obj["key"]: obj["value"]
+    ///     for obj
+    ///     in get_fields()
+    ///     if obj["key"] != "name"
+    /// }
+    ///
+    /// # Output (preserved)
+    /// {
+    ///     obj["key"]: obj["value"]
+    ///     for obj in get_fields()
+    ///     if obj["key"] != "name"
+    /// }
+    /// ```
+    ///
+    /// With `comprehension-line-break = "auto"` (default), the same comprehension would be collapsed:
+    ///
+    /// ```python
+    /// # Output
+    /// {obj["key"]: obj["value"] for obj in get_fields() if obj["key"] != "name"}
+    /// ```
+    #[option(
+        default = r#""auto""#,
+        value_type = r#""auto" | "preserve""#,
+        example = r#"
+            # Preserve multi-line formatting in comprehensions
+            comprehension-line-break = "preserve"
+        "#
+    )]
+    pub comprehension_line_break: Option<ComprehensionLineBreak>,
 
     /// The character Ruff uses at the end of a line.
     ///

@@ -45,6 +45,9 @@ pub struct PyFormatOptions {
     /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`.
     magic_trailing_comma: MagicTrailingComma,
 
+    /// How to handle line breaks in comprehensions
+    comprehension_line_break: ComprehensionLineBreak,
+
     /// Should the formatter generate a source map that allows mapping source positions to positions
     /// in the formatted document.
     source_map_generation: SourceMapGeneration,
@@ -87,6 +90,7 @@ impl Default for PyFormatOptions {
             quote_style: QuoteStyle::default(),
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
+            comprehension_line_break: ComprehensionLineBreak::default(),
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
@@ -114,6 +118,10 @@ impl PyFormatOptions {
 
     pub const fn magic_trailing_comma(&self) -> MagicTrailingComma {
         self.magic_trailing_comma
+    }
+
+    pub const fn comprehension_line_break(&self) -> ComprehensionLineBreak {
+        self.comprehension_line_break
     }
 
     pub const fn quote_style(&self) -> QuoteStyle {
@@ -165,6 +173,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_magic_trailing_comma(mut self, trailing_comma: MagicTrailingComma) -> Self {
         self.magic_trailing_comma = trailing_comma;
+        self
+    }
+
+    #[must_use]
+    pub fn with_comprehension_line_break(mut self, comprehension_line_break: ComprehensionLineBreak) -> Self {
+        self.comprehension_line_break = comprehension_line_break;
         self
     }
 
@@ -323,6 +337,51 @@ impl FromStr for MagicTrailingComma {
             "ignore" | "Ignore" => Ok(Self::Ignore),
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for MagicTrailingComma"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, CacheKey)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ComprehensionLineBreak {
+    #[default]
+    Auto,
+    Preserve,
+}
+
+impl ComprehensionLineBreak {
+    pub const fn is_auto(self) -> bool {
+        matches!(self, Self::Auto)
+    }
+
+    pub const fn is_preserve(self) -> bool {
+        matches!(self, Self::Preserve)
+    }
+}
+
+impl fmt::Display for ComprehensionLineBreak {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            ComprehensionLineBreak::Auto => "auto",
+            ComprehensionLineBreak::Preserve => "preserve",
+        })
+    }
+}
+
+impl FromStr for ComprehensionLineBreak {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "auto" | "Auto" => Ok(Self::Auto),
+            "preserve" | "Preserve" => Ok(Self::Preserve),
+            // TODO: replace this error with a diagnostic
+            _ => Err("Value not supported for ComprehensionLineBreak"),
         }
     }
 }
