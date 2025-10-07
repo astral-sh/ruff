@@ -57,7 +57,7 @@ use crate::types::diagnostic::{
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, report_bad_dunder_set_call,
     report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
@@ -1005,10 +1005,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .context
                         .report_lint(&INVALID_OVERLOAD, &function_node.name)
                     {
-                        builder.into_diagnostic(format_args!(
-                            "Overloaded non-stub function `{}` must have an implementation",
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Overloads for function `{}` must be followed by a non-`@overload`-decorated implementation function",
                             &function_node.name
                         ));
+                        diagnostic.info(format_args!(
+                            "Attempting to call `{}` will raise `TypeError` at runtime",
+                            &function_node.name
+                        ));
+                        diagnostic.info(
+                            "Overloaded functions without implementations are only permitted \
+                            in stub files, on protocols, or for abstract methods",
+                        );
+                        diagnostic.info(
+                            "See https://docs.python.org/3/library/typing.html#typing.overload \
+                            for more details",
+                        );
                     }
                 }
             }
@@ -2169,6 +2181,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(inferred_ty),
         );
+
+        if function_decorators.contains(FunctionDecorators::OVERLOAD) {
+            for stmt in &function.body {
+                match stmt {
+                    ast::Stmt::Pass(_) => continue,
+                    ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                        if matches!(
+                            &**value,
+                            ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
+                        ) {
+                            continue;
+                        }
+                    }
+                    _ => {}
+                }
+                let Some(builder) = self.context.report_lint(&USELESS_OVERLOAD_BODY, stmt) else {
+                    continue;
+                };
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Useless body for `@overload`-decorated function `{}`",
+                    &function.name
+                ));
+                diagnostic.set_primary_message("This statement will never be executed");
+                diagnostic.info(
+                    "`@overload`-decorated functions are solely for type checkers \
+                    and must be overwritten at runtime by a non-`@overload`-decorated implementation",
+                );
+                diagnostic.help("Consider replacing this function body with `...` or `pass`");
+                break;
+            }
+        }
     }
 
     fn infer_return_type_annotation(

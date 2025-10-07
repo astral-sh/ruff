@@ -64,6 +64,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
+    registry.register_lint(&USELESS_OVERLOAD_BODY);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_NAMED_TUPLE);
@@ -955,6 +956,62 @@ declare_lint! {
         summary: "detects invalid `@overload` usages",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for various `@overload`-decorated functions that have non-stub bodies.
+    ///
+    /// ## Why is this bad?
+    /// Functions decorated with `@overload` are ignored at runtime; they are overridden
+    /// by the implementation function that follows the series of overloads. While it is
+    /// not illegal to provide a body for an `@overload`-decorated function, it may indicate
+    /// a misunderstanding of how the `@overload` decorator works.
+    ///
+    /// ## Example
+    ///
+    /// ```py
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def foo(x: int) -> int:
+    ///     return x + 1  # will never be executed
+    ///
+    /// @overload
+    /// def foo(x: str) -> str:
+    ///     return "Oh no, got a string"  # will never be executed
+    ///
+    /// def foo(x: int | str) -> int | str:
+    ///     raise Exception("unexpected type encountered")
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// from typing import assert_never, overload
+    ///
+    /// @overload
+    /// def foo(x: int) -> int: ...
+    ///
+    /// @overload
+    /// def foo(x: str) -> str: ...
+    ///
+    /// def foo(x: int | str) -> int | str:
+    ///     if isinstance(x, int):
+    ///         return x + 1
+    ///     elif isinstance(x, str):
+    ///         return "Oh no, got a string"
+    ///     else:
+    ///         assert_never(x)
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)
+    pub(crate) static USELESS_OVERLOAD_BODY = {
+        summary: "detects `@overload`-decorated functions with non-stub bodies",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 

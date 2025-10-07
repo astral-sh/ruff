@@ -645,13 +645,9 @@ S = TypeVar("S")
 
 class WithOverloadedMethod(Generic[T]):
     @overload
-    def method(self, x: T) -> T:
-        return x
-
+    def method(self, x: T) -> T: ...
     @overload
-    def method(self, x: S) -> S | T:
-        return x
-
+    def method(self, x: S) -> S | T: ...
     def method(self, x: S | T) -> S | T:
         return x
 
