@@ -2,60 +2,80 @@
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 ---
 DJ015 [*] URL route `/help/` has an unnecessary leading slash
- --> DJ015_custom_paths.py:7:12
+ --> DJ015_custom_paths.py:6:12
   |
-5 | # Test that custom path functions are also checked for leading slashes
-6 | urlpatterns_custom = [
-7 |     mypath("/help/", views.help_view),  # DJ015
+4 | # Test that custom path functions are also checked for leading slashes
+5 | urlpatterns_custom = [
+6 |     mypath("/help/", views.help_view),  # DJ015
   |            ^^^^^^^^
-8 |     mypath("/about/", views.about_view),  # DJ015
-9 | ]
+7 |     mypath("/about/", views.about_view),  # DJ015
+8 | ]
   |
 help: Remove leading slash
-4  | 
-5  | # Test that custom path functions are also checked for leading slashes
-6  | urlpatterns_custom = [
-   -     mypath("/help/", views.help_view),  # DJ015
-7  +     mypath("help/", views.help_view),  # DJ015
-8  |     mypath("/about/", views.about_view),  # DJ015
-9  | ]
-10 | 
+3 | 
+4 | # Test that custom path functions are also checked for leading slashes
+5 | urlpatterns_custom = [
+  -     mypath("/help/", views.help_view),  # DJ015
+6 +     mypath("help/", views.help_view),  # DJ015
+7 |     mypath("/about/", views.about_view),  # DJ015
+8 | ]
+9 | 
 
 DJ015 [*] URL route `/about/` has an unnecessary leading slash
- --> DJ015_custom_paths.py:8:12
+ --> DJ015_custom_paths.py:7:12
   |
-6 | urlpatterns_custom = [
-7 |     mypath("/help/", views.help_view),  # DJ015
-8 |     mypath("/about/", views.about_view),  # DJ015
+5 | urlpatterns_custom = [
+6 |     mypath("/help/", views.help_view),  # DJ015
+7 |     mypath("/about/", views.about_view),  # DJ015
   |            ^^^^^^^^^
-9 | ]
+8 | ]
   |
 help: Remove leading slash
-5  | # Test that custom path functions are also checked for leading slashes
-6  | urlpatterns_custom = [
-7  |     mypath("/help/", views.help_view),  # DJ015
+4  | # Test that custom path functions are also checked for leading slashes
+5  | urlpatterns_custom = [
+6  |     mypath("/help/", views.help_view),  # DJ015
    -     mypath("/about/", views.about_view),  # DJ015
-8  +     mypath("about/", views.about_view),  # DJ015
-9  | ]
-10 | 
-11 | # OK - custom path without leading slash
+7  +     mypath("about/", views.about_view),  # DJ015
+8  | ]
+9  | 
+10 | # OK - custom path without leading slash
 
-DJ015 [*] URL route `/contact/` has an unnecessary leading slash
-  --> DJ015_custom_paths.py:19:10
+DJ015 [*] URL route `/api/users/` has an unnecessary leading slash
+  --> DJ015_custom_paths.py:18:12
    |
-17 | # Test that default django.urls.path still works
-18 | urlpatterns_default = [
-19 |     path("/contact/", views.contact_view),  # DJ015
-   |          ^^^^^^^^^^^
-20 |     path("contact/", views.contact_ok),  # OK
+16 | # Test multiple violations in same list
+17 | urlpatterns_multiple = [
+18 |     mypath("/api/users/", views.users_view),  # DJ015
+   |            ^^^^^^^^^^^^^
+19 |     mypath("/api/posts/", views.posts_view),  # DJ015
+20 |     mypath("api/comments/", views.comments_view),  # OK
+   |
+help: Remove leading slash
+15 | 
+16 | # Test multiple violations in same list
+17 | urlpatterns_multiple = [
+   -     mypath("/api/users/", views.users_view),  # DJ015
+18 +     mypath("api/users/", views.users_view),  # DJ015
+19 |     mypath("/api/posts/", views.posts_view),  # DJ015
+20 |     mypath("api/comments/", views.comments_view),  # OK
+21 | ]
+
+DJ015 [*] URL route `/api/posts/` has an unnecessary leading slash
+  --> DJ015_custom_paths.py:19:12
+   |
+17 | urlpatterns_multiple = [
+18 |     mypath("/api/users/", views.users_view),  # DJ015
+19 |     mypath("/api/posts/", views.posts_view),  # DJ015
+   |            ^^^^^^^^^^^^^
+20 |     mypath("api/comments/", views.comments_view),  # OK
 21 | ]
    |
 help: Remove leading slash
-16 | 
-17 | # Test that default django.urls.path still works
-18 | urlpatterns_default = [
-   -     path("/contact/", views.contact_view),  # DJ015
-19 +     path("contact/", views.contact_view),  # DJ015
-20 |     path("contact/", views.contact_ok),  # OK
+16 | # Test multiple violations in same list
+17 | urlpatterns_multiple = [
+18 |     mypath("/api/users/", views.users_view),  # DJ015
+   -     mypath("/api/posts/", views.posts_view),  # DJ015
+19 +     mypath("api/posts/", views.posts_view),  # DJ015
+20 |     mypath("api/comments/", views.comments_view),  # OK
 21 | ]
 22 |

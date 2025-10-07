@@ -13,10 +13,11 @@ urlpatterns_custom_ok = [
     mypath("about/", views.about_view),
 ]
 
-# Test that default django.urls.path still works
-urlpatterns_default = [
-    path("contact", views.contact_view),  # DJ014
-    path("contact/", views.contact_ok),  # OK
+# Test multiple violations in same list
+urlpatterns_multiple = [
+    mypath("api/users", views.users_view),  # DJ014
+    mypath("api/posts", views.posts_view),  # DJ014
+    mypath("api/comments/", views.comments_view),  # OK
 ]
 
 # OK - root path and empty string
