@@ -5656,7 +5656,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             };
 
-            let field_ty = self.infer_typed_dict_field_type_expression(&item.value);
+            // TODO: The only qualifiers supported on `TypedDict` are `Required`, `NotRequired`,
+            // and `ReadOnly`. We may want to error if others are used.
+            let field_ty =
+                self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
 
             let is_required = if field_ty.qualifiers.contains(TypeQualifiers::REQUIRED) {
                 // Explicit Required[T] annotation - always required
@@ -5687,85 +5690,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             typed_dict_items,
         )))
-    }
-
-    fn infer_typed_dict_field_type_expression(
-        &mut self,
-        expr: &ast::Expr,
-    ) -> TypeAndQualifiers<'db> {
-        let ty = match expr {
-            ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
-                let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice = &**slice;
-
-                // Unlike other type-form expressions, `TypedDict` constructor literals support
-                // the `Required`, `NotRequired`, and `ReadOnly` qualifiers.
-                match value_ty {
-                    Type::SpecialForm(
-                        type_qualifier @ (SpecialFormType::Required
-                        | SpecialFormType::NotRequired
-                        | SpecialFormType::ReadOnly),
-                    ) => {
-                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
-                            &*tuple.elts
-                        } else {
-                            std::slice::from_ref(slice)
-                        };
-
-                        let num_arguments = arguments.len();
-                        let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers =
-                                self.infer_typed_dict_field_type_expression(slice);
-
-                            match type_qualifier {
-                                SpecialFormType::Required => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::REQUIRED);
-                                }
-                                SpecialFormType::NotRequired => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::NOT_REQUIRED);
-                                }
-                                SpecialFormType::ReadOnly => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::READ_ONLY);
-                                }
-                                _ => unreachable!(),
-                            }
-
-                            type_and_qualifiers
-                        } else {
-                            for element in arguments {
-                                self.infer_typed_dict_field_type_expression(element);
-                            }
-
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
-                                    got {num_arguments}",
-                                ));
-                            }
-
-                            Type::unknown().into()
-                        };
-
-                        if slice.is_tuple_expr() {
-                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
-                        }
-
-                        type_and_qualifiers
-                    }
-
-                    _ => self
-                        .infer_subscript_type_expression_no_store(subscript, slice, value_ty)
-                        .into(),
-                }
-            }
-
-            type_expr => self.infer_type_expression_no_store(type_expr).into(),
-        };
-
-        self.store_expression_type(expr, ty.inner_type());
-        ty
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
