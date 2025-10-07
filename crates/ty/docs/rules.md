@@ -2143,11 +2143,11 @@ from typing import overload
 
 @overload
 def foo(x: int) -> int:
-    return x + 1
+    return x + 1  # will never be executed
 
 @overload
 def foo(x: str) -> str:
-    return "Oh no, got a string"
+    return "Oh no, got a string"  # will never be executed
 
 def foo(x: int | str) -> int | str:
     raise Exception("unexpected type encountered")

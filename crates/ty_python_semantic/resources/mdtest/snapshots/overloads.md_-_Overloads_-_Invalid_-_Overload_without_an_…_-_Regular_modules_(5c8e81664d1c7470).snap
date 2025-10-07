@@ -37,10 +37,11 @@ error[invalid-overload]: Overloads for function `func` must be followed by a non
 5 | @overload
 6 | # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 7 | def func(x: str) -> str: ...
-  |     ^^^^ Attempting to call `func` will raise `TypeError` at runtime
+  |     ^^^^
 8 |
 9 | class Foo:
   |
+info: Attempting to call `func` will raise `TypeError` at runtime
 info: Overloaded functions without implementations are only permitted in stub files, on protocols, or for abstract methods
 info: See https://docs.python.org/3/library/typing.html#typing.overload for more details
 info: rule `invalid-overload` is enabled by default
@@ -54,8 +55,9 @@ error[invalid-overload]: Overloads for function `method` must be followed by a n
 12 |     @overload
 13 |     # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation functi…
 14 |     def method(self, x: str) -> str: ...
-   |         ^^^^^^ Attempting to call `method` will raise `TypeError` at runtime
+   |         ^^^^^^
    |
+info: Attempting to call `method` will raise `TypeError` at runtime
 info: Overloaded functions without implementations are only permitted in stub files, on protocols, or for abstract methods
 info: See https://docs.python.org/3/library/typing.html#typing.overload for more details
 info: rule `invalid-overload` is enabled by default

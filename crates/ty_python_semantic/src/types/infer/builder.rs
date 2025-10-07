@@ -1009,7 +1009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Overloads for function `{}` must be followed by a non-`@overload`-decorated implementation function",
                             &function_node.name
                         ));
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.info(format_args!(
                             "Attempting to call `{}` will raise `TypeError` at runtime",
                             &function_node.name
                         ));
@@ -2206,7 +2206,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostic.set_primary_message("This statement will never be executed");
                 diagnostic.info(
                     "`@overload`-decorated functions are solely for type checkers \
-                    and must be overridden at runtime by a non-`@overload`-decorated implementation",
+                    and must be overwritten at runtime by a non-`@overload`-decorated implementation",
                 );
                 diagnostic.help("Consider replacing this function body with `...` or `pass`");
                 break;

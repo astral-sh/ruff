@@ -59,7 +59,7 @@ warning[useless-overload-body]: Useless body for `@overload`-decorated function 
 24 |
 25 | @overload
    |
-info: `@overload`-decorated functions are solely for type checkers and must be overridden at runtime by a non-`@overload`-decorated implementation
+info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
 help: Consider replacing this function body with `...` or `pass`
 info: rule `useless-overload-body` is enabled by default
 
@@ -76,7 +76,7 @@ warning[useless-overload-body]: Useless body for `@overload`-decorated function 
 30 |
 31 | def foo(x):
    |
-info: `@overload`-decorated functions are solely for type checkers and must be overridden at runtime by a non-`@overload`-decorated implementation
+info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
 help: Consider replacing this function body with `...` or `pass`
 info: rule `useless-overload-body` is enabled by default
 
