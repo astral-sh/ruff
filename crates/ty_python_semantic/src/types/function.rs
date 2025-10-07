@@ -72,6 +72,7 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
+use crate::types::display::DisplaySettings;
 use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -1386,10 +1387,11 @@ impl KnownFunction {
                 {
                     let mut diag = builder.into_diagnostic("Revealed type");
                     let span = context.span(&call_expression.arguments.args[0]);
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("`{}`", revealed_type.display(db))),
-                    );
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        revealed_type
+                            .display_with(db, DisplaySettings::default().preserve_long_unions())
+                    )));
                 }
             }
 

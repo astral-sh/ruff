@@ -35,6 +35,8 @@ pub struct DisplaySettings<'db> {
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
     pub qualified: Rc<FxHashSet<&'db str>>,
+    /// Whether long unions are displayed in full
+    pub preserve_full_unions: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -51,6 +53,22 @@ impl<'db> DisplaySettings<'db> {
         Self {
             multiline: false,
             ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn truncate_long_unions(self) -> Self {
+        Self {
+            preserve_full_unions: false,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn preserve_long_unions(self) -> Self {
+        Self {
+            preserve_full_unions: true,
+            ..self
         }
     }
 
@@ -1292,18 +1310,20 @@ impl Display for DisplayUnionType<'_> {
         let total_entries =
             usize::from(!condensed_types.is_empty()) + elements.len() - condensed_types.len();
 
-        if total_entries == 0 {
-            return Ok(());
-        }
+        assert_ne!(total_entries, 0);
 
         let mut join = f.join(" | ");
 
-        let display_limit = (if total_entries > MAX_DISPLAYED_UNION_ITEMS {
-            MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED
+        let display_limit = if self.settings.preserve_full_unions {
+            total_entries
         } else {
-            MAX_DISPLAYED_UNION_ITEMS
-        })
-        .min(total_entries);
+            let limit = if total_entries > MAX_DISPLAYED_UNION_ITEMS {
+                MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED
+            } else {
+                MAX_DISPLAYED_UNION_ITEMS
+            };
+            limit.min(total_entries)
+        };
 
         let mut condensed_types = Some(condensed_types);
         let mut displayed_entries = 0usize;
@@ -1332,11 +1352,13 @@ impl Display for DisplayUnionType<'_> {
             }
         }
 
-        let omitted_entries = total_entries.saturating_sub(displayed_entries);
-        if omitted_entries > 0 {
-            join.entry(&DisplayUnionOmitted {
-                count: omitted_entries,
-            });
+        if !self.settings.preserve_full_unions {
+            let omitted_entries = total_entries.saturating_sub(displayed_entries);
+            if omitted_entries > 0 {
+                join.entry(&DisplayUnionOmitted {
+                    count: omitted_entries,
+                });
+            }
         }
 
         join.finish()?;

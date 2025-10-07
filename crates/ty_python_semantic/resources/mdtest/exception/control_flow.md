@@ -522,7 +522,7 @@ try:
         reveal_type(x)  # revealed: Literal[2]
     reveal_type(x)  # revealed: Literal[2]
 except:
-    reveal_type(x)  # revealed: Literal[1, 2] | A | B | ... omitted 5 union elements
+    reveal_type(x)  # revealed: Literal[1, 2] | A | B | C | D | E | F | G
     x = could_raise_returns_H()
     reveal_type(x)  # revealed: H
     x = could_raise_returns_I()
