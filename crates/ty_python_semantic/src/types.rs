@@ -182,6 +182,7 @@ pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db> =
     CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db>>;
+
 impl Default for HasRelationToVisitor<'_> {
     fn default() -> Self {
         HasRelationToVisitor::new(ConstraintSet::from(true))
@@ -190,7 +191,10 @@ impl Default for HasRelationToVisitor<'_> {
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
 pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db>>;
+
+#[derive(Debug)]
 pub(crate) struct IsDisjoint;
+
 impl Default for IsDisjointVisitor<'_> {
     fn default() -> Self {
         IsDisjointVisitor::new(ConstraintSet::from(false))
@@ -199,7 +203,10 @@ impl Default for IsDisjointVisitor<'_> {
 
 /// A [`PairVisitor`] that is used in `is_equivalent` methods.
 pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent, ConstraintSet<'db>>;
+
+#[derive(Debug)]
 pub(crate) struct IsEquivalent;
+
 impl Default for IsEquivalentVisitor<'_> {
     fn default() -> Self {
         IsEquivalentVisitor::new(ConstraintSet::from(true))
@@ -208,6 +215,8 @@ impl Default for IsEquivalentVisitor<'_> {
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
+
+#[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
@@ -217,6 +226,8 @@ pub(crate) struct TryBool;
 
 /// A [`TypeTransformer`] that is used in `normalized` methods.
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
+
+#[derive(Debug)]
 pub(crate) struct Normalized;
 
 /// How a generic type has been specialized.
@@ -2301,7 +2312,7 @@ impl<'db> Type<'db> {
 
             (Type::TypeAlias(alias), _) => {
                 let self_alias_ty = alias.value_type(db);
-                disjointness_visitor.visit((self_alias_ty, other), || {
+                disjointness_visitor.visit((self, other), || {
                     self_alias_ty.is_disjoint_from_impl(
                         db,
                         other,
@@ -2313,7 +2324,7 @@ impl<'db> Type<'db> {
 
             (_, Type::TypeAlias(alias)) => {
                 let other_alias_ty = alias.value_type(db);
-                disjointness_visitor.visit((self, other_alias_ty), || {
+                disjointness_visitor.visit((self, other), || {
                     self.is_disjoint_from_impl(
                         db,
                         other_alias_ty,
@@ -2405,8 +2416,8 @@ impl<'db> Type<'db> {
                 })
             }
 
-            (Type::Intersection(intersection), other)
-            | (other, Type::Intersection(intersection)) => {
+            (Type::Intersection(intersection), non_intersection)
+            | (non_intersection, Type::Intersection(intersection)) => {
                 disjointness_visitor.visit((self, other), || {
                     intersection
                         .positive(db)
@@ -2414,7 +2425,7 @@ impl<'db> Type<'db> {
                         .when_any(db, |p| {
                             p.is_disjoint_from_impl(
                                 db,
-                                other,
+                                non_intersection,
                                 disjointness_visitor,
                                 relation_visitor,
                             )
@@ -2422,7 +2433,7 @@ impl<'db> Type<'db> {
                         // A & B & Not[C] is disjoint from C
                         .or(db, || {
                             intersection.negative(db).iter().when_any(db, |&neg_ty| {
-                                other.has_relation_to_impl(
+                                non_intersection.has_relation_to_impl(
                                     db,
                                     neg_ty,
                                     TypeRelation::Subtyping,
