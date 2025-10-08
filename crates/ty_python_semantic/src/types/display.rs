@@ -26,7 +26,7 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
-    UnionType, WrapperDescriptorKind, visitor,
+    TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -589,12 +589,16 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => typed_dict
-                .defining_class()
-                .class_literal(self.db)
-                .0
-                .display_with(self.db, self.settings.clone())
-                .fmt(f),
+
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::ClassBased(class) => class
+                    .class_literal(self.db)
+                    .0
+                    .display_with(self.db, self.settings.clone())
+                    .fmt(f),
+                TypedDictType::Functional(synthesized) => synthesized.name(self.db).fmt(f),
+            },
+
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
     }

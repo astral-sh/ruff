@@ -60,6 +60,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::TupleSpec;
+use crate::types::typed_dict::{FunctionalTypedDictType, TypedDictSchema};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
@@ -1014,6 +1015,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Turn a typed dict class literal or functional type dict type into a `TypedDictType`.
+    pub(crate) fn to_typed_dict_type(self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
+        match self {
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => Some(
+                TypedDictType::from_class(ClassType::NonGeneric(class_literal)),
+            ),
+            Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => {
+                Some(TypedDictType::Functional(typed_dict))
+            }
+            _ => None,
+        }
+    }
+
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
     /// Since a `ClassType` must be specialized, apply the default specialization to any
     /// unspecialized generic class literal.
@@ -1132,7 +1146,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn typed_dict(defining_class: impl Into<ClassType<'db>>) -> Self {
-        Self::TypedDict(TypedDictType::new(defining_class.into()))
+        Self::TypedDict(TypedDictType::from_class(defining_class.into()))
     }
 
     #[must_use]
@@ -1258,10 +1272,9 @@ impl<'db> Type<'db> {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
             }
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                self
-            }
+            Type::TypedDict(typed_dict) => visitor.visit(self, || {
+                Type::TypedDict(typed_dict.normalized_impl(db, visitor))
+            }),
             Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
             Type::LiteralString
             | Type::AlwaysFalsy
@@ -1514,6 +1527,11 @@ impl<'db> Type<'db> {
                     .default_type(db)
                     .has_relation_to_impl(db, right, relation, visitor)
             }
+
+            (
+                Type::KnownInstance(KnownInstanceType::TypedDictSchema(_)),
+                Type::SpecialForm(SpecialFormType::TypedDictSchema),
+            ) => ConstraintSet::from(true),
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
@@ -2979,6 +2997,14 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
+
+        if let Type::TypedDict(TypedDictType::Functional(typed_dict)) = self
+            && let Some(member) =
+                TypedDictType::synthesized_member(db, self, typed_dict.items(db), &name)
+        {
+            return Place::bound(member).into();
+        }
+
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
@@ -3733,7 +3759,7 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
+                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
@@ -4751,7 +4777,9 @@ impl<'db> Type<'db> {
                             Parameter::positional_only(Some(Name::new_static("typename")))
                                 .with_annotated_type(KnownClass::Str.to_instance(db)),
                             Parameter::positional_only(Some(Name::new_static("fields")))
-                                .with_annotated_type(KnownClass::Dict.to_instance(db))
+                                .with_annotated_type(Type::SpecialForm(
+                                    SpecialFormType::TypedDictSchema,
+                                ))
                                 .with_default_type(Type::any()),
                             Parameter::keyword_only(Name::new_static("total"))
                                 .with_annotated_type(KnownClass::Bool.to_instance(db))
@@ -4769,6 +4797,8 @@ impl<'db> Type<'db> {
             Type::SpecialForm(SpecialFormType::NamedTuple) => {
                 Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
             }
+
+            Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
@@ -4838,10 +4868,23 @@ impl<'db> Type<'db> {
             // TODO: this is actually callable
             Type::DataclassDecorator(_) => CallableBinding::not_callable(self).into(),
 
-            // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
-            Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
-
             Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
+
+            Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => {
+                CallableBinding::from_overloads(
+                    self,
+                    [Signature::new(
+                        // TODO: List more specific parameter types here for better code completion.
+                        Parameters::new([
+                            Parameter::variadic(Name::new_static("args")),
+                            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::TypedDict(TypedDictType::Functional(typed_dict))),
+                    )],
+                )
+                .into()
+            }
 
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
@@ -5646,6 +5689,15 @@ impl<'db> Type<'db> {
                     .map(Type::NonInferableTypeVar)
                     .unwrap_or(*self))
                 }
+                KnownInstanceType::TypedDictType(typed_dict) => {
+                    Ok(Type::TypedDict(TypedDictType::Functional(*typed_dict)))
+                }
+                KnownInstanceType::TypedDictSchema(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
@@ -5733,6 +5785,12 @@ impl<'db> Type<'db> {
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypedDict
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+                SpecialFormType::TypedDictSchema => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::InvalidType(*self, scope_id)
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -5932,9 +5990,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
-            // `TypedDict` instances are instances of `dict` at runtime, but its important that we
-            // understand a more specific meta type in order to correctly handle `__getitem__`.
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => typed_dict.to_meta_type(db),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
         }
     }
@@ -6491,8 +6547,10 @@ impl<'db> Type<'db> {
                 Protocol::Synthesized(_) => None,
             },
 
-            Type::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::ClassBased(class) => Some(TypeDefinition::Class(class.definition(db))),
+                // TODO: Support go-to-definition for functional `TypedDict`s.
+                TypedDictType::Functional(_) => None,
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
@@ -6841,6 +6899,13 @@ pub enum KnownInstanceType<'db> {
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
 
+    /// A single class object created using the `typing.TypedDict` functional syntax
+    TypedDictType(FunctionalTypedDictType<'db>),
+
+    /// An internal type representing the dictionary literal argument to the functional `TypedDict`
+    /// constructor.
+    TypedDictSchema(TypedDictSchema<'db>),
+
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
 
@@ -6868,7 +6933,12 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
-        KnownInstanceType::Deprecated(_) | KnownInstanceType::ConstraintSet(_) => {
+        KnownInstanceType::TypedDictType(typed_dict) => {
+            visitor.visit_typed_dict_type(db, TypedDictType::Functional(typed_dict));
+        }
+        KnownInstanceType::Deprecated(_)
+        | KnownInstanceType::ConstraintSet(_)
+        | KnownInstanceType::TypedDictSchema(_) => {
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
@@ -6890,15 +6960,11 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(type_alias) => {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
-            Self::Deprecated(deprecated) => {
-                // Nothing to normalize
-                Self::Deprecated(deprecated)
+            Self::TypedDictType(typed_dict) => {
+                Self::TypedDictType(typed_dict.normalized_impl(db, visitor))
             }
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
-            Self::ConstraintSet(set) => {
-                // Nothing to normalize
-                Self::ConstraintSet(set)
-            }
+            Self::Deprecated(_) | Self::TypedDictSchema(_) | Self::ConstraintSet(_) => self,
         }
     }
 
@@ -6910,6 +6976,8 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::GenericAlias
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::TypedDictType(_) => KnownClass::TypedDictFallback,
+            Self::TypedDictSchema(_) => KnownClass::Object,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
@@ -6966,6 +7034,8 @@ impl<'db> KnownInstanceType<'db> {
                             f.write_str("typing.TypeAliasType")
                         }
                     }
+                    KnownInstanceType::TypedDictType(_) => f.write_str("typing.TypedDict"),
+                    KnownInstanceType::TypedDictSchema(_) => f.write_str("_TypedDictSchema"),
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
@@ -9130,7 +9200,7 @@ impl TypeRelation {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum Truthiness {
     /// For an object `x`, `bool(x)` will always return `True`
     AlwaysTrue,
@@ -9174,6 +9244,14 @@ impl Truthiness {
             (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
             (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
             _ => Truthiness::Ambiguous,
+        }
+    }
+
+    pub(crate) fn unwrap_or(self, value: bool) -> bool {
+        match self {
+            Truthiness::AlwaysTrue => true,
+            Truthiness::AlwaysFalse => false,
+            Truthiness::Ambiguous => value,
         }
     }
 

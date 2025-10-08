@@ -169,9 +169,12 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypedDictSchema(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_) => None,
+                // TODO: Inherit the fields of functional `TypedDict`s.
+                KnownInstanceType::TypedDictType(_) => Some(Self::TypedDict),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -200,7 +203,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::TypedDictSchema => None,
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
