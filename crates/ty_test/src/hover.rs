@@ -54,53 +54,9 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
 
     let model = SemanticModel::new(db, file);
 
-    // Try to get the type from the node - HasType is mainly implemented for ast types
-    let ty = match node {
-        AnyNodeRef::StmtFunctionDef(s) => s.inferred_type(&model),
-        AnyNodeRef::StmtClassDef(s) => s.inferred_type(&model),
-        AnyNodeRef::StmtExpr(s) => s.value.as_ref().inferred_type(&model),
-        AnyNodeRef::ExprBoolOp(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprNamed(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprBinOp(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprUnaryOp(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprLambda(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprIf(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprDict(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprSet(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprListComp(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprSetComp(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprDictComp(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprGenerator(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprAwait(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprYield(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprYieldFrom(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprCompare(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprCall(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprFString(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprStringLiteral(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprBytesLiteral(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprNumberLiteral(e) => {
-            ruff_python_ast::ExprRef::from(e).inferred_type(&model)
-        }
-        AnyNodeRef::ExprBooleanLiteral(e) => {
-            ruff_python_ast::ExprRef::from(e).inferred_type(&model)
-        }
-        AnyNodeRef::ExprNoneLiteral(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprEllipsisLiteral(e) => {
-            ruff_python_ast::ExprRef::from(e).inferred_type(&model)
-        }
-        AnyNodeRef::ExprAttribute(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprSubscript(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprStarred(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprName(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprList(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprTuple(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprSlice(e) => ruff_python_ast::ExprRef::from(e).inferred_type(&model),
-        AnyNodeRef::ExprIpyEscapeCommand(e) => {
-            ruff_python_ast::ExprRef::from(e).inferred_type(&model)
-        }
-        _ => return None,
-    };
+    // Get the expression at this position and infer its type
+    let expr = node.as_expr_ref()?;
+    let ty = expr.inferred_type(&model);
 
     Some(ty.display(db).to_string())
 }
