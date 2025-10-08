@@ -310,8 +310,9 @@ class Container[T = bytes]:
     def method(self) -> Self:
         return self
 
-def _(c: Container[str]):
+def _(c: Container[str], d: Container):
     reveal_type(c.method())  # revealed: Container[str]
+    reveal_type(d.method())  # revealed: Container[bytes]
 
 T = TypeVar("T", default=bytes)
 
@@ -319,8 +320,9 @@ class LegacyContainer(Generic[T]):
     def method(self) -> Self:
         return self
 
-def _(c: LegacyContainer[str]):
+def _(c: LegacyContainer[str], d: LegacyContainer):
     reveal_type(c.method())  # revealed: LegacyContainer[str]
+    reveal_type(d.method())  # revealed: LegacyContainer[bytes]
 ```
 
 ## Invalid Usage
