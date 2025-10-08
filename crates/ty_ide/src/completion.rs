@@ -1798,12 +1798,11 @@ Meta.<CURSOR>
             // whether we're in release mode or not. These differences
             // aren't really relevant for completion tests AFAIK, so
             // just redact them. ---AG
-            filters => [(r"(?m)\s*__(annotations|new)__.+$", "")]},
+            filters => [(r"(?m)\s*__(annotations|new|annotate)__.+$", "")]},
             {
                 assert_snapshot!(test.completions_without_builtins_with_types(), @r"
                 meta_attr :: property
                 mro :: def mro(self) -> list[type]
-                __annotate__ :: @Todo(Support for `typing.TypeAlias`) | None
                 __base__ :: type | None
                 __bases__ :: tuple[type, ...]
                 __basicsize__ :: int
@@ -1973,7 +1972,7 @@ Answer.<CURSOR>
         insta::with_settings!({
             // See above: filter out some members which contain @Todo types that are
             // rendered differently in release mode.
-            filters => [(r"(?m)\s*__(call|reduce_ex)__.+$", "")]},
+            filters => [(r"(?m)\s*__(call|reduce_ex|annotate|signature)__.+$", "")]},
             {
                 assert_snapshot!(test.completions_without_builtins_with_types(), @r"
                 NO :: Literal[Answer.NO]
@@ -1981,7 +1980,6 @@ Answer.<CURSOR>
                 mro :: bound method <class 'Answer'>.mro() -> list[type]
                 name :: Any
                 value :: Any
-                __annotate__ :: @Todo(Support for `typing.TypeAlias`) | None
                 __annotations__ :: dict[str, Any]
                 __base__ :: type | None
                 __bases__ :: tuple[type, ...]
@@ -2024,7 +2022,6 @@ Answer.<CURSOR>
                 __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT@__reversed__]
                 __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
-                __signature__ :: @Todo(Support for `typing.TypeAlias`)
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
