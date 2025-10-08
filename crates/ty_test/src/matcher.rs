@@ -276,7 +276,7 @@ impl Matcher {
         let mut failures = vec![];
         let mut unmatched: Vec<&CheckOutput> = outputs.outputs.iter().collect();
         for assertion in assertions {
-            match assertion.parse() {
+            match assertion.parse(&self.line_index, &self.source) {
                 Ok(assertion) => {
                     if !self.matches(&assertion, &mut unmatched) {
                         failures.push(assertion.unmatched());

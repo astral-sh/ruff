@@ -272,7 +272,11 @@ impl<'a> UnparsedAssertion<'a> {
     }
 
     /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
-    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
+    pub(crate) fn parse(
+        &self,
+        line_index: &ruff_source_file::LineIndex,
+        source: &ruff_db::source::SourceText,
+    ) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
         match self {
             Self::Revealed(revealed) => {
                 if revealed.is_empty() {
@@ -285,7 +289,7 @@ impl<'a> UnparsedAssertion<'a> {
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
             Self::Hover(expected_type, full_comment, range) => {
-                HoverAssertion::from_str(expected_type, full_comment, *range)
+                HoverAssertion::from_str(expected_type, full_comment, *range, line_index, source)
                     .map(ParsedAssertion::Hover)
                     .map_err(PragmaParseError::HoverAssertionParseError)
             }
@@ -364,12 +368,9 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 /// A parsed and validated `# hover:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct HoverAssertion<'a> {
-    /// The zero-based column offset within the comment where the down arrow appears.
+    /// The zero-based column in the line where the down arrow appears.
     /// This indicates the character position in the target line where we should hover.
-    pub(crate) arrow_offset_in_comment: usize,
-
-    /// The range of the comment in the source file.
-    pub(crate) comment_range: TextRange,
+    pub(crate) column: usize,
 
     /// The expected type at the hover position.
     pub(crate) expected_type: &'a str,
@@ -380,6 +381,8 @@ impl<'a> HoverAssertion<'a> {
         expected_type: &'a str,
         full_comment: &'a str,
         comment_range: TextRange,
+        line_index: &ruff_source_file::LineIndex,
+        source: &ruff_db::source::SourceText,
     ) -> Result<Self, HoverAssertionParseError> {
         if expected_type.is_empty() {
             return Err(HoverAssertionParseError::EmptyType);
@@ -390,9 +393,15 @@ impl<'a> HoverAssertion<'a> {
             .find('↓')
             .ok_or(HoverAssertionParseError::MissingDownArrow)?;
 
+        // Calculate the column within the comment's line
+        // First, get the line and column of the comment's start
+        let comment_line_col = line_index.line_column(comment_range.start(), source);
+
+        // The hover column is the comment's column plus the arrow offset within the comment
+        let column = comment_line_col.column.to_zero_indexed() + arrow_offset_in_comment;
+
         Ok(Self {
-            arrow_offset_in_comment,
-            comment_range,
+            column,
             expected_type,
         })
     }
