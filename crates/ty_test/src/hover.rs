@@ -96,21 +96,28 @@ pub(crate) fn generate_hover_outputs(
 
         // Look for hover assertions in this line's assertions
         for assertion in line_assertions.iter() {
-            let UnparsedAssertion::Hover(_, _) = assertion else {
+            let UnparsedAssertion::Hover(_, _, _) = assertion else {
                 continue;
             };
 
-            // Parse the assertion to get the column
+            // Parse the assertion to get the hover information
             let Ok(ParsedAssertion::Hover(hover)) = assertion.parse() else {
                 // Invalid hover assertion - will be caught as error by matcher
                 continue;
             };
 
+            // Calculate the column within the comment's line
+            // First, get the line and column of the comment's start
+            let comment_line_col = lines.line_column(hover.comment_range.start(), &source);
+
+            // The hover column is the comment's column plus the arrow offset within the comment
+            let hover_column_in_line = comment_line_col.column.to_zero_indexed() + hover.arrow_offset_in_comment;
+
             // Get the start offset of the target line
             let target_line_start = lines.line_start(target_line, &source);
 
-            // Calculate the hover position from the column in the parsed assertion
-            let hover_offset = target_line_start + TextSize::try_from(hover.column).unwrap();
+            // Calculate the hover position: start of target line + column in line
+            let hover_offset = target_line_start + TextSize::try_from(hover_column_in_line).unwrap();
 
             // Get the inferred type at that position
             let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) else {

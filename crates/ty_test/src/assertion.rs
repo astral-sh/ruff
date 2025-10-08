@@ -129,7 +129,7 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
         loop {
             let inner_next = self.inner.next()?;
             let comment = &self.file_assertions.source[inner_next];
-            if let Some(assertion) = UnparsedAssertion::from_comment(comment) {
+            if let Some(assertion) = UnparsedAssertion::from_comment(comment, inner_next) {
                 return Some(AssertionWithRange(assertion, inner_next));
             }
         }
@@ -250,13 +250,14 @@ pub(crate) enum UnparsedAssertion<'a> {
     ///
     /// The first string is the expected type (body after `hover:`).
     /// The second string is the full comment text (including the down arrow).
-    Hover(&'a str, &'a str),
+    /// The TextRange is the position of the comment in the source file.
+    Hover(&'a str, &'a str, TextRange),
 }
 
 impl<'a> UnparsedAssertion<'a> {
     /// Returns `Some(_)` if the comment starts with `# error:`, `# revealed:`, or `# hover:`,
     /// indicating that it is an assertion comment.
-    fn from_comment(comment: &'a str) -> Option<Self> {
+    fn from_comment(comment: &'a str, range: TextRange) -> Option<Self> {
         let trimmed = comment.trim().strip_prefix('#')?.trim();
         let (keyword, body) = trimmed.split_once(':')?;
         let keyword = keyword.trim();
@@ -265,7 +266,7 @@ impl<'a> UnparsedAssertion<'a> {
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
-            "hover" | "↓ hover" => Some(Self::Hover(body, comment)),
+            "hover" | "↓ hover" => Some(Self::Hover(body, comment, range)),
             _ => None,
         }
     }
@@ -283,8 +284,8 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
-            Self::Hover(expected_type, full_comment) => {
-                HoverAssertion::from_str(expected_type, full_comment)
+            Self::Hover(expected_type, full_comment, range) => {
+                HoverAssertion::from_str(expected_type, full_comment, *range)
                     .map(ParsedAssertion::Hover)
                     .map_err(PragmaParseError::HoverAssertionParseError)
             }
@@ -297,7 +298,7 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => write!(f, "error: {assertion}"),
-            Self::Hover(expected_type, _) => write!(f, "hover: {expected_type}"),
+            Self::Hover(expected_type, _, _) => write!(f, "hover: {expected_type}"),
         }
     }
 }
@@ -363,9 +364,12 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 /// A parsed and validated `# hover:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct HoverAssertion<'a> {
-    /// The zero-based column where the down arrow appears in the assertion comment.
-    /// This indicates the position in the next line where we should hover.
-    pub(crate) column: usize,
+    /// The zero-based column offset within the comment where the down arrow appears.
+    /// This indicates the character position in the target line where we should hover.
+    pub(crate) arrow_offset_in_comment: usize,
+
+    /// The range of the comment in the source file.
+    pub(crate) comment_range: TextRange,
 
     /// The expected type at the hover position.
     pub(crate) expected_type: &'a str,
@@ -375,18 +379,20 @@ impl<'a> HoverAssertion<'a> {
     fn from_str(
         expected_type: &'a str,
         full_comment: &'a str,
+        comment_range: TextRange,
     ) -> Result<Self, HoverAssertionParseError> {
         if expected_type.is_empty() {
             return Err(HoverAssertionParseError::EmptyType);
         }
 
-        // Find the down arrow position in the full comment to determine the column
-        let column = full_comment
+        // Find the down arrow position within the comment text
+        let arrow_offset_in_comment = full_comment
             .find('↓')
             .ok_or(HoverAssertionParseError::MissingDownArrow)?;
 
         Ok(Self {
-            column,
+            arrow_offset_in_comment,
+            comment_range,
             expected_type,
         })
     }
