@@ -43,12 +43,14 @@ Add support for hover assertions in the mdtest framework. These assertions will 
 - [x] Calculate TextSize offset from: (target_line_start + down_arrow_column)
 
 ### 3. Create CheckOutput enum (matcher.rs)
-**Status:** In progress
+**Status:** ✅ Completed
 
 - [x] Add `CheckOutput` enum with `Diagnostic` and `Hover` variants
-- [ ] Update `match_file` to accept `&[CheckOutput]` instead of `&[Diagnostic]`
-- [ ] Create `SortedCheckOutputs` similar to `SortedDiagnostics`
-- [ ] Update matching logic to extract line numbers from CheckOutput variants
+- [x] Update `match_file` to accept `&[CheckOutput]` instead of `&[Diagnostic]`
+- [x] Create `SortedCheckOutputs` similar to `SortedDiagnostics`
+- [x] Update matching logic to extract line numbers from CheckOutput variants
+- [x] Implement `Unmatched` trait for `CheckOutput`
+- [x] Update lib.rs to convert diagnostics to `CheckOutput` before matching
 
 ### 4. Add hover checking logic (lib.rs)
 **Status:** Not started
@@ -119,3 +121,10 @@ def foo() -> int: ...
   - Simplified approach: down arrow must appear immediately before `hover` keyword
   - Added placeholder matching logic in matcher.rs (TODO: implement once diagnostics ready)
   - ty_test compiles successfully with warnings (unused code, expected at this stage)
+- **2025-10-08**: Completed step 3 - Created CheckOutput enum infrastructure
+  - Decided NOT to add HoverType to DiagnosticId (keep test logic separate)
+  - Created `CheckOutput` enum with `Diagnostic` and `Hover` variants
+  - Implemented `SortedCheckOutputs` to handle sorting/grouping by line
+  - Updated entire matcher module to work with `CheckOutput` instead of `Diagnostic`
+  - Updated lib.rs to convert diagnostics to `CheckOutput` before matching
+  - All changes compile successfully

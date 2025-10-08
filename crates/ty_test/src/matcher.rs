@@ -535,9 +535,29 @@ impl Matcher {
                 });
                 matched_revealed_type.is_some()
             }
-            ParsedAssertion::Hover(_hover) => {
-                // TODO: Implement hover matching once hover diagnostic infrastructure is in place
-                false
+            ParsedAssertion::Hover(hover) => {
+                let expected_type = discard_todo_metadata(hover.expected_type);
+
+                // Find a hover output that matches the expected type
+                let position = unmatched.iter().position(|output| {
+                    let CheckOutput::Hover {
+                        inferred_type, ..
+                    } = output
+                    else {
+                        return false;
+                    };
+
+                    // Compare the inferred type with the expected type
+                    let inferred_type = discard_todo_metadata(inferred_type);
+                    inferred_type == expected_type
+                });
+
+                if let Some(position) = position {
+                    unmatched.swap_remove(position);
+                    true
+                } else {
+                    false
+                }
             }
         }
     }
