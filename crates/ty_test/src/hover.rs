@@ -20,27 +20,39 @@ use crate::db::Db;
 fn find_covering_node<'a>(root: AnyNodeRef<'a>, offset: TextSize) -> Option<AnyNodeRef<'a>> {
     struct Visitor<'a> {
         offset: TextSize,
-        found: Option<AnyNodeRef<'a>>,
+        found: bool,
+        minimal_node: Option<AnyNodeRef<'a>>,
     }
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
         fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-            if node.range().contains(self.offset) {
-                self.found = Some(node);
+            if !self.found && node.range().contains(self.offset) {
+                // This node contains the offset. Save it and traverse into children
+                // to find a more specific node.
+                self.minimal_node = Some(node);
                 TraversalSignal::Traverse
             } else {
                 TraversalSignal::Skip
+            }
+        }
+
+        fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+            // If we're leaving a node that we saved, and we haven't found a more
+            // specific child, then this is the minimal covering node.
+            if !self.found && self.minimal_node == Some(node) {
+                self.found = true;
             }
         }
     }
 
     let mut visitor = Visitor {
         offset,
-        found: None,
+        found: false,
+        minimal_node: None,
     };
 
     root.visit_source_order(&mut visitor);
-    visitor.found
+    visitor.minimal_node
 }
 
 /// Get the inferred type at a given position in a file.
