@@ -1125,11 +1125,8 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
-            SemanticSyntaxErrorKind::AlternateBindedPattern(expected, found) => {
-                write!(
-                    f,
-                    "alternative pattern bind different names: expected `{expected}`, found `{found}`"
-                )
+            SemanticSyntaxErrorKind::AlternateBindedPattern(name) => {
+                write!(f, "variable `{name}` is not bound in all patterns")
             }
         }
     }
@@ -1511,7 +1508,7 @@ pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
 
-    AlternateBindedPattern(String, String),
+    AlternateBindedPattern(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1763,41 +1760,46 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // match 2:
                 //     case Class(x) | [x] | x: ...
 
-                let mut all_names: Vec<Vec<String>> = Vec::new();
+                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
-                    let mut names: Vec<String> =
-                        visitor.names.iter().map(ToString::to_string).collect();
-                    names.sort();
-                    all_names.push(names);
-                }
+                    let Some(prev) = &previous_names else {
+                        previous_names = Some(visitor.names);
+                        continue;
+                    };
+                    if let Some(name) = prev.symmetric_difference(&visitor.names).next() {
+                        // test_err alternate_binded_pattern
+                        // match x:
+                        //     case [a] | [b]: ...
+                        //     case [a] | []: ...
+                        //     case (x, y) | (x,): ...
+                        //     case [a, _] | [a, b]: ...
+                        //     case (x, (y | z)): ...
+                        //     case [a] | [b] | [c]: ...
+                        //     case [] | [a]: ...
+                        //     case [a] | [C(x)]: ...
+                        //     case [[a] | [b]]: ...
+                        //     case [C(a)] | [C(b)]: ...
+                        //     case [C(D(a))] | [C(D(b))]: ...
+                        //     case [(a, b)] | [(c, d)]: ...
 
-                if let Some(first_name) = all_names.first() {
-                    for current_name in all_names.iter().skip(1) {
-                        if current_name != first_name {
-                            // test_err alternate_binded_pattern
-                            // match x:
-                            //     case [a] | [b]: ...
-                            //     case [a] | []: ...
-                            //     case (x, y) | (x,): ...
-                            //     case [a, _] | [a, b]: ...
-                            //     case (x, (y | z)): ...
-                            //     case [a] | [b] | [c]: ...
-
-                            SemanticSyntaxChecker::add_error(
-                                self.ctx,
-                                SemanticSyntaxErrorKind::AlternateBindedPattern(
-                                    first_name.join(", "),
-                                    current_name.join(", "),
-                                ),
-                                pattern.range(),
-                            );
-                            break;
-                        }
+                        // test_ok alternate_binded_pattern
+                        // match x:
+                        //     case [a] | [a]: ...
+                        //     case (x, y) | (x, y): ...
+                        //     case (x, (y | y)): ...
+                        //     case [a, _] | [a, _]: ...
+                        //     case [a] | [C(a)]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::AlternateBindedPattern(name.to_string()),
+                            pattern.range(),
+                        );
+                        break;
                     }
                 }
             }
