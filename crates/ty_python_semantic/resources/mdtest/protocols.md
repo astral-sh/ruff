@@ -630,7 +630,7 @@ static_assert(is_assignable_to(FooSub, HasX))
 static_assert(not is_subtype_of(FooSub, HasXY))
 static_assert(not is_assignable_to(FooSub, HasXY))
 
-class FooBool(Foo):
+class FooBool:
     x: bool
 
 static_assert(not is_subtype_of(FooBool, HasX))
