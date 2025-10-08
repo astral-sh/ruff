@@ -397,18 +397,19 @@ impl<'a> HoverAssertion<'a> {
             return Err(HoverAssertionParseError::EmptyType);
         }
 
-        // Find the down arrow position within the comment text (as character offset)
-        let arrow_char_offset_in_comment = full_comment
-            .chars()
-            .position(|c| c == '↓')
+        // Find the down arrow position within the comment text (as byte offset)
+        let arrow_byte_offset_in_comment = full_comment
+            .find('↓')
             .ok_or(HoverAssertionParseError::MissingDownArrow)?;
 
-        // Calculate the column within the comment's line
-        // First, get the line and column of the comment's start
-        let comment_line_col = line_index.line_column(comment_range.start(), source);
+        // Calculate the TextSize position of the down arrow in the source file
+        let arrow_position = comment_range.start() + TextSize::try_from(arrow_byte_offset_in_comment).unwrap();
 
-        // The hover column is the comment's column plus the arrow's character offset within the comment
-        let column = comment_line_col.column.to_zero_indexed() + arrow_char_offset_in_comment;
+        // Get the line and character column of the down arrow
+        let arrow_line_col = line_index.line_column(arrow_position, source);
+
+        // Store the character column (which line_column already computed for us)
+        let column = arrow_line_col.column.to_zero_indexed();
 
         Ok(Self {
             column,
