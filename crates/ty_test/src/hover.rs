@@ -3,7 +3,6 @@
 //! This module provides functionality to extract hover assertions from comments,
 //! infer types at specified positions, and generate hover check outputs for matching.
 
-use crate::check_output::{CheckOutput, HoverOutput};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
@@ -12,7 +11,17 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{HasType, SemanticModel};
 
+use crate::check_output::CheckOutput;
 use crate::db::Db;
+
+/// A hover result for testing hover assertions.
+#[derive(Debug, Clone)]
+pub(crate) struct HoverOutput {
+    /// The position where hover was requested
+    pub(crate) offset: TextSize,
+    /// The inferred type at that position
+    pub(crate) inferred_type: String,
+}
 
 /// Find the AST node with minimal range that fully contains the given offset.
 fn find_covering_node<'a>(root: AnyNodeRef<'a>, offset: TextSize) -> Option<AnyNodeRef<'a>> {

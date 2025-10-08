@@ -5,17 +5,9 @@
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::TextSize;
 use std::ops::Range;
 
-/// A hover result for testing hover assertions.
-#[derive(Debug, Clone)]
-pub(crate) struct HoverOutput {
-    /// The position where hover was requested
-    pub(crate) offset: TextSize,
-    /// The inferred type at that position
-    pub(crate) inferred_type: String,
-}
+use crate::hover::HoverOutput;
 
 /// Represents either a diagnostic or a hover result for matching against assertions.
 #[derive(Debug, Clone)]

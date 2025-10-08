@@ -12,7 +12,8 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
-use crate::check_output::{CheckOutput, HoverOutput, LineCheckOutputs, SortedCheckOutputs};
+use crate::check_output::{CheckOutput, LineCheckOutputs, SortedCheckOutputs};
+use crate::hover::HoverOutput;
 use crate::db::Db;
 
 #[derive(Debug, Default)]
