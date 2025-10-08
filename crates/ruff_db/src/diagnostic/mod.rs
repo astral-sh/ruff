@@ -7,7 +7,8 @@ use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
-    DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, ceil_char_boundary,
+    DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
+    ceil_char_boundary,
     github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::{Db, files::File};

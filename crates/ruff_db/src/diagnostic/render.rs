@@ -1170,6 +1170,33 @@ pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
         .unwrap_or_else(|| TextSize::from(upper_bound))
 }
 
+/// A stub implementation of [`FileResolver`] intended for testing.
+pub struct DummyFileResolver;
+
+impl FileResolver for DummyFileResolver {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!()
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!()
+    }
+
+    fn notebook_index(&self, _file: &UnifiedFile) -> Option<NotebookIndex> {
+        None
+    }
+
+    fn is_notebook(&self, _file: &UnifiedFile) -> bool {
+        false
+    }
+
+    fn current_directory(&self) -> &Path {
+        static CWD: std::sync::LazyLock<std::path::PathBuf> =
+            std::sync::LazyLock::new(|| std::path::PathBuf::from("."));
+        &CWD
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
