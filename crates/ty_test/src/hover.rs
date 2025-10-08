@@ -70,8 +70,23 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
 
     let model = SemanticModel::new(db, file);
 
-    // Get the expression at this position and infer its type
-    let expr = node.as_expr_ref()?;
+    // Get the expression at this position. If we found a statement node, it might contain
+    // expressions, but we want to find the most specific expression node, so return None
+    // and rely on the visitor having found a more specific expression child node.
+    let expr = if let Some(expr) = node.as_expr_ref() {
+        expr
+    } else if let Some(stmt) = node.as_stmt_ref() {
+        // If we found a statement, check if it's an expression statement
+        match stmt {
+            ruff_python_ast::StmtRef::Expr(expr_stmt) => expr_stmt.value.as_ref().into(),
+            _ => {
+                return None;
+            }
+        }
+    } else {
+        return None;
+    };
+
     let ty = expr.inferred_type(&model);
 
     Some(ty.display(db).to_string())
