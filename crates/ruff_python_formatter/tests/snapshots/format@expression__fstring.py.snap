@@ -754,6 +754,10 @@ print(f"{  # Tuple with multiple elements that doesn't fit on a single line gets
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/15536
 print(f"{ {}, 1, }")
+
+
+# The inner quotes should not be changed to double quotes before Python 3.12
+f"{f'''{'nested'} inner'''} outer"
 ```
 
 ## Outputs
@@ -1581,6 +1585,10 @@ print(
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/15536
 print(f"{ {}, 1 }")
+
+
+# The inner quotes should not be changed to double quotes before Python 3.12
+f"{f'''{"nested"} inner'''} outer"
 ```
 
 
@@ -2408,10 +2416,23 @@ print(
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/15536
 print(f"{ {}, 1 }")
+
+
+# The inner quotes should not be changed to double quotes before Python 3.12
+f"{f'''{"nested"} inner'''} outer"
 ```
 
 
 ### Unsupported Syntax Errors
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+   --> fstring.py:812:9
+    |
+811 | # The inner quotes should not be changed to double quotes before Python 3.12
+812 | f"{f'''{"nested"} inner'''} outer"
+    |         ^
+    |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> fstring.py:178:8
     |
