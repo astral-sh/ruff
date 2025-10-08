@@ -247,11 +247,14 @@ pub(crate) enum UnparsedAssertion<'a> {
     Error(&'a str),
 
     /// A `# hover:` assertion.
-    ///
-    /// The first string is the expected type (body after `hover:`).
-    /// The second string is the full comment text (including the down arrow).
-    /// The TextRange is the position of the comment in the source file.
-    Hover(&'a str, &'a str, TextRange),
+    Hover {
+        /// The expected type (body after `hover:`).
+        expected_type: &'a str,
+        /// The full comment text (including the down arrow).
+        full_comment: &'a str,
+        /// The position of the comment in the source file.
+        range: TextRange,
+    },
 }
 
 impl<'a> UnparsedAssertion<'a> {
@@ -266,7 +269,11 @@ impl<'a> UnparsedAssertion<'a> {
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
-            "hover" | "↓ hover" => Some(Self::Hover(body, comment, range)),
+            "hover" | "↓ hover" => Some(Self::Hover {
+                expected_type: body,
+                full_comment: comment,
+                range,
+            }),
             _ => None,
         }
     }
@@ -288,11 +295,13 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
-            Self::Hover(expected_type, full_comment, range) => {
-                HoverAssertion::from_str(expected_type, full_comment, *range, line_index, source)
-                    .map(ParsedAssertion::Hover)
-                    .map_err(PragmaParseError::HoverAssertionParseError)
-            }
+            Self::Hover {
+                expected_type,
+                full_comment,
+                range,
+            } => HoverAssertion::from_str(expected_type, full_comment, *range, line_index, source)
+                .map(ParsedAssertion::Hover)
+                .map_err(PragmaParseError::HoverAssertionParseError),
         }
     }
 }
@@ -302,7 +311,7 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => write!(f, "error: {assertion}"),
-            Self::Hover(expected_type, _, _) => write!(f, "hover: {expected_type}"),
+            Self::Hover { expected_type, .. } => write!(f, "hover: {expected_type}"),
         }
     }
 }

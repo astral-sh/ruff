@@ -96,7 +96,7 @@ pub(crate) fn generate_hover_outputs(
 
         // Look for hover assertions in this line's assertions
         for assertion in line_assertions.iter() {
-            let UnparsedAssertion::Hover(_, _, _) = assertion else {
+            let UnparsedAssertion::Hover { .. } = assertion else {
                 continue;
             };
 
