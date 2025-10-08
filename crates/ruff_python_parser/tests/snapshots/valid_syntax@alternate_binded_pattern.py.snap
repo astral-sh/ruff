@@ -8,12 +8,12 @@ input_file: crates/ruff_python_parser/resources/inline/ok/alternate_binded_patte
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..151,
+        range: 0..147,
         body: [
             Match(
                 StmtMatch {
                     node_index: NodeIndex(None),
-                    range: 0..150,
+                    range: 0..146,
                     subject: Name(
                         ExprName {
                             node_index: NodeIndex(None),
@@ -358,27 +358,27 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 128..150,
+                            range: 124..146,
                             node_index: NodeIndex(None),
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 133..145,
+                                    range: 129..141,
                                     node_index: NodeIndex(None),
                                     patterns: [
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 133..136,
+                                                range: 129..132,
                                                 node_index: NodeIndex(None),
                                                 patterns: [
                                                     MatchAs(
                                                         PatternMatchAs {
-                                                            range: 134..135,
+                                                            range: 130..131,
                                                             node_index: NodeIndex(None),
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("a"),
-                                                                    range: 134..135,
+                                                                    range: 130..131,
                                                                     node_index: NodeIndex(None),
                                                                 },
                                                             ),
@@ -389,34 +389,34 @@ Module(
                                         ),
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 139..145,
+                                                range: 135..141,
                                                 node_index: NodeIndex(None),
                                                 patterns: [
                                                     MatchClass(
                                                         PatternMatchClass {
-                                                            range: 140..144,
+                                                            range: 136..140,
                                                             node_index: NodeIndex(None),
                                                             cls: Name(
                                                                 ExprName {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 140..141,
+                                                                    range: 136..137,
                                                                     id: Name("C"),
                                                                     ctx: Load,
                                                                 },
                                                             ),
                                                             arguments: PatternArguments {
-                                                                range: 141..144,
+                                                                range: 137..140,
                                                                 node_index: NodeIndex(None),
                                                                 patterns: [
                                                                     MatchAs(
                                                                         PatternMatchAs {
-                                                                            range: 142..143,
+                                                                            range: 138..139,
                                                                             node_index: NodeIndex(None),
                                                                             pattern: None,
                                                                             name: Some(
                                                                                 Identifier {
                                                                                     id: Name("a"),
-                                                                                    range: 142..143,
+                                                                                    range: 138..139,
                                                                                     node_index: NodeIndex(None),
                                                                                 },
                                                                             ),
@@ -438,11 +438,11 @@ Module(
                                 Expr(
                                     StmtExpr {
                                         node_index: NodeIndex(None),
-                                        range: 147..150,
+                                        range: 143..146,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 147..150,
+                                                range: 143..146,
                                             },
                                         ),
                                     },
