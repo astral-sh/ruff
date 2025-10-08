@@ -80,8 +80,9 @@ x = f"a{2+2:=^{foo(x+y**2):something else}}b"
 x = f"a{2+2:=^{foo(x+y**2):something else}one more}b"
 f'{(abc:=10)}'
 
-f"This is a really long string, but just make sure that you reflow fstrings {
-    2+2:d}"
+f"""This is a really long string, but just make sure that you reflow fstrings {
+    2+2:d
+}"""
 f"This is a really long string, but just make sure that you reflow fstrings correctly {2+2:d}"
 
 f"{2+2=}"
@@ -168,7 +169,7 @@ rf"\{"a"}"
  
  x = """foo {{ {2 + 2}bar
  baz"""
-@@ -28,55 +26,48 @@
+@@ -28,55 +26,50 @@
  
  x = f"""foo {{ {2 + 2}bar {{ baz"""
  
@@ -231,16 +232,16 @@ rf"\{"a"}"
 +x = f"a{2 + 2:=^{foo(x + y**2):something else}one more}b"
 +f"{(abc := 10)}"
  
--f"This is a really long string, but just make sure that you reflow fstrings {
+ f"""This is a really long string, but just make sure that you reflow fstrings {
 -    2+2:d
--}"
++    2 + 2:d
+ }"""
 -f"This is a really long string, but just make sure that you reflow fstrings correctly {2+2:d}"
-+f"This is a really long string, but just make sure that you reflow fstrings {2 + 2:d}"
 +f"This is a really long string, but just make sure that you reflow fstrings correctly {2 + 2:d}"
  
  f"{2+2=}"
  f"{2+2    =    }"
-@@ -88,14 +79,10 @@
+@@ -88,14 +81,10 @@
  %d
  }"""
  
@@ -257,7 +258,7 @@ rf"\{"a"}"
  )
  
  f"`escape` only permitted in {{'html', 'latex', 'latex-math'}}, \
-@@ -105,8 +92,10 @@
+@@ -105,8 +94,10 @@
  rf"\{{\}}"
  
  f"""
@@ -270,7 +271,7 @@ rf"\{"a"}"
  """
  
  value: str = f"""foo
-@@ -124,13 +113,15 @@
+@@ -124,13 +115,15 @@
  
  f'{{\\"kind\\":\\"ConfigMap\\",\\"metadata\\":{{\\"annotations\\":{{}},\\"name\\":\\"cluster-info\\",\\"namespace\\":\\"amazon-cloudwatch\\"}}}}'
  
@@ -364,7 +365,9 @@ x = f"a{2 + 2:=^{foo(x + y**2):something else}}b"
 x = f"a{2 + 2:=^{foo(x + y**2):something else}one more}b"
 f"{(abc := 10)}"
 
-f"This is a really long string, but just make sure that you reflow fstrings {2 + 2:d}"
+f"""This is a really long string, but just make sure that you reflow fstrings {
+    2 + 2:d
+}"""
 f"This is a really long string, but just make sure that you reflow fstrings correctly {2 + 2:d}"
 
 f"{2+2=}"
@@ -503,9 +506,9 @@ x = f"a{2+2:=^{foo(x+y**2):something else}}b"
 x = f"a{2+2:=^{foo(x+y**2):something else}one more}b"
 f"{(abc:=10)}"
 
-f"This is a really long string, but just make sure that you reflow fstrings {
+f"""This is a really long string, but just make sure that you reflow fstrings {
     2+2:d
-}"
+}"""
 f"This is a really long string, but just make sure that you reflow fstrings correctly {2+2:d}"
 
 f"{2+2=}"
