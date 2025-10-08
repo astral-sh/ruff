@@ -10,87 +10,61 @@ The `# ↓ hover:` syntax lets us assert the type at a specific column position.
 indicates the column where we want to check the type.
 
 ```py
-def test_basic_types() -> None:
-    # Test basic literals
+def test_basic_types(parameter: int) -> None:
+    # ↓ hover: int
+    parameter
+
+    #        ↓ hover: Literal[10]
     number = 10
-    #   ↓ hover: Literal[10]
-    number
 
+    #      ↓ hover: Literal["hello"]
     text = "hello"
-    #   ↓ hover: Literal["hello"]
-    text
-
-    # Test variables with type annotations
-    annotated: int = 42
-    #   ↓ hover: int
-    annotated
 ```
 
-## Hover on different expression types
+## Hovering on different expression types
 
 ### Literals
 
 ```py
-# Integer literal (standalone expression statement)
-#        ↓ hover: Literal[42]
-value1 = 42
+#           ↓ hover: Literal[42]
+int_value = 42
 
-# String literal
-#        ↓ hover: Literal["test"]
-value2 = "test"
+#              ↓ hover: Literal["test"]
+string_value = "test"
 
-# Boolean literal
-#        ↓ hover: Literal[True]
-value3 = True
+#            ↓ hover: Literal[True]
+bool_value = True
 ```
 
 ### Names and attributes
 
 ```py
 class MyClass:
-    value: int = 10
+    value: int
 
-def test_attributes() -> None:
-    instance = MyClass()
-
-    # Hover on simple name
-    #   ↓ hover: MyClass
+def test_attributes(instance: MyClass) -> None:
+    # ↓ hover: MyClass
     instance
 
-    # Hover on attribute access
-    #   ↓ hover: int
+    #        ↓ hover: int
     instance.value
 ```
 
 ### Function definitions
 
 ```py
-def get_number() -> int:
-    return 42
+def f(x: int) -> None: ...
 
-# Hover on a function name shows its type
-#          ↓ hover: def get_number() -> int
-result = get_number
+#        ↓ hover: def f(x: int) -> None
+result = f
 ```
 
 ### Binary operations
 
 ```py
-def test_binary_ops() -> None:
-    first = 10
-    second = 20
-
-    # Hover on left operand
-    #   ↓ hover: Literal[10]
-    first + second
-
-    # Hover on right operand
-    #          ↓ hover: Literal[20]
-    first + second
-
-    # Hover on the entire binary expression
-    #   ↓ hover: Literal[30]
-    first + second
+#        ↓ hover: Literal[10]
+#             ↓ hover: Literal[20]
+result = 10 + 20
 ```
 
 ### Comprehensions
@@ -103,43 +77,40 @@ result = [x for x in range(5)]
 
 ## Edge cases
 
-### Hover near start of expression
-
-```py
-# The down arrow must point to a character within the expression
-#        ↓ hover: Literal[1]
-value = 1 + 2
-```
-
-### Hover with unicode characters
-
-```py
-def test_unicode() -> None:
-    # Variable name with unicode
-    café = "coffee"
-    #   ↓ hover: Literal["coffee"]
-    café
-
-    # String literal with unicode
-    #           ↓ hover: Literal["hello 世界"]
-    result = "hello 世界"
-```
-
-## Multiple hovers on the same line
+### Multiple hovers on the same line
 
 We can have multiple hover assertions for different positions on the same line:
 
 ```py
-def multiple_hovers() -> None:
-    # Multiple hovers on literals in one expression
-    #        ↓ hover: Literal[1]
-    #            ↓ hover: Literal[2]
-    #                ↓ hover: Literal[3]
-    total = 1 + 2 + 3
+#       ↓ hover: Literal[1]
+#           ↓ hover: Literal[2]
+#               ↓ hover: Literal[3]
+total = 1 + 2 + 3
 
-    # Multiple hovers in function call arguments
-    #            ↓ hover: Literal[5]
-    #               ↓ hover: Literal[3]
-    result = max(5, 3)
+#            ↓ hover: Literal[5]
+#               ↓ hover: Literal[3]
+result = max(5, 3)
 ```
 
+### Hovering works on every character in expression
+
+```py
+def _(param: bool) -> None:
+    #        ↓ hover: bool
+    #         ↓ hover: bool
+    #          ↓ hover: bool
+    #           ↓ hover: bool
+    #            ↓ hover: bool
+    result = param
+```
+
+### Hovering with unicode characters
+
+```py
+def _(café: str) -> None:
+    #        ↓ hover: str
+    #         ↓ hover: str
+    #          ↓ hover: str
+    #           ↓ hover: str
+    result = café
+```
