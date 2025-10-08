@@ -61,6 +61,35 @@ class DataFrame:
     pass
 ```
 
+## Class from different module with the same qualified name
+
+`package/__init__.py`:
+
+```py
+from .foo import MyClass
+
+def make_MyClass() -> MyClass:
+    return MyClass()
+```
+
+`package/foo.pyi`:
+
+```pyi
+class MyClass: ...
+```
+
+`package/foo.py`:
+
+```py
+class MyClass: ...
+
+def get_MyClass() -> MyClass:
+    from . import make_MyClass
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1`, found `package.foo.MyClass @ src/package/foo.pyi:1`"
+    return make_MyClass()
+```
+
 ## Enum from different modules
 
 ```py
