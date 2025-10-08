@@ -11,15 +11,15 @@ use crate::checkers::ast::Checker;
 /// Checks for usage of `datetime.date.fromtimestamp()`.
 ///
 /// ## Why is this bad?
-/// Python datetime objects can be naive or timezone-aware. While an aware
+/// Python date objects are naive, that is, not timezone-aware. While an aware
 /// object represents a specific moment in time, a naive object does not
 /// contain enough information to unambiguously locate itself relative to other
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.date.fromtimestamp(ts)` returns a naive datetime object.
+/// `datetime.date.fromtimestamp(ts)` returns a naive date object.
 /// Instead, use `datetime.datetime.fromtimestamp(ts, tz=...)` to create a
-/// timezone-aware object.
+/// timezone-aware datetime object.
 ///
 /// ## Example
 /// ```python
