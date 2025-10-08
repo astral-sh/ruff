@@ -53,24 +53,22 @@ Add support for hover assertions in the mdtest framework. These assertions will 
 - [x] Update lib.rs to convert diagnostics to `CheckOutput` before matching
 
 ### 4. Add hover checking logic (lib.rs)
-**Status:** Not started
+**Status:** ✅ Completed
 
-- [ ] After type checking, for each hover assertion:
-  - [ ] Find the target line (first non-assertion line after hover comment)
-  - [ ] Calculate position from down arrow column
-  - [ ] Call `hover(db, file, position)` from ty_ide
-  - [ ] Create a "hover diagnostic" with the result
-  - [ ] Add to diagnostics list for matching
+- [x] Add find_covering_node() to locate AST nodes at positions
+- [x] Add infer_type_at_position() using ty_python_semantic (NOT ty_ide)
+- [x] Add generate_hover_outputs() to scan for hover assertions
+- [x] Calculate position from down arrow column in comment
+- [x] Create CheckOutput::Hover with inferred type
+- [x] Integrate into check flow before match_file()
 
 ### 5. Update matcher (matcher.rs)
-**Status:** In progress
+**Status:** ✅ Completed
 
 - [x] Add placeholder matching logic for `ParsedAssertion::Hover`
-- [ ] Compute column position from comment range when matching
-- [ ] Match against hover diagnostics by:
-  - [ ] Position (must match exactly)
-  - [ ] Type string (must match the assertion body)
-- [ ] Handle `@Todo` metadata stripping (line 201-212)
+- [x] Implement actual hover matching logic
+- [x] Match hover outputs by comparing inferred type with expected type
+- [x] Handle `@Todo` metadata stripping in hover assertions
 
 ### 6. Add tests
 **Status:** Not started
@@ -128,3 +126,11 @@ def foo() -> int: ...
   - Updated entire matcher module to work with `CheckOutput` instead of `Diagnostic`
   - Updated lib.rs to convert diagnostics to `CheckOutput` before matching
   - All changes compile successfully
+- **2025-10-08**: Completed steps 4 & 5 - Implemented hover type inference and matching
+  - Avoided adding ty_ide dependency; used ty_python_semantic directly
+  - Implemented find_covering_node() using AST visitor pattern
+  - Implemented infer_type_at_position() using HasType trait on AST nodes
+  - Implemented generate_hover_outputs() to scan comments and generate hover results
+  - Integrated hover outputs into check flow
+  - Implemented hover matching logic comparing inferred vs expected types
+  - **All core functionality now complete and compiling!**
