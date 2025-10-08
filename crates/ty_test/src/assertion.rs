@@ -377,7 +377,7 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 /// A parsed and validated `# hover:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct HoverAssertion<'a> {
-    /// The zero-based column in the line where the down arrow appears.
+    /// The zero-based character offset (UTF-32) in the line where the down arrow appears.
     /// This indicates the character position in the target line where we should hover.
     pub(crate) column: usize,
 
@@ -397,17 +397,18 @@ impl<'a> HoverAssertion<'a> {
             return Err(HoverAssertionParseError::EmptyType);
         }
 
-        // Find the down arrow position within the comment text
-        let arrow_offset_in_comment = full_comment
-            .find('↓')
+        // Find the down arrow position within the comment text (as character offset)
+        let arrow_char_offset_in_comment = full_comment
+            .chars()
+            .position(|c| c == '↓')
             .ok_or(HoverAssertionParseError::MissingDownArrow)?;
 
         // Calculate the column within the comment's line
         // First, get the line and column of the comment's start
         let comment_line_col = line_index.line_column(comment_range.start(), source);
 
-        // The hover column is the comment's column plus the arrow offset within the comment
-        let column = comment_line_col.column.to_zero_indexed() + arrow_offset_in_comment;
+        // The hover column is the comment's column plus the arrow's character offset within the comment
+        let column = comment_line_col.column.to_zero_indexed() + arrow_char_offset_in_comment;
 
         Ok(Self {
             column,

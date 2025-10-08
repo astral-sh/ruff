@@ -8,6 +8,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::AnyNodeRef;
+use ruff_source_file::{OneIndexed, PositionEncoding, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{HasType, SemanticModel};
 
@@ -106,11 +107,12 @@ pub(crate) fn generate_hover_outputs(
                 continue;
             };
 
-            // Get the start offset of the target line
-            let target_line_start = lines.line_start(target_line, &source);
-
-            // Calculate the hover position: start of target line + column
-            let hover_offset = target_line_start + TextSize::try_from(hover.column).unwrap();
+            // Convert the character column to a byte offset using LineIndex::offset
+            let hover_location = SourceLocation {
+                line: target_line,
+                character_offset: OneIndexed::from_zero_indexed(hover.column),
+            };
+            let hover_offset = lines.offset(hover_location, &source, PositionEncoding::Utf32);
 
             // Get the inferred type at that position
             let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) else {
