@@ -9,7 +9,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{HasType, SemanticModel};
 
@@ -69,56 +68,44 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
 
 /// Generate hover CheckOutputs for all hover assertions in a file.
 ///
-/// This scans the file for hover assertions (comments with `# ↓ hover:`),
-/// computes the hover position from the down arrow location, calls the type
-/// inference, and returns CheckOutput::Hover entries.
-pub(crate) fn generate_hover_outputs(db: &Db, file: File) -> Vec<matcher::CheckOutput> {
+/// Uses the parsed assertions from the assertion module, which correctly handles
+/// multiple stacked assertion comments and determines the target line number.
+pub(crate) fn generate_hover_outputs(
+    db: &Db,
+    file: File,
+    assertions: &crate::assertion::InlineFileAssertions,
+) -> Vec<matcher::CheckOutput> {
     let source = source_text(db, file);
     let lines = line_index(db, file);
-    let parsed = parsed_module(db, file).load(db);
-    let comment_ranges = CommentRanges::from(parsed.tokens());
 
     let mut hover_outputs = Vec::new();
 
-    for comment_range in &comment_ranges {
-        let comment_text = &source[comment_range];
+    // Iterate through all assertion groups, which are already associated with their target line
+    for line_assertions in assertions {
+        let target_line = line_assertions.line_number;
 
-        // Check if this is a hover assertion (contains "# ↓ hover:" or "# hover:")
-        if !comment_text.trim().starts_with('#') {
-            continue;
-        }
+        // Look for hover assertions in this line's assertions
+        for assertion in line_assertions.iter() {
+            if let crate::assertion::UnparsedAssertion::Hover(hover_text) = assertion {
+                // Find the down arrow position in the comment text to determine the column
+                if let Some(arrow_position) = hover_text.find('↓') {
+                    // Get the start offset of the target line
+                    let target_line_start = lines.line_start(target_line, &source);
 
-        let trimmed = comment_text.trim().strip_prefix('#').unwrap().trim();
-        if !trimmed.starts_with("↓ hover:") && !trimmed.starts_with("hover:") {
-            continue;
-        }
+                    // Calculate the hover position: start of target line + arrow column (0-indexed)
+                    let hover_offset =
+                        target_line_start + TextSize::try_from(arrow_position).unwrap();
 
-        // Find the down arrow position in the comment
-        let arrow_offset = comment_text.find('↓');
-        if arrow_offset.is_none() {
-            // No down arrow means we can't determine the column
-            continue;
-        }
-        let arrow_column = arrow_offset.unwrap();
-
-        // Get the line number of the comment
-        let comment_line = lines.line_index(comment_range.start());
-
-        // The hover target is the next non-comment, non-empty line
-        let target_line = comment_line.saturating_add(1);
-
-        // Get the start offset of the target line
-        let target_line_start = lines.line_start(target_line, &source);
-
-        // Calculate the hover position: start of target line + arrow column
-        let hover_offset = target_line_start + TextSize::try_from(arrow_column).unwrap();
-
-        // Get the inferred type at that position
-        if let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) {
-            hover_outputs.push(matcher::CheckOutput::Hover {
-                offset: hover_offset,
-                inferred_type,
-            });
+                    // Get the inferred type at that position
+                    if let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) {
+                        hover_outputs.push(matcher::CheckOutput::Hover {
+                            offset: hover_offset,
+                            inferred_type,
+                        });
+                    }
+                }
+                // If no down arrow, skip this hover assertion (will be caught as error by matcher)
+            }
         }
     }
 
