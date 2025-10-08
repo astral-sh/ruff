@@ -304,7 +304,7 @@ impl<'a> Binding<'a> {
             _ => None,
         }
     }
-    pub fn visibility(&self, source: &str) -> Visibility{
+    pub fn visibility(&self, source: &str) -> Visibility {
         visibility::binding_visibility(self.name(source))
     }
 }
