@@ -67,8 +67,8 @@ impl PythonVersion {
     }
 
     pub const fn latest_ty() -> Self {
-        // Make sure to update the default value for  `EnvironmentOptions::python_version` when bumping this version.
-        Self::PY313
+        // Make sure to update the default value for `EnvironmentOptions::python_version` when bumping this version.
+        Self::PY314
     }
 
     pub const fn as_tuple(self) -> (u8, u8) {

@@ -5510,14 +5510,6 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
-            // Until the latest supported version is bumped to Python 3.14
-            // we need to skip template strings here.
-            // The assertion below should remind the developer to
-            // remove this exception once we _do_ bump `latest_ty`
-            assert_ne!(PythonVersion::latest_ty(), PythonVersion::PY314);
-            if matches!(class, KnownClass::Template) {
-                continue;
-            }
             assert_ne!(
                 class.to_instance(&db),
                 Type::unknown(),
