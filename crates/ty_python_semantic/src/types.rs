@@ -1732,6 +1732,10 @@ impl<'db> Type<'db> {
                 })
                 .and(db, || {
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
+                        let neg_ty = match relation {
+                            TypeRelation::Subtyping | TypeRelation::Redundancy => neg_ty,
+                            TypeRelation::Assignability => neg_ty.bottom_materialization(db),
+                        };
                         self.is_disjoint_from_impl(
                             db,
                             neg_ty,
