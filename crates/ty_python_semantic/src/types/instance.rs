@@ -157,6 +157,10 @@ impl<'db> Type<'db> {
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
             if let Protocol::FromClass(class) = protocol.inner {
+                // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+                // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+                // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+                // `Q`'s members in a Liskov-incompatible way.
                 let type_to_test = if let Type::ProtocolInstance(ProtocolInstanceType {
                     inner: Protocol::FromClass(class),
                     ..
