@@ -74,6 +74,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::GenericContext;
+use crate::types::ide_support::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -82,7 +83,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
     SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, all_members, binding_type, todo_type, walk_signature,
+    UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
