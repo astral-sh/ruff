@@ -12,7 +12,7 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
-use crate::check_output::{CheckOutput, LineCheckOutputs, SortedCheckOutputs};
+use crate::check_output::{CheckOutput, SortedCheckOutputs};
 use crate::hover::HoverOutput;
 use crate::db::Db;
 
@@ -81,7 +81,7 @@ pub(super) fn match_file(
                         // matches and error on any that don't match, then advance both
                         // iterators.
                         matcher
-                            .match_line(outputs, assertions)
+                            .match_line(outputs.outputs, assertions)
                             .unwrap_or_else(|messages| {
                                 failures.push(assertions.line_number, messages);
                             });
@@ -267,14 +267,14 @@ impl Matcher {
     /// assertions.
     fn match_line<'a, 'b>(
         &self,
-        outputs: &LineCheckOutputs<'a>,
+        outputs: &'a [CheckOutput],
         assertions: &'a [UnparsedAssertion<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
-        let mut unmatched: Vec<&CheckOutput> = outputs.outputs.iter().collect();
+        let mut unmatched: Vec<&CheckOutput> = outputs.iter().collect();
         for assertion in assertions {
             match assertion.parse(&self.line_index, &self.source) {
                 Ok(assertion) => {
