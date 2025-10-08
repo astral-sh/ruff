@@ -39,18 +39,21 @@ impl CheckOutput {
 /// [`LineOutputRange`] has one entry for each contiguous slice of the outputs vector
 /// containing outputs which all start on the same line.
 #[derive(Debug)]
-pub(crate) struct SortedCheckOutputs {
-    outputs: Vec<CheckOutput>,
+pub(crate) struct SortedCheckOutputs<'a> {
+    outputs: Vec<&'a CheckOutput>,
     line_ranges: Vec<LineOutputRange>,
 }
 
-impl SortedCheckOutputs {
-    pub(crate) fn new(outputs: &[CheckOutput], line_index: &LineIndex) -> Self {
+impl<'a> SortedCheckOutputs<'a> {
+    pub(crate) fn new(
+        outputs: impl IntoIterator<Item = &'a CheckOutput>,
+        line_index: &LineIndex,
+    ) -> Self {
         let mut outputs: Vec<_> = outputs
-            .iter()
+            .into_iter()
             .map(|output| OutputWithLine {
                 line_number: output.line_number(line_index),
-                output: output.clone(),
+                output,
             })
             .collect();
         outputs.sort_unstable_by_key(|output_with_line| output_with_line.line_number);
@@ -104,9 +107,9 @@ impl SortedCheckOutputs {
 }
 
 #[derive(Debug)]
-struct OutputWithLine {
+struct OutputWithLine<'a> {
     line_number: OneIndexed,
-    output: CheckOutput,
+    output: &'a CheckOutput,
 }
 
 /// Range delineating check outputs in [`SortedCheckOutputs`] that begin on a single line.
@@ -118,7 +121,7 @@ struct LineOutputRange {
 
 /// Iterator to group sorted check outputs by line.
 pub(crate) struct LineCheckOutputsIterator<'a> {
-    outputs: &'a [CheckOutput],
+    outputs: &'a [&'a CheckOutput],
     inner: std::slice::Iter<'a, LineOutputRange>,
 }
 
@@ -146,7 +149,7 @@ pub(crate) struct LineCheckOutputs<'a> {
     pub(crate) line_number: OneIndexed,
 
     /// Check outputs starting on this line.
-    pub(crate) outputs: &'a [CheckOutput],
+    pub(crate) outputs: &'a [&'a CheckOutput],
 }
 
 #[cfg(test)]

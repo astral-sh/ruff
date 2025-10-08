@@ -13,8 +13,8 @@ use ruff_source_file::{LineIndex, OneIndexed};
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::check_output::{CheckOutput, SortedCheckOutputs};
-use crate::hover::HoverOutput;
 use crate::db::Db;
+use crate::hover::HoverOutput;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
@@ -171,7 +171,7 @@ fn maybe_add_undefined_reveal_clarification(
     }
 }
 
-impl Unmatched for CheckOutput {
+impl Unmatched for &CheckOutput {
     fn unmatched(&self) -> String {
         match self {
             CheckOutput::Diagnostic(diag) => diag.unmatched(),
@@ -180,7 +180,7 @@ impl Unmatched for CheckOutput {
     }
 }
 
-impl UnmatchedWithColumn for CheckOutput {
+impl UnmatchedWithColumn for &CheckOutput {
     fn unmatched_with_column(&self, column: OneIndexed) -> String {
         match self {
             CheckOutput::Diagnostic(diag) => diag.unmatched_with_column(column),
@@ -191,7 +191,11 @@ impl UnmatchedWithColumn for CheckOutput {
 
 impl Unmatched for &HoverOutput {
     fn unmatched(&self) -> String {
-        format!("{} hover result: {}", "unexpected:".red(), self.inferred_type)
+        format!(
+            "{} hover result: {}",
+            "unexpected:".red(),
+            self.inferred_type
+        )
     }
 }
 
@@ -267,14 +271,14 @@ impl Matcher {
     /// assertions.
     fn match_line<'a, 'b>(
         &self,
-        outputs: &'a [CheckOutput],
+        outputs: &'a [&'a CheckOutput],
         assertions: &'a [UnparsedAssertion<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
-        let mut unmatched: Vec<&CheckOutput> = outputs.iter().collect();
+        let mut unmatched = outputs.to_vec();
         for assertion in assertions {
             match assertion.parse(&self.line_index, &self.source) {
                 Ok(assertion) => {
@@ -308,10 +312,11 @@ impl Matcher {
                         .column
                 })
                 .unwrap_or(OneIndexed::from_zero_indexed(0)),
-            CheckOutput::Hover(hover) => self
-                .line_index
-                .line_column(hover.offset, &self.source)
-                .column,
+            CheckOutput::Hover(hover) => {
+                self.line_index
+                    .line_column(hover.offset, &self.source)
+                    .column
+            }
         }
     }
 
@@ -335,9 +340,7 @@ impl Matcher {
                     let lint_name_matches = !error.rule.is_some_and(|rule| {
                         !(diagnostic.id().is_lint_named(rule) || diagnostic.id().as_str() == rule)
                     });
-                    let column_matches = error
-                        .column
-                        .is_none_or(|col| col == self.column(output));
+                    let column_matches = error.column.is_none_or(|col| col == self.column(output));
                     let message_matches = error.message_contains.is_none_or(|needle| {
                         diagnostic.concise_message().to_string().contains(needle)
                     });
