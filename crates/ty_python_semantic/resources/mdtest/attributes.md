@@ -820,22 +820,30 @@ reveal_type(C().c)  # revealed: int
 
 ### Inheritance of class/instance attributes
 
-#### Instance variable defined in a base class
-
 ```py
 class Base:
-    declared_in_body: int | None = 1
+    attribute: int | None = 1
 
-    base_class_attribute_1: str | None
-    base_class_attribute_2: str | None
-    base_class_attribute_3: str | None
+    redeclared_with_same_type: str | None
+    redeclared_with_narrower_type: str | None
+    redeclared_with_wider_type: str | None
+
+    overwritten_in_subclass_body: str
+    overwritten_in_subclass_method: str
+
+    undeclared = "base"
 
     def __init__(self) -> None:
-        self.defined_in_init: str | None = "value in base"
+        self.pure_attribute: str | None = "value in base"
+
+        self.pure_overwritten_in_subclass_body: str = "value in base"
+        self.pure_overwritten_in_subclass_method: str = "value in base"
+
+        self.pure_undeclared = "base"
 
 class Intermediate(Base):
     # Redeclaring base class attributes with the *same *type is fine:
-    base_class_attribute_1: str | None = None
+    redeclared_with_same_type: str | None = None
 
     # Redeclaring them with a *narrower type* is unsound, because modifications
     # through a `Base` reference could violate that constraint.
@@ -847,22 +855,70 @@ class Intermediate(Base):
     # enabled by default can still be discussed.
     #
     # TODO: This should be an error
-    base_class_attribute_2: str
+    redeclared_with_narrower_type: str
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
     # TODO: This should be an error
-    base_class_attribute_3: str | int | None
+    redeclared_with_wider_type: str | int | None
+
+    # TODO: This should be an `invalid-assignment` error
+    overwritten_in_subclass_body = None
+
+    # TODO: This should be an `invalid-assignment` error
+    pure_overwritten_in_subclass_body = None
+
+    undeclared = "intermediate"
+
+    def set_attributes(self) -> None:
+        # TODO: This should be an `invalid-assignment` error
+        self.overwritten_in_subclass_method = None
+
+        # TODO: This should be an `invalid-assignment` error
+        self.pure_overwritten_in_subclass_method = None
+
+        self.pure_undeclared = "intermediate"
 
 class Derived(Intermediate): ...
 
-reveal_type(Derived.declared_in_body)  # revealed: int | None
+reveal_type(Derived.attribute)  # revealed: int | None
+reveal_type(Derived().attribute)  # revealed: int | None
 
-reveal_type(Derived().declared_in_body)  # revealed: int | None
+reveal_type(Derived.redeclared_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_with_same_type)  # revealed: str | None
 
-reveal_type(Derived().defined_in_init)  # revealed: str | None
+# TODO: It would probably be more consistent if these were `str | None`
+reveal_type(Derived.redeclared_with_narrower_type)  # revealed: str
+reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
+
+# TODO: It would probably be more consistent if these were `str | None`
+reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
+reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
+
+# TODO: Both of these should be `str`
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+# TODO: Both of these should be `str`
+reveal_type(Derived.overwritten_in_subclass_method)  # revealed: str
+reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str | Unknown | None
+
+reveal_type(Derived().pure_attribute)  # revealed: str | None
+
+# TODO: This should be `str`
+reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+# TODO: This should be `str`
+reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: Unknown | None
+
+# TODO: Both of these should be `Unknown | Literal["intermediate", "base"]`
+reveal_type(Derived.undeclared)  # revealed: Unknown | Literal["intermediate"]
+reveal_type(Derived().undeclared)  # revealed: Unknown | Literal["intermediate"]
+
+# TODO: This should be `Unknown | Literal["intermediate", "base"]`
+reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate"]
 ```
 
 ## Accessing attributes on class objects
