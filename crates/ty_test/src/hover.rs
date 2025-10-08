@@ -26,7 +26,7 @@ pub(crate) struct HoverOutput {
 }
 
 /// Find the AST node with minimal range that fully contains the given offset.
-fn find_covering_node<'a>(root: AnyNodeRef<'a>, offset: TextSize) -> Option<AnyNodeRef<'a>> {
+fn find_covering_node(root: AnyNodeRef<'_>, offset: TextSize) -> Option<AnyNodeRef<'_>> {
     struct Visitor<'a> {
         offset: TextSize,
         minimal_node: Option<AnyNodeRef<'a>>,
@@ -77,7 +77,7 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
     Some(ty.display(db).to_string())
 }
 
-/// Generate hover CheckOutputs for all hover assertions in a file.
+/// Generate hover `CheckOutputs` for all hover assertions in a file.
 ///
 /// Uses the parsed assertions from the assertion module, which correctly handles
 /// multiple stacked assertion comments and determines the target line number.
