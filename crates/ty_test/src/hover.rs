@@ -110,9 +110,7 @@ pub(crate) fn generate_hover_outputs(
             let target_line_start = lines.line_start(target_line, &source);
 
             // Calculate the hover position from the column in the parsed assertion
-            // Column is 1-indexed, so convert to 0-indexed for TextSize
-            let hover_offset =
-                target_line_start + TextSize::try_from(hover.column.get() - 1).unwrap();
+            let hover_offset = target_line_start + TextSize::try_from(hover.column).unwrap();
 
             // Get the inferred type at that position
             let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) else {

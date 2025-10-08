@@ -363,9 +363,9 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 /// A parsed and validated `# hover:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct HoverAssertion<'a> {
-    /// The column where the down arrow appears in the assertion comment.
+    /// The zero-based column where the down arrow appears in the assertion comment.
     /// This indicates the position in the next line where we should hover.
-    pub(crate) column: OneIndexed,
+    pub(crate) column: usize,
 
     /// The expected type at the hover position.
     pub(crate) expected_type: &'a str,
@@ -381,12 +381,9 @@ impl<'a> HoverAssertion<'a> {
         }
 
         // Find the down arrow position in the full comment to determine the column
-        let arrow_position = full_comment
+        let column = full_comment
             .find('↓')
             .ok_or(HoverAssertionParseError::MissingDownArrow)?;
-
-        // Column is 1-indexed, and the arrow position is 0-indexed
-        let column = OneIndexed::from_zero_indexed(arrow_position);
 
         Ok(Self {
             column,
