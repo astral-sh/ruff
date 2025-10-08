@@ -560,9 +560,6 @@ impl Violation for UndocumentedPublicInit {
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
-/// - [PEP 224 – Attribute Docstrings](https://peps.python.org/pep-0224/)
-/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
 pub(crate) struct UndocumentedPublicClassAttribute;
 
@@ -603,9 +600,6 @@ impl Violation for UndocumentedPublicClassAttribute {
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
-/// - [PEP 224 – Attribute Docstrings](https://peps.python.org/pep-0224/)
-/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
 pub(crate) struct UndocumentedPublicModuleVariable;
 
