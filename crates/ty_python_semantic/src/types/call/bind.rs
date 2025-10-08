@@ -962,43 +962,46 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Field) => {
-                            // TODO this will break on Python 3.14 -- we should match by parameter name instead
-                            if let [default, default_factory, init, .., kw_only] =
-                                overload.parameter_types()
-                            {
-                                let default_ty = match (default, default_factory) {
-                                    (Some(default_ty), _) => *default_ty,
-                                    (_, Some(default_factory_ty)) => default_factory_ty
-                                        .try_call(db, &CallArguments::none())
-                                        .map_or(Type::unknown(), |binding| binding.return_type(db)),
-                                    _ => Type::unknown(),
-                                };
+                            let default =
+                                overload.parameter_type_by_name("default").unwrap_or(None);
+                            let default_factory = overload
+                                .parameter_type_by_name("default_factory")
+                                .unwrap_or(None);
+                            let init = overload.parameter_type_by_name("init").unwrap_or(None);
+                            let kw_only =
+                                overload.parameter_type_by_name("kw_only").unwrap_or(None);
 
-                                let init = init
-                                    .map(|init| !init.bool(db).is_always_false())
-                                    .unwrap_or(true);
+                            let default_ty = match (default, default_factory) {
+                                (Some(default_ty), _) => default_ty,
+                                (_, Some(default_factory_ty)) => default_factory_ty
+                                    .try_call(db, &CallArguments::none())
+                                    .map_or(Type::unknown(), |binding| binding.return_type(db)),
+                                _ => Type::unknown(),
+                            };
 
-                                let kw_only = if Program::get(db).python_version(db)
-                                    >= PythonVersion::PY310
-                                {
+                            let init = init
+                                .map(|init| !init.bool(db).is_always_false())
+                                .unwrap_or(true);
+
+                            let kw_only =
+                                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
                                     kw_only.map(|kw_only| !kw_only.bool(db).is_always_false())
                                 } else {
                                     None
                                 };
 
-                                // `typeshed` pretends that `dataclasses.field()` returns the type of the
-                                // default value directly. At runtime, however, this function returns an
-                                // instance of `dataclasses.Field`. We also model it this way and return
-                                // a known-instance type with information about the field. The drawback
-                                // of this approach is that we need to pretend that instances of `Field`
-                                // are assignable to `T` if the default type of the field is assignable
-                                // to `T`. Otherwise, we would error on `name: str = field(default="")`.
-                                overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::Field(FieldInstance::new(
-                                        db, default_ty, init, kw_only,
-                                    )),
-                                ));
-                            }
+                            // `typeshed` pretends that `dataclasses.field()` returns the type of the
+                            // default value directly. At runtime, however, this function returns an
+                            // instance of `dataclasses.Field`. We also model it this way and return
+                            // a known-instance type with information about the field. The drawback
+                            // of this approach is that we need to pretend that instances of `Field`
+                            // are assignable to `T` if the default type of the field is assignable
+                            // to `T`. Otherwise, we would error on `name: str = field(default="")`.
+                            overload.set_return_type(Type::KnownInstance(
+                                KnownInstanceType::Field(FieldInstance::new(
+                                    db, default_ty, init, kw_only,
+                                )),
+                            ));
                         }
 
                         _ => {
@@ -2782,6 +2785,9 @@ impl<'db> MatchedArgument<'db> {
     }
 }
 
+/// Indicates that a parameter of the given name was not found.
+pub(crate) struct UnknownParameterNameError;
+
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug)]
 pub(crate) struct Binding<'db> {
@@ -2917,6 +2923,25 @@ impl<'db> Binding<'db> {
     /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    /// Returns the bound type for the specified parameter, or `None` if no argument was matched to
+    /// that parameter.
+    ///
+    /// Returns an error if the parameter name is not found.
+    pub(crate) fn parameter_type_by_name(
+        &self,
+        parameter_name: &str,
+    ) -> Result<Option<Type<'db>>, UnknownParameterNameError> {
+        let (index, _) = self
+            .signature
+            .parameters()
+            .iter()
+            .enumerate()
+            .find(|(_, param)| param.name().is_some_and(|name| name == parameter_name))
+            .ok_or(UnknownParameterNameError)?;
+
+        Ok(self.parameter_tys[index])
     }
 
     pub(crate) fn arguments_for_parameter<'a>(
