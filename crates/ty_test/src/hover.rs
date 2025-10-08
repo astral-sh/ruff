@@ -16,38 +16,32 @@ use ty_python_semantic::{HasType, SemanticModel};
 use crate::db::Db;
 
 /// Find the AST node with minimal range that fully contains the given offset.
-/// This is a simplified version of ty_ide's covering_node logic.
 fn find_covering_node<'a>(root: AnyNodeRef<'a>, offset: TextSize) -> Option<AnyNodeRef<'a>> {
     struct Visitor<'a> {
         offset: TextSize,
-        found: bool,
         minimal_node: Option<AnyNodeRef<'a>>,
     }
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
         fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-            if !self.found && node.range().contains(self.offset) {
-                // This node contains the offset. Save it and traverse into children
-                // to find a more specific node.
-                self.minimal_node = Some(node);
+            if node.range().contains(self.offset) {
+                // Update minimal_node if this node's range is smaller than the current one
+                if let Some(current) = self.minimal_node {
+                    if node.range().len() < current.range().len() {
+                        self.minimal_node = Some(node);
+                    }
+                } else {
+                    self.minimal_node = Some(node);
+                }
                 TraversalSignal::Traverse
             } else {
                 TraversalSignal::Skip
-            }
-        }
-
-        fn leave_node(&mut self, node: AnyNodeRef<'a>) {
-            // If we're leaving a node that we saved, and we haven't found a more
-            // specific child, then this is the minimal covering node.
-            if !self.found && self.minimal_node == Some(node) {
-                self.found = true;
             }
         }
     }
 
     let mut visitor = Visitor {
         offset,
-        found: false,
         minimal_node: None,
     };
 
