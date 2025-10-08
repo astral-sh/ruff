@@ -180,6 +180,15 @@ impl Unmatched for CheckOutput {
     }
 }
 
+impl UnmatchedWithColumn for CheckOutput {
+    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+        match self {
+            CheckOutput::Diagnostic(diag) => diag.unmatched_with_column(column),
+            CheckOutput::Hover(hover) => hover.unmatched_with_column(column),
+        }
+    }
+}
+
 impl Unmatched for &HoverOutput {
     fn unmatched(&self) -> String {
         format!("{} hover result: {}", "unexpected:".red(), self.inferred_type)
@@ -279,14 +288,7 @@ impl Matcher {
             }
         }
         for output in unmatched {
-            match output {
-                CheckOutput::Diagnostic(diag) => {
-                    failures.push(diag.unmatched_with_column(self.column(diag)));
-                }
-                CheckOutput::Hover(hover) => {
-                    failures.push(hover.unmatched());
-                }
-            }
+            failures.push(output.unmatched_with_column(self.column(output)));
         }
         if failures.is_empty() {
             Ok(())
@@ -295,16 +297,22 @@ impl Matcher {
         }
     }
 
-    fn column(&self, diagnostic: &Diagnostic) -> OneIndexed {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .map(|range| {
-                self.line_index
-                    .line_column(range.start(), &self.source)
-                    .column
-            })
-            .unwrap_or(OneIndexed::from_zero_indexed(0))
+    fn column(&self, output: &CheckOutput) -> OneIndexed {
+        match output {
+            CheckOutput::Diagnostic(diag) => diag
+                .primary_span()
+                .and_then(|span| span.range())
+                .map(|range| {
+                    self.line_index
+                        .line_column(range.start(), &self.source)
+                        .column
+                })
+                .unwrap_or(OneIndexed::from_zero_indexed(0)),
+            CheckOutput::Hover(hover) => self
+                .line_index
+                .line_column(hover.offset, &self.source)
+                .column,
+        }
     }
 
     /// Check if `assertion` matches any [`CheckOutput`]s in `unmatched`.
@@ -329,7 +337,7 @@ impl Matcher {
                     });
                     let column_matches = error
                         .column
-                        .is_none_or(|col| col == self.column(diagnostic));
+                        .is_none_or(|col| col == self.column(output));
                     let message_matches = error.message_contains.is_none_or(|needle| {
                         diagnostic.concise_message().to_string().contains(needle)
                     });
