@@ -11,6 +11,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{HasType, SemanticModel};
 
+use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::check_output::CheckOutput;
 use crate::db::Db;
 
@@ -82,7 +83,7 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
 pub(crate) fn generate_hover_outputs(
     db: &Db,
     file: File,
-    assertions: &crate::assertion::InlineFileAssertions,
+    assertions: &InlineFileAssertions,
 ) -> Vec<CheckOutput> {
     let source = source_text(db, file);
     let lines = line_index(db, file);
@@ -95,12 +96,12 @@ pub(crate) fn generate_hover_outputs(
 
         // Look for hover assertions in this line's assertions
         for assertion in line_assertions.iter() {
-            let crate::assertion::UnparsedAssertion::Hover(_, _) = assertion else {
+            let UnparsedAssertion::Hover(_, _) = assertion else {
                 continue;
             };
 
             // Parse the assertion to get the column
-            let Ok(crate::assertion::ParsedAssertion::Hover(hover)) = assertion.parse() else {
+            let Ok(ParsedAssertion::Hover(hover)) = assertion.parse() else {
                 // Invalid hover assertion - will be caught as error by matcher
                 continue;
             };
