@@ -71,11 +71,11 @@ Add support for hover assertions in the mdtest framework. These assertions will 
 - [x] Handle `@Todo` metadata stripping in hover assertions
 
 ### 6. Add tests
-**Status:** Not started
+**Status:** In progress
 
-- [ ] Add unit tests for hover assertion parsing
-- [ ] Create mdtest file with hover assertion examples
-- [ ] Test edge cases (no hover content, wrong position, etc.)
+- [x] Create simple mdtest file with working hover assertion examples (hover_simple.md)
+- [ ] Create comprehensive mdtest file with edge cases (hover.md - partially complete)
+- [ ] Add unit tests for hover assertion parsing in ty_test
 
 ## Key Design Decisions
 
@@ -134,3 +134,8 @@ def foo() -> int: ...
   - Integrated hover outputs into check flow
   - Implemented hover matching logic comparing inferred vs expected types
   - **All core functionality now complete and compiling!**
+- **2025-10-08**: Step 6 in progress - Added test files and refined implementation
+  - Created hover_simple.md mdtest with working examples
+  - Fixed infer_type_at_position to handle expression statements (StmtExpr nodes)
+  - Learned that arrow positioning must align exactly with target expression characters
+  - hover.md created but needs arrow alignment fixes (arrows must point to exact character positions)
