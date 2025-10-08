@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/try.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -173,9 +172,61 @@ else:
 
 finally:
     pass
+
+
+try:
+    pass
+# These parens can be removed on 3.14+ but not earlier
+except (BaseException, Exception, ValueError):
+    pass
+# But black won't remove these parentheses
+except (ZeroDivisionError,):
+    pass
+except (  # We wrap these and preserve the parens
+        BaseException, Exception, ValueError):
+    pass
+except (
+        BaseException,
+        # Same with this comment
+        Exception,
+        ValueError
+):
+    pass
+
+try:
+    pass
+# They can also be omitted for `except*`
+except* (BaseException, Exception, ValueError):
+    pass
+
+# But parentheses are still required in the presence of an `as` binding
+try:
+    pass
+except (BaseException, Exception, ValueError) as e:
+    pass
+
+try:
+    pass
+except* (BaseException, Exception, ValueError) as e:
+    pass
 ```
 
-## Output
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.13
+source_type                = Python
+```
+
 ```python
 try:
     pass
@@ -364,10 +415,50 @@ else:
 
 finally:
     pass
+
+
+try:
+    pass
+# These parens can be removed on 3.14+ but not earlier
+except (BaseException, Exception, ValueError):
+    pass
+# But black won't remove these parentheses
+except (ZeroDivisionError,):
+    pass
+except (  # We wrap these and preserve the parens
+    BaseException,
+    Exception,
+    ValueError,
+):
+    pass
+except (
+    BaseException,
+    # Same with this comment
+    Exception,
+    ValueError,
+):
+    pass
+
+try:
+    pass
+# They can also be omitted for `except*`
+except* (BaseException, Exception, ValueError):
+    pass
+
+# But parentheses are still required in the presence of an `as` binding
+try:
+    pass
+except (BaseException, Exception, ValueError) as e:
+    pass
+
+try:
+    pass
+except* (BaseException, Exception, ValueError) as e:
+    pass
 ```
 
 
-## Preview changes
+#### Preview changes
 ```diff
 --- Stable
 +++ Preview
@@ -391,4 +482,295 @@ finally:
  finally:
  
      def f():
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.14
+source_type                = Python
+```
+
+```python
+try:
+    pass
+except:
+    pass
+
+try:
+    pass
+except KeyError:  # should remove brackets and be a single line
+    pass
+
+
+try:  # try
+    pass
+    # end of body
+# before except
+except (Exception, ValueError) as exc:  # except line
+    pass
+# before except 2
+except KeyError as key:  # except line 2
+    pass
+    # in body 2
+# before else
+else:
+    pass
+# before finally
+finally:
+    pass
+
+
+# with line breaks
+try:  # try
+    pass
+    # end of body
+
+# before except
+except (Exception, ValueError) as exc:  # except line
+    pass
+
+# before except 2
+except KeyError as key:  # except line 2
+    pass
+    # in body 2
+
+# before else
+else:
+    pass
+
+# before finally
+finally:
+    pass
+
+
+# with line breaks
+try:
+    pass
+
+except:
+    pass
+
+
+try:
+    pass
+except (
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+) as exc:  # splits exception over multiple lines
+    pass
+
+
+try:
+    pass
+except:
+    a = 10  # trailing comment1
+    b = 11  # trailing comment2
+
+
+# try/except*, mostly the same as try
+try:  # try
+    pass
+    # end of body
+# before except
+except* (Exception, ValueError) as exc:  # except line
+    pass
+# before except 2
+except* KeyError as key:  # except line 2
+    pass
+    # in body 2
+# before else
+else:
+    pass
+# before finally
+finally:
+    pass
+
+# try and try star are statements with body
+# Minimized from https://github.com/python/cpython/blob/99b00efd5edfd5b26bf9e2a35cbfc96277fdcbb1/Lib/getpass.py#L68-L91
+try:
+    try:
+        pass
+    finally:
+        print(1)  # issue7208
+except A:
+    pass
+
+try:
+    f()  # end-of-line last comment
+except RuntimeError:
+    raise
+
+try:
+
+    def f():
+        pass
+        # a
+except:
+
+    def f():
+        pass
+        # b
+else:
+
+    def f():
+        pass
+        # c
+finally:
+
+    def f():
+        pass
+        # d
+
+
+try:
+    pass  # a
+except ZeroDivisionError:
+    pass  # b
+except:
+    pass  # c
+else:
+    pass  # d
+finally:
+    pass  # e
+
+try:  # 1 preceding: any, following: first in body, enclosing: try
+    print(1)  # 2 preceding: last in body, following: fist in alt body, enclosing: try
+except (
+    ZeroDivisionError
+):  # 3 preceding: test, following: fist in alt body, enclosing: try
+    print(2)  # 4 preceding: last in body, following: fist in alt body, enclosing: exc
+except:  # 5 preceding: last in body, following: fist in alt body, enclosing: try
+    print(2)  # 6 preceding: last in body, following: fist in alt body, enclosing: exc
+else:  # 7 preceding: last in body, following: fist in alt body, enclosing: exc
+    print(3)  # 8 preceding: last in body, following: fist in alt body, enclosing: try
+finally:  # 9 preceding: last in body, following: fist in alt body, enclosing: try
+    print(3)  # 10 preceding: last in body, following: any, enclosing: try
+
+try:
+    pass
+except (
+    ZeroDivisionError
+    # comment
+):
+    pass
+
+
+try:
+    pass
+
+finally:
+    pass
+
+
+try:
+    pass
+
+except ZeroDivisonError:
+    pass
+
+else:
+    pass
+
+finally:
+    pass
+
+
+try:
+    pass
+# These parens can be removed on 3.14+ but not earlier
+except (BaseException, Exception, ValueError):
+    pass
+# But black won't remove these parentheses
+except (ZeroDivisionError,):
+    pass
+except (  # We wrap these and preserve the parens
+    BaseException,
+    Exception,
+    ValueError,
+):
+    pass
+except (
+    BaseException,
+    # Same with this comment
+    Exception,
+    ValueError,
+):
+    pass
+
+try:
+    pass
+# They can also be omitted for `except*`
+except* (BaseException, Exception, ValueError):
+    pass
+
+# But parentheses are still required in the presence of an `as` binding
+try:
+    pass
+except (BaseException, Exception, ValueError) as e:
+    pass
+
+try:
+    pass
+except* (BaseException, Exception, ValueError) as e:
+    pass
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -117,16 +117,19 @@
+     def f():
+         pass
+         # a
++
+ except:
+ 
+     def f():
+         pass
+         # b
++
+ else:
+ 
+     def f():
+         pass
+         # c
++
+ finally:
+ 
+     def f():
+@@ -190,7 +193,7 @@
+ try:
+     pass
+ # These parens can be removed on 3.14+ but not earlier
+-except (BaseException, Exception, ValueError):
++except BaseException, Exception, ValueError:
+     pass
+ # But black won't remove these parentheses
+ except (ZeroDivisionError,):
+@@ -212,7 +215,7 @@
+ try:
+     pass
+ # They can also be omitted for `except*`
+-except* (BaseException, Exception, ValueError):
++except* BaseException, Exception, ValueError:
+     pass
+ 
+ # But parentheses are still required in the presence of an `as` binding
 ```
