@@ -1,10 +1,13 @@
 use crate::normalizer::Normalizer;
 use itertools::Itertools;
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, DummyFileResolver,
+};
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
 use ruff_python_parser::{ParseOptions, UnsupportedSyntaxError, parse};
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
@@ -193,7 +196,8 @@ fn format() {
             writeln!(snapshot, "## Outputs").unwrap();
 
             for (i, options) in options.into_iter().enumerate() {
-                let formatted_code = format_file(&content, &options, input_path);
+                let (formatted_code, unsupported_syntax_errors) =
+                    format_file(&content, &options, input_path);
 
                 writeln!(
                     snapshot,
@@ -210,7 +214,7 @@ fn format() {
 
                 // We want to capture the differences in the preview style in our fixtures
                 let options_preview = options.with_preview(PreviewMode::Enabled);
-                let formatted_preview = format_file(&content, &options_preview, input_path);
+                let (formatted_preview, _) = format_file(&content, &options_preview, input_path);
 
                 if formatted_code != formatted_preview {
                     // Having both snapshots makes it hard to see the difference, so we're keeping only
@@ -227,14 +231,28 @@ fn format() {
                     )
                     .unwrap();
                 }
+
+                if !unsupported_syntax_errors.is_empty() {
+                    writeln!(
+                        snapshot,
+                        "### Unsupported Syntax Errors\n{}",
+                        DisplayDiagnostics::new(
+                            &DummyFileResolver,
+                            &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                            &unsupported_syntax_errors
+                        )
+                    )
+                    .unwrap();
+                }
             }
         } else {
             // We want to capture the differences in the preview style in our fixtures
             let options = PyFormatOptions::from_extension(input_path);
-            let formatted_code = format_file(&content, &options, input_path);
+            let (formatted_code, unsupported_syntax_errors) =
+                format_file(&content, &options, input_path);
 
             let options_preview = options.with_preview(PreviewMode::Enabled);
-            let formatted_preview = format_file(&content, &options_preview, input_path);
+            let (formatted_preview, _) = format_file(&content, &options_preview, input_path);
 
             if formatted_code == formatted_preview {
                 writeln!(
@@ -259,6 +277,19 @@ fn format() {
                 )
                 .unwrap();
             }
+
+            if !unsupported_syntax_errors.is_empty() {
+                writeln!(
+                    snapshot,
+                    "## Unsupported Syntax Errors\n{}",
+                    DisplayDiagnostics::new(
+                        &DummyFileResolver,
+                        &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                        &unsupported_syntax_errors
+                    )
+                )
+                .unwrap();
+            }
         }
 
         insta::with_settings!({
@@ -277,7 +308,11 @@ fn format() {
     );
 }
 
-fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> String {
+fn format_file(
+    source: &str,
+    options: &PyFormatOptions,
+    input_path: &Path,
+) -> (String, Vec<Diagnostic>) {
     let (unformatted, formatted_code) = if source.contains("<RANGE_START>") {
         let mut content = source.to_string();
         let without_markers = content
@@ -337,9 +372,10 @@ fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> St
         (Cow::Borrowed(source), formatted_code)
     };
 
-    ensure_unchanged_ast(&unformatted, &formatted_code, options, input_path);
+    let unsupported_syntax_errors =
+        ensure_unchanged_ast(&unformatted, &formatted_code, options, input_path);
 
-    formatted_code
+    (formatted_code, unsupported_syntax_errors)
 }
 
 /// Format another time and make sure that there are no changes anymore
@@ -391,12 +427,15 @@ Formatted twice:
 /// Like Black, there are a few exceptions to this "invariant" which are encoded in
 /// [`NormalizedMod`] and related structs. Namely, formatting can change indentation within strings,
 /// and can also flatten tuples within `del` statements.
+///
+/// Returns any [`UnsupportedSyntaxError`]s in the formatted code as [`Diagnostic`]s for
+/// snapshotting.
 fn ensure_unchanged_ast(
     unformatted_code: &str,
     formatted_code: &str,
     options: &PyFormatOptions,
     input_path: &Path,
-) {
+) -> Vec<Diagnostic> {
     let source_type = options.source_type();
 
     // Parse the unformatted code.
@@ -446,6 +485,17 @@ fn ensure_unchanged_ast(
         );
     }
 
+    let file = SourceFileBuilder::new(
+        input_path.file_name().unwrap().to_string_lossy(),
+        formatted_code,
+    )
+    .finish();
+    let diagnostics = formatted_parsed
+        .unsupported_syntax_errors()
+        .iter()
+        .map(|error| Diagnostic::invalid_syntax(file.clone(), error, error))
+        .collect::<Vec<_>>();
+
     let mut formatted_ast = formatted_parsed.into_syntax();
     Normalizer.visit_module(&mut formatted_ast);
     let formatted_ast = ComparableMod::from(&formatted_ast);
@@ -466,6 +516,8 @@ fn ensure_unchanged_ast(
             input_path.display(),
         );
     }
+
+    diagnostics
 }
 
 struct Header<'a> {
