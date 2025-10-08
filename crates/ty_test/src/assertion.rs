@@ -246,23 +246,26 @@ pub(crate) enum UnparsedAssertion<'a> {
     /// An `# error:` assertion.
     Error(&'a str),
 
-    /// A `# hover:` assertion, with the full comment text including the down arrow.
-    Hover(&'a str),
+    /// A `# hover:` assertion.
+    ///
+    /// The first string is the expected type (body after `hover:`).
+    /// The second string is the full comment text (including the down arrow).
+    Hover(&'a str, &'a str),
 }
 
 impl<'a> UnparsedAssertion<'a> {
     /// Returns `Some(_)` if the comment starts with `# error:`, `# revealed:`, or `# hover:`,
     /// indicating that it is an assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
-        let comment = comment.trim().strip_prefix('#')?.trim();
-        let (keyword, body) = comment.split_once(':')?;
+        let trimmed = comment.trim().strip_prefix('#')?.trim();
+        let (keyword, body) = trimmed.split_once(':')?;
         let keyword = keyword.trim();
         let body = body.trim();
 
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
-            "hover" | "↓ hover" => Some(Self::Hover(body)),
+            "hover" | "↓ hover" => Some(Self::Hover(body, comment)),
             _ => None,
         }
     }
@@ -280,9 +283,11 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
-            Self::Hover(hover) => HoverAssertion::from_str(hover)
-                .map(ParsedAssertion::Hover)
-                .map_err(PragmaParseError::HoverAssertionParseError),
+            Self::Hover(expected_type, full_comment) => {
+                HoverAssertion::from_str(expected_type, full_comment)
+                    .map(ParsedAssertion::Hover)
+                    .map_err(PragmaParseError::HoverAssertionParseError)
+            }
         }
     }
 }
@@ -292,7 +297,7 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => write!(f, "error: {assertion}"),
-            Self::Hover(expected_type) => write!(f, "hover: {expected_type}"),
+            Self::Hover(expected_type, _) => write!(f, "hover: {expected_type}"),
         }
     }
 }
@@ -367,16 +372,25 @@ pub(crate) struct HoverAssertion<'a> {
 }
 
 impl<'a> HoverAssertion<'a> {
-    fn from_str(source: &'a str) -> Result<Self, HoverAssertionParseError> {
-        if source.is_empty() {
+    fn from_str(
+        expected_type: &'a str,
+        full_comment: &'a str,
+    ) -> Result<Self, HoverAssertionParseError> {
+        if expected_type.is_empty() {
             return Err(HoverAssertionParseError::EmptyType);
         }
 
-        // Column will be computed from the comment position in the matcher
-        // For now, we just validate and store the expected type
+        // Find the down arrow position in the full comment to determine the column
+        let arrow_position = full_comment
+            .find('↓')
+            .ok_or(HoverAssertionParseError::MissingDownArrow)?;
+
+        // Column is 1-indexed, and the arrow position is 0-indexed
+        let column = OneIndexed::from_zero_indexed(arrow_position);
+
         Ok(Self {
-            column: OneIndexed::from_zero_indexed(0), // Placeholder, will be set by matcher
-            expected_type: source,
+            column,
+            expected_type,
         })
     }
 }

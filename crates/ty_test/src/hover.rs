@@ -95,21 +95,23 @@ pub(crate) fn generate_hover_outputs(
 
         // Look for hover assertions in this line's assertions
         for assertion in line_assertions.iter() {
-            let crate::assertion::UnparsedAssertion::Hover(hover_text) = assertion else {
+            let crate::assertion::UnparsedAssertion::Hover(_, _) = assertion else {
                 continue;
             };
 
-            // Find the down arrow position in the comment text to determine the column
-            let Some(arrow_position) = hover_text.find('↓') else {
-                // No down arrow - skip this hover assertion (will be caught as error by matcher)
+            // Parse the assertion to get the column
+            let Ok(crate::assertion::ParsedAssertion::Hover(hover)) = assertion.parse() else {
+                // Invalid hover assertion - will be caught as error by matcher
                 continue;
             };
 
             // Get the start offset of the target line
             let target_line_start = lines.line_start(target_line, &source);
 
-            // Calculate the hover position: start of target line + arrow column (0-indexed)
-            let hover_offset = target_line_start + TextSize::try_from(arrow_position).unwrap();
+            // Calculate the hover position from the column in the parsed assertion
+            // Column is 1-indexed, so convert to 0-indexed for TextSize
+            let hover_offset =
+                target_line_start + TextSize::try_from(hover.column.get() - 1).unwrap();
 
             // Get the inferred type at that position
             let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) else {
