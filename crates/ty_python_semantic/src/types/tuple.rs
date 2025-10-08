@@ -22,7 +22,6 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
-use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::{
@@ -30,6 +29,7 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
     UnionBuilder, UnionType,
 };
+use crate::types::{Truthiness, TypeContext};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
 
@@ -232,13 +232,14 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
         TupleType::new(
             db,
             &self
                 .tuple(db)
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
 
@@ -396,12 +397,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
@@ -736,17 +738,18 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
         Self::mixed(
             self.prefix
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             self.variable
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.suffix
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
@@ -1116,13 +1119,14 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => {
-                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
+                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, visitor),
+            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         }
     }
 

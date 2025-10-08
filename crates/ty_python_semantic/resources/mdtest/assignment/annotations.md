@@ -130,13 +130,9 @@ type IntList = list[int]
 m: IntList = [1, 2, 3]
 reveal_type(m)  # revealed: list[int]
 
-# TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[Literal[1, 2, 3]]`"
 n: list[typing.Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
 
-# TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[Unknown | str]` is not assignable to `list[LiteralString]`"
 o: list[typing.LiteralString] = ["a", "b", "c"]
 reveal_type(o)  # revealed: list[LiteralString]
 
@@ -158,6 +154,65 @@ a: list[str] = [1, 2, 3]
 
 # error: [invalid-assignment] "Object of type `set[Unknown | int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
+```
+
+## Literal annnotations are respected
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing_extensions import Literal, LiteralString
+
+a: list[Literal[1]] = [1]
+reveal_type(a)  # revealed: list[Literal[1]]
+
+b: list[Literal[True]] = [True]
+reveal_type(b)  # revealed: list[Literal[True]]
+
+c: list[Literal["a"]] = ["a"]
+reveal_type(c)  # revealed: list[Literal["a"]]
+
+d: list[LiteralString] = ["a", "b", "c"]
+reveal_type(d)  # revealed: list[LiteralString]
+
+e: list[list[Literal[1]]] = [[1]]
+reveal_type(e)  # revealed: list[list[Literal[1]]]
+
+class Color(Enum):
+    RED = "red"
+
+f: dict[list[Literal[1]], list[Literal[Color.RED]]] = {[1]: [Color.RED, Color.RED]}
+reveal_type(f)  # revealed: dict[list[Literal[1]], list[Literal[Color.RED]]]
+
+class X[T]:
+    def __init__(self, value: T): ...
+
+g: X[Literal[1]] = X(1)
+reveal_type(g)  # revealed: X[Literal[1]]
+
+h: dict[list[X[Literal[1]]], set[Literal[b"a"]]] = {[X(1)]: {b"a"}}
+reveal_type(h)  # revealed: dict[list[X[Literal[1]]], set[Literal[b"a"]]]
+
+i: list[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(i)  # revealed: list[Literal[1, 2, 3]]
+
+j: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
+reveal_type(j)  # revealed: list[Literal[1, 2, 3]]
+
+type Y[T] = list[T]
+
+k: Y[Y[Literal[1]]] = [[1]]
+reveal_type(k)  # revealed: list[list[Literal[1]]]
+
+l: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
+reveal_type(l)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
+
+m: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
+reveal_type(m)  # revealed: list[tuple[Literal[1], ...]]
 ```
 
 ## PEP-604 annotations are supported

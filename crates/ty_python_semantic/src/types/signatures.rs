@@ -28,7 +28,7 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -138,12 +138,13 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
@@ -435,6 +436,7 @@ impl<'db> Signature<'db> {
                 .apply_type_mapping(
                     db,
                     &TypeMapping::MarkTypeVarsInferable(Some(definition.into())),
+                    TypeContext::default(),
                 );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
@@ -523,6 +525,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let flipped_mapping = match type_mapping {
@@ -538,10 +541,10 @@ impl<'db> Signature<'db> {
             definition: self.definition,
             parameters: self
                 .parameters
-                .apply_type_mapping_impl(db, flipped_mapping, visitor),
+                .apply_type_mapping_impl(db, flipped_mapping, tcx, visitor),
             return_ty: self
                 .return_ty
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         }
     }
 
@@ -582,10 +585,16 @@ impl<'db> Signature<'db> {
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &TypeMapping::BindSelf(self_type),
+                TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
-            return_ty =
-                return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
+            return_ty = return_ty.map(|ty| {
+                ty.apply_type_mapping(
+                    db,
+                    &TypeMapping::BindSelf(self_type),
+                    TypeContext::default(),
+                )
+            });
         }
         Self {
             generic_context: self.generic_context,
@@ -1294,6 +1303,7 @@ impl<'db> Parameters<'db> {
                             .expect("We should always find the surrounding class for an implicit self: Self annotation").apply_type_mapping(
                                 db,
                                 &TypeMapping::MarkTypeVarsInferable(None),
+                                TypeContext::default()
                             )
                     )
                 } else {
@@ -1423,6 +1433,7 @@ impl<'db> Parameters<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match type_mapping {
@@ -1442,7 +1453,7 @@ impl<'db> Parameters<'db> {
                 value: self
                     .value
                     .iter()
-                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
+                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                     .collect(),
                 is_gradual: self.is_gradual,
             },
@@ -1634,13 +1645,16 @@ impl<'db> Parameter<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             annotated_type: self
                 .annotated_type
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
-            kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            kind: self
+                .kind
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             form: self.form,
         }
@@ -1718,6 +1732,7 @@ impl<'db> Parameter<'db> {
                 definition_expression_type(db, definition, annotation).apply_type_mapping(
                     db,
                     &TypeMapping::MarkTypeVarsInferable(Some(definition.into())),
+                    TypeContext::default(),
                 )
             }),
             kind,
@@ -1857,25 +1872,26 @@ impl<'db> ParameterKind<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 name: name.clone(),
             },
             Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 name: name.clone(),
             },
             Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 name: name.clone(),
             },
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),

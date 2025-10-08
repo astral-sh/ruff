@@ -19,7 +19,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::{
     ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
-    binding_type, infer_isolated_expression,
+    TypeContext, binding_type, infer_isolated_expression,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
@@ -2719,7 +2719,7 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type.promote_literals(db);
+        let suggestion = binding_type.promote_literals(db, TypeContext::default());
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(
@@ -2826,6 +2826,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         db,
         "__mro_entries__",
         CallArguments::positional([tuple_of_types]),
+        TypeContext::default(),
     ) {
         Ok(ret) => {
             if ret.return_type(db).is_assignable_to(db, tuple_of_types) {

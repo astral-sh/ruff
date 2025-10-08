@@ -2551,7 +2551,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        self.specialization = self.signature.generic_context.map(|gc| builder.build(gc));
+        self.specialization = self
+            .signature
+            .generic_context
+            .map(|gc| builder.build(gc, *self.call_expression_tcx));
     }
 
     fn check_argument_type(

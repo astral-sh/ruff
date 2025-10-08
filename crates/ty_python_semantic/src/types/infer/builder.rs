@@ -3261,6 +3261,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             "__setitem__",
             CallArguments::positional([slice_ty, assigned_ty]),
+            TypeContext::default(),
         ) {
             Ok(_) => true,
             Err(err) => match err {
@@ -3533,6 +3534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     "__setattr__",
                     &mut CallArguments::positional([Type::string_literal(db, attribute), value_ty]),
+                    TypeContext::default(),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
@@ -4239,6 +4241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     op.in_place_dunder(),
                     CallArguments::positional([value_type]),
+                    TypeContext::default(),
                 );
 
                 match call {
@@ -5451,7 +5454,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = tuple;
 
         let annotated_tuple = tcx
-            .known_specialization(KnownClass::Tuple, self.db())
+            .known_specialization(self.db(), KnownClass::Tuple)
             .and_then(|specialization| {
                 specialization
                     .tuple(self.db())
@@ -5593,7 +5596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Extract the annotated type of `T`, if provided.
         let annotated_elt_tys = tcx
-            .known_specialization(collection_class, self.db())
+            .known_specialization(self.db(), collection_class)
             .map(|specialization| specialization.types(self.db()));
 
         // Create a set of constraints to infer a precise type for `T`.
@@ -5633,7 +5636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Merge the inferred type of the nested dictionary.
                 if let Some(specialization) =
-                    inferred_value_ty.known_specialization(KnownClass::Dict, self.db())
+                    inferred_value_ty.known_specialization(self.db(), KnownClass::Dict)
                 {
                     for (elt_ty, inferred_elt_ty) in
                         iter::zip(elt_tys.clone(), specialization.types(self.db()))
@@ -5656,14 +5659,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
+                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db(), elt_tcx);
 
                 builder.infer(Type::TypeVar(elt_ty), inferred_elt_ty).ok()?;
             }
         }
 
-        let class_type = class_literal
-            .apply_specialization(self.db(), |generic_context| builder.build(generic_context));
+        let class_type = class_literal.apply_specialization(self.db(), |generic_context| {
+            builder.build(generic_context, TypeContext::default())
+        });
 
         Type::from(class_type).to_instance(self.db())
     }
@@ -6186,7 +6190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
 
                 return callable_type
-                    .try_call_constructor(self.db(), call_arguments)
+                    .try_call_constructor(self.db(), call_arguments, tcx)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, callable_type, call_expression.into());
                         err.return_type()
@@ -7225,6 +7229,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.db(),
                     unary_dunder_method,
                     CallArguments::none(),
+                    TypeContext::default(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -7644,6 +7649,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.db(),
                                 reflected_dunder,
                                 CallArguments::positional([left_ty]),
+                                TypeContext::default(),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -7652,6 +7658,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self.db(),
                                         op.dunder(),
                                         CallArguments::positional([right_ty]),
+                                        TypeContext::default(),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -7664,6 +7671,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.db(),
                         op.dunder(),
                         CallArguments::positional([right_ty]),
+                        TypeContext::default(),
                     )
                     .map(|outcome| outcome.return_type(self.db()))
                     .ok();
@@ -7677,6 +7685,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.db(),
                                 op.reflected_dunder(),
                                 CallArguments::positional([left_ty]),
+                                TypeContext::default(),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .ok()
@@ -8430,6 +8439,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 op.dunder(),
                 &mut CallArguments::positional([right]),
+                TypeContext::default(),
                 policy,
             )
             .map(|outcome| outcome.return_type(db))
@@ -9025,7 +9035,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If the class defines `__getitem__`, return its return type.
         //
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-        match value_ty.try_call_dunder(db, "__getitem__", CallArguments::positional([slice_ty])) {
+        match value_ty.try_call_dunder(
+            db,
+            "__getitem__",
+            CallArguments::positional([slice_ty]),
+            TypeContext::default(),
+        ) {
             Ok(outcome) => {
                 return outcome.return_type(db);
             }

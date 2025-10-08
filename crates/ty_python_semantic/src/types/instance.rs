@@ -14,8 +14,8 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeMapping,
-    TypeRelation, VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
+    TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -475,15 +475,16 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
+                Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
             NominalInstanceInner::NonTuple(class) => Type::non_tuple_instance(
                 db,
-                class.apply_type_mapping_impl(db, type_mapping, visitor),
+                class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
             NominalInstanceInner::Object => Type::object(),
         }
@@ -734,15 +735,16 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
-                Self::from_class(class.apply_type_mapping_impl(db, type_mapping, visitor))
+                Self::from_class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Protocol::Synthesized(synthesized) => {
-                Self::synthesized(synthesized.apply_type_mapping_impl(db, type_mapping, visitor))
-            }
+            Protocol::Synthesized(synthesized) => Self::synthesized(
+                synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
         }
     }
 
@@ -813,7 +815,7 @@ mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-        NormalizedVisitor, TypeMapping, TypeVarVariance, VarianceInferable,
+        NormalizedVisitor, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
@@ -844,9 +846,10 @@ mod synthesized_protocol {
             self,
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
+            tcx: TypeContext<'db>,
             _visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Self {
-            Self(self.0.specialized_and_normalized(db, type_mapping))
+            Self(self.0.specialized_and_normalized(db, type_mapping, tcx))
         }
 
         pub(super) fn find_legacy_typevars_impl(

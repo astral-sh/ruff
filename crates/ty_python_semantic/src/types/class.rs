@@ -277,13 +277,20 @@ impl<'db> GenericAlias<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let tcx = tcx
+            .annotation
+            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
+            .map(|specialization| specialization.types(db))
+            .unwrap_or(&[]);
+
         Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
 
@@ -466,12 +473,13 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => {
-                Self::Generic(generic.apply_type_mapping_impl(db, type_mapping, visitor))
+                Self::Generic(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
         }
     }
@@ -2027,6 +2035,7 @@ impl<'db> ClassLiteral<'db> {
                                         ClassBase::is_typed_dict,
                                     ),
                                 },
+                                TypeContext::default(),
                             )
                         });
                 }
@@ -2329,6 +2338,7 @@ impl<'db> ClassLiteral<'db> {
                                     },
                                 ),
                             },
+                            TypeContext::default(),
                         )
                     })
             }
@@ -2663,7 +2673,8 @@ impl<'db> ClassLiteral<'db> {
                                 specialization,
                                 ClassBase::is_typed_dict
                             )
-                        }
+                        },
+                                TypeContext::default(),
                     )
                 )
         }
@@ -2913,6 +2924,7 @@ impl<'db> ClassLiteral<'db> {
                                         self.unknown_specialization(db),
                                     ),
                                 },
+                                TypeContext::default(),
                             )
                         });
                 }
