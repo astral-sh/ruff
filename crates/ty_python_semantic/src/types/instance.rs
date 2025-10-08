@@ -122,14 +122,16 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
-            self_protocol.interface(db).extends_interface_of(
+            self_protocol.interface(db).has_relation_to_impl(
                 db,
                 protocol.interface(db),
                 relation,
-                visitor,
+                relation_visitor,
+                disjointness_visitor,
             )
         } else {
             protocol
@@ -137,7 +139,13 @@ impl<'db> Type<'db> {
                 .interface(db)
                 .members(db)
                 .when_all(db, |member| {
-                    member.is_satisfied_by(db, self, relation, visitor)
+                    member.is_satisfied_by(
+                        db,
+                        self,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
                 })
         };
 
@@ -149,11 +157,26 @@ impl<'db> Type<'db> {
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
             if let Protocol::FromClass(class) = protocol.inner {
-                self.has_relation_to_impl(
+                // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+                // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+                // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+                // `Q`'s members in a Liskov-incompatible way.
+                let type_to_test = if let Type::ProtocolInstance(ProtocolInstanceType {
+                    inner: Protocol::FromClass(class),
+                    ..
+                }) = self
+                {
+                    Type::non_tuple_instance(db, class)
+                } else {
+                    self
+                };
+
+                type_to_test.has_relation_to_impl(
                     db,
                     Type::non_tuple_instance(db, class),
                     relation,
-                    visitor,
+                    relation_visitor,
+                    disjointness_visitor,
                 )
             } else {
                 ConstraintSet::from(false)
@@ -342,17 +365,28 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.has_relation_to_impl(db, tuple2, relation, visitor),
-            _ => self
-                .class(db)
-                .has_relation_to_impl(db, other.class(db), relation, visitor),
+            ) => tuple1.has_relation_to_impl(
+                db,
+                tuple2,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
+            _ => self.class(db).has_relation_to_impl(
+                db,
+                other.class(db),
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
         }
     }
 
@@ -381,7 +415,8 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsDisjointVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
             return ConstraintSet::from(false);
@@ -389,7 +424,12 @@ impl<'db> NominalInstanceType<'db> {
         let mut result = ConstraintSet::from(false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
-                let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
+                let compatible = self_spec.is_disjoint_from_impl(
+                    db,
+                    &other_spec,
+                    disjointness_visitor,
+                    relation_visitor,
+                );
                 if result.union(db, compatible).is_always_satisfied() {
                     return result;
                 }
@@ -601,6 +641,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     protocol,
                     TypeRelation::Subtyping,
                     &HasRelationToVisitor::default(),
+                    &IsDisjointVisitor::default(),
                 )
                 .is_always_satisfied()
         }

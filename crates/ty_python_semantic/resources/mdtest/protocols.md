@@ -617,11 +617,10 @@ static_assert(is_assignable_to(Foo, HasX))
 static_assert(not is_subtype_of(Foo, HasXY))
 static_assert(not is_assignable_to(Foo, HasXY))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasXIntSub, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(HasXIntSub, HasX))  # error: [static-assert-error]
-static_assert(not is_subtype_of(HasX, HasXIntSub))  # error: [static-assert-error]
-static_assert(not is_assignable_to(HasX, HasXIntSub))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasXIntSub, HasX))
+static_assert(not is_assignable_to(HasXIntSub, HasX))
+static_assert(not is_subtype_of(HasX, HasXIntSub))
+static_assert(not is_assignable_to(HasX, HasXIntSub))
 
 class FooSub(Foo): ...
 
@@ -2291,10 +2290,9 @@ class MethodPUnrelated(Protocol):
 
 static_assert(is_subtype_of(MethodPSub, MethodPSuper))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(MethodPUnrelated, MethodPSuper))  # error: [static-assert-error]
-static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))  # error: [static-assert-error]
-static_assert(not is_assignable_to(MethodPSuper, MethodPSub))  # error: [static-assert-error]
+static_assert(not is_assignable_to(MethodPUnrelated, MethodPSuper))
+static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))
+static_assert(not is_assignable_to(MethodPSuper, MethodPSub))
 ```
 
 ## Subtyping between protocols with method members and protocols with non-method members
@@ -2353,8 +2351,7 @@ And for the same reason, they are never assignable to attribute members (which a
 class Attribute(Protocol):
     f: Callable[[], bool]
 
-# TODO: should pass
-static_assert(not is_assignable_to(Method, Attribute))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Method, Attribute))
 ```
 
 Protocols with attribute members, meanwhile, cannot be assigned to protocols with method members,
@@ -2363,9 +2360,8 @@ this is not true for attribute members. The same principle also applies for prot
 members
 
 ```py
-# TODO: this should pass
-static_assert(not is_assignable_to(PropertyBool, Method))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Attribute, Method))  # error: [static-assert-error]
+static_assert(not is_assignable_to(PropertyBool, Method))
+static_assert(not is_assignable_to(Attribute, Method))
 ```
 
 But an exception to this rule is if an attribute member is marked as `ClassVar`, as this guarantees
@@ -2384,9 +2380,8 @@ static_assert(is_assignable_to(ClassVarAttribute, Method))
 class ClassVarAttributeBad(Protocol):
     f: ClassVar[Callable[[], str]]
 
-# TODO: these should pass:
-static_assert(not is_subtype_of(ClassVarAttributeBad, Method))  # error: [static-assert-error]
-static_assert(not is_assignable_to(ClassVarAttributeBad, Method))  # error: [static-assert-error]
+static_assert(not is_subtype_of(ClassVarAttributeBad, Method))
+static_assert(not is_assignable_to(ClassVarAttributeBad, Method))
 ```
 
 ## Narrowing of protocols
@@ -2707,9 +2702,8 @@ class RecursiveNonFullyStatic(Protocol):
     parent: RecursiveNonFullyStatic
     x: Any
 
-# TODO: these should pass, once we take into account types of members
-static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))  # error: [static-assert-error]
-static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))  # error: [static-assert-error]
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
 static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
@@ -2727,9 +2721,7 @@ class RecursiveOptionalParent(Protocol):
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
 # Due to invariance of mutable attribute members, neither is assignable to the other
-#
-# TODO: should pass
-static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))  # error: [static-assert-error]
+static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 
 class Other(Protocol):

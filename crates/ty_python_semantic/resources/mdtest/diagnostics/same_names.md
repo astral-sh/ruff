@@ -234,8 +234,8 @@ from typing import Protocol
 import proto_a
 import proto_b
 
-# TODO should be error: [invalid-assignment] "Object of type `proto_b.Drawable` is not assignable to `proto_a.Drawable`"
 def _(drawable_b: proto_b.Drawable):
+    # error: [invalid-assignment] "Object of type `proto_b.Drawable` is not assignable to `proto_a.Drawable`"
     drawable: proto_a.Drawable = drawable_b
 ```
 
