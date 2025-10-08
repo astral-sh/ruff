@@ -4,6 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use crate::all::DunderAllName;
+use crate::analyze::visibility::{self, Visibility};
 use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
@@ -302,6 +303,9 @@ impl<'a> Binding<'a> {
             BindingKind::FromImport(import) => Some(AnyImport::FromImport(import)),
             _ => None,
         }
+    }
+    pub fn visibility(&self, source: &str) -> Visibility{
+        visibility::binding_visibility(self.name(source))
     }
 }
 

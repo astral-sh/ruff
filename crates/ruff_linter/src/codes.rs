@@ -587,6 +587,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "105") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedMagicMethod),
         (Pydocstyle, "106") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicNestedClass),
         (Pydocstyle, "107") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicInit),
+        (Pydocstyle, "1001") => (RuleGroup::Preview, rules::pydocstyle::rules::UndocumentedPublicClassAttribute),
+        (Pydocstyle, "1002") => (RuleGroup::Preview, rules::pydocstyle::rules::UndocumentedPublicModuleVariable),
         (Pydocstyle, "200") => (RuleGroup::Stable, rules::pydocstyle::rules::UnnecessaryMultilineDocstring),
         (Pydocstyle, "201") => (RuleGroup::Stable, rules::pydocstyle::rules::BlankLineBeforeFunction),
         (Pydocstyle, "202") => (RuleGroup::Stable, rules::pydocstyle::rules::BlankLineAfterFunction),

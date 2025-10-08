@@ -528,6 +528,94 @@ impl Violation for UndocumentedPublicInit {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented public class attribute definitions.
+///
+/// ## Why is this bad?
+/// Public class attributes should be documented via docstrings to describe
+/// their purpose and expected values.
+///
+/// According to PEP 257, docstrings for class attributes should be placed
+/// immediately after the attribute assignment.
+///
+/// If the codebase adheres to a standard format for attribute docstrings,
+/// follow that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class Config:
+///     timeout: int = 30
+///     max_retries: int = 3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Config:
+///     timeout: int = 30
+///     """The timeout duration in seconds."""
+///
+///     max_retries: int = 3
+///     """The maximum number of retry attempts."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 224 – Attribute Docstrings](https://peps.python.org/pep-0224/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicClassAttribute;
+
+impl Violation for UndocumentedPublicClassAttribute {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Missing docstring in public class attribute".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for undocumented public module-level variable definitions.
+///
+/// ## Why is this bad?
+/// Public module-level variables should be documented via docstrings to
+/// describe their purpose and expected values.
+///
+/// According to PEP 257, docstrings for module-level variables should be
+/// placed immediately after the variable assignment.
+///
+/// If the codebase adheres to a standard format for module-level variable
+/// docstrings, follow that format for consistency.
+///
+/// ## Example
+/// ```python
+/// DEFAULT_TIMEOUT: int = 30
+/// MAX_CONNECTIONS: int = 100
+/// ```
+///
+/// Use instead:
+/// ```python
+/// DEFAULT_TIMEOUT: int = 30
+/// """The default timeout duration in seconds."""
+///
+/// MAX_CONNECTIONS: int = 100
+/// """The maximum number of concurrent connections allowed."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 224 – Attribute Docstrings](https://peps.python.org/pep-0224/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicModuleVariable;
+
+impl Violation for UndocumentedPublicModuleVariable {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Missing docstring in public module variable".to_string()
+    }
+}
+
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub(crate) fn not_missing(
     checker: &Checker,

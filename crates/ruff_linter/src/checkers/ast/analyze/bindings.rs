@@ -1,3 +1,5 @@
+use ruff_python_semantic::all::DunderAllName;
+use ruff_python_semantic::{BindingKind, Export};
 use ruff_text_size::Ranged;
 
 use crate::Fix;
@@ -5,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
     flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_return,
-    flake8_type_checking, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flake8_type_checking, pydocstyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 
 /// Run lint rules over the [`Binding`]s.
@@ -26,10 +28,32 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::CustomTypeVarForSelf,
         Rule::PrivateTypeParameter,
         Rule::UnnecessaryAssign,
+        Rule::UndocumentedPublicModuleVariable,
+        Rule::UndocumentedPublicClassAttribute,
     ]) {
         return;
     }
-
+    // Compute visibility of all definitions.
+    let exports: Option<Vec<DunderAllName>> = checker
+        .any_rule_enabled(&[
+            Rule::UndocumentedPublicModuleVariable,
+            Rule::UndocumentedPublicClassAttribute,
+        ])
+        .then(|| {
+            checker
+                .semantic
+                .global_scope()
+                .get_all("__all__")
+                .map(|binding_id| &checker.semantic.bindings[binding_id])
+                .filter_map(|binding| match &binding.kind {
+                    BindingKind::Export(Export { names }) => Some(names.iter().copied()),
+                    _ => None,
+                })
+                .fold(None, |acc, names| {
+                    Some(acc.into_iter().flatten().chain(names).collect())
+                })
+        })
+        .flatten();
     for (binding_id, binding) in checker.semantic.bindings.iter_enumerated() {
         if checker.is_rule_enabled(Rule::UnnecessaryAssign) {
             if binding.kind.is_function_definition() {
@@ -105,6 +129,12 @@ pub(crate) fn bindings(checker: &Checker) {
         }
         if checker.is_rule_enabled(Rule::PrivateTypeParameter) {
             pyupgrade::rules::private_type_parameter(checker, binding);
+        }
+        if checker.any_rule_enabled(&[
+            Rule::UndocumentedPublicClassAttribute,
+            Rule::UndocumentedPublicModuleVariable,
+        ]) {
+            pydocstyle::rules::undocumented_public_binding(checker, binding, exports.as_deref());
         }
     }
 }

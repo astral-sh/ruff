@@ -18,6 +18,7 @@ pub(crate) use one_liner::*;
 pub(crate) use sections::*;
 pub(crate) use starts_with_this::*;
 pub(crate) use triple_quotes::*;
+pub(crate) use undocumented_public_variable::*;
 
 mod backslashes;
 mod blank_after_summary;
@@ -39,3 +40,4 @@ mod one_liner;
 mod sections;
 mod starts_with_this;
 mod triple_quotes;
+mod undocumented_public_variable;
