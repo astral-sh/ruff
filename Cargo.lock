@@ -4402,6 +4402,7 @@ dependencies = [
  "colored 3.0.0",
  "insta",
  "memchr",
+ "path-slash",
  "regex",
  "ruff_db",
  "ruff_index",
