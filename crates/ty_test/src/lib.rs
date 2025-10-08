@@ -370,7 +370,13 @@ fn run_test(
                     .cmp(&right.rendering_sort_key(db))
             });
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
+            // Convert diagnostics to CheckOutput
+            let check_outputs: Vec<matcher::CheckOutput> = diagnostics
+                .iter()
+                .map(|diag| matcher::CheckOutput::Diagnostic(diag.clone()))
+                .collect();
+
+            let failure = match matcher::match_file(db, test_file.file, &check_outputs) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.backtick_offsets.clone(),

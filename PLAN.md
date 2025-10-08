@@ -42,12 +42,13 @@ Add support for hover assertions in the mdtest framework. These assertions will 
 - [x] Column position determined by whitespace before `#` in comment
 - [x] Calculate TextSize offset from: (target_line_start + down_arrow_column)
 
-### 3. Create hover diagnostic type (diagnostic.rs)
-**Status:** Not started
+### 3. Create CheckOutput enum (matcher.rs)
+**Status:** In progress
 
-- [ ] Add new diagnostic ID for hover results (similar to `RevealedType`)
-- [ ] Store the position and inferred type as a diagnostic
-- [ ] This allows reuse of existing matcher infrastructure
+- [x] Add `CheckOutput` enum with `Diagnostic` and `Hover` variants
+- [ ] Update `match_file` to accept `&[CheckOutput]` instead of `&[Diagnostic]`
+- [ ] Create `SortedCheckOutputs` similar to `SortedDiagnostics`
+- [ ] Update matching logic to extract line numbers from CheckOutput variants
 
 ### 4. Add hover checking logic (lib.rs)
 **Status:** Not started
