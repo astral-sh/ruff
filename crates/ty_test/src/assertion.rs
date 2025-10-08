@@ -377,9 +377,9 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 /// A parsed and validated `# hover:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct HoverAssertion<'a> {
-    /// The zero-based character offset (UTF-32) in the line where the down arrow appears.
+    /// The one-based character column (UTF-32) in the line where the down arrow appears.
     /// This indicates the character position in the target line where we should hover.
-    pub(crate) column: usize,
+    pub(crate) column: OneIndexed,
 
     /// The expected type at the hover position.
     pub(crate) expected_type: &'a str,
@@ -409,7 +409,7 @@ impl<'a> HoverAssertion<'a> {
         let arrow_line_col = line_index.line_column(arrow_position, source);
 
         // Store the character column (which line_column already computed for us)
-        let column = arrow_line_col.column.to_zero_indexed();
+        let column = arrow_line_col.column;
 
         Ok(Self {
             column,

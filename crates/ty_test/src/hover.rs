@@ -8,7 +8,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::AnyNodeRef;
-use ruff_source_file::{OneIndexed, PositionEncoding, SourceLocation};
+use ruff_source_file::{PositionEncoding, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{HasType, SemanticModel};
 
@@ -110,7 +110,7 @@ pub(crate) fn generate_hover_outputs(
             // Convert the character column to a byte offset using LineIndex::offset
             let hover_location = SourceLocation {
                 line: target_line,
-                character_offset: OneIndexed::from_zero_indexed(hover.column),
+                character_offset: hover.column,
             };
             let hover_offset = lines.offset(hover_location, &source, PositionEncoding::Utf32);
 
