@@ -1037,6 +1037,44 @@ impl<'db> Bindings<'db> {
                                                     .set(DataclassParams::ORDER, *order);
                                             }
 
+                                            if let Some(Some(Type::BooleanLiteral(eq))) = overload
+                                                .signature
+                                                .parameters()
+                                                .keyword_by_name("eq")
+                                                .map(|(idx, _)| idx)
+                                                .and_then(|idx| overload.parameter_types().get(idx))
+                                            {
+                                                dataclass_params.set(DataclassParams::EQ, *eq);
+                                            }
+
+                                            if let Some(Some(Type::BooleanLiteral(kw_only))) =
+                                                overload
+                                                    .signature
+                                                    .parameters()
+                                                    .keyword_by_name("kw_only")
+                                                    .map(|(idx, _)| idx)
+                                                    .and_then(|idx| {
+                                                        overload.parameter_types().get(idx)
+                                                    })
+                                            {
+                                                dataclass_params
+                                                    .set(DataclassParams::KW_ONLY, *kw_only);
+                                            }
+
+                                            if let Some(Some(Type::BooleanLiteral(frozen))) =
+                                                overload
+                                                    .signature
+                                                    .parameters()
+                                                    .keyword_by_name("frozen")
+                                                    .map(|(idx, _)| idx)
+                                                    .and_then(|idx| {
+                                                        overload.parameter_types().get(idx)
+                                                    })
+                                            {
+                                                dataclass_params
+                                                    .set(DataclassParams::FROZEN, *frozen);
+                                            }
+
                                             Type::DataclassDecorator(dataclass_params)
                                         },
                                     )

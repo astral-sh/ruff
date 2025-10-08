@@ -213,7 +213,7 @@ a = A(name="Harry")
 a = A("Harry")
 ```
 
-TODO: This can be overridden by the call to the decorator function.
+This can be overridden by the call to the decorator function.
 
 ```py
 from typing import dataclass_transform
@@ -225,10 +225,39 @@ class CustomerModel:
     id: int
     name: str
 
-# TODO: Should not emit errors
-# error: [missing-argument]
-# error: [too-many-positional-arguments]
 c = CustomerModel(1, "Harry")
+```
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def create_model(*, frozen: bool = True): ...
+@create_model(frozen=False)
+class MutableModel:
+    name: str
+
+m = MutableModel(name="test")
+m.name = "new"  # Should work (frozen=False)
+```
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(eq_default=True, order_default=False, kw_only_default=True, frozen_default=True)
+def create_model(*, eq: bool = True, order: bool = False, kw_only: bool = True, frozen: bool = True): ...
+@create_model(eq=False, order=True, kw_only=False, frozen=False)
+class AllOverridesModel:
+    name: str
+    age: int
+
+# All parameters should be overridden:
+# - eq=False: No __eq__ method generated
+# - order=True: __lt__, __gt__ etc. methods generated
+# - kw_only=False: Positional arguments allowed
+# - frozen=False: Fields are mutable
+model = AllOverridesModel("test", 25)
+model.name = "new"  # Should work (frozen=False)
 ```
 
 ### `field_specifiers`
