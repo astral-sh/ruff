@@ -1,6 +1,7 @@
 use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
+use crate::member::Member;
 use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
@@ -232,13 +233,9 @@ pub(crate) fn place<'db>(
     )
 }
 
-/// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
+/// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given
 /// `scope`.
-pub(crate) fn class_symbol<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> PlaceAndQualifiers<'db> {
+pub(crate) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Member<'db> {
     place_table(db, scope)
         .symbol_id(name)
         .map(|symbol_id| {
@@ -252,7 +249,7 @@ pub(crate) fn class_symbol<'db>(
 
             if !place_and_quals.place.is_unbound() && !place_and_quals.is_init_var() {
                 // Trust the declared type if we see a class-level declaration
-                return place_and_quals;
+                return Member::declared(place_and_quals);
             }
 
             if let PlaceAndQualifiers {
@@ -267,14 +264,14 @@ pub(crate) fn class_symbol<'db>(
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                match inferred {
+                Member::undeclared(match inferred {
                     Place::Unbound => Place::Unbound.with_qualifiers(qualifiers),
                     Place::Type(_, boundness) => {
                         Place::Type(ty, boundness).with_qualifiers(qualifiers)
                     }
-                }
+                })
             } else {
-                Place::Unbound.into()
+                Member::unbound()
             }
         })
         .unwrap_or_default()
