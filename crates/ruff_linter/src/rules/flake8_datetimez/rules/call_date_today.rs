@@ -17,9 +17,9 @@ use crate::checkers::ast::Checker;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.date.today` returns a naive date object. Instead, use
-/// `datetime.datetime.now(tz=...).date()` to create a timezone-aware
-/// datetime object.
+/// `datetime.date.today` returns a naive date object without taking timezones
+/// into account. Instead, use `datetime.datetime.now(tz=...).date()` to
+/// create a timezone-aware object and retrieve its date component.
 ///
 /// ## Example
 /// ```python
