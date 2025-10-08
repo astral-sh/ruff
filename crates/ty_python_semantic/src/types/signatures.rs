@@ -26,10 +26,9 @@ use crate::types::function::FunctionType;
 use crate::types::generics::{GenericContext, typing_self, walk_generic_context};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
-    todo_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -415,9 +414,7 @@ impl<'db> Signature<'db> {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
-                        definition,
-                    ))),
+                    &TypeMapping::MarkTypeVarsInferable(Some(definition.into())),
                 );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
@@ -1256,8 +1253,18 @@ impl<'db> Parameters<'db> {
                     let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                     Some(
-                        typing_self(db, scope_id, typevar_binding_context, class, &Type::TypeVar)
-                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
+                        // It looks like unnecessary work here that we create the implicit Self
+                        // annotation using non-inferable typevars and then immediately apply
+                        // `MarkTypeVarsInferable` to it. However, this is currently necessary to
+                        // ensure that implicit-Self and explicit Self annotations are both treated
+                        // the same. Marking type vars inferable will cause reification of lazy
+                        // typevar defaults/bounds/constraints; this needs to happen for both
+                        // implicit and explicit Self so they remain the "same" typevar.
+                        typing_self(db, scope_id, typevar_binding_context, class, &Type::NonInferableTypeVar)
+                            .expect("We should always find the surrounding class for an implicit self: Self annotation").apply_type_mapping(
+                                db,
+                                &TypeMapping::MarkTypeVarsInferable(None),
+                            )
                     )
                 } else {
                     // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
@@ -1680,9 +1687,7 @@ impl<'db> Parameter<'db> {
             annotated_type: parameter.annotation().map(|annotation| {
                 definition_expression_type(db, definition, annotation).apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
-                        definition,
-                    ))),
+                    &TypeMapping::MarkTypeVarsInferable(Some(definition.into())),
                 )
             }),
             kind,
