@@ -26,10 +26,12 @@ pub(crate) struct HoverOutput {
 }
 
 /// Find the AST node with minimal range that fully contains the given offset.
+/// Returns the smallest expression node if possible, skipping over identifier-only nodes.
 fn find_covering_node(root: AnyNodeRef<'_>, offset: TextSize) -> Option<AnyNodeRef<'_>> {
     struct Visitor<'a> {
         offset: TextSize,
         minimal_node: Option<AnyNodeRef<'a>>,
+        minimal_expr: Option<AnyNodeRef<'a>>,
     }
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
@@ -43,6 +45,18 @@ fn find_covering_node(root: AnyNodeRef<'_>, offset: TextSize) -> Option<AnyNodeR
                 } else {
                     self.minimal_node = Some(node);
                 }
+
+                // Also track the smallest expression node
+                if node.as_expr_ref().is_some() {
+                    if let Some(current) = self.minimal_expr {
+                        if node.range().len() < current.range().len() {
+                            self.minimal_expr = Some(node);
+                        }
+                    } else {
+                        self.minimal_expr = Some(node);
+                    }
+                }
+
                 TraversalSignal::Traverse
             } else {
                 TraversalSignal::Skip
@@ -53,10 +67,13 @@ fn find_covering_node(root: AnyNodeRef<'_>, offset: TextSize) -> Option<AnyNodeR
     let mut visitor = Visitor {
         offset,
         minimal_node: None,
+        minimal_expr: None,
     };
 
     root.visit_source_order(&mut visitor);
-    visitor.minimal_node
+
+    // Prefer the minimal expression node if we found one, otherwise return the minimal node
+    visitor.minimal_expr.or(visitor.minimal_node)
 }
 
 /// Get the inferred type at a given position in a file.
