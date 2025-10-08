@@ -512,12 +512,12 @@ impl Display for DisplayRepresentation<'_> {
             }
 
             Type::TypedDict(typed_dict) => match typed_dict {
-                TypedDictType::FromClass(class) => class
+                TypedDictType::ClassBased(class) => class
                     .class_literal(self.db)
                     .0
                     .display_with(self.db, self.settings.clone())
                     .fmt(f),
-                TypedDictType::Synthesized(synthesized) => synthesized.name(self.db).fmt(f),
+                TypedDictType::Functional(synthesized) => synthesized.name(self.db).fmt(f),
             },
 
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),

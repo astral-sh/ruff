@@ -29,7 +29,7 @@ use crate::types::function::{
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
-use crate::types::typed_dict::SynthesizedTypedDictType;
+use crate::types::typed_dict::FunctionalTypedDictType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
@@ -1137,7 +1137,7 @@ impl<'db> Bindings<'db> {
                             .collect::<FxOrderMap<_, _>>();
 
                         overload.set_return_type(Type::KnownInstance(
-                            KnownInstanceType::TypedDictType(SynthesizedTypedDictType::new(
+                            KnownInstanceType::TypedDictType(FunctionalTypedDictType::new(
                                 db,
                                 Name::new(name.value(db)),
                                 params,

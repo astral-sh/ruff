@@ -66,7 +66,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::typed_dict::{SynthesizedTypedDictType, TypedDictSchema};
+use crate::types::typed_dict::{FunctionalTypedDictType, TypedDictSchema};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
@@ -1010,14 +1010,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Turn a typed dict class literal or synthesized type dict type into a `TypedDictType`.
+    /// Turn a typed dict class literal or functional type dict type into a `TypedDictType`.
     pub(crate) fn to_typed_dict_type(self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
         match self {
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => Some(
                 TypedDictType::from_class(ClassType::NonGeneric(class_literal)),
             ),
             Type::KnownInstance(KnownInstanceType::TypedDictType(typed_dict)) => {
-                Some(TypedDictType::Synthesized(typed_dict))
+                Some(TypedDictType::Functional(typed_dict))
             }
             _ => None,
         }
@@ -2993,7 +2993,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
 
-        if let Type::TypedDict(TypedDictType::Synthesized(typed_dict)) = self
+        if let Type::TypedDict(TypedDictType::Functional(typed_dict)) = self
             && let Some(member) =
                 TypedDictType::synthesized_member(db, self, typed_dict.items(db), &name)
         {
@@ -4875,7 +4875,7 @@ impl<'db> Type<'db> {
                             Parameter::keyword_variadic(Name::new_static("kwargs"))
                                 .with_annotated_type(Type::any()),
                         ]),
-                        Some(Type::TypedDict(TypedDictType::Synthesized(typed_dict))),
+                        Some(Type::TypedDict(TypedDictType::Functional(typed_dict))),
                     )],
                 )
                 .into()
@@ -5685,7 +5685,7 @@ impl<'db> Type<'db> {
                     .unwrap_or(*self))
                 }
                 KnownInstanceType::TypedDictType(typed_dict) => {
-                    Ok(Type::TypedDict(TypedDictType::Synthesized(*typed_dict)))
+                    Ok(Type::TypedDict(TypedDictType::Functional(*typed_dict)))
                 }
                 KnownInstanceType::TypedDictSchema(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
@@ -6543,8 +6543,9 @@ impl<'db> Type<'db> {
             },
 
             Type::TypedDict(typed_dict) => match typed_dict {
-                TypedDictType::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
-                TypedDictType::Synthesized(_) => None,
+                TypedDictType::ClassBased(class) => Some(TypeDefinition::Class(class.definition(db))),
+                // TODO: Support go-to-definition for functional `TypedDict`s.
+                TypedDictType::Functional(_) => None,
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
@@ -6893,8 +6894,8 @@ pub enum KnownInstanceType<'db> {
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
 
-    /// A single instance of `typing.TypedDict`.
-    TypedDictType(SynthesizedTypedDictType<'db>),
+    /// A single class object created using the `typing.TypedDict` functional syntax
+    TypedDictType(FunctionalTypedDictType<'db>),
 
     /// An internal type representing the dictionary literal argument to the functional `TypedDict`
     /// constructor.
@@ -6928,7 +6929,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             visitor.visit_type_alias_type(db, type_alias);
         }
         KnownInstanceType::TypedDictType(typed_dict) => {
-            visitor.visit_typed_dict_type(db, TypedDictType::Synthesized(typed_dict));
+            visitor.visit_typed_dict_type(db, TypedDictType::Functional(typed_dict));
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::ConstraintSet(_)

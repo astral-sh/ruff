@@ -173,7 +173,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_) => None,
-                // TODO: Inherit the fields of synthesized `TypedDict`s.
+                // TODO: Inherit the fields of functional `TypedDict`s.
                 KnownInstanceType::TypedDictType(_) => Some(Self::TypedDict),
             },
 

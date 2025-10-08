@@ -51,21 +51,21 @@ impl Default for TypedDictParams {
 pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
-    FromClass(ClassType<'db>),
+    ClassBased(ClassType<'db>),
 
     /// A `TypedDict` created using the functional syntax.
-    Synthesized(SynthesizedTypedDictType<'db>),
+    Functional(FunctionalTypedDictType<'db>),
 }
 
 impl<'db> TypedDictType<'db> {
     pub(crate) fn from_class(class: ClassType<'db>) -> Self {
-        TypedDictType::FromClass(class)
+        TypedDictType::ClassBased(class)
     }
 
     pub(crate) fn items(&self, db: &'db dyn Db) -> Cow<'db, FxOrderMap<Name, Field<'db>>> {
         match self {
-            TypedDictType::Synthesized(synthesized) => Cow::Borrowed(synthesized.items(db)),
-            TypedDictType::FromClass(class) => {
+            TypedDictType::Functional(functional) => Cow::Borrowed(functional.items(db)),
+            TypedDictType::ClassBased(class) => {
                 let (class_literal, specialization) = class.class_literal(db);
                 Cow::Owned(class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict))
             }
@@ -77,8 +77,8 @@ impl<'db> TypedDictType<'db> {
         // `TypedDict` instances are instances of `dict` at runtime, but its important that we
         // understand a more specific meta type in order to correctly handle `__getitem__`.
         match self {
-            TypedDictType::FromClass(class) => SubclassOfType::from(db, class),
-            TypedDictType::Synthesized(_) => KnownClass::TypedDictFallback.to_class_literal(db),
+            TypedDictType::ClassBased(class) => SubclassOfType::from(db, class),
+            TypedDictType::Functional(_) => KnownClass::TypedDictFallback.to_class_literal(db),
         }
     }
 
@@ -90,11 +90,11 @@ impl<'db> TypedDictType<'db> {
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
         match self {
-            TypedDictType::FromClass(class) => {
-                TypedDictType::FromClass(class.apply_type_mapping_impl(db, type_mapping, visitor))
+            TypedDictType::ClassBased(class) => {
+                TypedDictType::ClassBased(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
-            TypedDictType::Synthesized(synthesized) => TypedDictType::Synthesized(
-                synthesized.apply_type_mapping_impl(db, type_mapping, visitor),
+            TypedDictType::Functional(functional) => TypedDictType::Functional(
+                functional.apply_type_mapping_impl(db, type_mapping, visitor),
             ),
         }
     }
@@ -409,9 +409,9 @@ pub struct TypedDictSchemaField<'db> {
     pub(crate) is_read_only: bool,
 }
 
-#[salsa::interned(debug, heap_size=SynthesizedTypedDictType::heap_size)]
+#[salsa::interned(debug, heap_size=FunctionalTypedDictType::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct SynthesizedTypedDictType<'db> {
+pub struct FunctionalTypedDictType<'db> {
     pub(crate) name: Name,
 
     pub(crate) params: TypedDictParams,
@@ -421,9 +421,9 @@ pub struct SynthesizedTypedDictType<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
+impl get_size2::GetSize for FunctionalTypedDictType<'_> {}
 
-impl<'db> SynthesizedTypedDictType<'db> {
+impl<'db> FunctionalTypedDictType<'db> {
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -442,7 +442,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
             })
             .collect::<FxOrderMap<_, _>>();
 
-        SynthesizedTypedDictType::new(db, self.name(db), self.params(db), items)
+        FunctionalTypedDictType::new(db, self.name(db), self.params(db), items)
     }
 
     pub(crate) fn normalized_impl(
@@ -469,9 +469,9 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     match typed_dict {
-        TypedDictType::FromClass(class) => visitor.visit_type(db, class.into()),
-        TypedDictType::Synthesized(synthesized) => {
-            for (_, item) in synthesized.items(db) {
+        TypedDictType::ClassBased(class) => visitor.visit_type(db, class.into()),
+        TypedDictType::Functional(functional) => {
+            for (_, item) in functional.items(db) {
                 visitor.visit_type(db, item.declared_ty);
             }
         }
