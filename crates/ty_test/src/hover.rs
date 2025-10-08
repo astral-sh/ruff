@@ -86,26 +86,31 @@ pub(crate) fn generate_hover_outputs(
 
         // Look for hover assertions in this line's assertions
         for assertion in line_assertions.iter() {
-            if let crate::assertion::UnparsedAssertion::Hover(hover_text) = assertion {
-                // Find the down arrow position in the comment text to determine the column
-                if let Some(arrow_position) = hover_text.find('↓') {
-                    // Get the start offset of the target line
-                    let target_line_start = lines.line_start(target_line, &source);
+            let crate::assertion::UnparsedAssertion::Hover(hover_text) = assertion else {
+                continue;
+            };
 
-                    // Calculate the hover position: start of target line + arrow column (0-indexed)
-                    let hover_offset =
-                        target_line_start + TextSize::try_from(arrow_position).unwrap();
+            // Find the down arrow position in the comment text to determine the column
+            let Some(arrow_position) = hover_text.find('↓') else {
+                // No down arrow - skip this hover assertion (will be caught as error by matcher)
+                continue;
+            };
 
-                    // Get the inferred type at that position
-                    if let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) {
-                        hover_outputs.push(matcher::CheckOutput::Hover {
-                            offset: hover_offset,
-                            inferred_type,
-                        });
-                    }
-                }
-                // If no down arrow, skip this hover assertion (will be caught as error by matcher)
-            }
+            // Get the start offset of the target line
+            let target_line_start = lines.line_start(target_line, &source);
+
+            // Calculate the hover position: start of target line + arrow column (0-indexed)
+            let hover_offset = target_line_start + TextSize::try_from(arrow_position).unwrap();
+
+            // Get the inferred type at that position
+            let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) else {
+                continue;
+            };
+
+            hover_outputs.push(matcher::CheckOutput::Hover {
+                offset: hover_offset,
+                inferred_type,
+            });
         }
     }
 
