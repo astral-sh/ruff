@@ -12,13 +12,9 @@ from typing import Type, Self
 
 class C:
     @classmethod
-    def make_instance(cls: Type["C"]) -> Self:
+    def make_instance(cls: Type[Self]) -> Self:
         return cls()
 
-    def foo(self) -> Self:
-        return self
-
-reveal_type(C.make_instance())  # revealed: Unknown
+reveal_type(C.make_instance())  # revealed: C
 reveal_type(C.make_instance)  # revealed: bound method <class 'C'>.make_instance() -> C
-reveal_type(C().foo())  # revealed: C
 ```

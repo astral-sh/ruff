@@ -6003,6 +6003,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        if func.is_attribute_expr() {
+            eprintln!(
+                "return type: {}",
+                bindings.return_type(self.db()).display(self.db())
+            );
+        }
+
         for binding in &mut bindings {
             let binding_type = binding.callable_type;
             for (_, overload) in binding.matching_overloads_mut() {
