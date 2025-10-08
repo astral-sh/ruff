@@ -3,7 +3,7 @@
 //! This module provides functionality to extract hover assertions from comments,
 //! infer types at specified positions, and generate hover check outputs for matching.
 
-use crate::check_output::CheckOutput;
+use crate::check_output::{CheckOutput, HoverOutput};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
@@ -107,10 +107,10 @@ pub(crate) fn generate_hover_outputs(
                 continue;
             };
 
-            hover_outputs.push(CheckOutput::Hover {
+            hover_outputs.push(CheckOutput::Hover(HoverOutput {
                 offset: hover_offset,
                 inferred_type,
-            });
+            }));
         }
     }
 

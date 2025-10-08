@@ -12,7 +12,7 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
-use crate::check_output::{CheckOutput, LineCheckOutputs, SortedCheckOutputs};
+use crate::check_output::{CheckOutput, HoverOutput, LineCheckOutputs, SortedCheckOutputs};
 use crate::db::Db;
 
 #[derive(Debug, Default)]
@@ -174,10 +174,25 @@ impl Unmatched for CheckOutput {
     fn unmatched(&self) -> String {
         match self {
             CheckOutput::Diagnostic(diag) => diag.unmatched(),
-            CheckOutput::Hover { inferred_type, .. } => {
-                format!("{} hover result: {inferred_type}", "unexpected:".red())
-            }
+            CheckOutput::Hover(hover) => hover.unmatched(),
         }
+    }
+}
+
+impl Unmatched for &HoverOutput {
+    fn unmatched(&self) -> String {
+        format!("{} hover result: {}", "unexpected:".red(), self.inferred_type)
+    }
+}
+
+impl UnmatchedWithColumn for &HoverOutput {
+    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+        format!(
+            "{} {} hover result: {}",
+            "unexpected:".red(),
+            column,
+            self.inferred_type
+        )
     }
 }
 
@@ -267,8 +282,8 @@ impl Matcher {
                 CheckOutput::Diagnostic(diag) => {
                     failures.push(diag.unmatched_with_column(self.column(diag)));
                 }
-                CheckOutput::Hover { inferred_type, .. } => {
-                    failures.push(format!("{} hover result: {inferred_type}", "unexpected:".red()));
+                CheckOutput::Hover(hover) => {
+                    failures.push(hover.unmatched());
                 }
             }
         }
@@ -401,15 +416,12 @@ impl Matcher {
 
                 // Find a hover output that matches the expected type
                 let position = unmatched.iter().position(|output| {
-                    let CheckOutput::Hover {
-                        inferred_type, ..
-                    } = output
-                    else {
+                    let CheckOutput::Hover(hover_output) = output else {
                         return false;
                     };
 
                     // Compare the inferred type with the expected type
-                    let inferred_type = discard_todo_metadata(inferred_type);
+                    let inferred_type = discard_todo_metadata(&hover_output.inferred_type);
                     inferred_type == expected_type
                 });
 
