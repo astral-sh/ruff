@@ -35,6 +35,8 @@ pub struct DisplaySettings<'db> {
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
     pub qualified: Rc<FxHashSet<&'db str>>,
+    /// Whether long unions are displayed in full
+    pub preserve_full_unions: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -51,6 +53,22 @@ impl<'db> DisplaySettings<'db> {
         Self {
             multiline: false,
             ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn truncate_long_unions(self) -> Self {
+        Self {
+            preserve_full_unions: false,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn preserve_long_unions(self) -> Self {
+        Self {
+            preserve_full_unions: true,
+            ..self
         }
     }
 
@@ -1265,6 +1283,9 @@ struct DisplayUnionType<'db> {
     settings: DisplaySettings<'db>,
 }
 
+const MAX_DISPLAYED_UNION_ITEMS: usize = 5;
+const MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED: usize = 3;
+
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fn is_condensable(ty: Type<'_>) -> bool {
@@ -1286,12 +1307,35 @@ impl Display for DisplayUnionType<'_> {
             .filter(|element| is_condensable(*element))
             .collect::<Vec<_>>();
 
+        let total_entries =
+            usize::from(!condensed_types.is_empty()) + elements.len() - condensed_types.len();
+
+        assert_ne!(total_entries, 0);
+
         let mut join = f.join(" | ");
 
+        let display_limit = if self.settings.preserve_full_unions {
+            total_entries
+        } else {
+            let limit = if total_entries > MAX_DISPLAYED_UNION_ITEMS {
+                MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED
+            } else {
+                MAX_DISPLAYED_UNION_ITEMS
+            };
+            limit.min(total_entries)
+        };
+
         let mut condensed_types = Some(condensed_types);
+        let mut displayed_entries = 0usize;
+
         for element in elements {
+            if displayed_entries >= display_limit {
+                break;
+            }
+
             if is_condensable(*element) {
                 if let Some(condensed_types) = condensed_types.take() {
+                    displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
                         db: self.db,
@@ -1299,10 +1343,20 @@ impl Display for DisplayUnionType<'_> {
                     });
                 }
             } else {
+                displayed_entries += 1;
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
                     settings: self.settings.singleline(),
+                });
+            }
+        }
+
+        if !self.settings.preserve_full_unions {
+            let omitted_entries = total_entries.saturating_sub(displayed_entries);
+            if omitted_entries > 0 {
+                join.entry(&DisplayUnionOmitted {
+                    count: omitted_entries,
                 });
             }
         }
@@ -1316,6 +1370,21 @@ impl Display for DisplayUnionType<'_> {
 impl fmt::Debug for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
+    }
+}
+
+struct DisplayUnionOmitted {
+    count: usize,
+}
+
+impl Display for DisplayUnionOmitted {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let plural = if self.count == 1 {
+            "element"
+        } else {
+            "elements"
+        };
+        write!(f, "... omitted {} union {}", self.count, plural)
     }
 }
 
