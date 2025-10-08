@@ -24,9 +24,9 @@ use ty_python_semantic::{
 };
 
 mod assertion;
+mod check_output;
 mod config;
 mod db;
-mod diagnostic;
 mod hover;
 mod matcher;
 mod parser;
@@ -372,9 +372,9 @@ fn run_test(
             });
 
             // Convert diagnostics to CheckOutput
-            let mut check_outputs: Vec<matcher::CheckOutput> = diagnostics
+            let mut check_outputs: Vec<check_output::CheckOutput> = diagnostics
                 .iter()
-                .map(|diag| matcher::CheckOutput::Diagnostic(diag.clone()))
+                .map(|diag| check_output::CheckOutput::Diagnostic(diag.clone()))
                 .collect();
 
             // Parse assertions to get hover assertions with correct line numbers

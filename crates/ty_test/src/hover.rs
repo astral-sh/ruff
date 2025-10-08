@@ -3,7 +3,7 @@
 //! This module provides functionality to extract hover assertions from comments,
 //! infer types at specified positions, and generate hover check outputs for matching.
 
-use crate::matcher;
+use crate::check_output::CheckOutput;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
@@ -74,7 +74,7 @@ pub(crate) fn generate_hover_outputs(
     db: &Db,
     file: File,
     assertions: &crate::assertion::InlineFileAssertions,
-) -> Vec<matcher::CheckOutput> {
+) -> Vec<CheckOutput> {
     let source = source_text(db, file);
     let lines = line_index(db, file);
 
@@ -107,7 +107,7 @@ pub(crate) fn generate_hover_outputs(
                 continue;
             };
 
-            hover_outputs.push(matcher::CheckOutput::Hover {
+            hover_outputs.push(CheckOutput::Hover {
                 offset: hover_offset,
                 inferred_type,
             });

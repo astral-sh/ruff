@@ -10,149 +10,10 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::TextSize;
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::check_output::{CheckOutput, LineCheckOutputs, SortedCheckOutputs};
 use crate::db::Db;
-
-/// Represents either a diagnostic or a hover result for matching against assertions.
-#[derive(Debug, Clone)]
-pub(crate) enum CheckOutput {
-    /// A regular diagnostic from the type checker
-    Diagnostic(Diagnostic),
-
-    /// A hover result for testing hover assertions
-    Hover {
-        /// The position where hover was requested
-        offset: TextSize,
-        /// The inferred type at that position
-        inferred_type: String,
-    },
-}
-
-impl CheckOutput {
-    fn line_number(&self, line_index: &LineIndex) -> OneIndexed {
-        match self {
-            CheckOutput::Diagnostic(diag) => diag
-                .primary_span()
-                .and_then(|span| span.range())
-                .map_or(OneIndexed::from_zero_indexed(0), |range| {
-                    line_index.line_index(range.start())
-                }),
-            CheckOutput::Hover { offset, .. } => line_index.line_index(*offset),
-        }
-    }
-}
-
-/// All check outputs for one embedded Python file, sorted and grouped by line number.
-///
-/// Similar to `SortedDiagnostics` but works with `CheckOutput` instead.
-#[derive(Debug)]
-struct SortedCheckOutputs {
-    outputs: Vec<CheckOutput>,
-    line_ranges: Vec<LineOutputRange>,
-}
-
-impl SortedCheckOutputs {
-    fn new(outputs: &[CheckOutput], line_index: &LineIndex) -> Self {
-        let mut outputs: Vec<_> = outputs
-            .iter()
-            .map(|output| OutputWithLine {
-                line_number: output.line_number(line_index),
-                output: output.clone(),
-            })
-            .collect();
-        outputs.sort_unstable_by_key(|output_with_line| output_with_line.line_number);
-
-        let mut result = Self {
-            outputs: Vec::with_capacity(outputs.len()),
-            line_ranges: vec![],
-        };
-
-        let mut current_line_number = None;
-        let mut start = 0;
-        for OutputWithLine {
-            line_number,
-            output,
-        } in outputs
-        {
-            match current_line_number {
-                None => {
-                    current_line_number = Some(line_number);
-                }
-                Some(current) => {
-                    if line_number != current {
-                        let end = result.outputs.len();
-                        result.line_ranges.push(LineOutputRange {
-                            line_number: current,
-                            output_index_range: start..end,
-                        });
-                        start = end;
-                        current_line_number = Some(line_number);
-                    }
-                }
-            }
-            result.outputs.push(output);
-        }
-        if let Some(line_number) = current_line_number {
-            result.line_ranges.push(LineOutputRange {
-                line_number,
-                output_index_range: start..result.outputs.len(),
-            });
-        }
-
-        result
-    }
-
-    fn iter_lines(&self) -> LineCheckOutputsIterator<'_> {
-        LineCheckOutputsIterator {
-            outputs: self.outputs.as_slice(),
-            inner: self.line_ranges.iter(),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct OutputWithLine {
-    line_number: OneIndexed,
-    output: CheckOutput,
-}
-
-#[derive(Debug)]
-struct LineOutputRange {
-    line_number: OneIndexed,
-    output_index_range: Range<usize>,
-}
-
-/// Iterator to group sorted check outputs by line.
-struct LineCheckOutputsIterator<'a> {
-    outputs: &'a [CheckOutput],
-    inner: std::slice::Iter<'a, LineOutputRange>,
-}
-
-impl<'a> Iterator for LineCheckOutputsIterator<'a> {
-    type Item = LineCheckOutputs<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let LineOutputRange {
-            line_number,
-            output_index_range,
-        } = self.inner.next()?;
-        Some(LineCheckOutputs {
-            line_number: *line_number,
-            outputs: &self.outputs[output_index_range.clone()],
-        })
-    }
-}
-
-impl std::iter::FusedIterator for LineCheckOutputsIterator<'_> {}
-
-/// All check outputs that start on a single line of source code.
-#[derive(Debug)]
-struct LineCheckOutputs<'a> {
-    line_number: OneIndexed,
-    outputs: &'a [CheckOutput],
-}
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
@@ -566,6 +427,7 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use crate::check_output::CheckOutput;
     use ruff_db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
@@ -625,11 +487,11 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 
-        let diagnostics: Vec<Diagnostic> = expected_diagnostics
+        let check_outputs: Vec<CheckOutput> = expected_diagnostics
             .into_iter()
-            .map(|diagnostic| diagnostic.into_diagnostic(file))
+            .map(|diagnostic| CheckOutput::Diagnostic(diagnostic.into_diagnostic(file)))
             .collect();
-        super::match_file(&db, file, &diagnostics)
+        super::match_file(&db, file, &check_outputs)
     }
 
     fn assert_fail(result: Result<(), FailuresByLine>, messages: &[(usize, &[&str])]) {
