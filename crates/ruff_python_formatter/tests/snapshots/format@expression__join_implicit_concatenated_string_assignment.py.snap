@@ -1092,3 +1092,518 @@ return (
     f"'{msg.topic}': '{msg.payload}'"  # type: ignore[str-bytes-safe]
 )
 ```
+
+
+## Unsupported Syntax Errors
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:127:1
+    |
+126 | # First break the right, join the string
+127 | type A[str, int, number] = (
+    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+128 |     "Literal[string, int] | None | CustomType| OtherCustomTypeExcee"  # comment
+129 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:132:1
+    |
+131 | # Keep multiline if overlong
+132 | type A[str, int, number] = (
+    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+133 |     "Literal[string, int] | None | "
+134 |     "CustomTypeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:138:1
+    |
+137 | # Break the left if it is over-long, join the string
+138 | type Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
+    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+139 |     stringgggggggggg,
+140 |     inttttttttttttttttttttttt,
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:145:1
+    |
+144 | # Break both if necessary and keep multiline
+145 | type Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
+    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+146 |     stringgggggggggg,
+147 |     inttttttttttttttttttttttt,
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:274:16
+    |
+272 |     f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+273 |         [
+274 |             a  # comment
+    |                ^^^^^^^^^ Cannot use comments in f-strings on Python 3.10 (syntax was added in Python 3.12)
+275 |         ]
+276 |     }"
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:283:16
+    |
+281 |     f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+282 |         [
+283 |             a  # comment
+    |                ^^^^^^^^^ Cannot use comments in f-strings on Python 3.10 (syntax was added in Python 3.12)
+284 |         ]
+285 |     }"
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:326:15
+    |
+325 | # Flatten and join the t-string
+326 | aaaaaaaaaaa = t"test{expression}flatcean beeeeeeee {joined} eeeeeeeeeeeeeeeee"  # inline
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+327 |
+328 | # Parenthesize the value and join it, inline the comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:330:5
+    |
+328 | # Parenthesize the value and join it, inline the comment
+329 | aaaaaaaaaaa = (
+330 |     t"test{expression}flatcean beeeeeeee {joined} eeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+331 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:335:5
+    |
+333 | # Parenthesize the t-string and keep it multiline because it doesn't fit on a single line including the comment
+334 | aaaaaaaaaaa = (
+335 |     t"test{expression}flat"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+336 |     t"cean beeeeeeee {joined} eeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+337 | )  # inline
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:336:5
+    |
+334 | aaaaaaaaaaa = (
+335 |     t"test{expression}flat"
+336 |     t"cean beeeeeeee {joined} eeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+337 | )  # inline
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:345:5
+    |
+343 |     aaaaaaa,
+344 |     b,
+345 | ] = t"ccccc{expression}ccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:352:5
+    |
+350 |     aaaaaaa,
+351 |     b,
+352 | ] = t"ccccc{expression}ccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+353 |
+354 | # The target splits because of the magic trailing comma
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:360:5
+    |
+358 |     b,
+359 | ] = (
+360 |     t"ccccc{expression}cccccccccccccccccccc"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+361 |     t"cccccccccccccccccccccccccccccccccccccccccc"
+362 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:361:5
+    |
+359 | ] = (
+360 |     t"ccccc{expression}cccccccccccccccccccc"
+361 |     t"cccccccccccccccccccccccccccccccccccccccccc"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+362 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:367:17
+    |
+365 | # The target should be flat
+366 | # The string should be joined because it fits into the line length
+367 | a[aaaaaaa, b] = t"ccccc{expression}ccccccccccccccccccccccccccccccccccc"  # comment
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+368 |
+369 | # Same but starting with a joined string. They should both result in the same formatting.
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:370:17
+    |
+369 | # Same but starting with a joined string. They should both result in the same formatting.
+370 | a[aaaaaaa, b] = t"ccccc{expression}ccccccccccccccccccccccccccccccccccc"  # comment
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+371 |
+372 | # The target should be flat
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:375:5
+    |
+373 | # The string gets parenthesized because it, with the inlined comment, exceeds the line length limit.
+374 | a[aaaaaaa, b] = (
+375 |     t"ccccc{expression}ccccccccccc"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+376 |     t"ccccccccccccccccccccccccccccccccccccccccccc"
+377 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:376:5
+    |
+374 | a[aaaaaaa, b] = (
+375 |     t"ccccc{expression}ccccccccccc"
+376 |     t"ccccccccccccccccccccccccccccccccccccccccccc"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+377 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:384:5
+    |
+382 |     aaaaaaa, b
+383 | ].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+384 |     t"ccccc{expression}ccccccccccccccccccccccccccccccccccccccccc"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+385 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:391:5
+    |
+389 |     aaaaaaa, b
+390 | ].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+391 |     t"ccccc{expression}cccccccccccccccccccccccccccccccc"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+392 |     t"ccccccccccccccccccccccccccccccc"
+393 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:392:5
+    |
+390 | ].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+391 |     t"ccccc{expression}cccccccccccccccccccccccccccccccc"
+392 |     t"ccccccccccccccccccccccccccccccc"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+393 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:397:5
+    |
+395 |   # Don't inline t-strings that contain expressions that are guaranteed to split, e.b. because of a magic trailing comma
+396 |   aaaaaaaaaaaaaaaaaa = (
+397 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+398 | |         [
+399 | |             a,
+400 | |         ]
+401 | |     }"
+    | |______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+402 |       t"moreeeeeeeeeeeeeeeeeeee"
+403 |       t"test"
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:402:5
+    |
+400 |         ]
+401 |     }"
+402 |     t"moreeeeeeeeeeeeeeeeeeee"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+403 |     t"test"
+404 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:403:5
+    |
+401 |     }"
+402 |     t"moreeeeeeeeeeeeeeeeeeee"
+403 |     t"test"
+    |     ^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+404 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:407:5
+    |
+406 |   aaaaaaaaaaaaaaaaaa = (
+407 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+408 | |         [
+409 | |             a,
+410 | |         ]
+411 | |     }"
+    | |______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+412 |       t"moreeeeeeeeeeeeeeeeeeee"
+413 |       t"test"  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:412:5
+    |
+410 |         ]
+411 |     }"
+412 |     t"moreeeeeeeeeeeeeeeeeeee"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+413 |     t"test"  # comment
+414 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:413:5
+    |
+411 |     }"
+412 |     t"moreeeeeeeeeeeeeeeeeeee"
+413 |     t"test"  # comment
+    |     ^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+414 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:417:5
+    |
+416 |   aaaaa[aaaaaaaaaaa] = (
+417 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+418 | |         [
+419 | |             a,
+420 | |         ]
+421 | |     }"
+    | |______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+422 |       t"moreeeeeeeeeeeeeeeeeeee"
+423 |       t"test"
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:422:5
+    |
+420 |         ]
+421 |     }"
+422 |     t"moreeeeeeeeeeeeeeeeeeee"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+423 |     t"test"
+424 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:423:5
+    |
+421 |     }"
+422 |     t"moreeeeeeeeeeeeeeeeeeee"
+423 |     t"test"
+    |     ^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+424 | )  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:427:5
+    |
+426 |   aaaaa[aaaaaaaaaaa] = (
+427 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+428 | |         [
+429 | |             a,
+430 | |         ]
+431 | |     }"
+    | |______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+432 |       t"moreeeeeeeeeeeeeeeeeeee"
+433 |       t"test"  # comment
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:432:5
+    |
+430 |         ]
+431 |     }"
+432 |     t"moreeeeeeeeeeeeeeeeeeee"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+433 |     t"test"  # comment
+434 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:433:5
+    |
+431 |     }"
+432 |     t"moreeeeeeeeeeeeeeeeeeee"
+433 |     t"test"  # comment
+    |     ^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+434 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:438:5
+    |
+436 |   # Don't inline t-strings that contain commented expressions
+437 |   aaaaaaaaaaaaaaaaaa = (
+438 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+439 | |         [
+440 | |             a  # comment
+441 | |         ]
+442 | |     }"
+    | |______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+443 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+444 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:443:5
+    |
+441 |         ]
+442 |     }"
+443 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+444 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:447:5
+    |
+446 |   aaaaa[aaaaaaaaaaa] = (
+447 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+448 | |         [
+449 | |             a  # comment
+450 | |         ]
+451 | |     }"
+    | |______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+452 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+453 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:452:5
+    |
+450 |         ]
+451 |     }"
+452 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+453 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:457:5
+    |
+455 |   # Don't inline t-strings with multiline debug expressions:
+456 |   aaaaaaaaaaaaaaaaaa = (
+457 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+458 | |     a=}"
+    | |________^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+459 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+460 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:459:5
+    |
+457 |     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+458 |     a=}"
+459 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+460 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:463:5
+    |
+462 |   aaaaaaaaaaaaaaaaaa = (
+463 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+464 | |     b=}"
+    | |________^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+465 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+466 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:465:5
+    |
+463 |     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+464 |     b=}"
+465 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+466 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:469:5
+    |
+468 |   aaaaaaaaaaaaaaaaaa = (
+469 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+470 | |     =}"
+    | |_______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+471 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+472 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:471:5
+    |
+469 |     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+470 |     =}"
+471 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+472 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:475:5
+    |
+474 |   aaaaa[aaaaaaaaaaa] = (
+475 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+476 | |     a=}"
+    | |________^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+477 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+478 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:477:5
+    |
+475 |     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+476 |     a=}"
+477 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+478 | )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:481:5
+    |
+480 |   aaaaa[aaaaaaaaaaa] = (
+481 | /     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+482 | |     =}"
+    | |_______^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+483 |       t"moreeeeeeeeeeeeeeeeeetest"  # comment
+484 |   )
+    |
+
+error[invalid-syntax]
+   --> join_implicit_concatenated_string_assignment.py:483:5
+    |
+481 |     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+482 |     =}"
+483 |     t"moreeeeeeeeeeeeeeeeeetest"  # comment
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+484 | )
+    |

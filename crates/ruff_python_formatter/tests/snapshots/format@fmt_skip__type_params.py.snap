@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/type_params.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -90,3 +89,70 @@ def test  [
 ]  () -> str:  # fmt: skip
     ...
 ```
+
+
+## Unsupported Syntax Errors
+error[invalid-syntax]
+ --> type_params.py:1:20
+  |
+1 | class TestTypeParam[ T ]:  # fmt: skip
+  |                    ^^^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+2 |     pass
+  |
+
+error[invalid-syntax]
+  --> type_params.py:5:21
+   |
+ 5 |   class TestTypeParam [ # trailing open paren comment
+   |  _____________________^
+ 6 | |     # leading comment
+ 7 | |     T # trailing type param comment
+ 8 | |     # trailing type param own line comment
+ 9 | | ]:  # fmt: skip
+   | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+10 |       pass
+   |
+
+error[invalid-syntax]
+  --> type_params.py:13:27
+   |
+13 |   class TestTrailingComment4[
+   |  ___________________________^
+14 | |     T
+15 | | ]  ( # trailing arguments open parenthesis comment
+   | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+16 |       # leading argument comment
+17 |       A # trailing argument comment
+   |
+
+error[invalid-syntax]
+  --> type_params.py:23:11
+   |
+23 |   def test  [
+   |  ___________^
+24 | |     # comment
+25 | |     A,
+26 | |
+27 | |     # another
+28 | |
+29 | |     B,
+30 | | ]  ():  # fmt: skip
+   | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+31 |       ...
+   |
+
+error[invalid-syntax]
+  --> type_params.py:34:11
+   |
+34 |   def test  [
+   |  ___________^
+35 | |     # comment
+36 | |     A,
+37 | |
+38 | |     # another
+39 | |
+40 | |     B,
+41 | | ]  () -> str:  # fmt: skip
+   | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+42 |       ...
+   |

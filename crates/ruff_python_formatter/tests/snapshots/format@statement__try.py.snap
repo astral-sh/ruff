@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/try.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -392,3 +391,27 @@ finally:
  
      def f():
 ```
+
+
+## Unsupported Syntax Errors
+error[invalid-syntax]
+  --> try.py:87:7
+   |
+85 |     # end of body
+86 | # before except
+87 | except* (Exception, ValueError) as exc:  # except line
+   |       ^ Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+88 |     pass
+89 | # before except 2
+   |
+
+error[invalid-syntax]
+  --> try.py:90:7
+   |
+88 |     pass
+89 | # before except 2
+90 | except* KeyError as key:  # except line 2
+   |       ^ Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+91 |     pass
+92 |     # in body 2
+   |
