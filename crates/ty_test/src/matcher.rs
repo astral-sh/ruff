@@ -372,6 +372,10 @@ impl Matcher {
                 });
                 matched_revealed_type.is_some()
             }
+            ParsedAssertion::Hover(_hover) => {
+                // TODO: Implement hover matching once hover diagnostic infrastructure is in place
+                false
+            }
         }
     }
 }
