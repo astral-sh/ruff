@@ -22,7 +22,7 @@ use ty_python_semantic::{
 };
 
 #[derive(Clone, Debug)]
-pub(crate) enum GotoTarget<'a> {
+pub enum GotoTarget<'a> {
     Expression(ast::ExprRef<'a>),
     FunctionDef(&'a ast::StmtFunctionDef),
     ClassDef(&'a ast::StmtClassDef),
@@ -269,7 +269,7 @@ impl<'db> DefinitionsOrTargets<'db> {
 }
 
 impl GotoTarget<'_> {
-    pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+    pub fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let ty = match self {
             GotoTarget::Expression(expression) => expression.inferred_type(model),
             GotoTarget::FunctionDef(function) => function.inferred_type(model),
@@ -820,7 +820,7 @@ fn definitions_to_navigation_targets<'db>(
     }
 }
 
-pub(crate) fn find_goto_target(
+pub fn find_goto_target(
     parsed: &ParsedModuleRef,
     offset: TextSize,
 ) -> Option<GotoTarget<'_>> {

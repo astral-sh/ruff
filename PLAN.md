@@ -139,3 +139,12 @@ def foo() -> int: ...
   - Fixed infer_type_at_position to handle expression statements (StmtExpr nodes)
   - Learned that arrow positioning must align exactly with target expression characters
   - hover.md created but needs arrow alignment fixes (arrows must point to exact character positions)
+- **2025-10-08**: Refactored to use ty_ide's existing infrastructure
+  - User feedback: original suggestion to avoid ty_ide dependency was a mistake
+  - Made ty_test::Db implement ty_project::Db (added project field)
+  - Added ty_project dependency to ty_test
+  - Made GotoTarget, find_goto_target, and GotoTarget::inferred_type public in ty_ide
+  - Exported GotoTarget, find_goto_target, Hover, and HoverContent from ty_ide
+  - Updated hover.rs to use ty_ide::find_goto_target instead of custom find_covering_node
+  - All tests pass with the refactored implementation
+  - **Implementation now uses ty_ide's existing covering node logic as requested**

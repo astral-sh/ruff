@@ -6,11 +6,10 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::AnyNodeRef;
 use ruff_source_file::{PositionEncoding, SourceLocation};
-use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::{HasType, SemanticModel};
+use ruff_text_size::TextSize;
+use ty_ide::find_goto_target;
+use ty_python_semantic::SemanticModel;
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::check_output::CheckOutput;
@@ -25,86 +24,17 @@ pub(crate) struct HoverOutput {
     pub(crate) inferred_type: String,
 }
 
-/// Find the AST node with minimal range that fully contains the given offset.
-/// Returns the smallest expression node if possible, skipping over identifier-only nodes.
-fn find_covering_node(root: AnyNodeRef<'_>, offset: TextSize) -> Option<AnyNodeRef<'_>> {
-    struct Visitor<'a> {
-        offset: TextSize,
-        minimal_node: Option<AnyNodeRef<'a>>,
-        minimal_expr: Option<AnyNodeRef<'a>>,
-    }
-
-    impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
-        fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-            if node.range().contains(self.offset) {
-                // Update minimal_node if this node's range is smaller than the current one
-                if let Some(current) = self.minimal_node {
-                    if node.range().len() < current.range().len() {
-                        self.minimal_node = Some(node);
-                    }
-                } else {
-                    self.minimal_node = Some(node);
-                }
-
-                // Also track the smallest expression node
-                if node.as_expr_ref().is_some() {
-                    if let Some(current) = self.minimal_expr {
-                        if node.range().len() < current.range().len() {
-                            self.minimal_expr = Some(node);
-                        }
-                    } else {
-                        self.minimal_expr = Some(node);
-                    }
-                }
-
-                TraversalSignal::Traverse
-            } else {
-                TraversalSignal::Skip
-            }
-        }
-    }
-
-    let mut visitor = Visitor {
-        offset,
-        minimal_node: None,
-        minimal_expr: None,
-    };
-
-    root.visit_source_order(&mut visitor);
-
-    // Prefer the minimal expression node if we found one, otherwise return the minimal node
-    visitor.minimal_expr.or(visitor.minimal_node)
-}
-
-/// Get the inferred type at a given position in a file.
+/// Get the inferred type at a given position in a file using ty_ide's goto logic.
 /// Returns None if no node is found at that position or if the node has no type.
+///
+/// Unlike ty_ide::hover, this function includes types for literals, which is useful
+/// for testing type inference in mdtest assertions.
 fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<String> {
     let parsed = parsed_module(db, file).load(db);
-    let ast = parsed.syntax();
-    let root: AnyNodeRef = ast.into();
-
-    let node = find_covering_node(root, offset)?;
+    let goto_target = find_goto_target(&parsed, offset)?;
 
     let model = SemanticModel::new(db, file);
-
-    // Get the expression at this position. If we found a statement node, it might contain
-    // expressions, but we want to find the most specific expression node, so return None
-    // and rely on the visitor having found a more specific expression child node.
-    let expr = if let Some(expr) = node.as_expr_ref() {
-        expr
-    } else if let Some(stmt) = node.as_stmt_ref() {
-        // If we found a statement, check if it's an expression statement
-        match stmt {
-            ruff_python_ast::StmtRef::Expr(expr_stmt) => expr_stmt.value.as_ref().into(),
-            _ => {
-                return None;
-            }
-        }
-    } else {
-        return None;
-    };
-
-    let ty = expr.inferred_type(&model);
+    let ty = goto_target.inferred_type(&model)?;
 
     Some(ty.display(db).to_string())
 }
