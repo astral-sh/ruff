@@ -1642,7 +1642,9 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(lhs_bound_typevar),
                 Type::NonInferableTypeVar(rhs_bound_typevar),
-            ) if lhs_bound_typevar == rhs_bound_typevar => ConstraintSet::from(true),
+            ) if lhs_bound_typevar.is_identical_to(db, rhs_bound_typevar) => {
+                ConstraintSet::from(true)
+            }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
@@ -7782,6 +7784,12 @@ pub struct TypeVarInstance<'db> {
     _default: Option<TypeVarDefaultEvaluation<'db>>,
 
     pub kind: TypeVarKind,
+
+    /// If this typevar was transformed from another typevar via `mark_typevars_inferable`, this
+    /// records the identity of the "original" typevar, so we can recognize them as the same
+    /// typevar in `bind_typevar`. TODO: this (and the `is_identical_to` methods) should be
+    /// removable once we remove `mark_typevars_inferable`.
+    pub(crate) original: Option<TypeVarInstance<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -7892,6 +7900,7 @@ impl<'db> TypeVarInstance<'db> {
                     .map(|ty| ty.normalized_impl(db, visitor).into()),
             }),
             self.kind(db),
+            self.original(db),
         )
     }
 
@@ -7937,6 +7946,7 @@ impl<'db> TypeVarInstance<'db> {
                     .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
             }),
             self.kind(db),
+            self.original(db),
         )
     }
 
@@ -7950,10 +7960,7 @@ impl<'db> TypeVarInstance<'db> {
         // inferable, so we set the parameter to `None` here.
         let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
 
-        Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
+        let new_bound_or_constraints =
             self._bound_or_constraints(db)
                 .map(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
@@ -7963,20 +7970,44 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
                     | TypeVarBoundOrConstraintsEvaluation::LazyConstraints => bound_or_constraints,
-                }),
-            self.explicit_variance(db),
-            self._default(db).and_then(|default| match default {
-                TypeVarDefaultEvaluation::Eager(ty) => Some(
-                    ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                        .into(),
-                ),
-                TypeVarDefaultEvaluation::Lazy => self.lazy_default(db).map(|ty| {
-                    ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                        .into()
-                }),
+                });
+
+        let new_default = self._default(db).and_then(|default| match default {
+            TypeVarDefaultEvaluation::Eager(ty) => Some(
+                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into(),
+            ),
+            TypeVarDefaultEvaluation::Lazy => self.lazy_default(db).map(|ty| {
+                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into()
             }),
+        });
+
+        // Ensure that we only modify the `original` field if we are going to modify one or both of
+        // `_bound_or_constraints` and `_default`; don't trigger creation of a new
+        // `TypeVarInstance` unnecessarily.
+        let new_original = if new_bound_or_constraints == self._bound_or_constraints(db)
+            && new_default == self._default(db)
+        {
+            self.original(db)
+        } else {
+            Some(self)
+        };
+
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            new_bound_or_constraints,
+            self.explicit_variance(db),
+            new_default,
             self.kind(db),
+            new_original,
         )
+    }
+
+    fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self == other || (self.original(db) == Some(other) || other.original(db) == Some(self))
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
@@ -7996,6 +8027,7 @@ impl<'db> TypeVarInstance<'db> {
             self.explicit_variance(db),
             None,
             self.kind(db),
+            self.original(db),
         ))
     }
 
@@ -8160,6 +8192,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 Some(variance),
                 None, // _default
                 TypeVarKind::Pep695,
+                None,
             ),
             BindingContext::Synthetic,
         )
@@ -8181,9 +8214,22 @@ impl<'db> BoundTypeVarInstance<'db> {
                 Some(TypeVarVariance::Invariant),
                 None,
                 TypeVarKind::TypingSelf,
+                None,
             ),
             binding_context,
         )
+    }
+
+    pub(crate) fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        if self.binding_context(db) != other.binding_context(db) {
+            return false;
+        }
+
+        self.typevar(db).is_identical_to(db, other.typevar(db))
     }
 
     pub(crate) fn variance_with_polarity(

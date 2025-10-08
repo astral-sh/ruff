@@ -2964,6 +2964,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None,
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
             TypeVarKind::Pep695,
+            None,
         )));
         self.add_declaration_with_binding(
             node.into(),
@@ -4257,6 +4258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(variance),
             default,
             TypeVarKind::Legacy,
+            None,
         )))
     }
 

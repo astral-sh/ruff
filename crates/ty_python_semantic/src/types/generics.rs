@@ -126,6 +126,7 @@ pub(crate) fn typing_self<'db>(
         Some(TypeVarVariance::Invariant),
         None,
         TypeVarKind::TypingSelf,
+        None,
     );
 
     bind_typevar(
@@ -396,7 +397,7 @@ impl<'db> GenericContext<'db> {
         typevar: TypeVarInstance<'db>,
     ) -> Option<BoundTypeVarInstance<'db>> {
         self.variables(db)
-            .find(|self_bound_typevar| self_bound_typevar.typevar(db) == typevar)
+            .find(|self_bound_typevar| self_bound_typevar.typevar(db).is_identical_to(db, typevar))
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not

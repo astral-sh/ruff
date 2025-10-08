@@ -411,4 +411,27 @@ class D(Generic[V]):
 reveal_type(D().x)  # revealed: V@D
 ```
 
+## Regression
+
+### Use of typevar with default inside a function body that binds it
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+_DataT = TypeVar("_DataT", bound=int, default=int)
+
+class Event(Generic[_DataT]):
+    def __init__(self, data: _DataT) -> None:
+        self.data = data
+
+def async_fire_internal(event_data: _DataT):
+    event: Event[_DataT] | None = None
+    event = Event(event_data)
+```
+
 [generics]: https://typing.python.org/en/latest/spec/generics.html
