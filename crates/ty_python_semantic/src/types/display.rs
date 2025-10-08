@@ -134,24 +134,24 @@ impl<'db> AmbiguousClassCollector<'db> {
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
                         if *existing != class {
-                            let class_parents = class.class_parents(db);
-                            if existing.class_parents(db) == class_parents {
+                            let qualified_name_components = class.qualified_name_components(db);
+                            if existing.qualified_name_components(db) == qualified_name_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             } else {
                                 *value = AmbiguityState::RequiresFullyQualifiedName {
                                     class,
-                                    class_parents,
+                                    qualified_name_components,
                                 };
                             }
                         }
                     }
                     AmbiguityState::RequiresFullyQualifiedName {
                         class: existing,
-                        class_parents,
+                        qualified_name_components,
                     } => {
                         if *existing != class {
-                            let new_class_parents = class.class_parents(db);
-                            if *class_parents == new_class_parents {
+                            let new_components = class.qualified_name_components(db);
+                            if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             }
                         }
@@ -172,7 +172,7 @@ enum AmbiguityState<'db> {
     /// The class must be displayed using its fully qualified name to avoid ambiguity.
     RequiresFullyQualifiedName {
         class: ClassLiteral<'db>,
-        class_parents: Vec<String>,
+        qualified_name_components: Vec<String>,
     },
     /// Even the class's fully qualified name is not sufficient;
     /// we must also include the file and line number.
@@ -275,16 +275,14 @@ impl<'db> ClassLiteral<'db> {
             settings,
         }
     }
-}
 
-struct ClassDisplay<'db> {
-    db: &'db dyn Db,
-    class: ClassLiteral<'db>,
-    settings: DisplaySettings<'db>,
-}
-
-impl<'db> ClassLiteral<'db> {
-    fn class_parents(self, db: &'db dyn Db) -> Vec<String> {
+    /// Returns the components of the qualified name of this class, excluding this class itself.
+    ///
+    /// For example, calling this method on a class `C` in the module `a.b` would return
+    /// `["a", "b"]`. Calling this method on a class `D` inside the namespace of a method
+    /// `m` inside the namespace of a class `C` in the module `a.b` would return
+    /// `["a", "b", "C", "<locals of function 'm'>"]`.
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
         let body_scope = self.body_scope(db);
         let file = body_scope.file(db);
         let module_ast = parsed_module(db, file).load(db);
@@ -325,11 +323,17 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
+struct ClassDisplay<'db> {
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    settings: DisplaySettings<'db>,
+}
+
 impl Display for ClassDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
         if qualification_level.is_some() {
-            for parent in self.class.class_parents(self.db) {
+            for parent in self.class.qualified_name_components(self.db) {
                 f.write_str(&parent)?;
                 f.write_char('.')?;
             }
