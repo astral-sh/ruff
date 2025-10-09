@@ -6276,6 +6276,18 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         let new_specialization =
             self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
+        eprintln!(
+            "DEBUGPRINT[68]: types.rs:5987: specialization={:#?}",
+            specialization
+        );
+        eprintln!(
+            "DEBUGPRINT[67]: types.rs:5987: self={:#?}",
+            self.display(db)
+        );
+        eprintln!(
+            "DEBUGPRINT[65]: types.rs:5986: new_specialization={:#?}",
+            new_specialization
+        );
         match specialization.materialization_kind(db) {
             None => new_specialization,
             Some(materialization_kind) => new_specialization.materialize(

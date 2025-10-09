@@ -134,6 +134,10 @@ impl<'db> Bindings<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: &TypeContext<'db>,
     ) -> Result<Self, CallError<'db>> {
+        eprintln!(
+            "in check types return type: {}",
+            self.return_type(db).display(db)
+        );
         for element in &mut self.elements {
             if let Some(mut updated_argument_forms) =
                 element.check_types(db, argument_types, call_expression_tcx)
@@ -144,7 +148,6 @@ impl<'db> Bindings<'db> {
                 self.argument_forms = updated_argument_forms;
             }
         }
-
         self.evaluate_known_cases(db);
 
         // In order of precedence:
@@ -1308,7 +1311,8 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
 
-        // Step 1: Check the result of the arity check which is done by `match_parameters`
+        dbg!(self.matching_overload_index());
+        // Step 1: Check the result of the parity check which is done by `match_parameters`
         let matching_overload_indexes = match self.matching_overload_index() {
             MatchingOverloadIndex::None => {
                 // If no candidate overloads remain from the arity check, we can stop here. We
@@ -2886,6 +2890,12 @@ impl<'db> Binding<'db> {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
         self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+        if self.signature.display(db).to_string().contains("cls") {
+            eprintln!("here");
+            eprintln!("signature {}", self.signature.display(db));
+            // dbg!(&self.signature.return_ty);
+            // dbg!(&self.return_ty);
+        }
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
@@ -2915,7 +2925,15 @@ impl<'db> Binding<'db> {
         checker.check_argument_types();
         self.specialization = checker.finish();
         if let Some(specialization) = self.specialization {
+            eprintln!(
+                "DEBUGPRINT[66]: before: self.return_ty={:#?}",
+                self.return_ty
+            );
             self.return_ty = self.return_ty.apply_specialization(db, specialization);
+            eprintln!(
+                "DEBUGPRINT[66]: after: self.return_ty={:#?}",
+                self.return_ty
+            );
         }
     }
 
