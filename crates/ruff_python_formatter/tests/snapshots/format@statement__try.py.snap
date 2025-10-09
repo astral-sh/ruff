@@ -391,27 +391,3 @@ finally:
  
      def f():
 ```
-
-
-## Unsupported Syntax Errors
-error[invalid-syntax]: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
-  --> try.py:87:7
-   |
-85 |     # end of body
-86 | # before except
-87 | except* (Exception, ValueError) as exc:  # except line
-   |       ^
-88 |     pass
-89 | # before except 2
-   |
-
-error[invalid-syntax]: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
-  --> try.py:90:7
-   |
-88 |     pass
-89 | # before except 2
-90 | except* KeyError as key:  # except line 2
-   |       ^
-91 |     pass
-92 |     # in body 2
-   |

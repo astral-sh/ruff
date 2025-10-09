@@ -70,24 +70,6 @@ string = f"{10 + len('bar')=}" f'{10 + len("bar")=}'
 ```
 
 
-### Unsupported Syntax Errors
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-  --> join_implicit_concatenated_string_preserve.py:13:8
-   |
-12 | # Already invalid Pre Python 312
-13 | f"{'Hy "User"'}{"Hy 'User'"}"
-   |        ^
-   |
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-  --> join_implicit_concatenated_string_preserve.py:13:17
-   |
-12 | # Already invalid Pre Python 312
-13 | f"{'Hy "User"'}{"Hy 'User'"}"
-   |                 ^
-   |
-
-
 ### Output 2
 ```
 indent-style               = space

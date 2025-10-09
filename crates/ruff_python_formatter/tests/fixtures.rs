@@ -430,7 +430,7 @@ Formatted twice:
 /// [`NormalizedMod`] and related structs. Namely, formatting can change indentation within strings,
 /// and can also flatten tuples within `del` statements.
 ///
-/// Returns any [`UnsupportedSyntaxError`]s in the formatted code as [`Diagnostic`]s for
+/// Returns any new [`UnsupportedSyntaxError`]s in the formatted code as [`Diagnostic`]s for
 /// snapshotting.
 fn ensure_unchanged_ast(
     unformatted_code: &str,
@@ -482,18 +482,6 @@ fn ensure_unchanged_ast(
             diag
         })
         .collect::<Vec<_>>();
-
-    if !formatted_unsupported_syntax_errors.is_empty() {
-        panic!(
-            "Formatted code `{}` introduced new unsupported syntax errors:\n---\n{}\n---",
-            input_path.display(),
-            DisplayDiagnostics::new(
-                &DummyFileResolver,
-                &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
-                &diagnostics
-            )
-        );
-    }
 
     let mut formatted_ast = formatted_parsed.into_syntax();
     Normalizer.visit_module(&mut formatted_ast);

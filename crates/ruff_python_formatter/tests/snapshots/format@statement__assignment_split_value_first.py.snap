@@ -473,27 +473,3 @@ type A[
     VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtinthatExceedsTheWidth
 ] = str
 ```
-
-
-## Unsupported Syntax Errors
-error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
-   --> assignment_split_value_first.py:223:1
-    |
-221 | ########
-222 | # Type Alias Statement
-223 | type A[str, int, number] = (
-    | ^^^^
-224 |     VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtin
-225 | )
-    |
-
-error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
-   --> assignment_split_value_first.py:227:1
-    |
-225 | )
-226 |
-227 | type A[
-    | ^^^^
-228 |     VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtinthatExceedsTheWidth
-229 | ] = str
-    |

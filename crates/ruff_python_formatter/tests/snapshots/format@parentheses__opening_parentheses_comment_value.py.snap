@@ -346,17 +346,3 @@ f5 = {  # f5
     i: i**2 for i in range(10)
 }
 ```
-
-
-## Unsupported Syntax Errors
-error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
-   --> opening_parentheses_comment_value.py:170:7
-    |
-169 |   # Non-empty parentheses: These are not allowed without a value
-170 |   def f1[  # f1
-    |  _______^
-171 | |     T
-172 | | ]():
-    | |_^
-173 |       pass
-    |
