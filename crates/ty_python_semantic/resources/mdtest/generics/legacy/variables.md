@@ -6,6 +6,8 @@ for both type variable syntaxes.
 
 Unless otherwise specified, all quotations come from the [Generics] section of the typing spec.
 
+Diagnostics for invalid type variables are snapshotted in `diagnostics/legacy_typevars.md`.
+
 ## Type variables
 
 ### Defining legacy type variables
@@ -21,6 +23,15 @@ from typing import TypeVar
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
 reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T.__name__)  # revealed: Literal["T"]
+```
+
+The typevar name can also be provided as a keyword argument:
+
+```py
+from typing import TypeVar
+
+T = TypeVar(name="T")
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 

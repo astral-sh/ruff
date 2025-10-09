@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 # Diagnostics
 
 ```
-error[invalid-legacy-type-variable]: The name of a `typing.TypeVar` (`Q`) must match the name of the variable it is assigned to (`T`)
+error[invalid-legacy-type-variable]: The name of a `TypeVar` (`Q`) must match the name of the variable it is assigned to (`T`)
  --> src/mdtest_snippet.py:4:1
   |
 3 | # error: [invalid-legacy-type-variable]

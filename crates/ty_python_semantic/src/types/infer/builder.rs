@@ -4089,6 +4089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut default = None;
         let mut covariant = false;
         let mut contravariant = false;
+        let mut name_param_ty = None;
 
         if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
             return error(
@@ -4107,6 +4108,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             };
             match identifier.id().as_str() {
+                "name" => {
+                    // Duplicate keyword argument is a syntax error, so we don't have to check if
+                    // `name_param_ty.is_some()` here.
+                    if !arguments.args.is_empty() {
+                        return error(
+                            &self.context,
+                            "The `name` parameter of `TypeVar` can only be provided once.",
+                            kwarg,
+                        );
+                    }
+                    name_param_ty =
+                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                }
                 "bound" => has_bound = true,
                 "covariant" => {
                     match self
@@ -4187,7 +4201,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (true, true) => {
                 return error(
                     &self.context,
-                    "A `typing.TypeVar` cannot be both covariant and contravariant",
+                    "A `TypeVar` cannot be both covariant and contravariant",
                     call_expr,
                 );
             }
@@ -4196,15 +4210,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (false, false) => TypeVarVariance::Invariant,
         };
 
-        let Some(name_param) = arguments
-            .find_positional(0)
-            .map(|arg| self.infer_expression(arg, TypeContext::default()))
-            .and_then(Type::into_string_literal)
+        let Some(name_param_ty) = name_param_ty.or_else(|| {
+            arguments
+                .find_positional(0)
+                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+        }) else {
+            return error(
+                &self.context,
+                "The `name` parameter of `TypeVar` is required.",
+                call_expr,
+            );
+        };
+
+        let Some(name_param) = name_param_ty
+            .into_string_literal()
             .map(|name| name.value(db))
         else {
             return error(
                 &self.context,
-                "The first argument to `typing.TypeVar` must be a string literal.",
+                "The first argument to `TypeVar` must be a string literal.",
                 call_expr,
             );
         };
@@ -4215,7 +4239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return error(
                 &self.context,
-                "A `typing.TypeVar` definition must be a simple variable assignment",
+                "A `TypeVar` definition must be a simple variable assignment",
                 target,
             );
         };
@@ -4224,7 +4248,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return error(
                 &self.context,
                 format_args!(
-                    "The name of a `typing.TypeVar` (`{name_param}`) must match \
+                    "The name of a `TypeVar` (`{name_param}`) must match \
                     the name of the variable it is assigned to (`{target_name}`)"
                 ),
                 target,
@@ -4234,7 +4258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
-        let num_constraints = arguments.args.len() - 1;
+        let num_constraints = arguments.args.len().saturating_sub(1);
 
         let bound_or_constraints = match (has_bound, num_constraints) {
             (false, 0) => None,
@@ -4242,15 +4266,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (true, _) => {
                 return error(
                     &self.context,
-                    "A `typing.TypeVar` cannot have both a bound and constraints",
+                    "A `TypeVar` cannot have both a bound and constraints",
                     call_expr,
                 );
             }
             (_, 1) => {
                 return error(
                     &self.context,
-                    "A `typing.TypeVar` cannot have exactly one constraint",
-                    arguments.args.get(1).unwrap(),
+                    "A `TypeVar` cannot have exactly one constraint",
+                    &arguments.args[1],
                 );
             }
             (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),

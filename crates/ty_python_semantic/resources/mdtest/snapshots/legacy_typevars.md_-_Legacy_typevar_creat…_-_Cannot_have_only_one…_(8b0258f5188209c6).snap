@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 # Diagnostics
 
 ```
-error[invalid-legacy-type-variable]: A `typing.TypeVar` cannot have exactly one constraint
+error[invalid-legacy-type-variable]: A `TypeVar` cannot have exactly one constraint
  --> src/mdtest_snippet.py:4:18
   |
 3 | # error: [invalid-legacy-type-variable]

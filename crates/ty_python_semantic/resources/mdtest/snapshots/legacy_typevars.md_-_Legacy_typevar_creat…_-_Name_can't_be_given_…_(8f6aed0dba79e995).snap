@@ -3,7 +3,7 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: legacy_typevars.md - Legacy typevar creation diagnostics - Cannot have both bound and constraint
+mdtest name: legacy_typevars.md - Legacy typevar creation diagnostics - Name can't be given more than once
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typevars.md
 ---
 
@@ -15,18 +15,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 1 | from typing import TypeVar
 2 | 
 3 | # error: [invalid-legacy-type-variable]
-4 | T = TypeVar("T", int, str, bound=bytes)
+4 | T = TypeVar("T", name="T")
 ```
 
 # Diagnostics
 
 ```
-error[invalid-legacy-type-variable]: A `TypeVar` cannot have both a bound and constraints
- --> src/mdtest_snippet.py:4:5
+error[invalid-legacy-type-variable]: The `name` parameter of `TypeVar` can only be provided once.
+ --> src/mdtest_snippet.py:4:18
   |
 3 | # error: [invalid-legacy-type-variable]
-4 | T = TypeVar("T", int, str, bound=bytes)
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | T = TypeVar("T", name="T")
+  |                  ^^^^^^^^
   |
 info: rule `invalid-legacy-type-variable` is enabled by default
 

@@ -4,6 +4,24 @@ The full tests for these features are in `generics/legacy/variables.md`.
 
 <!-- snapshot-diagnostics -->
 
+## Must have a name
+
+```py
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar()
+```
+
+## Name can't be given more than once
+
+```py
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", name="T")
+```
+
 ## Must be directly assigned to a variable
 
 > A `TypeVar()` expression must always directly be assigned to a variable (it should not be used as
