@@ -222,6 +222,13 @@ reveal_type(o)  # revealed: list[tuple[Literal[1], ...]]
 
 p: list[tuple[int, ...]] = [(1, 1, 1)]
 reveal_type(p)  # revealed: list[tuple[int, ...]]
+
+# literal promotion occurs based on assignability, an exact match is not required
+q: list[int | Literal[1]] = [1]
+reveal_type(q)  # revealed: list[int]
+
+r: list[Literal[1, 2, 3, 4]] = [1, 2]
+reveal_type(r)  # revealed: list[Literal[1, 2, 3, 4]]
 ```
 
 ## PEP-604 annotations are supported
