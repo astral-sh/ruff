@@ -67,7 +67,7 @@ class C:
     name: str
 ```
 
-## Types of decorators
+## Types of dataclass-transformers
 
 The examples from this section are straight from the Python documentation on
 [`typing.dataclass_transform`].
@@ -365,9 +365,130 @@ model.name = "new"  # No error
 model < model  # No error
 ```
 
-### `field_specifiers`
+### Overwriting of default parameters on the dataclass-like class
 
-To do
+#### Using function-based decorators
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def default_frozen_model(*, frozen: bool = True): ...
+@default_frozen_model()
+class Frozen:
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+@default_frozen_model(frozen=False)
+class Mutable:
+    name: str
+
+m = Mutable(name="test")
+m.name = "new"  # No error
+```
+
+#### Using metaclass-based decorators
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class DefaultFrozenMeta(type):
+    def __new__(
+        cls,
+        name,
+        bases,
+        namespace,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class DefaultFrozenModel(metaclass=DefaultFrozenMeta): ...
+
+class Frozen(DefaultFrozenModel):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+class Mutable(DefaultFrozenModel, frozen=False):
+    name: str
+
+m = Mutable(name="test")
+# TODO: no error here
+m.name = "new"  # error: [invalid-assignment]
+```
+
+#### Using base-class-based decorators
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class DefaultFrozenModel:
+    def __init_subclass__(
+        cls,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class Frozen(DefaultFrozenModel):
+    name: str
+
+# TODO: no error here
+# error: [unknown-argument]
+f = Frozen(name="test")
+# TODO: this should be an `invalid-assignment` error
+f.name = "new"
+
+class Mutable(DefaultFrozenModel, frozen=False):
+    name: str
+
+# TODO: no error here
+# error: [unknown-argument]
+m = Mutable(name="test")
+m.name = "new"  # No error
+```
+
+## `field_specifiers`
+
+The `field_specifiers` argument can be used to specify a list of functions that should be treated
+similar to `dataclasses.field` for normal dataclasses.
+
+The [`typing.dataclass_transform`] specification also allows classes (such as `dataclasses.Field`)
+to be listed in `field_specifiers`, but it is currently unclear how this should work, and other type
+checkers do not seem to support this either.
+
+### Basic example
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field(init=False)
+    name: str = fancy_field()
+    age: int | None = fancy_field(kw_only=True)
+
+# TODO: Should be `(self: Person, name: str, *, age: int | None) -> None`
+reveal_type(Person.__init__)  # revealed: (self: Person, id: int = Any, name: str = Any, age: int | None = Any) -> None
+
+# TODO: No error here
+# error: [invalid-argument-type]
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
 
 ## Overloaded dataclass-like decorators
 
