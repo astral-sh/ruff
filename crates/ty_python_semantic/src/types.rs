@@ -1731,12 +1731,22 @@ impl<'db> Type<'db> {
                     )
                 })
                 .and(db, || {
+                    // For subtyping/redundancy, we would want to check whether the *top materialization*
+                    // of `self` is disjoint from the *top materialization* of `neg_ty`. As an
+                    // optimization, however, we can avoid this explicit transformation here, since our
+                    // `Type::is_disjoint_from` implementation already only returns true for
+                    // `T.is_disjoint_from(U)` if the *top materialization* of `T` is disjoint from the
+                    // *top materialization* of `U`.
+                    let self_ty = match relation {
+                        TypeRelation::Subtyping | TypeRelation::Redundancy => self,
+                        TypeRelation::Assignability => self.bottom_materialization(db),
+                    };
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping | TypeRelation::Redundancy => neg_ty,
                             TypeRelation::Assignability => neg_ty.bottom_materialization(db),
                         };
-                        self.is_disjoint_from_impl(
+                        self_ty.is_disjoint_from_impl(
                             db,
                             neg_ty,
                             disjointness_visitor,
@@ -2262,10 +2272,20 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type and `other` have no common elements.
+    /// Return true if the top materialization of `self` has no overlap with the
+    /// top materialization of `other`.
     ///
-    /// Note: This function aims to have no false positives, but might return
-    /// wrong `false` answers in some cases.
+    /// In other words, return true if there are no possible materializations
+    /// of the pair of types that could result in any possible runtime value
+    /// simultaneously inhabiting both types.
+    ///
+    /// For example, `list[int]` is disjoint from `list[str]`: the two types have
+    /// no overlap. But `list[Any]` is not disjoint from `list[str]`: there exists
+    /// a fully static materialization of `list[Any]` (`list[str]`) that is a
+    /// subtype of `list[str]`
+    ///
+    /// This function aims to have no false positives, but might return wrong
+    /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_disjoint_from(db, other).is_always_satisfied()
     }
