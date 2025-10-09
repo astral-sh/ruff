@@ -388,20 +388,22 @@ fn validate_from_keywords<'db, 'ast>(
 /// Validates a `TypedDict` dictionary literal assignment,
 /// e.g. `person: Person = {"name": "Alice", "age": 30}`
 pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
+    db: &'db dyn Db,
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     dict_expr: &'ast ast::ExprDict,
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
-) -> Result<OrderSet<&'ast str>, OrderSet<&'ast str>> {
+) -> Result<OrderSet<&'db str>, OrderSet<&'db str>> {
     let mut valid = true;
     let mut provided_keys = OrderSet::new();
 
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
         if let Some(key_expr) = &item.key {
-            if let ast::Expr::StringLiteral(key_literal) = key_expr {
-                let key_str = key_literal.value.to_str();
+            let key_ty = expression_type_fn(key_expr);
+            if let Type::StringLiteral(key_str) = key_ty {
+                let key_str = key_str.value(db);
                 provided_keys.insert(key_str);
 
                 let value_type = expression_type_fn(&item.value);
