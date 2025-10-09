@@ -808,295 +808,295 @@ with (
 
 
 ### Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:9:6
    |
  7 |     # trailing
  8 |
  9 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 10 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 11 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:17:6
    |
 17 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 18 |     a,  # a  # comma
 19 |     b,  # c
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:24:6
    |
 24 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 25 |     a as (  # a  # as
 26 |         # own line
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:34:6
    |
 32 |     # body trailing own
 33 |
 34 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 35 |     a as (  # a  # as
 36 |         # own line
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:43:6
    |
 43 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 44 |     a,
 45 | ):  # magic trailing comma
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:70:6
    |
 68 |     pass
 69 |
 70 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 71 |     # leading comment
 72 |     a as b
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
   --> with.py:76:6
    |
 74 |     pass
 75 |
 76 | with (
-   |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |      ^
 77 |     a as b
 78 |     # trailing comment
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:106:6
     |
 104 |     pass
 105 |
 106 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 107 |     (
 108 |         a
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:116:6
     |
 114 |     pass
 115 |
 116 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 117 |     # comment
 118 |     a
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:122:6
     |
 120 |     pass
 121 |
 122 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 123 |     a  # comment
 124 | ):
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:127:6
     |
 125 |     pass
 126 |
 127 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 128 |     a
 129 |     # comment
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:133:6
     |
 131 |     pass
 132 |
 133 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 134 |     # comment
 135 |     a as b
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:139:6
     |
 137 |     pass
 138 |
 139 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 140 |     a as b  # comment
 141 | ):
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:144:6
     |
 142 |     pass
 143 |
 144 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 145 |     a as b
 146 |     # comment
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:150:6
     |
 148 |     pass
 149 |
 150 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 151 |     [
 152 |         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:176:6
     |
 175 | # Comments on open parentheses
 176 | with (  # comment
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 177 |     CtxManager1() as example1,
 178 |     CtxManager2() as example2,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:183:6
     |
 181 |     pass
 182 |
 183 | with (  # outer comment
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 184 |     (  # inner comment
 185 |         CtxManager1()
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:244:6
     |
 242 |     pass
 243 |
 244 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 245 |     a as b,
 246 |     # foo
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:270:6
     |
 268 |     pass
 269 |
 270 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 271 |     f(
 272 |         a,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:298:6
     |
 296 |     pass
 297 |
 298 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 299 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 300 |     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:305:6
     |
 303 |     pass
 304 |
 305 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 306 |     (
 307 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:317:10
     |
 316 | if True:
 317 |     with (
-    |          ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |          ^
 318 |         anyio.CancelScope(shield=True)
 319 |         if get_running_loop()
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:325:10
     |
 324 | if True:
 325 |     with (
-    |          ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |          ^
 326 |         anyio.CancelScope(shield=True)
 327 |         and B
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:333:10
     |
 332 | if True:
 333 |     with (
-    |          ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |          ^
 334 |         anyio.CancelScope(shield=True)
 335 |         if get_running_loop()
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:359:6
     |
 357 |     pass
 358 |
 359 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 360 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 361 | ):
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:379:6
     |
 378 | # Regression test for https://github.com/astral-sh/ruff/issues/14001
 379 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 380 |     open(
 381 |         "some/path.txt",
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:391:6
     |
 391 | with (  # trailing comment
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 392 |     open(
 393 |         "some/path.txt",
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:403:6
     |
 403 | with (
-    |      ^ Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+    |      ^
 404 |     open(
 405 |         "some/path.txt",
     |

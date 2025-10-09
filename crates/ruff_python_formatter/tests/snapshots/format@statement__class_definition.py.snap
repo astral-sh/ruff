@@ -541,23 +541,23 @@ class Foo5: ...
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
   --> class_definition.py:65:27
    |
 65 | class TestTrailingComment3[T]:  # trailing comment
-   |                           ^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+   |                           ^^^
 66 |     pass
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
   --> class_definition.py:69:27
    |
 69 | class TestTrailingComment4[T](A):  # trailing comment
-   |                           ^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+   |                           ^^^
 70 |     pass
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:171:21
     |
 171 |   class TestTypeParams[
@@ -566,11 +566,11 @@ error[invalid-syntax]
 173 | |     Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
 174 | |     Cccccccccccccccccccccc,
 175 | | ]:
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 176 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:179:21
     |
 179 |   class TestTypeParams[
@@ -579,52 +579,52 @@ error[invalid-syntax]
 181 | |     *Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
 182 | |     **Cccccccccccccccccccccc,
 183 | | ]:
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 184 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:187:21
     |
 187 |   class TestTypeParams[
     |  _____________________^
 188 | |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…
 189 | | ]:
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 190 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:193:21
     |
 193 |   class TestTypeParams[
     |  _____________________^
 194 | |     *Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…
 195 | | ]:
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 196 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:199:21
     |
 199 |   class TestTypeParams[
     |  _____________________^
 200 | |     **Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…
 201 | | ]:
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 202 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:205:21
     |
 205 | class TestTypeParams[**P, *Ts, T]:
-    |                     ^^^^^^^^^^^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    |                     ^^^^^^^^^^^^^
 206 |     pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:209:21
     |
 209 |   class TestTypeParams[  # trailing bracket comment
@@ -638,46 +638,46 @@ error[invalid-syntax]
 216 | |     D,  # trailing comment
 217 | |     # leading bracket comment
 218 | | ]:
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 219 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:222:21
     |
 222 |   class TestTypeParams[
     |  _____________________^
 223 | |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…
 224 | | ](B, C, D):
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 225 |       pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:228:21
     |
 228 |   class TestTypeParams[
     |  _____________________^
 229 | |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…
 230 | | ](
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 231 |       Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
 232 |       Cccccccccccccccccccccccc,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:238:21
     |
 238 | class TestTypeParams[A, B, C](meta=Aaaaaaaaaaaaaaaaaaaaaa):
-    |                     ^^^^^^^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    |                     ^^^^^^^^^
 239 |     pass
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> class_definition.py:271:11
     |
 269 | @decorator
 270 | # comment
 271 | class Foo3[T]: ...
-    |           ^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    |           ^^^
     |

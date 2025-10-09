@@ -1,7 +1,8 @@
 use crate::normalizer::Normalizer;
 use itertools::Itertools;
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, DummyFileResolver,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+    DisplayDiagnostics, DummyFileResolver, Severity, Span,
 };
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::comparable::ComparableMod;
@@ -493,7 +494,12 @@ fn ensure_unchanged_ast(
     let diagnostics = formatted_parsed
         .unsupported_syntax_errors()
         .iter()
-        .map(|error| Diagnostic::invalid_syntax(file.clone(), error, error))
+        .map(|error| {
+            let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, error);
+            let span = Span::from(file.clone()).with_range(error.range());
+            diag.annotate(Annotation::primary(span));
+            diag
+        })
         .collect::<Vec<_>>();
 
     let mut formatted_ast = formatted_parsed.into_syntax();

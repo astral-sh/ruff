@@ -349,7 +349,7 @@ f5 = {  # f5
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> opening_parentheses_comment_value.py:170:7
     |
 169 |   # Non-empty parentheses: These are not allowed without a value
@@ -357,6 +357,6 @@ error[invalid-syntax]
     |  _______^
 171 | |     T
 172 | | ]():
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
 173 |       pass
     |

@@ -897,381 +897,381 @@ f"aaaaaaaaaaaaaaaa \
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
   --> join_implicit_concatenated_string.py:23:8
    |
 21 | "two \"double\" two 'single'"
 22 |
 23 | f"{'Hy "User"'}more"
-   |        ^ Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+   |        ^
 24 |
 25 | b"aaaaaaaaabbbbbbbbbbbbbbbbbbbb"  # Join
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:101:1
     |
 100 |   # Join, and break expressions
 101 | / t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{
 102 | |     expression
 103 | | }bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccc {20999}more"
-    | |___________________________________________________________________________^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | |___________________________________________________________________________^
 104 |
 105 |   # Join, but don't break the expressions
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:106:1
     |
 105 | # Join, but don't break the expressions
 106 | t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccc {20999}more"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 107 |
 108 | t"test{expression}flatcan be {joined} together"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:108:1
     |
 106 | t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccc {20999}more"
 107 |
 108 | t"test{expression}flatcan be {joined} together"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 109 |
 110 | aaaaaaaaaaa = (
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:111:5
     |
 110 | aaaaaaaaaaa = (
 111 |     t"test{expression}flat"
-    |     ^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
 112 |     t"cean beeeeeeee {joined} eeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 113 | )  # inline
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:112:5
     |
 110 | aaaaaaaaaaa = (
 111 |     t"test{expression}flat"
 112 |     t"cean beeeeeeee {joined} eeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 113 | )  # inline
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:116:1
     |
 116 | t"single quoted '{x}'double quoted \"{x}\""  # Same number of quotes => use preferred quote style
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 117 | t'single quote \' {x}double quoted "{x}"'  # More double quotes => use single quotes
 118 | t"single quoted '{x}'double quote \" {x}\""  # More single quotes => use double quotes
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:117:1
     |
 116 | t"single quoted '{x}'double quoted \"{x}\""  # Same number of quotes => use preferred quote style
 117 | t'single quote \' {x}double quoted "{x}"'  # More double quotes => use single quotes
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 118 | t"single quoted '{x}'double quote \" {x}\""  # More single quotes => use double quotes
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:118:1
     |
 116 | t"single quoted '{x}'double quoted \"{x}\""  # Same number of quotes => use preferred quote style
 117 | t'single quote \' {x}double quoted "{x}"'  # More double quotes => use single quotes
 118 | t"single quoted '{x}'double quote \" {x}\""  # More single quotes => use double quotes
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 119 |
 120 | # Different triple quoted strings
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:121:1
     |
 120 | # Different triple quoted strings
 121 | t"{'''test'''}{'''other'''}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 122 |
 123 | # Now with inner quotes
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:124:1
     |
 123 | # Now with inner quotes
 124 | t"{'''test ' '''}{'''other " '''}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 125 | t"{some_where_nested('''test ' ''')}{'''other " ''' + 'more'}"
 126 | t"{b'''test ' '''}{b'''other " '''}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:125:1
     |
 123 | # Now with inner quotes
 124 | t"{'''test ' '''}{'''other " '''}"
 125 | t"{some_where_nested('''test ' ''')}{'''other " ''' + 'more'}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 126 | t"{b'''test ' '''}{b'''other " '''}"
 127 | t"{t'''test ' '''}{t'''other " '''}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:126:1
     |
 124 | t"{'''test ' '''}{'''other " '''}"
 125 | t"{some_where_nested('''test ' ''')}{'''other " ''' + 'more'}"
 126 | t"{b'''test ' '''}{b'''other " '''}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 127 | t"{t'''test ' '''}{t'''other " '''}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:127:4
     |
 125 | t"{some_where_nested('''test ' ''')}{'''other " ''' + 'more'}"
 126 | t"{b'''test ' '''}{b'''other " '''}"
 127 | t"{t'''test ' '''}{t'''other " '''}"
-    |    ^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |    ^^^^^^^^^^^^^^
 128 |
 129 | # debug expressions containing quotes
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:127:20
     |
 125 | t"{some_where_nested('''test ' ''')}{'''other " ''' + 'more'}"
 126 | t"{b'''test ' '''}{b'''other " '''}"
 127 | t"{t'''test ' '''}{t'''other " '''}"
-    |                    ^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |                    ^^^^^^^^^^^^^^^
 128 |
 129 | # debug expressions containing quotes
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:127:1
     |
 125 | t"{some_where_nested('''test ' ''')}{'''other " ''' + 'more'}"
 126 | t"{b'''test ' '''}{b'''other " '''}"
 127 | t"{t'''test ' '''}{t'''other " '''}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 128 |
 129 | # debug expressions containing quotes
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:130:1
     |
 129 | # debug expressions containing quotes
 130 | t"{10 + len('bar')=}{10 + len('bar')=}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 131 | t"{10 + len('bar')=}no debug{10}{10 + len('bar')=}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:131:1
     |
 129 | # debug expressions containing quotes
 130 | t"{10 + len('bar')=}{10 + len('bar')=}"
 131 | t"{10 + len('bar')=}no debug{10}{10 + len('bar')=}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 132 |
 133 | # We can't safely merge this pre Python 3.12 without altering the debug expression.
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:134:1
     |
 133 | # We can't safely merge this pre Python 3.12 without altering the debug expression.
 134 | t"{10 + len('bar')=}{10 + len("bar")=}"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:147:1
     |
 145 | f"test" Rf"test"
 146 |
 147 | t"test" rt"test"
-    | ^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^
 148 | t"test" Rt"test"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:147:9
     |
 145 | f"test" Rf"test"
 146 |
 147 | t"test" rt"test"
-    |         ^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |         ^^^^^^^^
 148 | t"test" Rt"test"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:148:1
     |
 147 | t"test" rt"test"
 148 | t"test" Rt"test"
-    | ^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:148:9
     |
 147 | t"test" rt"test"
 148 | t"test" Rt"test"
-    |         ^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |         ^^^^^^^^
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:159:1
     |
 157 | "single" f""""single"""
 158 |
 159 | t"single" t""""single"""
-    | ^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | ^^^^^^^^^
 160 |
 161 | b"single" b"""triple"""
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> join_implicit_concatenated_string.py:159:11
     |
 157 | "single" f""""single"""
 158 |
 159 | t"single" t""""single"""
-    |           ^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |           ^^^^^^^^^^^^^^
 160 |
 161 | b"single" b"""triple"""
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:436:15
     |
 434 | # Regression tests for https://github.com/astral-sh/ruff/issues/13935
 435 |
 436 | f'a{1=: "abcd \'\'}'
-    |               ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |               ^
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:436:17
     |
 434 | # Regression tests for https://github.com/astral-sh/ruff/issues/13935
 435 |
 436 | f'a{1=: "abcd \'\'}'
-    |                 ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                 ^
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:436:16
     |
 434 | # Regression tests for https://github.com/astral-sh/ruff/issues/13935
 435 |
 436 | f'a{1=: "abcd \'\'}'
-    |                ^ Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                ^
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:437:14
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
-    |              ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |              ^
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:437:16
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
-    |                ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                ^
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:437:15
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
-    |               ^ Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |               ^
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:438:14
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
-    |              ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |              ^
 439 |
 440 | # These strings contains escaped newline characters and should be joined, they are
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:438:16
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
-    |                ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                ^
 439 |
 440 | # These strings contains escaped newline characters and should be joined, they are
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:438:15
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
-    |               ^ Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |               ^
 439 |
 440 | # These strings contains escaped newline characters and should be joined, they are
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:438:34
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
-    |                                  ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                                  ^
 439 |
 440 | # These strings contains escaped newline characters and should be joined, they are
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:438:36
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
-    |                                    ^ Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                                    ^
 439 |
 440 | # These strings contains escaped newline characters and should be joined, they are
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> join_implicit_concatenated_string.py:438:35
     |
 436 | f'a{1=: "abcd \'\'}'
 437 | f'{1=: "abcd \'\'}a'
 438 | f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
-    |                                   ^ Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+    |                                   ^
 439 |
 440 | # These strings contains escaped newline characters and should be joined, they are
     |

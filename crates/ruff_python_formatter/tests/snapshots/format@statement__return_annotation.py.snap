@@ -511,39 +511,39 @@ def process_board_action(
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> return_annotation.py:112:6
     |
 112 | def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> (
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 113 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 114 | ): ...
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> return_annotation.py:117:6
     |
 117 |   def f[
     |  ______^
 118 | |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 119 | | ]() -> a: ...
-    | |_^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    | |_^
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> return_annotation.py:122:6
     |
 122 | def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 123 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 124 | ) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
    --> return_annotation.py:127:6
     |
 127 | def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 128 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 129 | ) -> a: ...
     |

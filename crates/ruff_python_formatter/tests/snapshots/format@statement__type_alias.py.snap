@@ -406,692 +406,692 @@ type short_bound_long_default[
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
  --> type_alias.py:2:1
   |
 1 | # basic usage
 2 | type X = int
-  | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+  | ^^^^
 3 | type X = int | str
 4 | type X = int | "ForwardRefY"
   |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
  --> type_alias.py:3:1
   |
 1 | # basic usage
 2 | type X = int
 3 | type X = int | str
-  | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+  | ^^^^
 4 | type X = int | "ForwardRefY"
 5 | type X[T] = T | list[X[T]]  # recursive
   |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
  --> type_alias.py:4:1
   |
 2 | type X = int
 3 | type X = int | str
 4 | type X = int | "ForwardRefY"
-  | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+  | ^^^^
 5 | type X[T] = T | list[X[T]]  # recursive
 6 | type X[T] = int
   |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
  --> type_alias.py:5:1
   |
 3 | type X = int | str
 4 | type X = int | "ForwardRefY"
 5 | type X[T] = T | list[X[T]]  # recursive
-  | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+  | ^^^^
 6 | type X[T] = int
 7 | type X[T] = list[T] | set[T]
   |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
  --> type_alias.py:6:1
   |
 4 | type X = int | "ForwardRefY"
 5 | type X[T] = T | list[X[T]]  # recursive
 6 | type X[T] = int
-  | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+  | ^^^^
 7 | type X[T] = list[T] | set[T]
 8 | type X[T = int] = int
   |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
  --> type_alias.py:7:1
   |
 5 | type X[T] = T | list[X[T]]  # recursive
 6 | type X[T] = int
 7 | type X[T] = list[T] | set[T]
-  | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+  | ^^^^
 8 | type X[T = int] = int
 9 | type X[T: int = int] = int
   |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:8:1
    |
  6 | type X[T] = int
  7 | type X[T] = list[T] | set[T]
  8 | type X[T = int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
  9 | type X[T: int = int] = int
 10 | type X[**P = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
   --> type_alias.py:8:10
    |
  6 | type X[T] = int
  7 | type X[T] = list[T] | set[T]
  8 | type X[T = int] = int
-   |          ^^^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+   |          ^^^^^
  9 | type X[T: int = int] = int
 10 | type X[**P = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:9:1
    |
  7 | type X[T] = list[T] | set[T]
  8 | type X[T = int] = int
  9 | type X[T: int = int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 10 | type X[**P = int] = int
 11 | type X[*Ts = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
   --> type_alias.py:9:15
    |
  7 | type X[T] = list[T] | set[T]
  8 | type X[T = int] = int
  9 | type X[T: int = int] = int
-   |               ^^^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+   |               ^^^^^
 10 | type X[**P = int] = int
 11 | type X[*Ts = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:10:1
    |
  8 | type X[T = int] = int
  9 | type X[T: int = int] = int
 10 | type X[**P = int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 11 | type X[*Ts = int] = int
 12 | type X[*Ts = *int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:11:1
    |
  9 | type X[T: int = int] = int
 10 | type X[**P = int] = int
 11 | type X[*Ts = int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 12 | type X[*Ts = *int] = int
 13 | type X[T, *Ts, **P] = (T, Ts, P)
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:12:1
    |
 10 | type X[**P = int] = int
 11 | type X[*Ts = int] = int
 12 | type X[*Ts = *int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 13 | type X[T, *Ts, **P] = (T, Ts, P)
 14 | type X[T: int, *Ts, **P] = (T, Ts, P)
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:13:1
    |
 11 | type X[*Ts = int] = int
 12 | type X[*Ts = *int] = int
 13 | type X[T, *Ts, **P] = (T, Ts, P)
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 14 | type X[T: int, *Ts, **P] = (T, Ts, P)
 15 | type X[T: (int, str), *Ts, **P] = (T, Ts, P)
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:14:1
    |
 12 | type X[*Ts = *int] = int
 13 | type X[T, *Ts, **P] = (T, Ts, P)
 14 | type X[T: int, *Ts, **P] = (T, Ts, P)
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 15 | type X[T: (int, str), *Ts, **P] = (T, Ts, P)
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:15:1
    |
 13 | type X[T, *Ts, **P] = (T, Ts, P)
 14 | type X[T: int, *Ts, **P] = (T, Ts, P)
 15 | type X[T: (int, str), *Ts, **P] = (T, Ts, P)
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 16 |
 17 | # long name
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:18:1
    |
 17 | # long name
 18 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 19 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[
 20 |     A
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:19:1
    |
 17 | # long name
 18 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = int
 19 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 20 |     A
 21 | ] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:22:1
    |
 20 |     A
 21 | ] = int
 22 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 23 |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaa
 24 | ] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:25:1
    |
 23 |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaa
 24 | ] = int
 25 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 26 |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 27 |     Bbbbbbbbbbbbb,
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:29:1
    |
 27 |     Bbbbbbbbbbbbb,
 28 | ] = int
 29 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Ttttt…
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 30 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = (
 31 |     Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt  # with comment
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:30:1
    |
 28 | ] = int
 29 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Ttttt…
 30 | type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = (
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 31 |     Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt  # with comment
 32 | )
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:35:1
    |
 34 | # long value
 35 | type X = Ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt…
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 36 | type X = (
 37 |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:36:1
    |
 34 | # long value
 35 | type X = Ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt…
 36 | type X = (
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 37 |     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 38 |     | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:41:1
    |
 39 |     | Ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 40 | )
 41 | type XXXXXXXXXXXXX = (
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 42 |     Tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt  # with comment
 43 | )
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:46:1
    |
 45 | # soft keyword as alias name
 46 | type type = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 47 | type match = int
 48 | type case = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:47:1
    |
 45 | # soft keyword as alias name
 46 | type type = int
 47 | type match = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 48 | type case = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:48:1
    |
 46 | type type = int
 47 | type match = int
 48 | type case = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 49 |
 50 | # soft keyword as value
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:51:1
    |
 50 | # soft keyword as value
 51 | type foo = type
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 52 | type foo = match
 53 | type foo = case
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:52:1
    |
 50 | # soft keyword as value
 51 | type foo = type
 52 | type foo = match
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 53 | type foo = case
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:53:1
    |
 51 | type foo = type
 52 | type foo = match
 53 | type foo = case
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 54 |
 55 | # multine definitions
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:56:1
    |
 55 | # multine definitions
 56 | type X = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 57 | type X = int
 58 | type X = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:57:1
    |
 55 | # multine definitions
 56 | type X = int
 57 | type X = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 58 | type X = int
 59 | type X = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:58:1
    |
 56 | type X = int
 57 | type X = int
 58 | type X = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 59 | type X = int
 60 | type X[T] = T
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:59:1
    |
 57 | type X = int
 58 | type X = int
 59 | type X = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 60 | type X[T] = T
 61 | type X[T] = T
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:60:1
    |
 58 | type X = int
 59 | type X = int
 60 | type X[T] = T
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 61 | type X[T] = T
 62 | type X[T] = T
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:61:1
    |
 59 | type X = int
 60 | type X[T] = T
 61 | type X[T] = T
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 62 | type X[T] = T
 63 | type X[T] = T
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:62:1
    |
 60 | type X[T] = T
 61 | type X[T] = T
 62 | type X[T] = T
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 63 | type X[T] = T
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:63:1
    |
 61 | type X[T] = T
 62 | type X[T] = T
 63 | type X[T] = T
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 64 |
 65 | # bounds and defaults with multiline definitions
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:66:1
    |
 65 | # bounds and defaults with multiline definitions
 66 | type X[T: int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 67 | type X[T: int] = int
 68 | type X[T = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:67:1
    |
 65 | # bounds and defaults with multiline definitions
 66 | type X[T: int] = int
 67 | type X[T: int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 68 | type X[T = int] = int
 69 | type X[T = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:68:1
    |
 66 | type X[T: int] = int
 67 | type X[T: int] = int
 68 | type X[T = int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 69 | type X[T = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
   --> type_alias.py:68:10
    |
 66 | type X[T: int] = int
 67 | type X[T: int] = int
 68 | type X[T = int] = int
-   |          ^^^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+   |          ^^^^^
 69 | type X[T = int] = int
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:69:1
    |
 67 | type X[T: int] = int
 68 | type X[T = int] = int
 69 | type X[T = int] = int
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 70 |
 71 | # type leading comment
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
   --> type_alias.py:69:10
    |
 67 | type X[T: int] = int
 68 | type X[T = int] = int
 69 | type X[T = int] = int
-   |          ^^^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+   |          ^^^^^
 70 |
 71 | # type leading comment
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:72:1
    |
 71 | # type leading comment
 72 | type X = (  # trailing open paren comment
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 73 |     # value leading comment
 74 |     int  # value trailing comment
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:80:1
    |
 79 | # type leading comment
 80 | type X = (
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 81 |     # value leading comment
 82 |     int  # value trailing comment
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:87:1
    |
 86 | # type parameters
 87 | type type_params_single_line[
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 88 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 89 |     bbbbbbbbbbbbbbb,
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
   --> type_alias.py:92:1
    |
 90 |     ccccccccccccccccc,
 91 | ] = int
 92 | type type_params_arguments_on_their_own_line[
-   | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+   | ^^^^
 93 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 94 |     bbbbbbbbbbbbbbb,
    |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:99:1
     |
  97 |     eeeeeee,
  98 | ] = int
  99 | type type_params_argument_per_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 100 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 101 |     bbbbbbbbbbbbbbb,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:107:1
     |
 105 |     ffffffffffff,
 106 | ] = int
 107 | type type_params_trailing_comma[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 108 |     a,
 109 |     b,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:111:1
     |
 109 |     b,
 110 | ] = int
 111 | type type_params_comments[  # trailing open bracket comment
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 112 |     # leading comment
 113 |     A,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:121:1
     |
 119 |     # leading close bracket comment
 120 | ] = int  # trailing value comment
 121 | type type_params_single_comment[  # trailing open bracket comment
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 122 |     A,
 123 |     B,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:125:1
     |
 123 |     B,
 124 | ] = int
 125 | type type_params_all_kinds[type_var, *type_var_tuple, **param_spec] = int
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 126 |
 127 | # type variable bounds
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:128:1
     |
 127 | # type variable bounds
 128 | type bounds_single_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 129 |     T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc)
 130 | ] = T
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:131:1
     |
 129 |     T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc)
 130 | ] = T
 131 | type bounds_arguments_on_their_own_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 132 |     T: (
 133 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:140:1
     |
 138 |     )
 139 | ] = T
 140 | type bounds_argument_per_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 141 |     T: (
 142 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:150:1
     |
 148 |     )
 149 | ] = T
 150 | type bounds_trailing_comma[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 151 |     T: (
 152 |         a,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:158:1
     |
 157 | # bounds plus comments
 158 | type comment_before_colon[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 159 |     T: # comment
 160 |     int
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:162:1
     |
 160 |     int
 161 | ] = T
 162 | type comment_after_colon[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 163 |     T: # comment
 164 |     int
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:166:1
     |
 164 |     int
 165 | ] = T
 166 | type comment_on_its_own_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 167 |     T: # comment
 168 |     # another comment
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:174:1
     |
 173 | # type variable defaults
 174 | type defaults_single_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 175 |     T = (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc)
 176 | ] = T
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:175:7
     |
 173 | # type variable defaults
 174 | type defaults_single_line[
 175 |     T = (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc)
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 176 | ] = T
 177 | type defaults_on_their_own_line[
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:177:1
     |
 175 |     T = (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc)
 176 | ] = T
 177 | type defaults_on_their_own_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 178 |     T = (
 179 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:178:7
     |
 176 |   ] = T
@@ -1104,23 +1104,23 @@ error[invalid-syntax]
 182 | |         ddddddddddddd,
 183 | |         eeeeeee,
 184 | |     )
-    | |_____^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_____^
 185 |   ] = T
 186 |   type defaults_one_per_line[
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:186:1
     |
 184 |     )
 185 | ] = T
 186 | type defaults_one_per_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 187 |     T = (
 188 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:187:7
     |
 185 |   ] = T
@@ -1134,23 +1134,23 @@ error[invalid-syntax]
 192 | |         eeeeeeeeeeeeeeee,
 193 | |         ffffffffffff,
 194 | |     )
-    | |_____^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_____^
 195 |   ] = T
 196 |   type defaults_trailing_comma[
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:196:1
     |
 194 |     )
 195 | ] = T
 196 | type defaults_trailing_comma[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 197 |     T = (
 198 |         a,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:197:7
     |
 195 |   ] = T
@@ -1160,21 +1160,21 @@ error[invalid-syntax]
 198 | |         a,
 199 | |         b,
 200 | |     )
-    | |_____^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_____^
 201 |   ] = T
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:204:1
     |
 203 | # defaults plus comments
 204 | type comment_before_colon[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 205 |     T = # comment
 206 |     int
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:205:7
     |
 203 |   # defaults plus comments
@@ -1182,23 +1182,23 @@ error[invalid-syntax]
 205 |       T = # comment
     |  _______^
 206 | |     int
-    | |_______^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_______^
 207 |   ] = T
 208 |   type comment_after_colon[
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:208:1
     |
 206 |     int
 207 | ] = T
 208 | type comment_after_colon[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 209 |     T = # comment
 210 |     int
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:209:7
     |
 207 |   ] = T
@@ -1206,23 +1206,23 @@ error[invalid-syntax]
 209 |       T = # comment
     |  _______^
 210 | |     int
-    | |_______^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_______^
 211 |   ] = T
 212 |   type comment_on_its_own_line[
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:212:1
     |
 210 |     int
 211 | ] = T
 212 | type comment_on_its_own_line[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 213 |     T = # comment
 214 |     # another comment
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:213:7
     |
 211 |   ] = T
@@ -1231,76 +1231,76 @@ error[invalid-syntax]
     |  _______^
 214 | |     # another comment
 215 | |     int
-    | |_______^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_______^
 216 |       # why not another
 217 |   ] = T
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:218:1
     |
 216 |     # why not another
 217 | ] = T
 218 | type after_star[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 219 |     *Ts = # comment
 220 |     *int
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:224:1
     |
 223 | # both bounds and defaults
 224 | type bound_and_default[T: int = int] = int
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 225 | type long_bound_short_default[
 226 |     T: (
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:224:31
     |
 223 | # both bounds and defaults
 224 | type bound_and_default[T: int = int] = int
-    |                               ^^^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    |                               ^^^^^
 225 | type long_bound_short_default[
 226 |     T: (
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:225:1
     |
 223 | # both bounds and defaults
 224 | type bound_and_default[T: int = int] = int
 225 | type long_bound_short_default[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 226 |     T: (
 227 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:232:7
     |
 230 |         ddddddddddddd,
 231 |         eeeeeee,
 232 |     ) = a
-    |       ^^^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    |       ^^^
 233 | ] = int
 234 | type short_bound_long_default[
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
    --> type_alias.py:234:1
     |
 232 |     ) = a
 233 | ] = int
 234 | type short_bound_long_default[
-    | ^^^^ Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+    | ^^^^
 235 |     T: a = (
 236 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
    --> type_alias.py:235:10
     |
 233 |   ] = int
@@ -1313,6 +1313,6 @@ error[invalid-syntax]
 239 | |         ddddddddddddd,
 240 | |         eeeeeee,
 241 | |     )
-    | |_____^ Cannot set default type for a type parameter on Python 3.10 (syntax was added in Python 3.13)
+    | |_____^
 242 |   ] = int
     |

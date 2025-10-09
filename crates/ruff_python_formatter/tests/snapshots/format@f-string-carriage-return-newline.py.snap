@@ -28,7 +28,7 @@ t"{
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
  --> f-string-carriage-return-newline.py:6:1
   |
 4 |   }"
@@ -36,5 +36,5 @@ error[invalid-syntax]
 6 | / t"{
 7 | | 1=
 8 | | }"
-  | |__^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+  | |__^
   |

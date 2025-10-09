@@ -255,45 +255,45 @@ data[  # comment 1
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
    --> slice.py:115:6
     |
 113 | # PEP 646 introduced starred expression in indexes
 114 | # https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
 115 | data[*x]
-    |      ^^ Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+    |      ^^
 116 | data[*x,]
 117 | data[*x,]
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
    --> slice.py:116:6
     |
 114 | # https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
 115 | data[*x]
 116 | data[*x,]
-    |      ^^ Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+    |      ^^
 117 | data[*x,]
 118 | data[  # comment 1
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
    --> slice.py:117:6
     |
 115 | data[*x]
 116 | data[*x,]
 117 | data[*x,]
-    |      ^^ Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+    |      ^^
 118 | data[  # comment 1
 119 |     *x,  # comment 2
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
    --> slice.py:119:5
     |
 117 | data[*x,]
 118 | data[  # comment 1
 119 |     *x,  # comment 2
-    |     ^^ Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+    |     ^^
 120 | ]  # comment 3
     |

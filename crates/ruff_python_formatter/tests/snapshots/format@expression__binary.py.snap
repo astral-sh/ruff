@@ -962,36 +962,36 @@ aaaaaaaaaaa = (
 
 
 ## Unsupported Syntax Errors
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> binary.py:489:20
     |
 488 | # This t-string should be flattened
 489 | xxxxxxxxxxxxxxxx = t"aaaaaaaaaaaaaaaaaaaaa {expression} bbbbbbbbbbbbbbbbbbbbbbbb" + (
-    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 490 |     yyyyyyyyyyyyyy + zzzzzzzzzzz
 491 | )
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> binary.py:496:5
     |
 494 |   # wrapped in parentheses.
 495 |   (
 496 | /     t"hellooooooooooooooooooooooo \
 497 | |         worlddddddddddddddddddddddddddddddddd"
-    | |______________________________________________^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | |______________________________________________^
 498 |       + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
 499 |   )
     |
 
-error[invalid-syntax]
+error[invalid-syntax]: Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
    --> binary.py:501:5
     |
 499 |   )
 500 |   aaaaaaaaaaa = (
 501 | /     t"hellooooooooooooooooooooooo \
 502 | |         worlddddddddddddddddddddddddddddddddd"
-    | |______________________________________________^ Cannot use t-strings on Python 3.10 (syntax was added in Python 3.14)
+    | |______________________________________________^
 503 |       + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
 504 |   )
     |
