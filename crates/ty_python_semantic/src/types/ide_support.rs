@@ -122,7 +122,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_instance_members(db, ty, class_literal);
 
                 // If this is a NamedTuple instance, include members from NamedTupleFallback
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
             }
@@ -142,7 +142,7 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
 
@@ -153,7 +153,7 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
                 self.extend_with_class_members(db, ty, class_literal);
@@ -164,7 +164,7 @@ impl<'db> AllMembers<'db> {
                     let class_literal = class_type.class_literal(db).0;
                     self.extend_with_class_members(db, ty, class_literal);
 
-                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                         self.extend_with_type(
                             db,
                             KnownClass::NamedTupleFallback.to_class_literal(db),

@@ -122,9 +122,6 @@ class CustomerModel(ModelBase):
     id: int
     name: str
 
-# TODO: this is not supported yet
-# error: [unknown-argument]
-# error: [unknown-argument]
 CustomerModel(id=1, name="Test")
 ```
 
@@ -216,7 +213,7 @@ class OrderedModelBase: ...
 class TestWithBase(OrderedModelBase):
     inner: int
 
-reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
+reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: bool
 ```
 
 ### `kw_only_default`
@@ -273,8 +270,7 @@ class ModelBase: ...
 class TestBase(ModelBase):
     name: str
 
-# TODO: This should be `(self: TestBase, *, name: str) -> None`
-reveal_type(TestBase.__init__)  # revealed: def __init__(self) -> None
+reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
 ```
 
 ### `frozen_default`
@@ -329,12 +325,9 @@ class ModelBase: ...
 class TestMeta(ModelBase):
     name: str
 
-# TODO: no error here
-# error: [unknown-argument]
 t = TestMeta(name="test")
 
-# TODO: this should be an `invalid-assignment` error
-t.name = "new"
+t.name = "new"  # error: [invalid-assignment]
 ```
 
 ### Combining parameters

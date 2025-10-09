@@ -555,7 +555,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
+            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class, None);
 
             // (2) If it's a `NamedTuple` class, check that no field without a default value
             // appears after a field with a default value.
@@ -852,7 +852,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (6) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-                CodeGeneratorKind::from_class(self.db(), class)
+                CodeGeneratorKind::from_class(self.db(), class, None)
             {
                 let specialization = None;
 

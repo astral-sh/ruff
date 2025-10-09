@@ -184,7 +184,11 @@ pub(crate) enum CodeGeneratorKind {
 }
 
 impl CodeGeneratorKind {
-    pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
+    pub(crate) fn from_class(
+        db: &dyn Db,
+        class: ClassLiteral<'_>,
+        specialization: Option<Specialization<'_>>,
+    ) -> Option<Self> {
         #[salsa::tracked(
             cycle_fn=code_generator_of_class_recover,
             cycle_initial=code_generator_of_class_initial,
@@ -193,10 +197,19 @@ impl CodeGeneratorKind {
         fn code_generator_of_class<'db>(
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
+            specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
             } else if let Ok((_, Some(transformer_params))) = class.try_metaclass(db) {
+                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
+            } else if let Some(transformer_params) =
+                class.iter_mro(db, specialization).skip(1).find_map(|base| {
+                    base.into_class().and_then(|class| {
+                        class.class_literal(db).0.dataclass_transformer_params(db)
+                    })
+                })
+            {
                 Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
             } else if class
                 .explicit_bases(db)
@@ -213,6 +226,7 @@ impl CodeGeneratorKind {
         fn code_generator_of_class_initial(
             _db: &dyn Db,
             _class: ClassLiteral<'_>,
+            _specialization: Option<Specialization<'_>>,
         ) -> Option<CodeGeneratorKind> {
             None
         }
@@ -223,16 +237,25 @@ impl CodeGeneratorKind {
             _value: &Option<CodeGeneratorKind>,
             _count: u32,
             _class: ClassLiteral<'_>,
+            _specialization: Option<Specialization<'_>>,
         ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind>> {
             salsa::CycleRecoveryAction::Iterate
         }
 
-        code_generator_of_class(db, class)
+        code_generator_of_class(db, class, specialization)
     }
 
-    pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    pub(super) fn matches(
+        self,
+        db: &dyn Db,
+        class: ClassLiteral<'_>,
+        specialization: Option<Specialization<'_>>,
+    ) -> bool {
         matches!(
-            (CodeGeneratorKind::from_class(db, class), self),
+            (
+                CodeGeneratorKind::from_class(db, class, specialization),
+                self
+            ),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
                 | (Some(Self::NamedTuple), Self::NamedTuple)
                 | (Some(Self::TypedDict), Self::TypedDict)
@@ -2094,7 +2117,7 @@ impl<'db> ClassLiteral<'db> {
             .with_qualifiers(TypeQualifiers::CLASS_VAR);
         }
 
-        if CodeGeneratorKind::NamedTuple.matches(db, self) {
+        if CodeGeneratorKind::NamedTuple.matches(db, self, specialization) {
             if let Some(field) = self
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
@@ -2156,7 +2179,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
 
-        let field_policy = CodeGeneratorKind::from_class(db, self)?;
+        let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 
         let transformer_params =
             if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
@@ -2697,7 +2720,7 @@ impl<'db> ClassLiteral<'db> {
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let (class_literal, specialization) = class.class_literal(db);
-                    if field_policy.matches(db, class_literal) {
+                    if field_policy.matches(db, class_literal, specialization) {
                         Some((class_literal, specialization))
                     } else {
                         None
@@ -3491,7 +3514,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             .map(|class| class.variance_of(db, typevar));
 
         let default_attribute_variance = {
-            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self, None);
             // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
             // their field types in contravariant position, thus meaning a frozen dataclass must
             // still be invariant in its field types. Other synthesized methods on dataclasses are
