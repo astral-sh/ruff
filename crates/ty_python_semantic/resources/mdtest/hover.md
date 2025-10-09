@@ -1,10 +1,10 @@
 # Hover type assertions
 
-You can use the `hover` assertion to test the infered type of an expression. This exercises the same
-logic as the hover LSP action.
+You can use the `hover` assertion to test the inferred type of an expression. This exercises the
+same logic as the hover LSP action.
 
 Typically, you will not need to use the `hover` action to test the behavior of our type inference
-code, since you can also use `reveal_type` to display the infered type of an expression. Since
+code, since you can also use `reveal_type` to display the inferred type of an expression. Since
 `reveal_type` is part of the standard library, we prefer to use it when possible.
 
 However, there are certain situations where `reveal_type` and `hover` will give different results.
@@ -16,10 +16,10 @@ In particular, `reveal_type` is not transparent to bidirectional type checking, 
 ### Basic syntax
 
 The `hover` assertion operates on a specific location in the source text. We find the "inner-most"
-expression at that position, and then query the infered type of that expression. The row to query is
-identified just like any other mdtest assertion. The column to query is identified by a down arrow
-(↓) in the assertion. (Note that the down arrow should always appear immediately before the `hover`
-keyword in the assertion.)
+expression at that position, and then query the inferred type of that expression. The row to query
+is identified just like any other mdtest assertion. The column to query is identified by a down
+arrow (↓) in the assertion. (Note that the down arrow should always appear immediately before the
+`hover` keyword in the assertion.)
 
 ```py
 def test_basic_types(parameter: int) -> None:

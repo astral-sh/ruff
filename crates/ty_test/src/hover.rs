@@ -25,7 +25,7 @@ pub(crate) struct HoverOutput {
 }
 
 /// Get the inferred type at a given position in a file. Returns None if no node is found at that
-/// position or if the node has no infered type.
+/// position or if the node has no inferred type.
 ///
 /// This reuses much of the logic from [`ty_ide::hover`]. Unlike that function, we return types for
 /// literals, which is useful for testing type inference in mdtest assertions.
