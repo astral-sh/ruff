@@ -97,10 +97,10 @@ from typing import TypeVar
 T = TypeVar("T", covariant=True, contravariant=True)
 ```
 
-## Variance parameters must be unambiguous
+## Boolean parameters must be unambiguous
 
 ```py
-from typing import TypeVar
+from typing_extensions import TypeVar
 
 def cond() -> bool:
     return True
@@ -110,6 +110,9 @@ T = TypeVar("T", covariant=cond())
 
 # error: [invalid-legacy-type-variable]
 U = TypeVar("U", contravariant=cond())
+
+# error: [invalid-legacy-type-variable]
+V = TypeVar("V", infer_variance=cond())
 ```
 
 ## Invalid keyword arguments

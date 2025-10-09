@@ -4134,7 +4134,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `covariant` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
-                                kwarg,
+                                &kwarg.value,
                             );
                         }
                     }
@@ -4151,7 +4151,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `contravariant` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
-                                kwarg,
+                                &kwarg.value,
                             );
                         }
                     }
@@ -4180,7 +4180,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     // TODO support `infer_variance` in legacy TypeVars
-                    self.infer_expression(&kwarg.value, TypeContext::default());
+                    if self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                        .is_ambiguous()
+                    {
+                        return error(
+                            &self.context,
+                            "The `infer_variance` parameter of `TypeVar` \
+                            cannot have an ambiguous truthiness",
+                            &kwarg.value,
+                        );
+                    }
                 }
                 name => {
                     // We don't return here; this error is informational since this will error
