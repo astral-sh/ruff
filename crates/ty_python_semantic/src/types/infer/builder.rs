@@ -53,11 +53,12 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, report_bad_dunder_set_call,
+    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, report_bad_dunder_set_call,
     report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
@@ -95,7 +96,7 @@ use crate::types::{
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -212,9 +213,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per declaration at most.
     declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
-    /// The definitions that are deferred.
+    /// The definitions with deferred sub-parts.
     ///
-    /// The list should only contain one entry per deferred.
+    /// The list should only contain one entry per definition.
     deferred: VecSet<Definition<'db>>,
 
     /// The returned types and their corresponding ranges of the region, if it is a function body.
@@ -497,8 +498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Infer the deferred types for the definitions here to consider the end-of-scope
-        // semantics.
+        // Infer deferred types for all definitions.
         for definition in std::mem::take(&mut self.deferred) {
             self.extend_definition(infer_deferred_types(self.db(), definition));
         }
@@ -1244,6 +1244,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVar(typevar) => {
                 self.infer_typevar_deferred(typevar.node(self.module()));
+            }
+            DefinitionKind::Assignment(assignment) => {
+                self.infer_assignment_deferred(assignment.value(self.module()));
             }
             _ => {}
         }
@@ -2961,6 +2964,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None,
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
             TypeVarKind::Pep695,
+            None,
         )));
         self.add_declaration_with_binding(
             node.into(),
@@ -3993,7 +3997,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
-                let value_ty = self.infer_standalone_expression(value, TypeContext::default());
+                let tcx = TypeContext::default();
+                let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
+                {
+                    self.infer_standalone_expression_impl(value, standalone_expression, tcx)
+                } else if let ast::Expr::Call(call_expr) = value {
+                    // If the RHS is not a standalone expression, this is a simple assignment
+                    // (single target, no unpackings). That means it's a valid syntactic form
+                    // for a legacy TypeVar creation; check for that.
+                    let callable_type = self.infer_maybe_standalone_expression(
+                        call_expr.func.as_ref(),
+                        TypeContext::default(),
+                    );
+
+                    let typevar_class = callable_type
+                        .into_class_literal()
+                        .and_then(|cls| cls.known(self.db()))
+                        .filter(|cls| {
+                            matches!(cls, KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
+                        });
+
+                    let ty = if let Some(typevar_class) = typevar_class {
+                        self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
+                    } else {
+                        self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                    };
+                    self.store_expression_type(value, ty);
+                    ty
+                } else {
+                    self.infer_expression(value, tcx)
+                };
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
@@ -4022,6 +4055,272 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.store_expression_type(target, target_ty);
         self.add_binding(target.into(), definition, target_ty);
+    }
+
+    fn infer_legacy_typevar(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+        known_class: KnownClass,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, node) {
+                builder.into_diagnostic(message);
+            }
+            // If the call doesn't create a valid typevar, we'll emit diagnostics and fall back to
+            // just creating a regular instance of `typing.TypeVar`.
+            KnownClass::TypeVar.to_instance(context.db())
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+        let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVar;
+        let assume_all_features = self.in_stub() || is_typing_extensions;
+        let python_version = Program::get(db).python_version(db);
+        let have_features_from =
+            |version: PythonVersion| assume_all_features || python_version >= version;
+
+        let mut has_bound = false;
+        let mut default = None;
+        let mut covariant = false;
+        let mut contravariant = false;
+        let mut name_param_ty = None;
+
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `TypeVar` creation",
+                starred,
+            );
+        }
+
+        for kwarg in &arguments.keywords {
+            let Some(identifier) = kwarg.arg.as_ref() else {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVar` creation",
+                    kwarg,
+                );
+            };
+            match identifier.id().as_str() {
+                "name" => {
+                    // Duplicate keyword argument is a syntax error, so we don't have to check if
+                    // `name_param_ty.is_some()` here.
+                    if !arguments.args.is_empty() {
+                        return error(
+                            &self.context,
+                            "The `name` parameter of `TypeVar` can only be provided once.",
+                            kwarg,
+                        );
+                    }
+                    name_param_ty =
+                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                }
+                "bound" => has_bound = true,
+                "covariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => covariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `covariant` parameter of `TypeVar` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "contravariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => contravariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `contravariant` parameter of `TypeVar` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "default" => {
+                    if !have_features_from(PythonVersion::PY313) {
+                        // We don't return here; this error is informational since this will error
+                        // at runtime, but the user's intent is plain, we may as well respect it.
+                        error(
+                            &self.context,
+                            "The `default` parameter of `typing.TypeVar` was added in Python 3.13",
+                            kwarg,
+                        );
+                    }
+
+                    default = Some(TypeVarDefaultEvaluation::Lazy);
+                }
+                "infer_variance" => {
+                    if !have_features_from(PythonVersion::PY312) {
+                        // We don't return here; this error is informational since this will error
+                        // at runtime, but the user's intent is plain, we may as well respect it.
+                        error(
+                            &self.context,
+                            "The `infer_variance` parameter of `typing.TypeVar` was added in Python 3.12",
+                            kwarg,
+                        );
+                    }
+                    // TODO support `infer_variance` in legacy TypeVars
+                    if self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                        .is_ambiguous()
+                    {
+                        return error(
+                            &self.context,
+                            "The `infer_variance` parameter of `TypeVar` \
+                            cannot have an ambiguous truthiness",
+                            &kwarg.value,
+                        );
+                    }
+                }
+                name => {
+                    // We don't return here; this error is informational since this will error
+                    // at runtime, but it will likely cause fewer cascading errors if we just
+                    // ignore the unknown keyword and still understand as much of the typevar as we
+                    // can.
+                    error(
+                        &self.context,
+                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation",),
+                        kwarg,
+                    );
+                    self.infer_expression(&kwarg.value, TypeContext::default());
+                }
+            }
+        }
+
+        let variance = match (covariant, contravariant) {
+            (true, true) => {
+                return error(
+                    &self.context,
+                    "A `TypeVar` cannot be both covariant and contravariant",
+                    call_expr,
+                );
+            }
+            (true, false) => TypeVarVariance::Covariant,
+            (false, true) => TypeVarVariance::Contravariant,
+            (false, false) => TypeVarVariance::Invariant,
+        };
+
+        let Some(name_param_ty) = name_param_ty.or_else(|| {
+            arguments
+                .find_positional(0)
+                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+        }) else {
+            return error(
+                &self.context,
+                "The `name` parameter of `TypeVar` is required.",
+                call_expr,
+            );
+        };
+
+        let Some(name_param) = name_param_ty
+            .into_string_literal()
+            .map(|name| name.value(db))
+        else {
+            return error(
+                &self.context,
+                "The first argument to `TypeVar` must be a string literal.",
+                call_expr,
+            );
+        };
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `TypeVar` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name_param != target_name {
+            return error(
+                &self.context,
+                format_args!(
+                    "The name of a `TypeVar` (`{name_param}`) must match \
+                    the name of the variable it is assigned to (`{target_name}`)"
+                ),
+                target,
+            );
+        }
+
+        // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
+        // only check presence/absence/number here.
+
+        let num_constraints = arguments.args.len().saturating_sub(1);
+
+        let bound_or_constraints = match (has_bound, num_constraints) {
+            (false, 0) => None,
+            (true, 0) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+            (true, _) => {
+                return error(
+                    &self.context,
+                    "A `TypeVar` cannot have both a bound and constraints",
+                    call_expr,
+                );
+            }
+            (_, 1) => {
+                return error(
+                    &self.context,
+                    "A `TypeVar` cannot have exactly one constraint",
+                    &arguments.args[1],
+                );
+            }
+            (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
+        };
+
+        if bound_or_constraints.is_some() || default.is_some() {
+            self.deferred.insert(definition);
+        }
+
+        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db,
+            target_name,
+            Some(definition),
+            bound_or_constraints,
+            Some(variance),
+            default,
+            TypeVarKind::Legacy,
+            None,
+        )))
+    }
+
+    fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
+        // Infer deferred bounds/constraints/defaults of a legacy TypeVar.
+        let ast::Expr::Call(ast::ExprCall { arguments, .. }) = value else {
+            return;
+        };
+        for arg in arguments.args.iter().skip(1) {
+            self.infer_type_expression(arg);
+        }
+        if let Some(bound) = arguments.find_keyword("bound") {
+            self.infer_type_expression(&bound.value);
+        }
+        if let Some(default) = arguments.find_keyword("default") {
+            self.infer_type_expression(&default.value);
+        }
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -6046,6 +6345,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        // TODO: Use the type context for more precise inference.
+        let callable_type =
+            self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
+
+        self.infer_call_expression_impl(call_expression, callable_type, tcx)
+    }
+
+    fn infer_call_expression_impl(
+        &mut self,
+        call_expression: &ast::ExprCall,
+        callable_type: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprCall {
             range: _,
             node_index: _,
@@ -6064,9 +6376,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 ty
             });
-
-        // TODO: Use the type context for more precise inference.
-        let callable_type = self.infer_maybe_standalone_expression(func, TypeContext::default());
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
@@ -6171,7 +6480,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Object
                         | KnownClass::Property
                         | KnownClass::Super
-                        | KnownClass::TypeVar
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
@@ -6193,6 +6501,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
+
+                if matches!(
+                    class.known(self.db()),
+                    Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
+                ) {
+                    // Inference of correctly-placed `TypeVar` definitions is done in
+                    // `TypeInferenceBuilder::infer_legacy_typevar`, and doesn't use the full
+                    // call-binding machinery. If we reach here, it means that someone is trying to
+                    // instantiate a `typing.TypeVar` in an invalid context.
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVar` definition must be a simple variable assignment",
+                        );
+                    }
+                }
 
                 return callable_type
                     .try_call_constructor(self.db(), call_arguments, tcx)
@@ -6253,7 +6579,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 self.index,
                                 overload,
-                                &call_arguments,
                                 call_expression,
                             );
                         }
@@ -9353,7 +9678,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         assert!(
             deferred.is_empty(),
-            "Expression region can't have deferred types"
+            "Expression region can't have deferred definitions"
         );
 
         let extra =

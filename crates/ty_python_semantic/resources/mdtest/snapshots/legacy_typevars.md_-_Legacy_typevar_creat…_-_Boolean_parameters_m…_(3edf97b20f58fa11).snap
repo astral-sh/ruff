@@ -1,0 +1,70 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: legacy_typevars.md - Legacy typevar creation diagnostics - Boolean parameters must be unambiguous
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typevars.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import TypeVar
+ 2 | 
+ 3 | def cond() -> bool:
+ 4 |     return True
+ 5 | 
+ 6 | # error: [invalid-legacy-type-variable]
+ 7 | T = TypeVar("T", covariant=cond())
+ 8 | 
+ 9 | # error: [invalid-legacy-type-variable]
+10 | U = TypeVar("U", contravariant=cond())
+11 | 
+12 | # error: [invalid-legacy-type-variable]
+13 | V = TypeVar("V", infer_variance=cond())
+```
+
+# Diagnostics
+
+```
+error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+ --> src/mdtest_snippet.py:7:28
+  |
+6 | # error: [invalid-legacy-type-variable]
+7 | T = TypeVar("T", covariant=cond())
+  |                            ^^^^^^
+8 |
+9 | # error: [invalid-legacy-type-variable]
+  |
+info: rule `invalid-legacy-type-variable` is enabled by default
+
+```
+
+```
+error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:10:32
+   |
+ 9 | # error: [invalid-legacy-type-variable]
+10 | U = TypeVar("U", contravariant=cond())
+   |                                ^^^^^^
+11 |
+12 | # error: [invalid-legacy-type-variable]
+   |
+info: rule `invalid-legacy-type-variable` is enabled by default
+
+```
+
+```
+error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:13:33
+   |
+12 | # error: [invalid-legacy-type-variable]
+13 | V = TypeVar("V", infer_variance=cond())
+   |                                 ^^^^^^
+   |
+info: rule `invalid-legacy-type-variable` is enabled by default
+
+```

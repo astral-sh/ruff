@@ -33,7 +33,7 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
@@ -1642,7 +1642,9 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(lhs_bound_typevar),
                 Type::NonInferableTypeVar(rhs_bound_typevar),
-            ) if lhs_bound_typevar == rhs_bound_typevar => ConstraintSet::from(true),
+            ) if lhs_bound_typevar.is_identical_to(db, rhs_bound_typevar) => {
+                ConstraintSet::from(true)
+            }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
@@ -4841,56 +4843,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownClass::TypeVar) => {
-                    // ```py
-                    // class TypeVar:
-                    //     def __new__(
-                    //         cls,
-                    //         name: str,
-                    //         *constraints: Any,
-                    //         bound: Any | None = None,
-                    //         contravariant: bool = False,
-                    //         covariant: bool = False,
-                    //         infer_variance: bool = False,
-                    //         default: Any = ...,
-                    //     ) -> Self: ...
-                    // ```
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_or_keyword(Name::new_static("name"))
-                                    .with_annotated_type(Type::LiteralString),
-                                Parameter::variadic(Name::new_static("constraints"))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::keyword_only(Name::new_static("bound"))
-                                    .type_form()
-                                    .with_annotated_type(UnionType::from_elements(
-                                        db,
-                                        [Type::any(), Type::none(db)],
-                                    ))
-                                    .with_default_type(Type::none(db)),
-                                Parameter::keyword_only(Name::new_static("default"))
-                                    .type_form()
-                                    .with_annotated_type(Type::any())
-                                    .with_default_type(KnownClass::NoneType.to_instance(db)),
-                                Parameter::keyword_only(Name::new_static("contravariant"))
-                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::BooleanLiteral(false)),
-                                Parameter::keyword_only(Name::new_static("covariant"))
-                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::BooleanLiteral(false)),
-                                Parameter::keyword_only(Name::new_static("infer_variance"))
-                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::BooleanLiteral(false)),
-                            ]),
-                            Some(KnownClass::TypeVar.to_instance(db)),
-                        ),
-                    )
-                    .into()
-                }
-
                 Some(KnownClass::Deprecated) => {
                     // ```py
                     // class deprecated:
@@ -7832,6 +7784,12 @@ pub struct TypeVarInstance<'db> {
     _default: Option<TypeVarDefaultEvaluation<'db>>,
 
     pub kind: TypeVarKind,
+
+    /// If this typevar was transformed from another typevar via `mark_typevars_inferable`, this
+    /// records the identity of the "original" typevar, so we can recognize them as the same
+    /// typevar in `bind_typevar`. TODO: this (and the `is_identical_to` methods) should be
+    /// removable once we remove `mark_typevars_inferable`.
+    pub(crate) original: Option<TypeVarInstance<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -7942,6 +7900,7 @@ impl<'db> TypeVarInstance<'db> {
                     .map(|ty| ty.normalized_impl(db, visitor).into()),
             }),
             self.kind(db),
+            self.original(db),
         )
     }
 
@@ -7987,6 +7946,7 @@ impl<'db> TypeVarInstance<'db> {
                     .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
             }),
             self.kind(db),
+            self.original(db),
         )
     }
 
@@ -8000,10 +7960,7 @@ impl<'db> TypeVarInstance<'db> {
         // inferable, so we set the parameter to `None` here.
         let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
 
-        Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
+        let new_bound_or_constraints =
             self._bound_or_constraints(db)
                 .map(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
@@ -8013,20 +7970,44 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
                     | TypeVarBoundOrConstraintsEvaluation::LazyConstraints => bound_or_constraints,
-                }),
-            self.explicit_variance(db),
-            self._default(db).and_then(|default| match default {
-                TypeVarDefaultEvaluation::Eager(ty) => Some(
-                    ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                        .into(),
-                ),
-                TypeVarDefaultEvaluation::Lazy => self.lazy_default(db).map(|ty| {
-                    ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                        .into()
-                }),
+                });
+
+        let new_default = self._default(db).and_then(|default| match default {
+            TypeVarDefaultEvaluation::Eager(ty) => Some(
+                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into(),
+            ),
+            TypeVarDefaultEvaluation::Lazy => self.lazy_default(db).map(|ty| {
+                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into()
             }),
+        });
+
+        // Ensure that we only modify the `original` field if we are going to modify one or both of
+        // `_bound_or_constraints` and `_default`; don't trigger creation of a new
+        // `TypeVarInstance` unnecessarily.
+        let new_original = if new_bound_or_constraints == self._bound_or_constraints(db)
+            && new_default == self._default(db)
+        {
+            self.original(db)
+        } else {
+            Some(self)
+        };
+
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            new_bound_or_constraints,
+            self.explicit_variance(db),
+            new_default,
             self.kind(db),
+            new_original,
         )
+    }
+
+    fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self == other || (self.original(db) == Some(other) || other.original(db) == Some(self))
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
@@ -8046,38 +8027,88 @@ impl<'db> TypeVarInstance<'db> {
             self.explicit_variance(db),
             None,
             self.kind(db),
+            self.original(db),
         ))
     }
 
-    #[salsa::tracked(cycle_fn=lazy_bound_cycle_recover, cycle_initial=lazy_bound_cycle_initial)]
+    #[salsa::tracked(cycle_fn=lazy_bound_cycle_recover, cycle_initial=lazy_bound_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_bound(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
-        let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
+        let ty = match definition.kind(db) {
+            // PEP 695 typevar
+            DefinitionKind::TypeVar(typevar) => {
+                let typevar_node = typevar.node(&module);
+                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+            }
+            // legacy typevar
+            DefinitionKind::Assignment(assignment) => {
+                let call_expr = assignment.value(&module).as_call_expr()?;
+                let expr = &call_expr.arguments.find_keyword("bound")?.value;
+                definition_expression_type(db, definition, expr)
+            }
+            _ => return None,
+        };
         Some(TypeVarBoundOrConstraints::UpperBound(ty))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
-        let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
-            .into_union()?;
+        let ty = match definition.kind(db) {
+            // PEP 695 typevar
+            DefinitionKind::TypeVar(typevar) => {
+                let typevar_node = typevar.node(&module);
+                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+                    .into_union()?
+            }
+            // legacy typevar
+            DefinitionKind::Assignment(assignment) => {
+                let call_expr = assignment.value(&module).as_call_expr()?;
+                // We don't use `UnionType::from_elements` or `UnionBuilder` here,
+                // because we don't want to simplify the list of constraints as we would with
+                // an actual union type.
+                // TODO: We probably shouldn't use `UnionType` to store these at all? TypeVar
+                // constraints are not a union.
+                UnionType::new(
+                    db,
+                    call_expr
+                        .arguments
+                        .args
+                        .iter()
+                        .skip(1)
+                        .map(|arg| definition_expression_type(db, definition, arg))
+                        .collect::<Box<_>>(),
+                )
+            }
+            _ => return None,
+        };
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
-        Some(definition_expression_type(
-            db,
-            definition,
-            typevar_node.default.as_ref()?,
-        ))
+        match definition.kind(db) {
+            // PEP 695 typevar
+            DefinitionKind::TypeVar(typevar) => {
+                let typevar_node = typevar.node(&module);
+                Some(definition_expression_type(
+                    db,
+                    definition,
+                    typevar_node.default.as_ref()?,
+                ))
+            }
+            // legacy typevar
+            DefinitionKind::Assignment(assignment) => {
+                let call_expr = assignment.value(&module).as_call_expr()?;
+                let expr = &call_expr.arguments.find_keyword("default")?.value;
+                Some(definition_expression_type(db, definition, expr))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -8153,6 +8184,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 Some(variance),
                 None, // _default
                 TypeVarKind::Pep695,
+                None,
             ),
             BindingContext::Synthetic,
         )
@@ -8174,9 +8206,22 @@ impl<'db> BoundTypeVarInstance<'db> {
                 Some(TypeVarVariance::Invariant),
                 None,
                 TypeVarKind::TypingSelf,
+                None,
             ),
             binding_context,
         )
+    }
+
+    pub(crate) fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        if self.binding_context(db) != other.binding_context(db) {
+            return false;
+        }
+
+        self.typevar(db).is_identical_to(db, other.typevar(db))
     }
 
     pub(crate) fn variance_with_polarity(

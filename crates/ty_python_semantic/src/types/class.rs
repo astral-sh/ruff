@@ -16,7 +16,7 @@ use crate::semantic_index::{
 };
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
+use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
@@ -29,9 +29,8 @@ use crate::types::{
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
-    determine_upper_bound, infer_definition_types,
+    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
+    declaration_type, determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -3761,6 +3760,8 @@ pub enum KnownClass {
     SupportsIndex,
     Iterable,
     Iterator,
+    // typing_extensions
+    ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     // Collections
     ChainMap,
     Counter,
@@ -3815,6 +3816,7 @@ impl KnownClass {
             | Self::VersionInfo
             | Self::TypeAliasType
             | Self::TypeVar
+            | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
@@ -3943,6 +3945,7 @@ impl KnownClass {
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
@@ -4025,6 +4028,7 @@ impl KnownClass {
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
@@ -4107,6 +4111,7 @@ impl KnownClass {
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
@@ -4194,6 +4199,7 @@ impl KnownClass {
             | Self::NoneType
             | Self::SpecialForm
             | Self::TypeVar
+            | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
@@ -4289,6 +4295,7 @@ impl KnownClass {
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
@@ -4358,6 +4365,7 @@ impl KnownClass {
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
+            Self::ExtensionsTypeVar => "TypeVar",
             Self::ParamSpec => "ParamSpec",
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
@@ -4656,6 +4664,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
+            | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
             | Self::ParamSpec
             | Self::ParamSpecArgs
@@ -4752,6 +4761,7 @@ impl KnownClass {
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeVar
+            | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
@@ -4838,6 +4848,7 @@ impl KnownClass {
             | Self::Generator
             | Self::Deprecated
             | Self::TypeVar
+            | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
@@ -4875,99 +4886,102 @@ impl KnownClass {
     ) -> Option<Self> {
         // We assert that this match is exhaustive over the right-hand side in the unit test
         // `known_class_roundtrip_from_str()`
-        let candidate = match class_name {
-            "bool" => Self::Bool,
-            "object" => Self::Object,
-            "bytes" => Self::Bytes,
-            "bytearray" => Self::Bytearray,
-            "tuple" => Self::Tuple,
-            "type" => Self::Type,
-            "int" => Self::Int,
-            "float" => Self::Float,
-            "complex" => Self::Complex,
-            "str" => Self::Str,
-            "set" => Self::Set,
-            "frozenset" => Self::FrozenSet,
-            "dict" => Self::Dict,
-            "list" => Self::List,
-            "slice" => Self::Slice,
-            "property" => Self::Property,
-            "BaseException" => Self::BaseException,
-            "BaseExceptionGroup" => Self::BaseExceptionGroup,
-            "Exception" => Self::Exception,
-            "ExceptionGroup" => Self::ExceptionGroup,
-            "staticmethod" => Self::Staticmethod,
-            "classmethod" => Self::Classmethod,
-            "Awaitable" => Self::Awaitable,
-            "Generator" => Self::Generator,
-            "deprecated" => Self::Deprecated,
-            "GenericAlias" => Self::GenericAlias,
-            "NoneType" => Self::NoneType,
-            "ModuleType" => Self::ModuleType,
-            "GeneratorType" => Self::GeneratorType,
-            "AsyncGeneratorType" => Self::AsyncGeneratorType,
-            "CoroutineType" => Self::CoroutineType,
-            "FunctionType" => Self::FunctionType,
-            "MethodType" => Self::MethodType,
-            "UnionType" => Self::UnionType,
-            "MethodWrapperType" => Self::MethodWrapperType,
-            "WrapperDescriptorType" => Self::WrapperDescriptorType,
-            "BuiltinFunctionType" => Self::BuiltinFunctionType,
-            "NewType" => Self::NewType,
-            "TypeAliasType" => Self::TypeAliasType,
-            "TypeVar" => Self::TypeVar,
-            "Iterable" => Self::Iterable,
-            "Iterator" => Self::Iterator,
-            "ParamSpec" => Self::ParamSpec,
-            "ParamSpecArgs" => Self::ParamSpecArgs,
-            "ParamSpecKwargs" => Self::ParamSpecKwargs,
-            "TypeVarTuple" => Self::TypeVarTuple,
-            "ChainMap" => Self::ChainMap,
-            "Counter" => Self::Counter,
-            "defaultdict" => Self::DefaultDict,
-            "deque" => Self::Deque,
-            "OrderedDict" => Self::OrderedDict,
-            "_Alias" => Self::StdlibAlias,
-            "_SpecialForm" => Self::SpecialForm,
-            "_NoDefaultType" => Self::NoDefaultType,
-            "SupportsIndex" => Self::SupportsIndex,
-            "Enum" => Self::Enum,
-            "EnumMeta" => Self::EnumType,
+        let candidates: &[Self] = match class_name {
+            "bool" => &[Self::Bool],
+            "object" => &[Self::Object],
+            "bytes" => &[Self::Bytes],
+            "bytearray" => &[Self::Bytearray],
+            "tuple" => &[Self::Tuple],
+            "type" => &[Self::Type],
+            "int" => &[Self::Int],
+            "float" => &[Self::Float],
+            "complex" => &[Self::Complex],
+            "str" => &[Self::Str],
+            "set" => &[Self::Set],
+            "frozenset" => &[Self::FrozenSet],
+            "dict" => &[Self::Dict],
+            "list" => &[Self::List],
+            "slice" => &[Self::Slice],
+            "property" => &[Self::Property],
+            "BaseException" => &[Self::BaseException],
+            "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
+            "Exception" => &[Self::Exception],
+            "ExceptionGroup" => &[Self::ExceptionGroup],
+            "staticmethod" => &[Self::Staticmethod],
+            "classmethod" => &[Self::Classmethod],
+            "Awaitable" => &[Self::Awaitable],
+            "Generator" => &[Self::Generator],
+            "deprecated" => &[Self::Deprecated],
+            "GenericAlias" => &[Self::GenericAlias],
+            "NoneType" => &[Self::NoneType],
+            "ModuleType" => &[Self::ModuleType],
+            "GeneratorType" => &[Self::GeneratorType],
+            "AsyncGeneratorType" => &[Self::AsyncGeneratorType],
+            "CoroutineType" => &[Self::CoroutineType],
+            "FunctionType" => &[Self::FunctionType],
+            "MethodType" => &[Self::MethodType],
+            "UnionType" => &[Self::UnionType],
+            "MethodWrapperType" => &[Self::MethodWrapperType],
+            "WrapperDescriptorType" => &[Self::WrapperDescriptorType],
+            "BuiltinFunctionType" => &[Self::BuiltinFunctionType],
+            "NewType" => &[Self::NewType],
+            "TypeAliasType" => &[Self::TypeAliasType],
+            "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
+            "Iterable" => &[Self::Iterable],
+            "Iterator" => &[Self::Iterator],
+            "ParamSpec" => &[Self::ParamSpec],
+            "ParamSpecArgs" => &[Self::ParamSpecArgs],
+            "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
+            "TypeVarTuple" => &[Self::TypeVarTuple],
+            "ChainMap" => &[Self::ChainMap],
+            "Counter" => &[Self::Counter],
+            "defaultdict" => &[Self::DefaultDict],
+            "deque" => &[Self::Deque],
+            "OrderedDict" => &[Self::OrderedDict],
+            "_Alias" => &[Self::StdlibAlias],
+            "_SpecialForm" => &[Self::SpecialForm],
+            "_NoDefaultType" => &[Self::NoDefaultType],
+            "SupportsIndex" => &[Self::SupportsIndex],
+            "Enum" => &[Self::Enum],
+            "EnumMeta" => &[Self::EnumType],
             "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
-                Self::EnumType
+                &[Self::EnumType]
             }
             "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
-                Self::StrEnum
+                &[Self::StrEnum]
             }
-            "auto" => Self::Auto,
-            "member" => Self::Member,
-            "nonmember" => Self::Nonmember,
-            "ABCMeta" => Self::ABCMeta,
-            "super" => Self::Super,
-            "_version_info" => Self::VersionInfo,
+            "auto" => &[Self::Auto],
+            "member" => &[Self::Member],
+            "nonmember" => &[Self::Nonmember],
+            "ABCMeta" => &[Self::ABCMeta],
+            "super" => &[Self::Super],
+            "_version_info" => &[Self::VersionInfo],
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                Self::EllipsisType
+                &[Self::EllipsisType]
             }
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
-                Self::EllipsisType
+                &[Self::EllipsisType]
             }
-            "_NotImplementedType" => Self::NotImplementedType,
-            "Field" => Self::Field,
-            "KW_ONLY" => Self::KwOnly,
-            "InitVar" => Self::InitVar,
-            "NamedTupleFallback" => Self::NamedTupleFallback,
-            "NamedTupleLike" => Self::NamedTupleLike,
-            "ConstraintSet" => Self::ConstraintSet,
-            "TypedDictFallback" => Self::TypedDictFallback,
-            "Template" => Self::Template,
-            "Path" => Self::Path,
-            "_ProtocolMeta" => Self::ProtocolMeta,
+            "_NotImplementedType" => &[Self::NotImplementedType],
+            "Field" => &[Self::Field],
+            "KW_ONLY" => &[Self::KwOnly],
+            "InitVar" => &[Self::InitVar],
+            "NamedTupleFallback" => &[Self::NamedTupleFallback],
+            "NamedTupleLike" => &[Self::NamedTupleLike],
+            "ConstraintSet" => &[Self::ConstraintSet],
+            "TypedDictFallback" => &[Self::TypedDictFallback],
+            "Template" => &[Self::Template],
+            "Path" => &[Self::Path],
+            "_ProtocolMeta" => &[Self::ProtocolMeta],
             _ => return None,
         };
 
-        candidate
-            .check_module(db, file_to_module(db, file)?.known(db)?)
-            .then_some(candidate)
+        let module = file_to_module(db, file)?.known(db)?;
+
+        candidates
+            .iter()
+            .copied()
+            .find(|&candidate| candidate.check_module(db, module))
     }
 
     /// Return `true` if the module of `self` matches `module`
@@ -5028,6 +5042,8 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::TypeVar
+            | Self::ExtensionsTypeVar
             | Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::Awaitable
@@ -5036,7 +5052,6 @@ impl KnownClass {
             | Self::Path => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
-            | Self::TypeVar
             | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::SupportsIndex
@@ -5059,7 +5074,6 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload: &mut Binding<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) {
         let db = context.db();
@@ -5132,6 +5146,7 @@ impl KnownClass {
                     _ => {}
                 }
             }
+
             KnownClass::Deprecated => {
                 // Parsing something of the form:
                 //
@@ -5156,153 +5171,6 @@ impl KnownClass {
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
                     DeprecatedInstance::new(db, message.into_string_literal()),
-                )));
-            }
-            KnownClass::TypeVar => {
-                let assigned_to = index
-                    .try_expression(ast::ExprRef::from(call_expression))
-                    .and_then(|expr| expr.assigned_to(db));
-
-                let Some(target) = assigned_to.as_ref().and_then(|assigned_to| {
-                    match assigned_to.node(module).targets.as_slice() {
-                        [ast::Expr::Name(target)] => Some(target),
-                        _ => None,
-                    }
-                }) else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "A legacy `typing.TypeVar` must be immediately assigned to a variable",
-                        );
-                    }
-                    return;
-                };
-
-                let [
-                    Some(name_param),
-                    constraints,
-                    bound,
-                    default,
-                    contravariant,
-                    covariant,
-                    _infer_variance,
-                ] = overload.parameter_types()
-                else {
-                    return;
-                };
-
-                let covariant = covariant
-                    .map(|ty| ty.bool(db))
-                    .unwrap_or(Truthiness::AlwaysFalse);
-
-                let contravariant = contravariant
-                    .map(|ty| ty.bool(db))
-                    .unwrap_or(Truthiness::AlwaysFalse);
-
-                let variance = match (contravariant, covariant) {
-                    (Truthiness::Ambiguous, _) => {
-                        if let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        {
-                            builder.into_diagnostic(
-                                "The `contravariant` parameter of a legacy `typing.TypeVar` \
-                                cannot have an ambiguous value",
-                            );
-                        }
-                        return;
-                    }
-                    (_, Truthiness::Ambiguous) => {
-                        if let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        {
-                            builder.into_diagnostic(
-                                "The `covariant` parameter of a legacy `typing.TypeVar` \
-                                cannot have an ambiguous value",
-                            );
-                        }
-                        return;
-                    }
-                    (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
-                        if let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        {
-                            builder.into_diagnostic(
-                                "A legacy `typing.TypeVar` cannot be both \
-                                covariant and contravariant",
-                            );
-                        }
-                        return;
-                    }
-                    (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
-                        TypeVarVariance::Contravariant
-                    }
-                    (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue) => TypeVarVariance::Covariant,
-                    (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
-                        TypeVarVariance::Invariant
-                    }
-                };
-
-                let name_param = name_param.into_string_literal().map(|name| name.value(db));
-
-                if name_param.is_none_or(|name_param| name_param != target.id) {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "The name of a legacy `typing.TypeVar`{} must match \
-                            the name of the variable it is assigned to (`{}`)",
-                            if let Some(name_param) = name_param {
-                                format!(" (`{name_param}`)")
-                            } else {
-                                String::new()
-                            },
-                            target.id,
-                        ));
-                    }
-                    return;
-                }
-
-                let bound_or_constraint = match (bound, constraints) {
-                    (Some(bound), None) => {
-                        Some(TypeVarBoundOrConstraints::UpperBound(*bound).into())
-                    }
-
-                    (None, Some(_constraints)) => {
-                        // We don't use UnionType::from_elements or UnionBuilder here,
-                        // because we don't want to simplify the list of constraints like
-                        // we do with the elements of an actual union type.
-                        // TODO: Consider using a new `OneOfType` connective here instead,
-                        // since that more accurately represents the actual semantics of
-                        // typevar constraints.
-                        let elements = UnionType::new(
-                            db,
-                            overload
-                                .arguments_for_parameter(call_arguments, 1)
-                                .map(|(_, ty)| ty)
-                                .collect::<Box<_>>(),
-                        );
-                        Some(TypeVarBoundOrConstraints::Constraints(elements).into())
-                    }
-
-                    // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
-                    // constrained
-                    (Some(_), Some(_)) => return,
-
-                    (None, None) => None,
-                };
-
-                let containing_assignment = index.expect_single_definition(target);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
-                    TypeVarInstance::new(
-                        db,
-                        &target.id,
-                        Some(containing_assignment),
-                        bound_or_constraint,
-                        Some(variance),
-                        default.map(Into::into),
-                        TypeVarKind::Legacy,
-                    ),
                 )));
             }
 
