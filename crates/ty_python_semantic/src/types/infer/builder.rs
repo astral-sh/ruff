@@ -3215,7 +3215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for target in targets {
             self.infer_target(target, value, |builder, value_expr| {
-                builder.infer_standalone_expression(value_expr, TypeContext::default())
+                builder.infer_maybe_standalone_expression(value_expr, TypeContext::default())
             });
         }
     }
