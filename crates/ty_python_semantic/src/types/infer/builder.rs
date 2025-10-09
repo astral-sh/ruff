@@ -5589,10 +5589,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some((class_literal, generic_context.variables(self.db())))
         };
 
-        let (class_literal, elt_tys) = elt_tys(collection_class).unwrap_or_else(|| {
-            let name = collection_class.name(self.db());
-            panic!("Typeshed should always have a `{name}` class in `builtins.pyi`")
-        });
+        let Some((class_literal, elt_tys)) = elt_tys(collection_class) else {
+            // Infer the element types without type context, and fallback to unknown for
+            // custom typesheds.
+            for elt in elts.flatten().flatten() {
+                self.get_or_infer_expression(elt, TypeContext::default());
+            }
+
+            return None;
+        };
 
         // Extract the annotated type of `T`, if provided.
         let annotated_elt_tys = tcx

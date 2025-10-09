@@ -851,13 +851,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
-        let class_literal = known_class.try_to_class_literal(db).unwrap_or_else(|| {
-            panic!(
-                "typeshed should always have a `{}` class in `builtins.py`",
-                known_class.display(db)
-            )
-        });
-
+        let class_literal = known_class.try_to_class_literal(db)?;
         self.specialization_of(db, Some(class_literal))
     }
 
