@@ -1,5 +1,4 @@
 use crate::normalizer::Normalizer;
-use itertools::Itertools;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
     DisplayDiagnostics, DummyFileResolver, Severity, Span,
@@ -469,33 +468,13 @@ fn ensure_unchanged_ast(
     formatted_unsupported_syntax_errors
         .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
 
-    if !formatted_unsupported_syntax_errors.is_empty() {
-        let index = LineIndex::from_source_text(formatted_code);
-        panic!(
-            "Formatted code `{}` introduced new unsupported syntax errors:\n---\n{}\n---",
-            input_path.display(),
-            formatted_unsupported_syntax_errors
-                .into_values()
-                .map(|error| {
-                    let location = index.line_column(error.start(), formatted_code);
-                    format!(
-                        "{row}:{col} {error}",
-                        row = location.line,
-                        col = location.column
-                    )
-                })
-                .join("\n")
-        );
-    }
-
     let file = SourceFileBuilder::new(
         input_path.file_name().unwrap().to_string_lossy(),
         formatted_code,
     )
     .finish();
-    let diagnostics = formatted_parsed
-        .unsupported_syntax_errors()
-        .iter()
+    let diagnostics = formatted_unsupported_syntax_errors
+        .values()
         .map(|error| {
             let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, error);
             let span = Span::from(file.clone()).with_range(error.range());
@@ -503,6 +482,18 @@ fn ensure_unchanged_ast(
             diag
         })
         .collect::<Vec<_>>();
+
+    if !formatted_unsupported_syntax_errors.is_empty() {
+        panic!(
+            "Formatted code `{}` introduced new unsupported syntax errors:\n---\n{}\n---",
+            input_path.display(),
+            DisplayDiagnostics::new(
+                &DummyFileResolver,
+                &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                &diagnostics
+            )
+        );
+    }
 
     let mut formatted_ast = formatted_parsed.into_syntax();
     Normalizer.visit_module(&mut formatted_ast);
