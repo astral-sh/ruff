@@ -5,9 +5,11 @@ use ruff_db::diagnostic::{
     DisplayDiagnostics, DummyFileResolver, Severity, Span,
 };
 use ruff_formatter::FormatOptions;
+use ruff_python_ast::Mod;
 use ruff_python_ast::comparable::ComparableMod;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
-use ruff_python_parser::{ParseOptions, UnsupportedSyntaxError, parse};
+use ruff_python_parser::{ParseOptions, Parsed, UnsupportedSyntaxError, parse};
 use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
@@ -447,7 +449,7 @@ fn ensure_unchanged_ast(
     .expect("Unformatted code to be valid syntax");
 
     let unformatted_unsupported_syntax_errors =
-        collect_unsupported_syntax_errors(unformatted_parsed.unsupported_syntax_errors());
+        collect_unsupported_syntax_errors(&unformatted_parsed);
     let mut unformatted_ast = unformatted_parsed.into_syntax();
 
     Normalizer.visit_module(&mut unformatted_ast);
@@ -462,7 +464,7 @@ fn ensure_unchanged_ast(
 
     // Assert that there are no new unsupported syntax errors
     let mut formatted_unsupported_syntax_errors =
-        collect_unsupported_syntax_errors(formatted_parsed.unsupported_syntax_errors());
+        collect_unsupported_syntax_errors(&formatted_parsed);
 
     formatted_unsupported_syntax_errors
         .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
@@ -595,14 +597,50 @@ source_type                = {source_type:?}"#,
     }
 }
 
+/// A visitor to collect a sequence of node IDs for fingerprinting [`UnsupportedSyntaxError`]s.
+///
+/// It visits each statement in the AST in source order and saves its range. The index of the node
+/// enclosing a syntax error's range can then be retrieved with the `node_id` method. This `node_id`
+/// should be stable across formatting runs since the formatter won't add or remove statements.
+#[derive(Default)]
+struct StmtVisitor {
+    nodes: Vec<TextRange>,
+}
+
+impl StmtVisitor {
+    fn new(module: &Mod) -> Self {
+        let mut visitor = Self::default();
+        visitor.visit_mod(module);
+        visitor
+    }
+
+    /// Return the index of the statement node that contains `range`.
+    fn node_id(&self, range: TextRange) -> usize {
+        self.nodes
+            .iter()
+            .position(|node| node.contains_range(range))
+            .unwrap()
+    }
+}
+
+impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
+    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
+        self.nodes.push(stmt.range());
+        ruff_python_ast::visitor::source_order::walk_stmt(self, stmt);
+    }
+}
+
 /// Collects the unsupported syntax errors and assigns a unique hash to each error.
 fn collect_unsupported_syntax_errors(
-    errors: &[UnsupportedSyntaxError],
+    parsed: &Parsed<Mod>,
 ) -> FxHashMap<u64, UnsupportedSyntaxError> {
+    let visitor = StmtVisitor::new(parsed.syntax());
+
     let mut collected = FxHashMap::default();
 
-    for error in errors {
-        let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, 0);
+    for error in parsed.unsupported_syntax_errors() {
+        let node_id = visitor.node_id(error.range);
+        let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, node_id, 0);
 
         // Make sure that we do not get a fingerprint that is already in use
         // by adding in the previously generated one.
@@ -610,7 +648,7 @@ fn collect_unsupported_syntax_errors(
             match collected.entry(error_fingerprint) {
                 Entry::Occupied(_) => {
                     error_fingerprint =
-                        fingerprint_unsupported_syntax_error(error, error_fingerprint);
+                        fingerprint_unsupported_syntax_error(error, node_id, error_fingerprint);
                 }
                 Entry::Vacant(entry) => {
                     entry.insert(error.clone());
@@ -623,7 +661,11 @@ fn collect_unsupported_syntax_errors(
     collected
 }
 
-fn fingerprint_unsupported_syntax_error(error: &UnsupportedSyntaxError, salt: u64) -> u64 {
+fn fingerprint_unsupported_syntax_error(
+    error: &UnsupportedSyntaxError,
+    node_id: usize,
+    salt: u64,
+) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     let UnsupportedSyntaxError {
@@ -637,6 +679,7 @@ fn fingerprint_unsupported_syntax_error(error: &UnsupportedSyntaxError, salt: u6
     salt.hash(&mut hasher);
     kind.hash(&mut hasher);
     target_version.hash(&mut hasher);
+    node_id.hash(&mut hasher);
 
     hasher.finish()
 }
