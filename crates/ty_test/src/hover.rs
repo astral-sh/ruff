@@ -1,7 +1,7 @@
 //! Hover type inference for mdtest assertions.
 //!
-//! This module provides functionality to extract hover assertions from comments,
-//! infer types at specified positions, and generate hover check outputs for matching.
+//! This module provides functionality to extract hover assertions from comments, infer types at
+//! specified positions, and generate hover check outputs for matching.
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -15,20 +15,20 @@ use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion}
 use crate::check_output::CheckOutput;
 use crate::db::Db;
 
-/// A hover result for testing hover assertions.
+/// A hover result for testing `hover` assertions.
 #[derive(Debug, Clone)]
 pub(crate) struct HoverOutput {
-    /// The position where hover was requested
+    /// The offset (within the entire file) where hover was requested
     pub(crate) offset: TextSize,
     /// The inferred type at that position
     pub(crate) inferred_type: String,
 }
 
-/// Get the inferred type at a given position in a file using ty_ide's goto logic.
-/// Returns None if no node is found at that position or if the node has no type.
+/// Get the inferred type at a given position in a file. Returns None if no node is found at that
+/// position or if the node has no infered type.
 ///
-/// Unlike ty_ide::hover, this function includes types for literals, which is useful
-/// for testing type inference in mdtest assertions.
+/// This reuses much of the logic from [`ty_ide::hover`]. Unlike that function, we return types for
+/// literals, which is useful for testing type inference in mdtest assertions.
 fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<String> {
     let parsed = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&parsed, offset)?;
@@ -39,10 +39,7 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
     Some(ty.display(db).to_string())
 }
 
-/// Generate hover `CheckOutputs` for all hover assertions in a file.
-///
-/// Uses the parsed assertions from the assertion module, which correctly handles
-/// multiple stacked assertion comments and determines the target line number.
+/// Generate hover outputs for all of the `hover` assertions in a file.
 pub(crate) fn generate_hover_outputs(
     db: &Db,
     file: File,
@@ -59,17 +56,18 @@ pub(crate) fn generate_hover_outputs(
 
         // Look for hover assertions in this line's assertions
         for assertion in line_assertions.iter() {
-            let UnparsedAssertion::Hover { .. } = assertion else {
+            if !matches!(assertion, UnparsedAssertion::Hover { .. }) {
                 continue;
-            };
+            }
 
-            // Parse the assertion to get the hover information
             let Ok(ParsedAssertion::Hover(hover)) = assertion.parse(&lines, &source) else {
-                // Invalid hover assertion - will be caught as error by matcher
+                // The matcher will catch and report incorrectly formatted `hover` assertions, so
+                // we can just skip them.
                 continue;
             };
 
-            // Convert the character column to a byte offset using LineIndex::offset
+            // Convert the column offset within the assertion's line into a byte offset within the
+            // entire file.
             let hover_location = SourceLocation {
                 line: target_line,
                 character_offset: hover.column,
@@ -80,7 +78,6 @@ pub(crate) fn generate_hover_outputs(
             let Some(inferred_type) = infer_type_at_position(db, file, hover_offset) else {
                 continue;
             };
-
             hover_outputs.push(CheckOutput::Hover(HoverOutput {
                 offset: hover_offset,
                 inferred_type,
