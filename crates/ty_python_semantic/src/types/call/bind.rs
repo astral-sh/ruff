@@ -1023,56 +1023,30 @@ impl<'db> Bindings<'db> {
                                             let mut dataclass_params =
                                                 DataclassParams::from(params);
 
-                                            if let Some(Some(Type::BooleanLiteral(order))) =
-                                                overload
-                                                    .signature
-                                                    .parameters()
-                                                    .keyword_by_name("order")
-                                                    .map(|(idx, _)| idx)
-                                                    .and_then(|idx| {
-                                                        overload.parameter_types().get(idx)
-                                                    })
+                                            if let Ok(Some(Type::BooleanLiteral(order))) =
+                                                overload.parameter_type_by_name("order")
                                             {
-                                                dataclass_params
-                                                    .set(DataclassParams::ORDER, *order);
+                                                dataclass_params.set(DataclassParams::ORDER, order);
                                             }
 
-                                            if let Some(Some(Type::BooleanLiteral(eq))) = overload
-                                                .signature
-                                                .parameters()
-                                                .keyword_by_name("eq")
-                                                .map(|(idx, _)| idx)
-                                                .and_then(|idx| overload.parameter_types().get(idx))
+                                            if let Ok(Some(Type::BooleanLiteral(eq))) =
+                                                overload.parameter_type_by_name("eq")
                                             {
-                                                dataclass_params.set(DataclassParams::EQ, *eq);
+                                                dataclass_params.set(DataclassParams::EQ, eq);
                                             }
 
-                                            if let Some(Some(Type::BooleanLiteral(kw_only))) =
-                                                overload
-                                                    .signature
-                                                    .parameters()
-                                                    .keyword_by_name("kw_only")
-                                                    .map(|(idx, _)| idx)
-                                                    .and_then(|idx| {
-                                                        overload.parameter_types().get(idx)
-                                                    })
+                                            if let Ok(Some(Type::BooleanLiteral(kw_only))) =
+                                                overload.parameter_type_by_name("kw_only")
                                             {
                                                 dataclass_params
-                                                    .set(DataclassParams::KW_ONLY, *kw_only);
+                                                    .set(DataclassParams::KW_ONLY, kw_only);
                                             }
 
-                                            if let Some(Some(Type::BooleanLiteral(frozen))) =
-                                                overload
-                                                    .signature
-                                                    .parameters()
-                                                    .keyword_by_name("frozen")
-                                                    .map(|(idx, _)| idx)
-                                                    .and_then(|idx| {
-                                                        overload.parameter_types().get(idx)
-                                                    })
+                                            if let Ok(Some(Type::BooleanLiteral(frozen))) =
+                                                overload.parameter_type_by_name("frozen")
                                             {
                                                 dataclass_params
-                                                    .set(DataclassParams::FROZEN, *frozen);
+                                                    .set(DataclassParams::FROZEN, frozen);
                                             }
 
                                             Type::DataclassDecorator(dataclass_params)
@@ -2971,12 +2945,11 @@ impl<'db> Binding<'db> {
         &self,
         parameter_name: &str,
     ) -> Result<Option<Type<'db>>, UnknownParameterNameError> {
-        let (index, _) = self
+        let index = self
             .signature
             .parameters()
-            .iter()
-            .enumerate()
-            .find(|(_, param)| param.name().is_some_and(|name| name == parameter_name))
+            .keyword_by_name(parameter_name)
+            .map(|(i, _)| i)
             .ok_or(UnknownParameterNameError)?;
 
         Ok(self.parameter_tys[index])
