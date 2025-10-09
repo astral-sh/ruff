@@ -189,6 +189,7 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String
         )
     }
 }
+
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
