@@ -381,7 +381,11 @@ fn run_test(
             let assertions = assertion::InlineFileAssertions::from_file(db, test_file.file);
 
             // Generate and add hover outputs
-            check_outputs.extend(hover::generate_hover_outputs(db, test_file.file, &assertions));
+            check_outputs.extend(hover::generate_hover_outputs(
+                db,
+                test_file.file,
+                &assertions,
+            ));
 
             let failure = match matcher::match_file(db, test_file.file, &check_outputs) {
                 Ok(()) => None,

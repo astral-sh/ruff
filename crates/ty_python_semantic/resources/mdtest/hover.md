@@ -1,8 +1,8 @@
 # Hover type assertions
 
-This document tests the hover assertion functionality in mdtest. Hover assertions allow testing
-the inferred type at a specific position in the code, similar to how a language server's hover
-feature works.
+This document tests the hover assertion functionality in mdtest. Hover assertions allow testing the
+inferred type at a specific position in the code, similar to how a language server's hover feature
+works.
 
 ## Basic hover assertions
 

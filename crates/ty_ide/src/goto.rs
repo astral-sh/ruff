@@ -820,10 +820,7 @@ fn definitions_to_navigation_targets<'db>(
     }
 }
 
-pub fn find_goto_target(
-    parsed: &ParsedModuleRef,
-    offset: TextSize,
-) -> Option<GotoTarget<'_>> {
+pub fn find_goto_target(parsed: &ParsedModuleRef, offset: TextSize) -> Option<GotoTarget<'_>> {
     let token = parsed
         .tokens()
         .at_offset(offset)
