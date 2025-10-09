@@ -1,13 +1,25 @@
 # Hover type assertions
 
-This document tests the hover assertion functionality in mdtest. Hover assertions allow testing the
-inferred type at a specific position in the code, similar to how a language server's hover feature
-works.
+You can use the `hover` assertion to test the infered type of an expression. This exercises the same
+logic as the hover LSP action.
 
-## Basic hover assertions
+Typically, you will not need to use the `hover` action to test the behavior of our type inference
+code, since you can also use `reveal_type` to display the infered type of an expression. Since
+`reveal_type` is part of the standard library, we prefer to use it when possible.
 
-The `# ↓ hover:` syntax lets us assert the type at a specific column position. The down arrow (↓)
-indicates the column where we want to check the type.
+However, there are certain situations where `reveal_type` and `hover` will give different results.
+In particular, `reveal_type` is not transparent to bidirectional type checking, as seen in the
+"Different results" section below.
+
+## Syntax
+
+### Basic syntax
+
+The `hover` assertion operates on a specific location in the source text. We find the "inner-most"
+expression at that position, and then query the infered type of that expression. The row to query is
+identified just like any other mdtest assertion. The column to query is identified by a down arrow
+(↓) in the assertion. (Note that the down arrow should always appear immediately before the `hover`
+keyword in the assertion.)
 
 ```py
 def test_basic_types(parameter: int) -> None:
@@ -19,6 +31,58 @@ def test_basic_types(parameter: int) -> None:
 
     #      ↓ hover: Literal["hello"]
     text = "hello"
+```
+
+### Multiple hovers on the same line
+
+We can have multiple hover assertions for different positions on the same line:
+
+```py
+#       ↓ hover: Literal[1]
+#           ↓ hover: Literal[2]
+#               ↓ hover: Literal[3]
+total = 1 + 2 + 3
+
+#            ↓ hover: Literal[5]
+#               ↓ hover: Literal[3]
+result = max(5, 3)
+```
+
+### Hovering works on every character in an expression
+
+```py
+def _(param: bool) -> None:
+    #        ↓ hover: bool
+    #         ↓ hover: bool
+    #          ↓ hover: bool
+    #           ↓ hover: bool
+    #            ↓ hover: bool
+    result = param
+```
+
+### Hovering with unicode characters
+
+```py
+def _(café: str) -> None:
+    #        ↓ hover: str
+    #         ↓ hover: str
+    #          ↓ hover: str
+    #           ↓ hover: str
+    result = café
+```
+
+## Different results for `reveal_type` and `hover`
+
+```py
+from typing import overload
+
+def f(x: dict[str, int]) -> None: ...
+
+# revealed: dict[Unknown, Unknown]
+f(reveal_type({}))
+
+# ↓ hover: dict[str, int]
+f({})
 ```
 
 ## Hovering on different expression types
@@ -73,44 +137,4 @@ result = 10 + 20
 # List comprehension
 #        ↓ hover: list[@Todo(list comprehension element type)]
 result = [x for x in range(5)]
-```
-
-## Edge cases
-
-### Multiple hovers on the same line
-
-We can have multiple hover assertions for different positions on the same line:
-
-```py
-#       ↓ hover: Literal[1]
-#           ↓ hover: Literal[2]
-#               ↓ hover: Literal[3]
-total = 1 + 2 + 3
-
-#            ↓ hover: Literal[5]
-#               ↓ hover: Literal[3]
-result = max(5, 3)
-```
-
-### Hovering works on every character in expression
-
-```py
-def _(param: bool) -> None:
-    #        ↓ hover: bool
-    #         ↓ hover: bool
-    #          ↓ hover: bool
-    #           ↓ hover: bool
-    #            ↓ hover: bool
-    result = param
-```
-
-### Hovering with unicode characters
-
-```py
-def _(café: str) -> None:
-    #        ↓ hover: str
-    #         ↓ hover: str
-    #          ↓ hover: str
-    #           ↓ hover: str
-    result = café
 ```
