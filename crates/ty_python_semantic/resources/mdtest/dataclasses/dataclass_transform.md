@@ -216,10 +216,6 @@ class OrderedModelBase: ...
 class TestWithBase(OrderedModelBase):
     inner: int
 
-# TODO: No errors here, should reveal `bool`
-# error: [too-many-positional-arguments]
-# error: [too-many-positional-arguments]
-# error: [unsupported-operator]
 reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
 ```
 
