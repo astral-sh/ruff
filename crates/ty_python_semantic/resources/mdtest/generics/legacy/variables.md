@@ -41,6 +41,18 @@ tuple_with_typevar = ("foo", TypeVar("W"))
 reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
 ```
 
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+# error: [invalid-legacy-type-variable]
+U: TypeVar = TypeVar("U")
+
+# error: [invalid-legacy-type-variable]
+tuple_with_typevar = ("foo", TypeVar("W"))
+reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
+```
+
 ### `TypeVar` parameter must match variable name
 
 > The argument to `TypeVar()` must be a string equal to the variable name to which it is assigned.

@@ -6461,7 +6461,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
 
-                if class.is_known(self.db(), KnownClass::TypeVar) {
+                if matches!(
+                    class.known(self.db()),
+                    Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
+                ) {
                     // Inference of correctly-placed `TypeVar` definitions is done in
                     // `TypeInferenceBuilder::infer_legacy_typevar`, and doesn't use the full
                     // call-binding machinery. If we reach here, it means that someone is trying to
