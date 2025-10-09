@@ -18,6 +18,7 @@ use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
 use crate::importer::{ImportRequest, Importer};
+use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols};
 
 #[derive(Clone, Debug)]
@@ -206,6 +207,10 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let typed = find_typed_text(db, file, offset);
+    let typed_query = typed
+        .as_deref()
+        .map(QueryPattern::new)
+        .unwrap_or_else(QueryPattern::matches_all_symbols);
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -236,6 +241,7 @@ pub fn completion<'db>(
     };
     let mut completions: Vec<Completion<'_>> = semantic_completions
         .into_iter()
+        .filter(|c| typed_query.is_match_symbol_name(c.name.as_str()))
         .map(|c| Completion::from_semantic_completion(db, c))
         .collect();
 
@@ -1076,7 +1082,7 @@ g<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"foo");
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found after filtering out completions>");
     }
 
     #[test]
@@ -1514,10 +1520,8 @@ class Foo:
         );
 
         assert_snapshot!(test.completions_without_builtins(), @r"
-        Foo
         bar
         frob
-        quux
         ");
     }
 
@@ -1531,11 +1535,7 @@ class Foo:
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        Foo
-        bar
-        quux
-        ");
+        assert_snapshot!(test.completions_without_builtins(), @"bar");
     }
 
     #[test]
@@ -1708,29 +1708,8 @@ quux.b<CURSOR>
         assert_snapshot!(test.completions_without_builtins_with_types(), @r"
         bar :: Unknown | Literal[2]
         baz :: Unknown | Literal[3]
-        foo :: Unknown | Literal[1]
-        __annotations__ :: dict[str, Any]
-        __class__ :: type[Quux]
-        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
-        __dict__ :: dict[str, Any]
-        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
-        __doc__ :: str | None
-        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
-        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
-        __getstate__ :: bound method Quux.__getstate__() -> object
-        __hash__ :: bound method Quux.__hash__() -> int
-        __init__ :: bound method Quux.__init__() -> Unknown
         __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
-        __module__ :: str
-        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Quux
-        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
-        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
-        __repr__ :: bound method Quux.__repr__() -> str
-        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
-        __sizeof__ :: bound method Quux.__sizeof__() -> int
-        __str__ :: bound method Quux.__str__() -> str
         __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
         ");
     }
@@ -2080,10 +2059,7 @@ bar(o<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        bar
-        foo
-        ");
+        assert_snapshot!(test.completions_without_builtins(), @"foo");
     }
 
     #[test]
@@ -2118,8 +2094,6 @@ class C:
         );
 
         assert_snapshot!(test.completions_without_builtins(), @r"
-        C
-        bar
         foo
         self
         ");
@@ -2154,8 +2128,6 @@ class C:
         // that is only a method that can be called on
         // `self`.
         assert_snapshot!(test.completions_without_builtins(), @r"
-        C
-        bar
         foo
         self
         ");
@@ -2200,7 +2172,7 @@ hidden_<CURSOR>
 
         assert_snapshot!(
             test.completions_without_builtins(),
-            @"<No completions found after filtering out completions>",
+            @"<No completions found>",
         );
     }
 
@@ -2220,7 +2192,10 @@ if sys.platform == \"not-my-current-platform\":
         // TODO: ideally, `only_available_in_this_branch` should be available here, but we
         // currently make no effort to provide a good IDE experience within sections that
         // are unreachable
-        assert_snapshot!(test.completions_without_builtins(), @"sys");
+        assert_snapshot!(
+            test.completions_without_builtins(),
+            @"<No completions found after filtering out completions>",
+        );
     }
 
     #[test]
