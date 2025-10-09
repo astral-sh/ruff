@@ -202,7 +202,7 @@ from typing import dataclass_transform
 from dataclasses import field
 
 @dataclass_transform(kw_only_default=True)
-def create_model(*, init=True): ...
+def create_model(*, kw_only: bool = True): ...
 @create_model()
 class A:
     name: str
@@ -213,13 +213,9 @@ a = A(name="Harry")
 a = A("Harry")
 ```
 
-This can be overridden by the call to the decorator function.
+This can be overridden by setting `kw_only=False` when applying the decorator:
 
 ```py
-from typing import dataclass_transform
-
-@dataclass_transform(kw_only_default=True)
-def create_model(*, kw_only: bool = True): ...
 @create_model(kw_only=False)
 class CustomerModel:
     id: int
@@ -228,18 +224,37 @@ class CustomerModel:
 c = CustomerModel(1, "Harry")
 ```
 
+### `frozen_default`
+
+When provided, sets the default value for the `frozen` parameter of `field()`.
+
 ```py
 from typing import dataclass_transform
 
 @dataclass_transform(frozen_default=True)
 def create_model(*, frozen: bool = True): ...
+@create_model()
+class ImmutableModel:
+    name: str
+
+i = ImmutableModel(name="test")
+i.name = "new"  # error: [invalid-assignment]
+```
+
+Again, this can be overridden by setting `frozen=False` when applying the decorator:
+
+```py
 @create_model(frozen=False)
 class MutableModel:
     name: str
 
 m = MutableModel(name="test")
-m.name = "new"  # Should work (frozen=False)
+m.name = "new"  # No error
 ```
+
+### Combining parameters
+
+Combining several of these parameters also works as expected:
 
 ```py
 from typing import dataclass_transform
@@ -247,17 +262,18 @@ from typing import dataclass_transform
 @dataclass_transform(eq_default=True, order_default=False, kw_only_default=True, frozen_default=True)
 def create_model(*, eq: bool = True, order: bool = False, kw_only: bool = True, frozen: bool = True): ...
 @create_model(eq=False, order=True, kw_only=False, frozen=False)
-class AllOverridesModel:
+class OverridesAllParametersModel:
     name: str
     age: int
 
-# All parameters should be overridden:
-# - eq=False: No __eq__ method generated
-# - order=True: __lt__, __gt__ etc. methods generated
-# - kw_only=False: Positional arguments allowed
-# - frozen=False: Fields are mutable
-model = AllOverridesModel("test", 25)
-model.name = "new"  # Should work (frozen=False)
+# Positional arguments are allowed:
+model = OverridesAllParametersModel("test", 25)
+
+# Mutation is allowed:
+model.name = "new"  # No error
+
+# Comparison methods are generated:
+model < model  # No error
 ```
 
 ### `field_specifiers`
