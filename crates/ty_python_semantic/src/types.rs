@@ -8039,20 +8039,20 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                Some(definition_expression_type(
+                definition_expression_type(
                     db,
                     definition,
                     typevar_node.bound.as_ref()?,
-                ))
+                )
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let expr = &call_expr.arguments.find_keyword("bound")?.value;
-                Some(definition_expression_type(db, definition, expr))
+                definition_expression_type(db, definition, expr)
             }
-            _ => None,
-        }?;
+            _ => return None,
+        };
         Some(TypeVarBoundOrConstraints::UpperBound(ty))
     }
 
@@ -8064,34 +8064,30 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                Some(
-                    definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
-                        .into_union()?,
-                )
+                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+                    .into_union()?
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
-                Some(
-                    // We don't use `UnionType::from_elements` or `UnionBuilder` here,
-                    // because we don't want to simplify the list of constraints as we would with
-                    // an actual union type.
-                    // TODO: We probably shouldn't use `UnionType` to store these at all? TypeVar
-                    // constraints are not a union.
-                    UnionType::new(
-                        db,
-                        call_expr
-                            .arguments
-                            .args
-                            .iter()
-                            .skip(1)
-                            .map(|arg| definition_expression_type(db, definition, arg))
-                            .collect::<Box<_>>(),
-                    ),
+                // We don't use `UnionType::from_elements` or `UnionBuilder` here,
+                // because we don't want to simplify the list of constraints as we would with
+                // an actual union type.
+                // TODO: We probably shouldn't use `UnionType` to store these at all? TypeVar
+                // constraints are not a union.
+                UnionType::new(
+                    db,
+                    call_expr
+                        .arguments
+                        .args
+                        .iter()
+                        .skip(1)
+                        .map(|arg| definition_expression_type(db, definition, arg))
+                        .collect::<Box<_>>(),
                 )
             }
-            _ => None,
-        }?;
+            _ => return  None,
+        };
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }
 

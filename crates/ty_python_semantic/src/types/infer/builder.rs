@@ -4001,32 +4001,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
                     self.infer_standalone_expression_impl(value, standalone_expression, tcx)
-                } else {
+                } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
-                    if let Some(call_expr) = value.as_call_expr() {
-                        let callable_type = self.infer_maybe_standalone_expression(
-                            call_expr.func.as_ref(),
-                            TypeContext::default(),
-                        );
-                        let ty = if let Some(typevar_class) = callable_type
-                            .into_class_literal()
-                            .and_then(|cls| match cls.known(self.db()) {
-                                known @ Some(
-                                    KnownClass::TypeVar | KnownClass::ExtensionsTypeVar,
-                                ) => known,
-                                _ => None,
-                            }) {
-                            self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
-                        } else {
-                            self.infer_call_expression_impl(call_expr, callable_type, tcx)
-                        };
-                        self.store_expression_type(value, ty);
-                        ty
+                    let callable_type = self.infer_maybe_standalone_expression(
+                        call_expr.func.as_ref(),
+                        TypeContext::default(),
+                    );
+
+                    let typevar_class = callable_type
+                        .into_class_literal()
+                        .and_then(|cls| cls.known(self.db()))
+                        .filter(|cls| {
+                            matches!(cls, KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
+                        });
+
+                    let ty = if let Some(typevar_class) = typevar_class {
+                        self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
                     } else {
-                        self.infer_expression(value, tcx)
-                    }
+                        self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                    };
+                    self.store_expression_type(value, ty);
+                    ty
+                } else {
+                    self.infer_expression(value, tcx)
                 };
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
@@ -4112,7 +4111,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return error(
                                 &self.context,
                                 "The `covariant` parameter of `typing.TypeVar` \
-                                cannot have an ambiguous value",
+                                cannot have an ambiguous truthiness",
                                 kwarg,
                             );
                         }
@@ -4129,7 +4128,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return error(
                                 &self.context,
                                 "The `contravariant` parameter of `typing.TypeVar` \
-                                cannot have an ambiguous value",
+                                cannot have an ambiguous truthiness",
                                 kwarg,
                             );
                         }
@@ -4159,6 +4158,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     // TODO support `infer_variance` in legacy TypeVars
+                    self.infer_expression(&kwarg.value, TypeContext::default());
                 }
                 name => {
                     // We don't return here; this error is informational since this will error
@@ -4172,6 +4172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ),
                         kwarg,
                     );
+                    self.infer_expression(&kwarg.value, TypeContext::default());
                 }
             }
         }
@@ -4202,10 +4203,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(target_name) = target.as_name_expr().map(|n| &n.id) else {
+        let ast::Expr::Name(ast::ExprName { id, .. }) = target_name else {
             return error(
                 &self.context,
-                "A `typing.TypeVar` must be assigned to a variable",
+                "A `typing.TypeVar` definition must be a simple variable assignment",
                 target,
             );
         };
@@ -4264,10 +4265,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
         // Infer deferred bounds/constraints/defaults of a legacy TypeVar.
-        let Some(call_expr) = value.as_call_expr() else {
+        let ast::Expr::Call(ast::ExprCall { arguments, .. }) = value else {
             return;
         };
-        let arguments = &call_expr.arguments;
         for arg in arguments.args.iter().skip(1) {
             self.infer_type_expression(arg);
         }
