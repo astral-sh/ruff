@@ -317,7 +317,7 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
 }
 
 /// An assertion comment that has been parsed and validated for correctness.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ParsedAssertion<'a> {
     /// A `# revealed:` assertion.
     Revealed(&'a str),
@@ -340,7 +340,7 @@ impl std::fmt::Display for ParsedAssertion<'_> {
 }
 
 /// A parsed and validated `# error:` assertion comment.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct ErrorAssertion<'a> {
     /// The diagnostic rule code we expect.
     pub(crate) rule: Option<&'a str>,
@@ -375,7 +375,7 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 }
 
 /// A parsed and validated `# hover:` assertion comment.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct HoverAssertion<'a> {
     /// The one-based character column (UTF-32) in the line where the down arrow appears.
     /// This indicates the character position in the target line where we should hover.
@@ -403,7 +403,8 @@ impl<'a> HoverAssertion<'a> {
             .ok_or(HoverAssertionParseError::MissingDownArrow)?;
 
         // Calculate the TextSize position of the down arrow in the source file
-        let arrow_position = comment_range.start() + TextSize::try_from(arrow_byte_offset_in_comment).unwrap();
+        let arrow_position =
+            comment_range.start() + TextSize::try_from(arrow_byte_offset_in_comment).unwrap();
 
         // Get the line and character column of the down arrow
         let arrow_line_col = line_index.line_column(arrow_position, source);
@@ -536,7 +537,7 @@ impl<'a> ErrorAssertionParser<'a> {
 /// Enumeration of ways in which parsing an assertion comment can fail.
 ///
 /// The assertion comment could be a "revealed", "error", or "hover" assertion.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum PragmaParseError<'a> {
     #[error("Must specify which type should be revealed")]
     EmptyRevealTypeAssertion,
@@ -547,7 +548,7 @@ pub(crate) enum PragmaParseError<'a> {
 }
 
 /// Enumeration of ways in which parsing an *error* assertion comment can fail.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum ErrorAssertionParseError<'a> {
     #[error("no rule or message text")]
     NoRuleOrMessage,
@@ -570,7 +571,7 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 }
 
 /// Enumeration of ways in which parsing a *hover* assertion comment can fail.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum HoverAssertionParseError {
     #[error("Hover assertion must contain a down arrow (↓) to indicate position")]
     MissingDownArrow,
@@ -905,6 +906,173 @@ mod tests {
         assert_eq!(
             format!("{assert}"),
             r#"error: 1 [unbound-name] "`x` is unbound""#
+        );
+    }
+
+    #[test]
+    fn hover_basic() {
+        let assertions = get_assertions(&dedent(
+            "
+            # ↓ hover: int
+            x
+            ",
+        ));
+
+        let [line] = &as_vec(&assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
+
+        let [assert] = &line.assertions[..] else {
+            panic!("expected one assertion");
+        };
+
+        assert_eq!(format!("{assert}"), "hover: int");
+    }
+
+    #[test]
+    fn hover_with_spaces_before_arrow() {
+        let assertions = get_assertions(&dedent(
+            "
+            #    ↓ hover: str
+            value
+            ",
+        ));
+
+        let [line] = &as_vec(&assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
+
+        let [assert] = &line.assertions[..] else {
+            panic!("expected one assertion");
+        };
+
+        assert_eq!(format!("{assert}"), "hover: str");
+    }
+
+    #[test]
+    fn hover_complex_type() {
+        let assertions = get_assertions(&dedent(
+            "
+            # ↓ hover: list[@Todo(list comprehension element type)]
+            result
+            ",
+        ));
+
+        let [line] = &as_vec(&assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
+
+        let [assert] = &line.assertions[..] else {
+            panic!("expected one assertion");
+        };
+
+        assert_eq!(
+            format!("{assert}"),
+            "hover: list[@Todo(list comprehension element type)]"
+        );
+    }
+
+    #[test]
+    fn hover_multiple_on_same_line() {
+        let assertions = get_assertions(&dedent(
+            "
+            # ↓ hover: Literal[1]
+            #     ↓ hover: Literal[2]
+            x = 1 + 2
+            ",
+        ));
+
+        let [line] = &as_vec(&assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(3));
+
+        let [assert1, assert2] = &line.assertions[..] else {
+            panic!("expected two assertions");
+        };
+
+        assert_eq!(format!("{assert1}"), "hover: Literal[1]");
+        assert_eq!(format!("{assert2}"), "hover: Literal[2]");
+    }
+
+    #[test]
+    fn hover_mixed_with_other_assertions() {
+        let assertions = get_assertions(&dedent(
+            "
+            # ↓ hover: int
+            # error: [some-error]
+            x
+            ",
+        ));
+
+        let [line] = &as_vec(&assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(3));
+
+        let [assert1, assert2] = &line.assertions[..] else {
+            panic!("expected two assertions");
+        };
+
+        assert_eq!(format!("{assert1}"), "hover: int");
+        assert_eq!(format!("{assert2}"), "error: [some-error]");
+    }
+
+    #[test]
+    fn hover_parsed_column() {
+        use ruff_db::files::system_path_to_file;
+
+        let mut db = Db::setup();
+        let settings = ProgramSettings {
+            python_version: PythonVersionWithSource::default(),
+            python_platform: PythonPlatform::default(),
+            search_paths: SearchPathSettings::new(Vec::new())
+                .to_search_paths(db.system(), db.vendored())
+                .unwrap(),
+        };
+        Program::init_or_update(&mut db, settings);
+
+        let source_code = dedent(
+            "
+            #      ↓ hover: Literal[10]
+            value = 10
+            ",
+        );
+
+        db.write_file("/src/test.py", &source_code).unwrap();
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+
+        let assertions = InlineFileAssertions::from_file(&db, file);
+
+        let [line] = &as_vec(&assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
+
+        let [assert] = &line.assertions[..] else {
+            panic!("expected one assertion");
+        };
+
+        // Parse the assertion to verify column is extracted correctly
+        let source = ruff_db::source::source_text(&db, file);
+        let lines = ruff_db::source::line_index(&db, file);
+
+        let parsed = assert.parse(&lines, &source);
+        assert_eq!(
+            parsed,
+            Ok(ParsedAssertion::Hover(HoverAssertion {
+                column: OneIndexed::from_zero_indexed(7),
+                expected_type: "Literal[10]"
+            }))
         );
     }
 }
