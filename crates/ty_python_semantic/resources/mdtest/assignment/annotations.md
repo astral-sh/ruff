@@ -214,8 +214,14 @@ reveal_type(l)  # revealed: list[list[Literal[1]]]
 m: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(m)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
 
-n: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
-reveal_type(n)  # revealed: list[tuple[Literal[1], ...]]
+n: list[tuple[int, str, int]] = [(1, "2", 3), (4, "5", 6)]
+reveal_type(n)  # revealed: list[tuple[int, str, int]]
+
+o: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
+reveal_type(o)  # revealed: list[tuple[Literal[1], ...]]
+
+p: list[tuple[int, ...]] = [(1, 1, 1)]
+reveal_type(p)  # revealed: list[tuple[int, ...]]
 ```
 
 ## PEP-604 annotations are supported

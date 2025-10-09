@@ -400,10 +400,29 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let tcx_tuple = tcx
+            .annotation
+            .and_then(|annotation| annotation.known_specialization(db, KnownClass::Tuple))
+            .and_then(|specialization| {
+                specialization
+                    .tuple(db)
+                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
+                    .resize(db, TupleLength::Fixed(self.0.len()))
+                    .ok()
+            });
+
+        let tcx_elements = match tcx_tuple.as_ref() {
+            None => Either::Right(std::iter::repeat(TypeContext::default())),
+            Some(tuple) => {
+                Either::Left(tuple.all_elements().map(|tcx| TypeContext::new(Some(*tcx))))
+            }
+        };
+
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                .zip(tcx_elements)
+                .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
