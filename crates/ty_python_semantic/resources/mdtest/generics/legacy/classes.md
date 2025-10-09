@@ -1,12 +1,5 @@
 # Generic classes: Legacy syntax
 
-We use TypeVar defaults here, which were added in Python 3.13 for legacy typevars.
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
 ## Defining a generic class
 
 At its simplest, to define a generic class using the legacy syntax, you inherit from the
@@ -115,7 +108,7 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 The type parameter can be specified explicitly:
 
 ```py
-from typing import Generic, Literal, TypeVar
+from typing_extensions import Generic, Literal, TypeVar
 
 T = TypeVar("T")
 
@@ -202,7 +195,7 @@ reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 We can infer the type parameter from a type context:
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -247,7 +240,7 @@ consistent with each other.
 ### `__new__` only
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -264,7 +257,7 @@ wrong_innards: C[int] = C("five")
 ### `__init__` only
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -280,7 +273,7 @@ wrong_innards: C[int] = C("five")
 ### Identical `__new__` and `__init__` signatures
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -299,7 +292,7 @@ wrong_innards: C[int] = C("five")
 ### Compatible `__new__` and `__init__` signatures
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -332,7 +325,7 @@ If either method comes from a generic base class, we don't currently use its inf
 to specialize the class.
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -351,7 +344,7 @@ reveal_type(D(1))  # revealed: D[int]
 ### Generic class inherits `__init__` from generic base class
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -371,7 +364,7 @@ reveal_type(D(1, "str"))  # revealed: D[int, str]
 This is a specific example of the above, since it was reported specifically by a user.
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -389,7 +382,7 @@ for `tuple`, so we use a different mechanism to make sure it has the right inher
 context. But from the user's point of view, this is another example of the above.)
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -410,7 +403,7 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import TypeVar, Sequence, Never
+from typing_extensions import TypeVar, Sequence, Never
 
 T = TypeVar("T")
 
@@ -428,7 +421,7 @@ def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: t
 ### `__init__` is itself generic
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 S = TypeVar("S")
 T = TypeVar("T")
@@ -447,7 +440,7 @@ wrong_innards: C[int] = C("five", 1)
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
-from typing import overload, Generic, TypeVar
+from typing_extensions import overload, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -487,7 +480,7 @@ C[None](12)
 
 ```py
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -501,7 +494,7 @@ reveal_type(A(x=1))  # revealed: A[int]
 ### Class typevar has another typevar as a default
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U", default=T)
@@ -522,7 +515,7 @@ When a generic subclass fills its superclass's type parameter with one of its ow
 propagate through:
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -556,7 +549,7 @@ scope for the method.
 
 ```py
 from ty_extensions import generic_context
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -588,7 +581,7 @@ In a specialized generic alias, the specialization is applied to the attributes 
 class.
 
 ```py
-from typing import Generic, TypeVar, Protocol
+from typing_extensions import Generic, TypeVar, Protocol
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -646,7 +639,7 @@ reveal_type(d.method3().x)  # revealed: int
 When a method is overloaded, the specialization is applied to all overloads.
 
 ```py
-from typing import overload, Generic, TypeVar
+from typing_extensions import overload, Generic, TypeVar
 
 S = TypeVar("S")
 
@@ -674,7 +667,7 @@ A class can use itself as the type parameter of one of its superclasses. (This i
 Here, `Sub` is not a generic class, since it fills its superclass's type parameter (with itself).
 
 ```pyi
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -689,7 +682,7 @@ reveal_type(Sub)  # revealed: <class 'Sub'>
 A similar case can work in a non-stub file, if forward references are stringified:
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -704,7 +697,7 @@ reveal_type(Sub)  # revealed: <class 'Sub'>
 In a non-stub file, without stringified forward references, this raises a `NameError`:
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -717,7 +710,7 @@ class Sub(Base[Sub]): ...
 ### Cyclic inheritance as a generic parameter
 
 ```pyi
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -729,7 +722,7 @@ class Derived(list[Derived[T]], Generic[T]): ...
 Inheritance that would result in a cyclic MRO is detected as an error.
 
 ```py
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
