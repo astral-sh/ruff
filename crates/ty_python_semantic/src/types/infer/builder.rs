@@ -851,7 +851,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // (6) Check that a dataclass does not have more than one `KW_ONLY`.
-            if let Some(field_policy @ CodeGeneratorKind::DataclassLike) =
+            if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
                 let specialization = None;

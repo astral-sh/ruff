@@ -165,7 +165,7 @@ Normal(1) < Normal(2)  # error: [unsupported-operator]
 class NormalOverwritten:
     inner: int
 
-NormalOverwritten(1) < NormalOverwritten(2)
+reveal_type(NormalOverwritten(1) < NormalOverwritten(2))  # revealed: bool
 
 @order_default_false
 class OrderFalse:
@@ -177,13 +177,13 @@ OrderFalse(1) < OrderFalse(2)  # error: [unsupported-operator]
 class OrderFalseOverwritten:
     inner: int
 
-OrderFalseOverwritten(1) < OrderFalseOverwritten(2)
+reveal_type(OrderFalseOverwritten(1) < OrderFalseOverwritten(2))  # revealed: bool
 
 @order_default_true
 class OrderTrue:
     inner: int
 
-OrderTrue(1) < OrderTrue(2)
+reveal_type(OrderTrue(1) < OrderTrue(2))  # revealed: bool
 
 @order_default_true(order=False)
 class OrderTrueOverwritten:
@@ -191,6 +191,36 @@ class OrderTrueOverwritten:
 
 # error: [unsupported-operator]
 OrderTrueOverwritten(1) < OrderTrueOverwritten(2)
+```
+
+This also works for metaclass-based transformers:
+
+```py
+@dataclass_transform(order_default=True)
+class OrderedModelMeta(type): ...
+
+class OrderedModel(metaclass=OrderedModelMeta): ...
+
+class TestWithMeta(OrderedModel):
+    inner: int
+
+reveal_type(TestWithMeta(1) < TestWithMeta(2))  # revealed: bool
+```
+
+And for base-class-based transformers:
+
+```py
+@dataclass_transform(order_default=True)
+class OrderedModelBase: ...
+
+class TestWithBase(OrderedModelBase):
+    inner: int
+
+# TODO: No errors here, should reveal `bool`
+# error: [too-many-positional-arguments]
+# error: [too-many-positional-arguments]
+# error: [unsupported-operator]
+reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
 ```
 
 ### `kw_only_default`
@@ -224,6 +254,33 @@ class CustomerModel:
 c = CustomerModel(1, "Harry")
 ```
 
+This also works for metaclass-based transformers:
+
+```py
+@dataclass_transform(kw_only_default=True)
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class TestMeta(ModelBase):
+    name: str
+
+reveal_type(TestMeta.__init__)  # revealed: (self: TestMeta, *, name: str) -> None
+```
+
+And for base-class-based transformers:
+
+```py
+@dataclass_transform(kw_only_default=True)
+class ModelBase: ...
+
+class TestBase(ModelBase):
+    name: str
+
+# TODO: This should be `(self: TestBase, *, name: str) -> None`
+reveal_type(TestBase.__init__)  # revealed: def __init__(self) -> None
+```
+
 ### `frozen_default`
 
 When provided, sets the default value for the `frozen` parameter of `field()`.
@@ -250,6 +307,38 @@ class MutableModel:
 
 m = MutableModel(name="test")
 m.name = "new"  # No error
+```
+
+This also works for metaclass-based transformers:
+
+```py
+@dataclass_transform(frozen_default=True)
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class TestMeta(ModelBase):
+    name: str
+
+t = TestMeta(name="test")
+t.name = "new"  # error: [invalid-assignment]
+```
+
+And for base-class-based transformers:
+
+```py
+@dataclass_transform(frozen_default=True)
+class ModelBase: ...
+
+class TestMeta(ModelBase):
+    name: str
+
+# TODO: no error here
+# error: [unknown-argument]
+t = TestMeta(name="test")
+
+# TODO: this should be an `invalid-assignment` error
+t.name = "new"
 ```
 
 ### Combining parameters
@@ -365,6 +454,34 @@ D2("a")
 
 D1(1.2)  # error: [invalid-argument-type]
 D2(1.2)  # error: [invalid-argument-type]
+```
+
+### Use cases
+
+#### Home Assistant
+
+Home Assistant uses a pattern like this, where a `@dataclass`-decorated class inherits from a base
+class that is itself a `dataclass`-like construct via a metaclass-based dataclass transformer. Make
+sure that we recognize all fields in a hierarchy like this:
+
+```py
+from dataclasses import dataclass
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type):
+    pass
+
+class Sensor(metaclass=ModelMeta):
+    key: int
+
+@dataclass(frozen=True, kw_only=True)
+class TemperatureSensor(Sensor):
+    name: str
+
+t = TemperatureSensor(key=1, name="Temperature Sensor")
+reveal_type(t.key)  # revealed: int
+reveal_type(t.name)  # revealed: str
 ```
 
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
