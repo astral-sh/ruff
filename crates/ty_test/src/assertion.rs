@@ -269,7 +269,7 @@ impl<'a> UnparsedAssertion<'a> {
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
-            "hover" | "↓ hover" => Some(Self::Hover {
+            "↓ hover" => Some(Self::Hover {
                 expected_type: body,
                 full_comment: comment,
                 range,
