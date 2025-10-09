@@ -165,7 +165,7 @@ Normal(1) < Normal(2)  # error: [unsupported-operator]
 class NormalOverwritten:
     inner: int
 
-NormalOverwritten(1) < NormalOverwritten(2)
+reveal_type(NormalOverwritten(1) < NormalOverwritten(2))  # revealed: bool
 
 @order_default_false
 class OrderFalse:
@@ -177,13 +177,13 @@ OrderFalse(1) < OrderFalse(2)  # error: [unsupported-operator]
 class OrderFalseOverwritten:
     inner: int
 
-OrderFalseOverwritten(1) < OrderFalseOverwritten(2)
+reveal_type(OrderFalseOverwritten(1) < OrderFalseOverwritten(2))  # revealed: bool
 
 @order_default_true
 class OrderTrue:
     inner: int
 
-OrderTrue(1) < OrderTrue(2)
+reveal_type(OrderTrue(1) < OrderTrue(2))  # revealed: bool
 
 @order_default_true(order=False)
 class OrderTrueOverwritten:
@@ -204,7 +204,7 @@ class OrderedModel(metaclass=OrderedModelMeta): ...
 class TestWithMeta(OrderedModel):
     inner: int
 
-TestWithMeta(1) < TestWithMeta(2)
+reveal_type(TestWithMeta(1) < TestWithMeta(2))  # revealed: bool
 ```
 
 And for base-class-based transformers:
@@ -216,11 +216,11 @@ class OrderedModelBase: ...
 class TestWithBase(OrderedModelBase):
     inner: int
 
-# TODO: No errors here
+# TODO: No errors here, should reveal `bool`
 # error: [too-many-positional-arguments]
 # error: [too-many-positional-arguments]
 # error: [unsupported-operator]
-TestWithBase(1) < TestWithBase(2)
+reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
 ```
 
 ### `kw_only_default`
@@ -479,7 +479,9 @@ class Sensor(metaclass=ModelMeta):
 class TemperatureSensor(Sensor):
     name: str
 
-TemperatureSensor(key=1, name="Temperature Sensor")
+t = TemperatureSensor(key=1, name="Temperature Sensor")
+reveal_type(t.key)  # revealed: int
+reveal_type(t.name)  # revealed: str
 ```
 
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

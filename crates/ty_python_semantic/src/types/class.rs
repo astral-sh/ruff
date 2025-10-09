@@ -2283,9 +2283,7 @@ impl<'db> ClassLiteral<'db> {
 
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
-                let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT);
-
-                if !has_synthesized_dunder_init {
+                if !has_dataclass_param(DataclassParams::INIT) {
                     return None;
                 }
 
