@@ -24,7 +24,7 @@ reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
-### Directly assigned to a variable
+### Must be directly assigned to a variable
 
 > A `TypeVar()` expression must always directly be assigned to a variable (it should not be used as
 > part of a larger expression).

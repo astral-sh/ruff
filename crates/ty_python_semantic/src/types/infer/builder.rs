@@ -4090,11 +4090,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut covariant = false;
         let mut contravariant = false;
 
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `TypeVar` creation",
+                starred,
+            );
+        }
+
         for kwarg in &arguments.keywords {
             let Some(identifier) = kwarg.arg.as_ref() else {
                 return error(
                     &self.context,
-                    "Starred arguments are not supported in legacy `typing.TypeVar` creation",
+                    "Starred arguments are not supported in `TypeVar` creation",
                     kwarg,
                 );
             };
@@ -4110,7 +4118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
-                                "The `covariant` parameter of `typing.TypeVar` \
+                                "The `covariant` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
                                 kwarg,
                             );
@@ -4127,7 +4135,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
-                                "The `contravariant` parameter of `typing.TypeVar` \
+                                "The `contravariant` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
                                 kwarg,
                             );
@@ -4167,9 +4175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // can.
                     error(
                         &self.context,
-                        format_args!(
-                            "Unknown keyword argument `{name}` in `typing.TypeVar` creation",
-                        ),
+                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation",),
                         kwarg,
                     );
                     self.infer_expression(&kwarg.value, TypeContext::default());
@@ -4244,7 +4250,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return error(
                     &self.context,
                     "A `typing.TypeVar` cannot have exactly one constraint",
-                    call_expr,
+                    arguments.args.get(1).unwrap(),
                 );
             }
             (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
@@ -6474,7 +6480,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
                     {
                         builder.into_diagnostic(
-                            "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                            "A `TypeVar` definition must be a simple variable assignment",
                         );
                     }
                 }
