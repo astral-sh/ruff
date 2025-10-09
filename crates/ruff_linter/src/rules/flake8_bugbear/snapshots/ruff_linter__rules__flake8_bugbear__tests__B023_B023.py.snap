@@ -244,14 +244,3 @@ B023 Function definition does not bind loop variable `i`
 174 |             return [lambda: i for i in range(3)]  # error
     |                             ^
     |
-
-B023 Function definition does not bind loop variable `val`
-   --> B023.py:180:26
-    |
-178 |     def make_func(val=val):
-179 |         def tmp():
-180 |             return print(val)
-    |                          ^^^
-181 |
-182 |         return tmp
-    |
