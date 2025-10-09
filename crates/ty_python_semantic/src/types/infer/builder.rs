@@ -577,7 +577,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
+            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class, None);
 
             // (2) If it's a `NamedTuple` class, check that no field without a default value
             // appears after a field with a default value.
@@ -898,7 +898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (7) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-                CodeGeneratorKind::from_class(self.db(), class)
+                CodeGeneratorKind::from_class(self.db(), class, None)
             {
                 let specialization = None;
 
@@ -4569,11 +4569,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .dataclass_params(db)
                     .map(|params| SmallVec::from(params.field_specifiers(db)))
                     .or_else(|| {
-                        class_literal
-                            .try_metaclass(db)
-                            .ok()
-                            .and_then(|(_, params)| params)
-                            .map(|params| SmallVec::from(params.field_specifiers(db)))
+                        Some(SmallVec::from(
+                            CodeGeneratorKind::from_class(db, class_literal, None)?
+                                .dataclass_transformer_params()?
+                                .field_specifiers(db),
+                        ))
                     })
             }
 

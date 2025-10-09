@@ -122,9 +122,6 @@ class CustomerModel(ModelBase):
     id: int
     name: str
 
-# TODO: this is not supported yet
-# error: [unknown-argument]
-# error: [unknown-argument]
 CustomerModel(id=1, name="Test")
 ```
 
@@ -216,11 +213,7 @@ class OrderedModelBase: ...
 class TestWithBase(OrderedModelBase):
     inner: int
 
-# TODO: No errors here, should reveal `bool`
-# error: [too-many-positional-arguments]
-# error: [too-many-positional-arguments]
-# error: [unsupported-operator]
-reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
+reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: bool
 ```
 
 ### `kw_only_default`
@@ -277,8 +270,7 @@ class ModelBase: ...
 class TestBase(ModelBase):
     name: str
 
-# TODO: This should be `(self: TestBase, *, name: str) -> None`
-reveal_type(TestBase.__init__)  # revealed: def __init__(self) -> None
+reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
 ```
 
 ### `frozen_default`
@@ -333,12 +325,9 @@ class ModelBase: ...
 class TestMeta(ModelBase):
     name: str
 
-# TODO: no error here
-# error: [unknown-argument]
 t = TestMeta(name="test")
 
-# TODO: this should be an `invalid-assignment` error
-t.name = "new"
+t.name = "new"  # error: [invalid-assignment]
 ```
 
 ### Combining parameters
@@ -437,19 +426,15 @@ class DefaultFrozenModel:
 class Frozen(DefaultFrozenModel):
     name: str
 
-# TODO: no error here
-# error: [unknown-argument]
 f = Frozen(name="test")
-# TODO: this should be an `invalid-assignment` error
-f.name = "new"
+f.name = "new"  # error: [invalid-assignment]
 
 class Mutable(DefaultFrozenModel, frozen=False):
     name: str
 
-# TODO: no error here
-# error: [unknown-argument]
 m = Mutable(name="test")
-m.name = "new"  # No error
+# TODO: This should not be an error
+m.name = "new"  # error: [invalid-assignment]
 ```
 
 ## `field_specifiers`
@@ -532,12 +517,8 @@ class Person(FancyBase):
     name: str = fancy_field()
     age: int | None = fancy_field(kw_only=True)
 
-# TODO: should be (self: Person, name: str = Unknown, *, age: int | None = Unknown) -> None
-reveal_type(Person.__init__)  # revealed: def __init__(self) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 
-# TODO: shouldn't be an error
-# error: [too-many-positional-arguments]
-# error: [unknown-argument]
 alice = Person("Alice", age=30)
 
 reveal_type(alice.id)  # revealed: int
