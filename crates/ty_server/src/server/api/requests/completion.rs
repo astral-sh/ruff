@@ -3,8 +3,8 @@ use std::time::Instant;
 
 use lsp_types::request::Completion;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionParams,
-    CompletionResponse, Documentation, TextEdit, Url,
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    CompletionParams, CompletionResponse, Documentation, TextEdit, Url,
 };
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
@@ -100,7 +100,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             })
             .collect();
         let len = items.len();
-        let response = CompletionResponse::Array(items);
+        let response = CompletionResponse::List(CompletionList {
+            is_incomplete: true,
+            items,
+        });
         tracing::debug!(
             "Completions request returned {len} suggestions in {elapsed:?}",
             elapsed = Instant::now().duration_since(start)
