@@ -18,8 +18,8 @@ use crate::checkers::ast::Checker;
 /// always use timezone-aware objects.
 ///
 /// `datetime.date.fromtimestamp(ts)` returns a naive date object.
-/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=...)` to create a
-/// timezone-aware datetime object.
+/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=...).date()` to
+/// create a timezone-aware datetime object and retrieve its date component.
 ///
 /// ## Example
 /// ```python
@@ -32,14 +32,14 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc)
+/// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc).date()
 /// ```
 ///
 /// Or, for Python 3.11 and later:
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.fromtimestamp(946684800, tz=datetime.UTC)
+/// datetime.datetime.fromtimestamp(946684800, tz=datetime.UTC).date()
 /// ```
 ///
 /// ## References
