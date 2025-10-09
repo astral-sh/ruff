@@ -8,6 +8,7 @@ use ruff_python_ast::Mod;
 use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
+use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseOptions, Parsed, UnsupportedSyntaxError, parse};
 use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -448,7 +449,7 @@ fn ensure_unchanged_ast(
     .expect("Unformatted code to be valid syntax");
 
     let unformatted_unsupported_syntax_errors =
-        collect_unsupported_syntax_errors(&unformatted_parsed);
+        collect_unsupported_syntax_errors(&unformatted_parsed, unformatted_code);
     let mut unformatted_ast = unformatted_parsed.into_syntax();
 
     Normalizer.visit_module(&mut unformatted_ast);
@@ -463,7 +464,7 @@ fn ensure_unchanged_ast(
 
     // Assert that there are no new unsupported syntax errors
     let mut formatted_unsupported_syntax_errors =
-        collect_unsupported_syntax_errors(&formatted_parsed);
+        collect_unsupported_syntax_errors(&formatted_parsed, formatted_code);
 
     formatted_unsupported_syntax_errors
         .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
@@ -581,24 +582,70 @@ source_type                = {source_type:?}"#,
 /// It visits each statement in the AST in source order and saves its range. The index of the node
 /// enclosing a syntax error's range can then be retrieved with the `node_id` method. This `node_id`
 /// should be stable across formatting runs since the formatter won't add or remove statements.
-#[derive(Default)]
+///
+/// Expected syntax errors can be suppressed by adding an `# invalid-syntax: allow` pragma comment
+/// to the line preceding the statement containing the syntax error. For example,
+///
+/// ```python
+/// # invalid-syntax: allow
+/// f"foo {'\'bar\''}"
+/// ```
+///
+/// This gets formatted to
+///
+/// ```python
+/// f"foo {"'bar'"}"
+/// ```
+///
+/// which would technically be invalid before Python 3.12 because the f-string reuses the outer
+/// quote character. However, the escapes in the input are also invalid before 3.12, so it's safe
+/// for us to make the transformation anyway.
+///
+/// Such pragma comments are only necessary in cases where the syntax error is introduced or
+/// modified by running the formatter. In this case, the `UnsupportedSyntaxErrorKind` changes from
+/// `Pep701FString(Backslash)` to `Pep701FString(NestedQuote)`, in turn changing the hash and the
+/// fingerprint computed below.
 struct StmtVisitor {
     nodes: Vec<TextRange>,
+    pragma_comments: Vec<OneIndexed>,
+    index: LineIndex,
 }
 
 impl StmtVisitor {
-    fn new(module: &Mod) -> Self {
-        let mut visitor = Self::default();
-        visitor.visit_mod(module);
+    fn new(parsed: &Parsed<Mod>, source: &str) -> Self {
+        let index = LineIndex::from_source_text(source);
+        let mut visitor = Self {
+            nodes: Vec::new(),
+            pragma_comments: Indexer::from_tokens(parsed.tokens(), source)
+                .comment_ranges()
+                .into_iter()
+                .filter(|comment_range| source[*comment_range].contains("invalid-syntax: allow"))
+                .map(|range| index.line_index(range.start()))
+                .collect(),
+            index,
+        };
+        visitor.visit_mod(parsed.syntax());
         visitor
     }
 
-    /// Return the index of the statement node that contains `range`.
-    fn node_id(&self, range: TextRange) -> usize {
-        self.nodes
+    /// Return the index of the statement node that contains `range`, if it exists, and if it is not
+    /// ignored by a pragma comment.
+    fn node_id(&self, range: TextRange) -> Option<usize> {
+        let position = self
+            .nodes
             .iter()
-            .position(|node| node.contains_range(range))
-            .unwrap()
+            .position(|node| node.contains_range(range))?;
+        let node_range = self.nodes[position];
+
+        let line = self.index.line_index(node_range.start());
+        if line
+            .checked_sub(OneIndexed::new(1).unwrap())
+            .is_some_and(|previous_line| self.pragma_comments.contains(&previous_line))
+        {
+            return None;
+        }
+
+        Some(position)
     }
 }
 
@@ -612,13 +659,16 @@ impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
 /// Collects the unsupported syntax errors and assigns a unique hash to each error.
 fn collect_unsupported_syntax_errors(
     parsed: &Parsed<Mod>,
+    source: &str,
 ) -> FxHashMap<u64, UnsupportedSyntaxError> {
-    let visitor = StmtVisitor::new(parsed.syntax());
+    let visitor = StmtVisitor::new(parsed, source);
 
     let mut collected = FxHashMap::default();
 
     for error in parsed.unsupported_syntax_errors() {
-        let node_id = visitor.node_id(error.range);
+        let Some(node_id) = visitor.node_id(error.range) else {
+            continue;
+        };
         let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, node_id, 0);
 
         // Make sure that we do not get a fingerprint that is already in use

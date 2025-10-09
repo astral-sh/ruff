@@ -165,6 +165,7 @@ fr'flip quotes {x}'  # Use preferred quotes, because raw string contains now quo
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
+# invalid-syntax: allow
 f"foo {'\'bar\''}"
 f"foo {'\"bar\"'}"
 
@@ -715,6 +716,7 @@ f'{f'{z=:hy "user"}'} \'\'\''
 #  We have to be careful about changing the quotes if the f-string has a debug expression because it is inserted verbatim.
 f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
 f'{1=: abcd \'\'}'  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
+# invalid-syntax: allow
 f'{1=: abcd \"\"}'  # Changing the quotes here is fine because the inner quotes are escaped
 # Don't change the quotes in the following cases:
 f'{x=:hy "user"} \'\'\''

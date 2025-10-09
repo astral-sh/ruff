@@ -171,6 +171,7 @@ fr'flip quotes {x}'  # Use preferred quotes, because raw string contains now quo
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
+# invalid-syntax: allow
 f"foo {'\'bar\''}"
 f"foo {'\"bar\"'}"
 
@@ -721,6 +722,7 @@ f'{f'{z=:hy "user"}'} \'\'\''
 #  We have to be careful about changing the quotes if the f-string has a debug expression because it is inserted verbatim.
 f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
 f'{1=: abcd \'\'}'  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
+# invalid-syntax: allow
 f'{1=: abcd \"\"}'  # Changing the quotes here is fine because the inner quotes are escaped
 # Don't change the quotes in the following cases:
 f'{x=:hy "user"} \'\'\''
@@ -950,6 +952,7 @@ rf"flip quotes {x}"  # Use preferred quotes, because raw string contains now quo
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
+# invalid-syntax: allow
 f"foo {"'bar'"}"
 f"foo {'"bar"'}"
 
@@ -1543,6 +1546,7 @@ f"{f'{z=:hy "user"}'} '''"
 #  We have to be careful about changing the quotes if the f-string has a debug expression because it is inserted verbatim.
 f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
 f"{1=: abcd \'\'}"  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
+# invalid-syntax: allow
 f"{1=: abcd \"\"}"  # Changing the quotes here is fine because the inner quotes are escaped
 # Don't change the quotes in the following cases:
 f'{x=:hy "user"} \'\'\''
@@ -1777,6 +1781,7 @@ rf"flip quotes {x}"  # Use preferred quotes, because raw string contains now quo
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
+# invalid-syntax: allow
 f"foo {"'bar'"}"
 f"foo {'"bar"'}"
 
@@ -2370,6 +2375,7 @@ f"{f'{z=:hy "user"}'} '''"
 #  We have to be careful about changing the quotes if the f-string has a debug expression because it is inserted verbatim.
 f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
 f"{1=: abcd \'\'}"  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
+# invalid-syntax: allow
 f"{1=: abcd \"\"}"  # Changing the quotes here is fine because the inner quotes are escaped
 # Don't change the quotes in the following cases:
 f'{x=:hy "user"} \'\'\''
@@ -2413,55 +2419,34 @@ print(f"{ {}, 1 }")
 
 ### Unsupported Syntax Errors
 error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:762:19
+   --> fstring.py:763:19
     |
-760 | f'{1: abcd "{"aa"}" }'
-761 | f'{1=: "abcd {'aa'}}'
-762 | f"{x:a{z:hy \"user\"}} '''"
+761 | f'{1: abcd "{"aa"}" }'
+762 | f'{1=: "abcd {'aa'}}'
+763 | f"{x:a{z:hy \"user\"}} '''"
     |                   ^
-763 |
-764 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
+764 |
+765 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
 
 error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:762:13
+   --> fstring.py:763:13
     |
-760 | f'{1: abcd "{"aa"}" }'
-761 | f'{1=: "abcd {'aa'}}'
-762 | f"{x:a{z:hy \"user\"}} '''"
+761 | f'{1: abcd "{"aa"}" }'
+762 | f'{1=: "abcd {'aa'}}'
+763 | f"{x:a{z:hy \"user\"}} '''"
     |             ^
-763 |
-764 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
+764 |
+765 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
 
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:178:8
+   --> fstring.py:763:14
     |
-176 | # Here, the formatter will remove the escapes which is correct because they aren't allowed
-177 | # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
-178 | f"foo {"'bar'"}"
-    |        ^
-179 | f"foo {'"bar"'}"
-    |
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:771:14
-    |
-769 | f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
-770 | f"{1=: abcd \'\'}"  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
-771 | f"{1=: abcd \"\"}"  # Changing the quotes here is fine because the inner quotes are escaped
+761 | f'{1: abcd "{"aa"}" }'
+762 | f'{1=: "abcd {'aa'}}'
+763 | f"{x:a{z:hy \"user\"}} '''"
     |              ^
-772 | # Don't change the quotes in the following cases:
-773 | f'{x=:hy "user"} \'\'\''
-    |
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:762:14
-    |
-760 | f'{1: abcd "{"aa"}" }'
-761 | f'{1=: "abcd {'aa'}}'
-762 | f"{x:a{z:hy \"user\"}} '''"
-    |              ^
-763 |
-764 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
+764 |
+765 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
