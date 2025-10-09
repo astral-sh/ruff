@@ -383,11 +383,11 @@ impl<'db> TypeContext<'db> {
     // specialization.
     fn known_specialization(
         &self,
-        known_class: KnownClass,
         db: &'db dyn Db,
+        known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         self.annotation
-            .and_then(|ty| ty.known_specialization(known_class, db))
+            .and_then(|ty| ty.known_specialization(db, known_class))
     }
 }
 

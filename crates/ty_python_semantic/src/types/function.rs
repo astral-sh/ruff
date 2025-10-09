@@ -82,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, todo_type, walk_signature,
+    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
+    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -667,14 +667,15 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let updated_signature =
             self.signature(db)
-                .apply_type_mapping_impl(db, type_mapping, visitor);
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         let updated_last_definition_signature = self
             .last_definition_signature(db)
-            .apply_type_mapping_impl(db, type_mapping, visitor);
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         Self::new(
             db,
             self.literal(db),

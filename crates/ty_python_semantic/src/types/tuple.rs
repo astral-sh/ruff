@@ -22,7 +22,6 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
-use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::{
@@ -30,6 +29,7 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
     UnionBuilder, UnionType,
 };
+use crate::types::{Truthiness, TypeContext};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
 
@@ -232,13 +232,14 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
         TupleType::new(
             db,
             &self
                 .tuple(db)
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
 
@@ -396,12 +397,32 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let tcx_tuple = tcx
+            .annotation
+            .and_then(|annotation| annotation.known_specialization(db, KnownClass::Tuple))
+            .and_then(|specialization| {
+                specialization
+                    .tuple(db)
+                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
+                    .resize(db, TupleLength::Fixed(self.0.len()))
+                    .ok()
+            });
+
+        let tcx_elements = match tcx_tuple.as_ref() {
+            None => Either::Right(std::iter::repeat(TypeContext::default())),
+            Some(tuple) => {
+                Either::Left(tuple.all_elements().map(|tcx| TypeContext::new(Some(*tcx))))
+            }
+        };
+
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .zip(tcx_elements)
+                .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
@@ -736,17 +757,18 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
         Self::mixed(
             self.prefix
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             self.variable
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.suffix
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
@@ -1116,13 +1138,14 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => {
-                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
+                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, visitor),
+            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         }
     }
 

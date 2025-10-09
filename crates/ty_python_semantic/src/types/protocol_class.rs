@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::TypeContext;
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -339,6 +340,7 @@ impl<'db> ProtocolInterface<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -350,6 +352,7 @@ impl<'db> ProtocolInterface<'db> {
                         data.apply_type_mapping_impl(
                             db,
                             type_mapping,
+                            tcx,
                             &ApplyTypeMappingVisitor::default(),
                         )
                         .normalized(db),
@@ -428,10 +431,13 @@ impl<'db> ProtocolMemberData<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
-            kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
+            kind: self
+                .kind
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             qualifiers: self.qualifiers,
         }
     }
@@ -516,18 +522,22 @@ impl<'db> ProtocolMemberKind<'db> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
-                callable.apply_type_mapping_impl(db, type_mapping, visitor),
+                callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
             ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                property.apply_type_mapping_impl(db, type_mapping, visitor),
+                property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
-            ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.apply_type_mapping_impl(db, type_mapping, visitor))
-            }
+            ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(ty.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            )),
         }
     }
 

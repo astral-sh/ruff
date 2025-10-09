@@ -5,8 +5,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
-    TypeRelation,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
+    TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -84,6 +84,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.subclass_of {
@@ -91,6 +92,7 @@ impl<'db> SubclassOfType<'db> {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
                     db,
                     type_mapping,
+                    tcx,
                     visitor,
                 )),
             }),

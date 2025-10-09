@@ -12,6 +12,7 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use crate::types::TypeContext;
 use crate::{Db, FxOrderMap};
 
 use ordermap::OrderSet;
@@ -62,13 +63,17 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
         Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+            defining_class: self.defining_class.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
         }
     }
 }

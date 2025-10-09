@@ -16,7 +16,7 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, Type, TypeMapping, TypeRelation,
+    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType,
     binding_type, declaration_type,
 };
@@ -460,8 +460,11 @@ impl<'db> GenericContext<'db> {
                 generic_context: self,
                 types: &expanded[0..idx],
             };
-            let default =
-                default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
+            let default = default.apply_type_mapping(
+                db,
+                &TypeMapping::PartialSpecialization(partial),
+                TypeContext::default(),
+            );
             expanded[idx] = default;
         }
 
@@ -791,27 +794,34 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
+        self.apply_type_mapping_impl(db, type_mapping, &[], &ApplyTypeMappingVisitor::default())
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: &[Type<'db>],
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
+
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
+            .enumerate()
+            .map(|(i, ty)| {
+                let tcx = TypeContext::new(tcx.get(i).copied());
+                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            })
             .collect();
 
-        let tuple_inner = self
-            .tuple_inner(db)
-            .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
+        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
+            tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+        });
+
         Specialization::new(
             db,
             self.generic_context(db),
@@ -924,6 +934,7 @@ impl<'db> Specialization<'db> {
             tuple.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Materialize(materialization_kind),
+                TypeContext::default(),
                 visitor,
             )
         });
@@ -1122,19 +1133,30 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
-    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
+    pub(crate) fn build(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Specialization<'db> {
+        let tcx_specialization = tcx
+            .annotation
+            .and_then(|annotation| annotation.specialization_of(self.db, None));
+
         let types = (generic_context.variables_inner(self.db).iter()).map(|(variable, options)| {
             let mut ty = self.types.get(variable).copied();
 
             // When inferring a specialization for a generic class typevar from a constructor call,
-            // promote any typevars that are inferred as a literal to the corresponding instance
-            // type.
+            // promote any typevars that are inferred as a literal to the corresponding instance type.
             if options.should_promote_literals {
-                ty = ty.map(|ty| ty.promote_literals(self.db));
+                let tcx = tcx_specialization
+                    .and_then(|specialization| specialization.get(self.db, *variable));
+
+                ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
             }
 
             ty
         });
+
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)
     }

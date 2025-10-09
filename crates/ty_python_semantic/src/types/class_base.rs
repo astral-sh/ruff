@@ -5,7 +5,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
     MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
-    TypeMapping, todo_type,
+    TypeContext, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -277,11 +277,12 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
-                Self::Class(class.apply_type_mapping_impl(db, type_mapping, visitor))
+                Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
@@ -296,6 +297,7 @@ impl<'db> ClassBase<'db> {
             let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
+                TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
             match specialization.materialization_kind(db) {
@@ -311,6 +313,7 @@ impl<'db> ClassBase<'db> {
         self.apply_type_mapping_impl(
             db,
             &TypeMapping::Materialize(kind),
+            TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
     }
