@@ -194,25 +194,28 @@ class X[T]:
 g: X[Literal[1]] = X(1)
 reveal_type(g)  # revealed: X[Literal[1]]
 
-h: dict[list[X[Literal[1]]], set[Literal[b"a"]]] = {[X(1)]: {b"a"}}
-reveal_type(h)  # revealed: dict[list[X[Literal[1]]], set[Literal[b"a"]]]
+h: X[int] = X(1)
+reveal_type(h)  # revealed: X[int]
 
-i: list[Literal[1, 2, 3]] = [1, 2, 3]
-reveal_type(i)  # revealed: list[Literal[1, 2, 3]]
+i: dict[list[X[Literal[1]]], set[Literal[b"a"]]] = {[X(1)]: {b"a"}}
+reveal_type(i)  # revealed: dict[list[X[Literal[1]]], set[Literal[b"a"]]]
 
-j: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
+j: list[Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(j)  # revealed: list[Literal[1, 2, 3]]
+
+k: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
+reveal_type(k)  # revealed: list[Literal[1, 2, 3]]
 
 type Y[T] = list[T]
 
-k: Y[Y[Literal[1]]] = [[1]]
-reveal_type(k)  # revealed: list[list[Literal[1]]]
+l: Y[Y[Literal[1]]] = [[1]]
+reveal_type(l)  # revealed: list[list[Literal[1]]]
 
-l: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
-reveal_type(l)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
+m: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
+reveal_type(m)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
 
-m: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
-reveal_type(m)  # revealed: list[tuple[Literal[1], ...]]
+n: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
+reveal_type(n)  # revealed: list[tuple[Literal[1], ...]]
 ```
 
 ## PEP-604 annotations are supported

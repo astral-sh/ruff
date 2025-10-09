@@ -1138,18 +1138,25 @@ impl<'db> SpecializationBuilder<'db> {
         generic_context: GenericContext<'db>,
         tcx: TypeContext<'db>,
     ) -> Specialization<'db> {
+        let tcx_specialization = tcx
+            .annotation
+            .and_then(|annotation| annotation.specialization_of(self.db, None));
+
         let types = (generic_context.variables_inner(self.db).iter()).map(|(variable, options)| {
             let mut ty = self.types.get(variable).copied();
 
             // When inferring a specialization for a generic class typevar from a constructor call,
-            // promote any typevars that are inferred as a literal to the corresponding instance
-            // type.
+            // promote any typevars that are inferred as a literal to the corresponding instance type.
             if options.should_promote_literals {
-                ty = ty.map(|ty| ty.promote_literals(self.db, tcx));
+                let tcx = tcx_specialization
+                    .and_then(|specialization| specialization.get(self.db, *variable));
+
+                ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
             }
 
             ty
         });
+
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)
     }

@@ -858,14 +858,16 @@ impl<'db> Type<'db> {
             )
         });
 
-        self.specialization_of(db, class_literal)
+        self.specialization_of(db, Some(class_literal))
     }
 
     // If the type is a specialized instance of the given class, returns the specialization.
+    //
+    // If no class is provided, returns the specialization of any class instance.
     pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,
-        class_literal: ClassLiteral<'_>,
+        expected_class: Option<ClassLiteral<'_>>,
     ) -> Option<Specialization<'db>> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
@@ -874,13 +876,12 @@ impl<'db> Type<'db> {
         }
         .class(db);
 
-        if class_type.class_literal(db).0 != class_literal {
+        let (class_literal, specialization) = class_type.class_literal(db);
+        if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
             return None;
         }
 
-        class_type
-            .into_generic_alias()
-            .map(|generic_alias| generic_alias.specialization(db))
+        specialization
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
