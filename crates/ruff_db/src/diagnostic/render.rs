@@ -1191,9 +1191,7 @@ impl FileResolver for DummyFileResolver {
     }
 
     fn current_directory(&self) -> &Path {
-        static CWD: std::sync::LazyLock<std::path::PathBuf> =
-            std::sync::LazyLock::new(|| std::path::PathBuf::from("."));
-        &CWD
+        Path::new(".")
     }
 }
 
