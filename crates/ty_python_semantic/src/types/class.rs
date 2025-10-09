@@ -176,7 +176,7 @@ fn try_metaclass_cycle_initial<'db>(
 #[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
-    DataclassLike,
+    DataclassLike(Option<DataclassTransformerParams>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
     /// Classes inheriting from `typing.TypedDict`
@@ -194,12 +194,10 @@ impl CodeGeneratorKind {
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind> {
-            if class.dataclass_params(db).is_some()
-                || class
-                    .try_metaclass(db)
-                    .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
-            {
-                Some(CodeGeneratorKind::DataclassLike)
+            if class.dataclass_params(db).is_some() {
+                Some(CodeGeneratorKind::DataclassLike(None))
+            } else if let Ok((_, Some(transformer_params))) = class.try_metaclass(db) {
+                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
             } else if class
                 .explicit_bases(db)
                 .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
@@ -233,7 +231,12 @@ impl CodeGeneratorKind {
     }
 
     pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
-        CodeGeneratorKind::from_class(db, class) == Some(self)
+        matches!(
+            (CodeGeneratorKind::from_class(db, class), self),
+            (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
+                | (Some(Self::NamedTuple), Self::NamedTuple)
+                | (Some(Self::TypedDict), Self::TypedDict)
+        )
     }
 }
 
@@ -2152,10 +2155,20 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
-        let has_dataclass_param =
-            |param| dataclass_params.is_some_and(|params| params.contains(param));
 
         let field_policy = CodeGeneratorKind::from_class(db, self)?;
+
+        let transformer_params =
+            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
+                Some(DataclassParams::from(transformer_params))
+            } else {
+                None
+            };
+
+        let has_dataclass_param = |param| {
+            dataclass_params.is_some_and(|params| params.contains(param))
+                || transformer_params.is_some_and(|params| params.contains(param))
+        };
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -2269,11 +2282,8 @@ impl<'db> ClassLiteral<'db> {
         };
 
         match (field_policy, name) {
-            (CodeGeneratorKind::DataclassLike, "__init__") => {
-                let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT)
-                    || self
-                        .try_metaclass(db)
-                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some());
+            (CodeGeneratorKind::DataclassLike(_), "__init__") => {
+                let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT);
 
                 if !has_synthesized_dunder_init {
                     return None;
@@ -2289,7 +2299,7 @@ impl<'db> ClassLiteral<'db> {
                     .with_annotated_type(KnownClass::Type.to_instance(db));
                 signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
             }
-            (CodeGeneratorKind::DataclassLike, "__lt__" | "__le__" | "__gt__" | "__ge__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
                 if !has_dataclass_param(DataclassParams::ORDER) {
                     return None;
                 }
@@ -2332,7 +2342,7 @@ impl<'db> ClassLiteral<'db> {
                         )
                     })
             }
-            (CodeGeneratorKind::DataclassLike, "__replace__")
+            (CodeGeneratorKind::DataclassLike(_), "__replace__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
             {
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
@@ -2340,7 +2350,7 @@ impl<'db> ClassLiteral<'db> {
 
                 signature_from_fields(vec![self_parameter], Some(instance_ty))
             }
-            (CodeGeneratorKind::DataclassLike, "__setattr__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if has_dataclass_param(DataclassParams::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new([
@@ -2356,7 +2366,7 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
-            (CodeGeneratorKind::DataclassLike, "__slots__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__slots__") => {
                 has_dataclass_param(DataclassParams::SLOTS).then(|| {
                     let fields = self.fields(db, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
@@ -2794,7 +2804,7 @@ impl<'db> ClassLiteral<'db> {
 
                 let kind = match field_policy {
                     CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
-                    CodeGeneratorKind::DataclassLike => FieldKind::Dataclass {
+                    CodeGeneratorKind::DataclassLike(_) => FieldKind::Dataclass {
                         default_ty,
                         init_only: attr.is_init_var(),
                         init,
