@@ -158,22 +158,7 @@ type long_bound_short_default[T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb
 type short_bound_long_default[T:a= (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)]=int
 ```
 
-## Outputs
-### Output 1
-```
-indent-style               = space
-line-width                 = 88
-indent-width               = 4
-quote-style                = Double
-line-ending                = LineFeed
-magic-trailing-comma       = Respect
-docstring-code             = Disabled
-docstring-code-line-width  = "dynamic"
-preview                    = Disabled
-target_version             = 3.12
-source_type                = Python
-```
-
+## Output
 ```python
 # basic usage
 type X = int
