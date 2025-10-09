@@ -205,6 +205,7 @@ pub fn completion<'db>(
     file: File,
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
+    let typed = find_typed_text(db, file, offset);
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -240,7 +241,14 @@ pub fn completion<'db>(
 
     if settings.auto_import {
         if let Some(scoped) = scoped {
-            add_unimported_completions(db, file, &parsed, scoped, &mut completions);
+            add_unimported_completions(
+                db,
+                file,
+                &parsed,
+                scoped,
+                typed.as_deref(),
+                &mut completions,
+            );
         }
     }
     completions.sort_by(compare_suggestions);
@@ -260,9 +268,10 @@ fn add_unimported_completions<'db>(
     file: File,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
+    typed: Option<&str>,
     completions: &mut Vec<Completion<'db>>,
 ) {
-    let Some(typed) = scoped.typed else {
+    let Some(typed) = typed else {
         return;
     };
     let source = source_text(db, file);
@@ -485,21 +494,13 @@ impl<'t> CompletionTargetTokens<'t> {
             }
             CompletionTargetTokens::Generic { token } => {
                 let node = covering_node(parsed.syntax().into(), token.range()).node();
-                let typed = match node {
-                    ast::AnyNodeRef::ExprName(ast::ExprName { id, .. }) => {
-                        let name = id.as_str();
-                        if name.is_empty() { None } else { Some(name) }
-                    }
-                    _ => None,
-                };
-                Some(CompletionTargetAst::Scoped(ScopedTarget { node, typed }))
+                Some(CompletionTargetAst::Scoped(ScopedTarget { node }))
             }
             CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(offset);
                 let covering_node = covering_node(parsed.syntax().into(), range);
                 Some(CompletionTargetAst::Scoped(ScopedTarget {
                     node: covering_node.node(),
-                    typed: None,
                 }))
             }
         }
@@ -561,11 +562,6 @@ struct ScopedTarget<'t> {
     /// The node with the smallest range that fully covers
     /// the token under the cursor.
     node: ast::AnyNodeRef<'t>,
-    /// The text that has been typed so far, if available.
-    ///
-    /// When not `None`, the typed text is guaranteed to be
-    /// non-empty.
-    typed: Option<&'t str>,
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
@@ -727,6 +723,31 @@ fn import_tokens(tokens: &[Token]) -> Option<(&Token, &Token)> {
         };
     }
     None
+}
+
+/// Looks for the text typed immediately before the cursor offset
+/// given.
+///
+/// If there isn't any typed text or it could not otherwise be found,
+/// then `None` is returned.
+fn find_typed_text(db: &dyn Db, file: File, offset: TextSize) -> Option<String> {
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, file);
+    let tokens = parsed.tokens().before(offset);
+    let last = tokens.last()?;
+    if !matches!(last.kind(), TokenKind::Name) {
+        return None;
+    }
+    // This one's weird, but if the cursor is beyond
+    // what is in the closest `Name` token, then it's
+    // likely we can't infer anything about what has
+    // been typed. This likely means there is whtiespace
+    // or something that isn't represented in the token
+    // stream. So just give up.
+    if last.range().end() < offset {
+        return None;
+    }
+    Some(source.as_str()[last.range()].to_string())
 }
 
 /// Order completions lexicographically, with these exceptions:
