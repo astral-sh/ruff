@@ -5565,14 +5565,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        validate_typed_dict_dict_literal(
-            self.db(),
-            &self.context,
-            typed_dict,
-            dict,
-            dict.into(),
-            |expr| self.expression_type(expr),
-        )
+        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
+            self.expression_type(expr)
+        })
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
     }
