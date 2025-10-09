@@ -1,6 +1,6 @@
 # Generic classes: Legacy syntax
 
-We use TypeVar defaults here, which was added in Python 3.13 for legacy typevars.
+We use TypeVar defaults here, which were added in Python 3.13 for legacy typevars.
 
 ```toml
 [environment]

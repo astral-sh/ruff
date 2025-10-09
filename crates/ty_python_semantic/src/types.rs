@@ -8039,11 +8039,7 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(
-                    db,
-                    definition,
-                    typevar_node.bound.as_ref()?,
-                )
+                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
@@ -8086,7 +8082,7 @@ impl<'db> TypeVarInstance<'db> {
                         .collect::<Box<_>>(),
                 )
             }
-            _ => return  None,
+            _ => return None,
         };
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }

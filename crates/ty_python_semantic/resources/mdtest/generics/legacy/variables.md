@@ -142,11 +142,6 @@ reveal_type(T.__constraints__)  # revealed: tuple[()]
 
 S = TypeVar("S")
 reveal_type(S.__bound__)  # revealed: None
-
-from typing import TypedDict
-
-# error: [invalid-type-form]
-T = TypeVar("T", bound=TypedDict)
 ```
 
 The upper bound must be a valid type expression:
@@ -257,7 +252,11 @@ T = TypeVar("T", invalid_keyword=True)
 python-version = "3.10"
 ```
 
-In a stub file, features from the latest supported Python version can be used on any version:
+In a stub file, features from the latest supported Python version can be used on any version.
+There's no need to require use of `typing_extensions.TypeVar` in a stub file, when the type checker
+can understand the typevar definition perfectly well either way, and there can be no runtime error.
+(Perhaps it's arguable whether this special case is worth it, but other type checkers do it, so we
+maintain compatibility.)
 
 ```pyi
 from typing import TypeVar
@@ -385,7 +384,8 @@ reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 python-version = "3.13"
 ```
 
-Defaults can be generic, but can only refer to earlier typevars:
+Defaults can be generic, but can only refer to typevars from the same scope if they were defined
+earlier in that scope:
 
 ```py
 from typing import Generic, TypeVar
@@ -408,6 +408,7 @@ V = TypeVar("V", default="V")
 class D(Generic[V]):
     x: V
 
+# TODO: we shouldn't leak a typevar like this in type inference
 reveal_type(D().x)  # revealed: V@D
 ```
 

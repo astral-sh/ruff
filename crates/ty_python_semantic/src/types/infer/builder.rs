@@ -4203,7 +4203,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let ast::Expr::Name(ast::ExprName { id, .. }) = target_name else {
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
             return error(
                 &self.context,
                 "A `typing.TypeVar` definition must be a simple variable assignment",
