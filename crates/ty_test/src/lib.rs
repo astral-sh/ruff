@@ -1,6 +1,3 @@
-use crate::config::Log;
-use crate::db::Db;
-use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
@@ -22,6 +19,12 @@ use ty_python_semantic::{
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
     resolve_module,
 };
+use ty_static::EnvVars;
+
+use crate::check_output::CheckOutput;
+use crate::config::Log;
+use crate::db::Db;
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 
 mod assertion;
 mod check_output;
@@ -30,8 +33,6 @@ mod db;
 mod hover;
 mod matcher;
 mod parser;
-
-use ty_static::EnvVars;
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -371,22 +372,12 @@ fn run_test(
                     .cmp(&right.rendering_sort_key(db))
             });
 
-            // Convert diagnostics to CheckOutput
-            let mut check_outputs: Vec<check_output::CheckOutput> = diagnostics
-                .iter()
-                .map(|diag| check_output::CheckOutput::Diagnostic(diag.clone()))
+            // Collect all of the check outputs for this file, and verify that they match the
+            // assertions in the file.
+            let mut check_outputs: Vec<_> = (diagnostics.iter().cloned())
+                .map(CheckOutput::Diagnostic)
                 .collect();
-
-            // Parse assertions to get hover assertions with correct line numbers
-            let assertions = assertion::InlineFileAssertions::from_file(db, test_file.file);
-
-            // Generate and add hover outputs
-            check_outputs.extend(hover::generate_hover_outputs(
-                db,
-                test_file.file,
-                &assertions,
-            ));
-
+            hover::generate_hover_outputs_into(db, &mut check_outputs, test_file.file);
             let failure = match matcher::match_file(db, test_file.file, &check_outputs) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {

@@ -40,18 +40,17 @@ fn infer_type_at_position(db: &Db, file: File, offset: TextSize) -> Option<Strin
 }
 
 /// Generate hover outputs for all of the `hover` assertions in a file.
-pub(crate) fn generate_hover_outputs(
+pub(crate) fn generate_hover_outputs_into(
     db: &Db,
+    hover_outputs: &mut Vec<CheckOutput>,
     file: File,
-    assertions: &InlineFileAssertions,
-) -> Vec<CheckOutput> {
+) {
+    let assertions = InlineFileAssertions::from_file(db, file);
     let source = source_text(db, file);
     let lines = line_index(db, file);
 
-    let mut hover_outputs = Vec::new();
-
     // Iterate through all assertion groups, which are already associated with their target line
-    for line_assertions in assertions {
+    for line_assertions in &assertions {
         let target_line = line_assertions.line_number;
 
         // Look for hover assertions in this line's assertions
@@ -84,6 +83,4 @@ pub(crate) fn generate_hover_outputs(
             }));
         }
     }
-
-    hover_outputs
 }

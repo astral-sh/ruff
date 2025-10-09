@@ -36,7 +36,7 @@ impl CheckOutput {
 /// All check outputs for one embedded Python file, sorted and grouped by line number.
 ///
 /// The outputs are kept in a flat vector, sorted by line number. A separate vector of
-/// [`LineOutputRange`] has one entry for each contiguous slice of the outputs vector
+/// [`LineOutputRange`] has one entry for each contiguous slice of the `outputs` vector
 /// containing outputs which all start on the same line.
 #[derive(Debug)]
 pub(crate) struct SortedCheckOutputs<'a> {
@@ -112,7 +112,7 @@ struct OutputWithLine<'a> {
     output: &'a CheckOutput,
 }
 
-/// Range delineating check outputs in [`SortedCheckOutputs`] that begin on a single line.
+/// Range delineating check outputs in [`SortedCheckOutputs`] that belong to a single line.
 #[derive(Debug)]
 struct LineOutputRange {
     line_number: OneIndexed,
@@ -142,7 +142,7 @@ impl<'a> Iterator for LineCheckOutputsIterator<'a> {
 
 impl std::iter::FusedIterator for LineCheckOutputsIterator<'_> {}
 
-/// All check outputs that start on a single line of source code in one embedded Python file.
+/// All check outputs that belong to a single line of source code in one embedded Python file.
 #[derive(Debug)]
 pub(crate) struct LineCheckOutputs<'a> {
     /// Line number on which these outputs start.
