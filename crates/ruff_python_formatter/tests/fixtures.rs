@@ -662,9 +662,13 @@ fn collect_unsupported_syntax_errors(
     parsed: &Parsed<Mod>,
     source: &str,
 ) -> FxHashMap<u64, UnsupportedSyntaxError> {
-    let visitor = StmtVisitor::new(parsed, source);
-
     let mut collected = FxHashMap::default();
+
+    if parsed.unsupported_syntax_errors().is_empty() {
+        return collected;
+    }
+
+    let visitor = StmtVisitor::new(parsed, source);
 
     for error in parsed.unsupported_syntax_errors() {
         let Some(node_id) = visitor.node_id(error.range) else {
