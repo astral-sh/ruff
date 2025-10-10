@@ -1,6 +1,9 @@
+use rustc_hash::FxHashSet;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::find_binding_value;
+use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -78,6 +81,11 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
+            let Some(fix_safety) = remove_affix_fix_safety(&removal_data, checker.semantic())
+            else {
+                return;
+            };
+
             let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
@@ -88,11 +96,11 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_expr.start(),
-                if_expr.end(),
-            )));
+            let edit = Edit::replacement(replacement, if_expr.start(), if_expr.end());
+            diagnostic.set_fix(match fix_safety {
+                FixSafety::Safe => Fix::safe_edit(edit),
+                FixSafety::Unsafe => Fix::unsafe_edit(edit),
+            });
         }
     }
 }
@@ -106,6 +114,11 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
         if affix_matches_slice_bound(&removal_data, checker.semantic()) {
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
+
+            let Some(fix_safety) = remove_affix_fix_safety(&removal_data, checker.semantic())
+            else {
+                return;
+            };
 
             let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
@@ -121,11 +134,11 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_stmt.start(),
-                if_stmt.end(),
-            )));
+            let edit = Edit::replacement(replacement, if_stmt.start(), if_stmt.end());
+            diagnostic.set_fix(match fix_safety {
+                FixSafety::Safe => Fix::safe_edit(edit),
+                FixSafety::Unsafe => Fix::unsafe_edit(edit),
+            });
         }
     }
 }
@@ -499,4 +512,85 @@ struct RemoveAffixData<'a> {
     bound: &'a ast::Expr,
     /// Contains the prefix or suffix used in `text.startswith(prefix)` or `text.endswith(suffix)`
     affix_query: AffixQuery<'a>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum FixSafety {
+    Safe,
+    Unsafe,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum TypeKnowledge {
+    KnownStr,
+    KnownBytes,
+    KnownNonStr,
+    Unknown,
+}
+
+fn remove_affix_fix_safety(data: &RemoveAffixData, semantic: &SemanticModel) -> Option<FixSafety> {
+    let text_knowledge = classify_expr_type(data.text, semantic);
+    let affix_knowledge = classify_expr_type(data.affix_query.affix, semantic);
+
+    match (text_knowledge, affix_knowledge) {
+        (TypeKnowledge::KnownNonStr, _) | (_, TypeKnowledge::KnownNonStr) => None,
+        (TypeKnowledge::KnownStr, TypeKnowledge::KnownStr) => Some(FixSafety::Safe),
+        (TypeKnowledge::KnownBytes, TypeKnowledge::KnownBytes) => Some(FixSafety::Safe),
+        (TypeKnowledge::KnownStr, TypeKnowledge::KnownBytes)
+        | (TypeKnowledge::KnownBytes, TypeKnowledge::KnownStr) => None,
+        _ => Some(FixSafety::Unsafe),
+    }
+}
+
+fn classify_expr_type(expr: &ast::Expr, semantic: &SemanticModel) -> TypeKnowledge {
+    let mut seen = FxHashSet::default();
+    classify_expr_type_inner(expr, semantic, &mut seen)
+}
+
+fn classify_expr_type_inner(
+    expr: &ast::Expr,
+    semantic: &SemanticModel,
+    seen: &mut FxHashSet<BindingId>,
+) -> TypeKnowledge {
+    use ast::Expr;
+
+    match expr {
+        _ if expr.is_string_literal_expr() || expr.is_f_string_expr() => TypeKnowledge::KnownStr,
+        Expr::BytesLiteral(_) => TypeKnowledge::KnownBytes,
+        Expr::Name(name) => classify_name_expr_type(name, semantic, seen),
+        Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::Tuple(_)
+        | Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Generator(_) => TypeKnowledge::KnownNonStr,
+        _ => TypeKnowledge::Unknown,
+    }
+}
+
+fn classify_name_expr_type(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    seen: &mut FxHashSet<BindingId>,
+) -> TypeKnowledge {
+    let Some(binding_id) = semantic.only_binding(name) else {
+        return TypeKnowledge::Unknown;
+    };
+
+    if !seen.insert(binding_id) {
+        return TypeKnowledge::Unknown;
+    }
+
+    let binding = semantic.binding(binding_id);
+    if let Some(value) = find_binding_value(binding, semantic) {
+        return classify_expr_type_inner(value, semantic, seen);
+    }
+
+    TypeKnowledge::Unknown
 }
