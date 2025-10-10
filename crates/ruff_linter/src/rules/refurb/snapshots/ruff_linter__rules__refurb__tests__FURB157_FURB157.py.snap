@@ -167,15 +167,16 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^
 24 | Decimal("__1____000") 
    |
-help: Replace with `1000`
+help: Replace with `1_000`
 20 | # See https://github.com/astral-sh/ruff/issues/13807
 21 | 
 22 | # Errors
    - Decimal("1_000")
-23 + Decimal(1000)
+23 + Decimal(1_000)
 24 | Decimal("__1____000") 
 25 | 
 26 | # Ok
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:24:9
@@ -187,15 +188,16 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 25 |
 26 | # Ok
    |
-help: Replace with `1000`
+help: Replace with `1_000`
 21 | 
 22 | # Errors
 23 | Decimal("1_000")
    - Decimal("__1____000") 
-24 + Decimal(1000) 
+24 + Decimal(1_000) 
 25 | 
 26 | # Ok
 27 | Decimal("2e-4")
+note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:48:9
@@ -494,6 +496,7 @@ help: Replace with `"nan"`
 69 + Decimal("nan")
 70 | Decimal(float("   -" "nan"))
 71 | Decimal(float("-nAn"))
+72 | 
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:70:9
@@ -511,6 +514,8 @@ help: Replace with `"nan"`
    - Decimal(float("   -" "nan"))
 70 + Decimal("nan")
 71 | Decimal(float("-nAn"))
+72 | 
+73 | # Test cases for digit separators (safe fixes)
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:71:9
@@ -519,6 +524,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 70 | Decimal(float("   -" "nan"))
 71 | Decimal(float("-nAn"))
    |         ^^^^^^^^^^^^^
+72 |
+73 | # Test cases for digit separators (safe fixes)
    |
 help: Replace with `"nan"`
 68 | Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
@@ -526,3 +533,81 @@ help: Replace with `"nan"`
 70 | Decimal(float("   -" "nan"))
    - Decimal(float("-nAn"))
 71 + Decimal("nan")
+72 | 
+73 | # Test cases for digit separators (safe fixes)
+74 | # https://github.com/astral-sh/ruff/issues/20572
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:75:9
+   |
+73 | # Test cases for digit separators (safe fixes)
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+   |         ^^^^^^^^^^^^
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+   |
+help: Replace with `15_000_000`
+72 | 
+73 | # Test cases for digit separators (safe fixes)
+74 | # https://github.com/astral-sh/ruff/issues/20572
+   - Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+75 + Decimal(15_000_000)  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+note: This is an unsafe fix and may change runtime behavior
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:76:9
+   |
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+   |         ^^^^^^^^^^^
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+   |
+help: Replace with `1_234_567`
+73 | # Test cases for digit separators (safe fixes)
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+   - Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+76 + Decimal(1_234_567)   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+note: This is an unsafe fix and may change runtime behavior
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:77:9
+   |
+75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+   |         ^^^^^^^^
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+   |
+help: Replace with `-5_000`
+74 | # https://github.com/astral-sh/ruff/issues/20572
+75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+   - Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+77 + Decimal(-5_000)      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+note: This is an unsafe fix and may change runtime behavior
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:78:9
+   |
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+   |         ^^^^^^^^
+   |
+help: Replace with `+9_999`
+75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+   - Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+78 + Decimal(+9_999)      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+note: This is an unsafe fix and may change runtime behavior
