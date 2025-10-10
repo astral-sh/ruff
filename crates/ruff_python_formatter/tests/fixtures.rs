@@ -108,7 +108,8 @@ fn black_compatibility() {
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
-        ensure_unchanged_ast(&content, &formatted_code, &options, input_path);
+        let unsupported_syntax_errors =
+            ensure_unchanged_ast(&content, &formatted_code, &options, input_path);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -162,6 +163,20 @@ fn black_compatibility() {
 
             write!(snapshot, "{}", Header::new("Black Output")).unwrap();
             write!(snapshot, "{}", CodeFrame::new("python", &expected_output)).unwrap();
+
+            if !unsupported_syntax_errors.is_empty() {
+                write!(snapshot, "{}", Header::new("New Unsupported Syntax Errors")).unwrap();
+                writeln!(
+                    snapshot,
+                    "{}",
+                    DisplayDiagnostics::new(
+                        &DummyFileResolver,
+                        &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                        &unsupported_syntax_errors
+                    )
+                )
+                .unwrap();
+            }
 
             insta::with_settings!({
                 omit_expression => true,
