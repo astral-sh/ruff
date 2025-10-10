@@ -9,6 +9,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::types::KnownClass;
 use ty_python_semantic::{
     Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
     types::{CycleDetector, Type},
@@ -252,6 +253,9 @@ pub fn completion<'db>(
         .map(|c| Completion::from_semantic_completion(db, c))
         .collect();
 
+    if scoped.is_some() {
+        add_keyword_value_completions(db, &typed_query, &mut completions);
+    }
     if settings.auto_import {
         if let Some(scoped) = scoped {
             add_unimported_completions(
@@ -267,6 +271,37 @@ pub fn completion<'db>(
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
     completions
+}
+
+/// Adds a subset of completions derived from keywords.
+///
+/// Note that at present, these should only be added to "scoped"
+/// completions. i.e., This will include `None`, `True`, `False`, etc.
+fn add_keyword_value_completions<'db>(
+    db: &'db dyn Db,
+    query: &QueryPattern,
+    completions: &mut Vec<Completion<'db>>,
+) {
+    let keywords = [
+        ("None", KnownClass::NoneType.to_instance(db)),
+        ("True", Type::BooleanLiteral(true)),
+        ("False", Type::BooleanLiteral(false)),
+    ];
+    for (name, ty) in keywords {
+        if !query.is_match_symbol_name(name) {
+            continue;
+        }
+        completions.push(Completion {
+            name: ast::name::Name::new(name),
+            insert: None,
+            ty: Some(ty),
+            kind: None,
+            module_name: None,
+            import: None,
+            builtin: true,
+            documentation: None,
+        });
+    }
 }
 
 /// Adds completions not in scope.
