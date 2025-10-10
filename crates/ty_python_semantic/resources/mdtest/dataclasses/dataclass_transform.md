@@ -367,7 +367,7 @@ model < model  # No error
 
 ### Overwriting of default parameters on the dataclass-like class
 
-#### Using function-based decorators
+#### Using function-based transformers
 
 ```py
 from typing import dataclass_transform
@@ -389,7 +389,7 @@ m = Mutable(name="test")
 m.name = "new"  # No error
 ```
 
-#### Using metaclass-based decorators
+#### Using metaclass-based transformers
 
 ```py
 from typing import dataclass_transform
@@ -421,7 +421,7 @@ m = Mutable(name="test")
 m.name = "new"  # error: [invalid-assignment]
 ```
 
-#### Using base-class-based decorators
+#### Using base-class-based transformers
 
 ```py
 from typing import dataclass_transform
