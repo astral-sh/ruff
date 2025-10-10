@@ -609,21 +609,24 @@ source_type                = {source_type:?}"#,
 /// modified by running the formatter. In this case, the `UnsupportedSyntaxErrorKind` changes from
 /// `Pep701FString(Backslash)` to `Pep701FString(NestedQuote)`, in turn changing the hash and the
 /// fingerprint computed below.
-struct StmtVisitor {
+struct StmtVisitor<'a> {
     nodes: Vec<TextRange>,
-    pragma_comments: Vec<OneIndexed>,
+    pragma_comments: FxHashMap<OneIndexed, &'a str>,
     index: LineIndex,
 }
 
-impl StmtVisitor {
-    fn new(parsed: &Parsed<Mod>, source: &str) -> Self {
+impl<'a> StmtVisitor<'a> {
+    fn new(parsed: &Parsed<Mod>, source: &'a str) -> Self {
         let index = LineIndex::from_source_text(source);
         let mut visitor = Self {
             nodes: Vec::new(),
             pragma_comments: CommentRanges::from(parsed.tokens())
                 .into_iter()
-                .filter(|comment_range| source[*comment_range].contains("invalid-syntax: allow"))
-                .map(|range| index.line_index(range.start()))
+                .filter_map(|comment_range| {
+                    source[comment_range]
+                        .split_once("invalid-syntax: allow")
+                        .map(|(_, rest)| (index.line_index(comment_range.start()), rest.trim()))
+                })
                 .collect(),
             index,
         };
@@ -633,19 +636,23 @@ impl StmtVisitor {
 
     /// Return the index of the statement node that contains `range`, and if it is not ignored by a
     /// pragma comment.
-    fn node_id(&self, range: TextRange) -> Option<usize> {
+    fn node_id(&self, error: &UnsupportedSyntaxError) -> Option<usize> {
         let (position, node_range) = self
             .nodes
             .iter()
             .enumerate()
-            .filter(|(_, node)| node.contains_range(range))
+            .filter(|(_, node)| node.contains_range(error.range))
             .min_by_key(|(_, node)| node.len())
             .expect("Expected an enclosing node in the AST");
 
         let line = self.index.line_index(node_range.start());
         if line
             .checked_sub(OneIndexed::new(1).unwrap())
-            .is_some_and(|previous_line| self.pragma_comments.contains(&previous_line))
+            .is_some_and(|previous_line| {
+                self.pragma_comments
+                    .get(&previous_line)
+                    .is_some_and(|msg| error.message().contains(msg))
+            })
         {
             return None;
         }
@@ -675,7 +682,7 @@ fn collect_unsupported_syntax_errors(
     let visitor = StmtVisitor::new(parsed, source);
 
     for error in parsed.unsupported_syntax_errors() {
-        let Some(node_id) = visitor.node_id(error.range) else {
+        let Some(node_id) = visitor.node_id(error) else {
             continue;
         };
         let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, node_id, 0);
