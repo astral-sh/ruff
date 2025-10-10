@@ -1,4 +1,5 @@
 name,file,index,rank
+fstring-completions,main.py,0,1
 higher-level-symbols-preferred,main.py,0,
 higher-level-symbols-preferred,main.py,1,1
 import-deprioritizes-dunder,main.py,0,1
@@ -12,6 +13,7 @@ raise-uses-base-exception,main.py,0,2
 scope-existing-over-new-import,main.py,0,474
 scope-prioritize-closer,main.py,0,2
 scope-simple-long-identifier,main.py,0,1
+tstring-completions,main.py,0,1
 ty-extensions-lower-stdlib,main.py,0,7
 type-var-typing-over-ast,main.py,0,3
 type-var-typing-over-ast,main.py,1,270
