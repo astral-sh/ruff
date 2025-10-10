@@ -7,7 +7,7 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{Token, TokenAt, TokenKind};
+use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::{
     Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
@@ -207,7 +207,10 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
-    if is_in_comment(&parsed, offset) {
+    if is_in_comment(&parsed, offset)
+        || is_in_string(&parsed, offset)
+        || is_in_unclosed_string(&parsed, offset)
+    {
         return vec![];
     }
 
@@ -375,7 +378,7 @@ impl<'t> CompletionTargetTokens<'t> {
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
-        let before = parsed.tokens().before(offset);
+        let before = tokens_start_before(parsed.tokens(), offset);
         Some(
             // Our strategy when it comes to `object.attribute` here is
             // to look for the `.` and then take the token immediately
@@ -574,6 +577,25 @@ struct ScopedTarget<'t> {
     node: ast::AnyNodeRef<'t>,
 }
 
+/// Returns a slice of tokens that all start before or at the given
+/// [`TextSize`] offset.
+///
+/// If the given offset is between two tokens, the returned slice will end just
+/// before the following token. In other words, if the offset is between the
+/// end of previous token and start of next token, the returned slice will end
+/// just before the next token.
+///
+/// Unlike `Tokens::before`, this never panics. If `offset` is within a token's
+/// range (including if it's at the very beginning), then that token will be
+/// included in the slice returned.
+fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
+    let idx = match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
+        Ok(idx) => idx,
+        Err(idx) => idx,
+    };
+    &tokens[..idx]
+}
+
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
 ///
 /// If a suffix of `tokens` with the given `kinds` could not be found,
@@ -747,7 +769,7 @@ fn find_typed_text(
     offset: TextSize,
 ) -> Option<String> {
     let source = source_text(db, file);
-    let tokens = parsed.tokens().before(offset);
+    let tokens = tokens_start_before(parsed.tokens(), offset);
     let last = tokens.last()?;
     if !matches!(last.kind(), TokenKind::Name) {
         return None;
@@ -767,12 +789,103 @@ fn find_typed_text(
 /// Whether the given offset within the parsed module is within
 /// a comment or not.
 fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = parsed.tokens().before(offset);
+    let tokens = tokens_start_before(parsed.tokens(), offset);
     tokens
         .iter()
         .rev()
         .take_while(|t| matches!(t.kind(), TokenKind::Comment | TokenKind::NonLogicalNewline))
         .any(|t| matches!(t.kind(), TokenKind::Comment))
+}
+
+/// Returns true when the cursor at `offset` is positioned within
+/// a string token (regular, f-string, t-string, etc).
+///
+/// Note that this will return `false` when positioned within an
+/// interpolation block in an f-string or a t-string.
+fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+    tokens.last().is_some_and(|t| {
+        matches!(
+            t.kind(),
+            TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
+        )
+    })
+}
+
+/// Returns true when the cursor at `offset` is positioned within an
+/// unclosed string token.
+///
+/// Note that this may scan to the beginning of the token stream.
+///
+/// At present, this may not correctly detect all unclosed strings. If
+/// given a choice, this prefers to return `false` incorrectly over
+/// returning `true` incorrectly (i.e., false negatives are preferred
+/// over false positives). That is, we would rather show completions
+/// when we aren't supposed to than *not* show completions when we are
+/// supposed to.
+fn is_in_unclosed_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+    for (i, t) in tokens.iter().enumerate().rev() {
+        match t.kind() {
+            TokenKind::Unknown => {
+                // It's possible to lex an unknown token with single/double
+                // quotes. If we got here, then we assume it is the opening
+                // of an unclosed string.
+                if t.flags().has_quotes() {
+                    return true;
+                }
+                // Otherwise, we permit any kind of unknown token to be
+                // counted as part of a possible unclosed string.
+                continue;
+            }
+            // We found the start of an f-string without seeing
+            // the end of an f-string before our cursor, so that
+            // should mean we're within an unclosed f-string.
+            // Similarly for t-strings.
+            //
+            // ... unless we're in the middle of interpolation, in
+            // which case, we should not behave as-if we are within
+            // a string.
+            TokenKind::FStringStart | TokenKind::TStringStart => {
+                return !is_within_brackets(&tokens[i..]);
+            }
+            TokenKind::FStringMiddle
+            | TokenKind::FStringEnd
+            | TokenKind::TStringMiddle
+            | TokenKind::TStringEnd => return false,
+            // We have to pretty much allow everything else since
+            // pretty much anything can appear within an f-string or
+            // a t-string.
+            //
+            // This does mean it's not only possible but likely
+            // that we will scan all the way back to the beginning
+            // of a file. But this should only happen once and it
+            // should only reflect a marginal cost (since we've
+            // already parsed the source code in its entirety by
+            // this point). There may be a way to short circuit,
+            // but I think that might there to be some token or
+            // pattern of tokens that our lexer will never generate
+            // within an f/t-string. ---AG
+            _ => continue,
+        }
+    }
+    false
+}
+
+/// Returns true if the position following the end of the given tokens is
+/// within an opened f-string or t-string interpolation.
+///
+/// It is assumed that `tokens[0]` is an `FStringStart` or `TStringStart`
+/// token.
+fn is_within_brackets(tokens: &[Token]) -> bool {
+    for t in tokens.iter().rev() {
+        match t.kind() {
+            TokenKind::Lbrace => return true,
+            TokenKind::Rbrace => return false,
+            _ => continue,
+        }
+    }
+    false
 }
 
 /// Order completions lexicographically, with these exceptions:
@@ -2805,12 +2918,7 @@ f = Foo()
         // but we instead fall back to scope based completions. Since
         // we're inside a string, we should avoid giving completions at
         // all.
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        Foo
-        bar
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions_without_builtins(), @r"<No completions found>");
     }
 
     #[test]
@@ -2827,6 +2935,26 @@ f = Foo()
 
 # F-string, this is an attribute access
 f"{f.<CURSOR>
+"#,
+        );
+
+        test.assert_completions_include("method");
+    }
+
+    #[test]
+    fn string_dot_attr3() {
+        let test = cursor_test(
+            r#"
+foo = 1
+bar = 2
+
+class Foo:
+    def method(self): ...
+
+f = Foo()
+
+# T-string, this is an attribute access
+t"{f.<CURSOR>
 "#,
         );
 
@@ -3339,6 +3467,486 @@ zqzqzq = 1
 ",
         );
 
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"Foo.zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('Foo.zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"\"\"zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"\"\"Foo.zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"\"\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"\"\"Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('''zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('''Foo.zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('''zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('''Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"zqzq<CURSOR>\")
+        ",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"{Foo} and Foo.zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"zqzq<CURSOR>
+        ",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'{Foo} and Foo.zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"\"\"zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"\"\"{Foo} and Foo.zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"\"\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"\"\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'''zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'''{Foo} and Foo.zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'''zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'''{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"{Foo} and Foo.zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'{Foo} and Foo.zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"\"\"zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"\"\"{Foo} and Foo.zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"\"\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"\"\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'''zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'''{Foo} and Foo.zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'''zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'''{Foo} and Foo.zqzq<CURSOR>
+",
+        );
         assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
     }
 
