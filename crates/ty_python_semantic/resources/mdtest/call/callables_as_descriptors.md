@@ -146,3 +146,40 @@ class C2:
 
 C2().method_decorated(1)
 ```
+
+Note that we currently only apply this heuristic when calling a function such as `memoize` via the
+decorator syntax. This is inconsistent, of course, because the above *should* be equivalent to the
+following, but here we emit errors:
+
+```py
+def memoize3(f: Callable[[C3, int], str]) -> Callable[[C3, int], str]:
+    raise NotImplementedError
+
+class C3:
+    def method(self, x: int) -> str:
+        return str(x)
+
+    method_decorated = memoize3(method)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+C3().method_decorated(1)
+```
+
+The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
+return type of `memoize` is actually related to the method that we pass in. But when `memoize` is
+applied as a decorator, it is reasonable to assume so. In general, a function call might however
+return a `Callable` that is unrelated to the argument passed in. And here, it seems more
+reasonable/safe to treat the `Callable` as a non-descriptor:
+
+```py
+def convert_int_function(c: Callable[[int], int]) -> Callable[[int], str]:
+    return lambda x: str(c(x))
+
+class C4:
+    abs = convert_int_function(abs)
+    round = convert_int_function(round)
+
+reveal_type(C4().abs)  # revealed: Unknown | ((int, /) -> str)
+reveal_type(C4().round)  # revealed: Unknown | ((int, /) -> str)
+```
