@@ -19,7 +19,9 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, Specialization, walk_specialization,
+};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -534,17 +536,20 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other).is_always_satisfied()
+        self.when_subclass_of(db, other, InferableTypeVars::None)
+            .is_always_satisfied()
     }
 
     pub(super) fn when_subclass_of(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
+            inferable,
             TypeRelation::Subtyping,
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
@@ -555,6 +560,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -580,6 +586,7 @@ impl<'db> ClassType<'db> {
                             base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
+                                inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
@@ -604,6 +611,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -622,6 +630,7 @@ impl<'db> ClassType<'db> {
                     this.specialization(db).is_equivalent_to_impl(
                         db,
                         other.specialization(db),
+                        inferable,
                         visitor,
                     )
                 })
@@ -1550,15 +1559,10 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
-    /// Returns a specialization of this class where each typevar is mapped to itself. The second
-    /// parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on the use case.
-    pub(crate) fn identity_specialization(
-        self,
-        db: &'db dyn Db,
-        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
-    ) -> ClassType<'db> {
+    /// Returns a specialization of this class where each typevar is mapped to itself.
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.identity_specialization(db, typevar_to_type)
+            generic_context.identity_specialization(db)
         })
     }
 
