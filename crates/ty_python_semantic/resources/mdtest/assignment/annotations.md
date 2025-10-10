@@ -308,6 +308,22 @@ x = Foo()
 reveal_type(x)  # revealed: Foo
 ```
 
+## Annotations are deferred by default in Python 3.14 and later
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+x: Foo
+
+class Foo: ...
+
+x = Foo()
+reveal_type(x)  # revealed: Foo
+```
+
 ## Annotated assignments in stub files are inferred correctly
 
 ```pyi

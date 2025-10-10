@@ -374,9 +374,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Are we currently inferring types in file with deferred types?
-    /// This is true for stub files and files with `__future__.annotations`
+    /// This is true for stub files, for files with `__future__.annotations`, and
+    /// by default for all source files in Python 3.14 and later.
     fn defer_annotations(&self) -> bool {
-        self.index.has_future_annotations() || self.in_stub()
+        self.index.has_future_annotations()
+            || self.in_stub()
+            || Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY314
     }
 
     /// Are we currently in a context where name resolution should be deferred
