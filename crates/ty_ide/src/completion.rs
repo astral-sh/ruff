@@ -206,12 +206,16 @@ pub fn completion<'db>(
     file: File,
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
-    let typed = find_typed_text(db, file, offset);
+    let parsed = parsed_module(db, file).load(db);
+    if is_in_comment(&parsed, offset) {
+        return vec![];
+    }
+
+    let typed = find_typed_text(db, file, &parsed, offset);
     let typed_query = typed
         .as_deref()
         .map(QueryPattern::new)
         .unwrap_or_else(QueryPattern::matches_all_symbols);
-    let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
         return vec![];
@@ -736,8 +740,12 @@ fn import_tokens(tokens: &[Token]) -> Option<(&Token, &Token)> {
 ///
 /// If there isn't any typed text or it could not otherwise be found,
 /// then `None` is returned.
-fn find_typed_text(db: &dyn Db, file: File, offset: TextSize) -> Option<String> {
-    let parsed = parsed_module(db, file).load(db);
+fn find_typed_text(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+) -> Option<String> {
     let source = source_text(db, file);
     let tokens = parsed.tokens().before(offset);
     let last = tokens.last()?;
@@ -754,6 +762,17 @@ fn find_typed_text(db: &dyn Db, file: File, offset: TextSize) -> Option<String> 
         return None;
     }
     Some(source.as_str()[last.range()].to_string())
+}
+
+/// Whether the given offset within the parsed module is within
+/// a comment or not.
+fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
+    let tokens = parsed.tokens().before(offset);
+    tokens
+        .iter()
+        .rev()
+        .take_while(|t| matches!(t.kind(), TokenKind::Comment | TokenKind::NonLogicalNewline))
+        .any(|t| matches!(t.kind(), TokenKind::Comment))
 }
 
 /// Order completions lexicographically, with these exceptions:
@@ -3309,6 +3328,18 @@ from os.<CURSOR>
         let completion = completions.iter().find(|c| c.name == "rec").unwrap();
 
         assert_eq!(completion.kind(&test.db), Some(CompletionKind::Struct));
+    }
+
+    #[test]
+    fn no_completions_in_comment() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+# zqzq<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
     }
 
     // NOTE: The methods below are getting somewhat ridiculous.
