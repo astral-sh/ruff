@@ -1299,7 +1299,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         true
     }
 
-    fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
+    /// Add a binding for the given definition.
+    ///
+    /// Returns the result of the `infer_value_ty` closure, which is called with the declared type
+    /// as type context.
+    fn add_binding(
+        &mut self,
+        node: AnyNodeRef,
+        binding: Definition<'db>,
+        infer_value_ty: impl FnOnce(&mut Self, TypeContext<'db>) -> Type<'db>,
+    ) -> Type<'db> {
         /// Arbitrary `__getitem__`/`__setitem__` methods on a class do not
         /// necessarily guarantee that the passed-in value for `__setitem__` is stored and
         /// can be retrieved unmodified via `__getitem__`. Therefore, we currently only
@@ -1344,7 +1353,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let file_scope_id = binding.file_scope(db);
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
-        let mut bound_ty = ty;
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
         let place_id = binding.place(self.db());
@@ -1455,40 +1463,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
-        let unwrap_declared_ty = || {
-            resolved_place
-                .ignore_possibly_unbound()
-                .unwrap_or(Type::unknown())
-        };
-
         // If the place is unbound and its an attribute or subscript place, fall back to normal
         // attribute/subscript inference on the root type.
-        let declared_ty = if resolved_place.is_unbound() && !place_table.place(place_id).is_symbol()
-        {
-            if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-                let value_type =
-                    self.infer_maybe_standalone_expression(value, TypeContext::default());
-                if let Place::Type(ty, Boundness::Bound) = value_type.member(db, attr).place {
-                    // TODO: also consider qualifiers on the attribute
-                    ty
+        let declared_ty =
+            if resolved_place.is_unbound() && !place_table.place(place_id).is_symbol() {
+                if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+                    let value_type =
+                        self.infer_maybe_standalone_expression(value, TypeContext::default());
+                    if let Place::Type(ty, Boundness::Bound) = value_type.member(db, attr).place {
+                        // TODO: also consider qualifiers on the attribute
+                        Some(ty)
+                    } else {
+                        None
+                    }
+                } else if let AnyNodeRef::ExprSubscript(
+                    subscript @ ast::ExprSubscript {
+                        value, slice, ctx, ..
+                    },
+                ) = node
+                {
+                    let value_ty = self.infer_expression(value, TypeContext::default());
+                    let slice_ty = self.infer_expression(slice, TypeContext::default());
+
+                    Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
                 } else {
-                    unwrap_declared_ty()
+                    None
                 }
-            } else if let AnyNodeRef::ExprSubscript(
-                subscript @ ast::ExprSubscript {
-                    value, slice, ctx, ..
-                },
-            ) = node
-            {
-                let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
             } else {
-                unwrap_declared_ty()
+                None
             }
-        } else {
-            unwrap_declared_ty()
-        };
+            .or_else(|| resolved_place.ignore_possibly_unbound());
+
+        let inferred_ty = infer_value_ty(self, TypeContext::new(declared_ty));
+
+        let declared_ty = declared_ty.unwrap_or(Type::unknown());
+        let mut bound_ty = inferred_ty;
 
         if qualifiers.contains(TypeQualifiers::FINAL) {
             let mut previous_bindings = use_def.bindings_at_definition(binding);
@@ -1544,7 +1553,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, binding, declared_ty, bound_ty);
-            // allow declarations to override inference in case of invalid assignment
+
+            // Allow declarations to override inference in case of invalid assignment.
             bound_ty = declared_ty;
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
@@ -1572,6 +1582,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.bindings.insert(binding, bound_ty);
+
+        inferred_ty
     }
 
     /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
@@ -2402,7 +2414,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 Type::unknown()
             };
-            self.add_binding(parameter.into(), definition, ty);
+
+            self.add_binding(parameter.into(), definition, |_, _| ty);
         }
     }
 
@@ -2432,11 +2445,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(ty),
             );
         } else {
-            self.add_binding(
-                parameter.into(),
-                definition,
-                Type::homogeneous_tuple(self.db(), Type::unknown()),
-            );
+            self.add_binding(parameter.into(), definition, |builder, _| {
+                Type::homogeneous_tuple(builder.db(), Type::unknown())
+            });
         }
     }
 
@@ -2464,14 +2475,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(ty),
             );
         } else {
-            self.add_binding(
-                parameter.into(),
-                definition,
+            self.add_binding(parameter.into(), definition, |builder, _| {
                 KnownClass::Dict.to_specialized_instance(
-                    self.db(),
-                    [KnownClass::Str.to_instance(self.db()), Type::unknown()],
-                ),
-            );
+                    builder.db(),
+                    [KnownClass::Str.to_instance(builder.db()), Type::unknown()],
+                )
+            });
         }
     }
 
@@ -2742,12 +2751,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for item in items {
             let target = item.optional_vars.as_deref();
             if let Some(target) = target {
-                self.infer_target(target, &item.context_expr, |builder, context_expr| {
+                self.infer_target(target, &item.context_expr, |builder, tcx| {
                     // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
                     //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
                     //  `with not_context_manager as a.x: ...
                     builder
-                        .infer_standalone_expression(context_expr, TypeContext::default())
+                        .infer_standalone_expression(&item.context_expr, tcx)
                         .enter(builder.db())
                 });
             } else {
@@ -2787,7 +2796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.store_expression_type(target, target_ty);
-        self.add_binding(target.into(), definition, target_ty);
+        self.add_binding(target.into(), definition, |_, _| target_ty);
     }
 
     /// Infers the type of a context expression (`with expr`) and returns the target's type
@@ -2919,7 +2928,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_binding(
             except_handler_definition.node(self.module()).into(),
             definition,
-            symbol_ty,
+            |_, _| symbol_ty,
         );
     }
 
@@ -3089,11 +3098,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.add_binding(
-            pattern.into(),
-            definition,
-            todo_type!("`match` pattern definition types"),
-        );
+        self.add_binding(pattern.into(), definition, |_, _| {
+            todo_type!("`match` pattern definition types")
+        });
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
@@ -3214,8 +3221,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value, |builder, value_expr| {
-                builder.infer_standalone_expression(value_expr, TypeContext::default())
+            self.infer_target(target, value, |builder, tcx| {
+                builder.infer_standalone_expression(value, tcx)
             });
         }
     }
@@ -3229,15 +3236,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// The `infer_value_expr` function is used to infer the type of the `value` expression which
     /// are not `Name` expressions. The returned type is the one that is eventually assigned to the
     /// `target`.
-    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, infer_value_expr: F)
+    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, mut infer_value_expr: F)
     where
-        F: Fn(&mut TypeInferenceBuilder<'db, '_>, &ast::Expr) -> Type<'db>,
+        F: FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     {
-        let assigned_ty = match target {
+        self.infer_target_impl(target, value, &mut |builder, tcx| match target {
             ast::Expr::Name(_) => None,
-            _ => Some(infer_value_expr(self, value)),
-        };
-        self.infer_target_impl(target, value, assigned_ty);
+            _ => Some(infer_value_expr(builder, tcx)),
+        });
     }
 
     /// Make sure that the subscript assignment `obj[slice] = value` is valid.
@@ -3389,30 +3395,67 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         target: &ast::ExprAttribute,
         object_ty: Type<'db>,
         attribute: &str,
-        value_ty: Type<'db>,
+        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
 
-        let ensure_assignable_to = |attr_ty| -> bool {
-            let assignable = value_ty.is_assignable_to(db, attr_ty);
-            if !assignable && emit_diagnostics {
-                report_invalid_attribute_assignment(
-                    &self.context,
-                    target.into(),
-                    attr_ty,
-                    value_ty,
-                    attribute,
-                );
-            }
-            assignable
+        // A wrapper over `infer_value_ty` that allows inferring the value type multiple times, e.g. when
+        // resolving a class attribute.
+        let mut first_tcx = None;
+
+        // TODO: This doesn't work, because the RHS is a standalone expression, so cannot be inferred multiple times.
+        let mut infer_value_ty = |builder: &mut Self, tcx: TypeContext<'db>| -> Type<'db> {
+            // Each type is a valid independent inference of the given argument, so we take the intersection
+            // of any inferred types.
+            let prev_multi_inference_state = mem::replace(
+                &mut builder.multi_inference_state,
+                MultiInferenceState::Intersect,
+            );
+
+            // If we are inferring the argument multiple times, silence diagnostics to avoid duplicated warnings.
+            let was_in_multi_inference = if let Some(first_tcx) = first_tcx {
+                // The first time we infer an argument during multi-inference must be without type context,
+                // to avoid leaking diagnostics for bidirectional inference attempts.
+                debug_assert_eq!(first_tcx, TypeContext::default());
+
+                builder.context.set_multi_inference(true)
+            } else {
+                builder.context.is_in_multi_inference()
+            };
+
+            let value_ty = infer_value_ty(builder, tcx);
+
+            // Reset the mutli-inference state.
+            first_tcx.get_or_insert(tcx);
+            builder.multi_inference_state = prev_multi_inference_state;
+            builder.context.set_multi_inference(was_in_multi_inference);
+
+            value_ty
         };
 
+        // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
+        let ensure_assignable_to =
+            |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
+                let assignable = value_ty.is_assignable_to(db, attr_ty);
+                if !assignable && emit_diagnostics {
+                    report_invalid_attribute_assignment(
+                        &builder.context,
+                        target.into(),
+                        attr_ty,
+                        value_ty,
+                        attribute,
+                    );
+                }
+                assignable
+            };
+
         // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
-        let invalid_assignment_to_final = |qualifiers: TypeQualifiers| -> bool {
+        let invalid_assignment_to_final = |builder: &Self, qualifiers: TypeQualifiers| -> bool {
             if qualifiers.contains(TypeQualifiers::FINAL) {
                 if emit_diagnostics {
-                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                    if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
                         builder.into_diagnostic(format_args!(
                             "Cannot assign to final attribute `{attribute}` \
                                          on type `{}`",
@@ -3428,8 +3471,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match object_ty {
             Type::Union(union) => {
+                // TODO: We could perform multi-inference here with each element of the union as type context.
+                let value_ty = infer_value_ty(self, TypeContext::default());
+
                 if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
+                    self.validate_attribute_assignment(
+                        target,
+                        *elem,
+                        attribute,
+                        &mut |_, _| value_ty,
+                        false,
+                    )
                 }) {
                     true
                 } else {
@@ -3452,9 +3504,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Intersection(intersection) => {
+                // TODO: We could perform multi-inference here with each element of the intersection as type context.
+                let value_ty = infer_value_ty(self, TypeContext::default());
+
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
+                    self.validate_attribute_assignment(
+                        target,
+                        *elem,
+                        attribute,
+                        &mut |_, _| value_ty,
+                        false,
+                    )
                 }) {
                     true
                 } else {
@@ -3478,12 +3539,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target,
                 alias.value_type(self.db()),
                 attribute,
-                value_ty,
+                &mut infer_value_ty,
                 emit_diagnostics,
             ),
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
+                infer_value_ty(self, TypeContext::default());
+
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -3495,6 +3558,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
             Type::BoundSuper(_) => {
+                infer_value_ty(self, TypeContext::default());
+
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -3506,7 +3571,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Never => true,
+            Type::Dynamic(..) | Type::Never => {
+                infer_value_ty(self, TypeContext::default());
+                true
+            }
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -3532,6 +3600,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypedDict(_) => {
+                // TODO: We could use the annotated parameter type(s) of `__setattr__` as type context here,
+                // however, we would still have to perform the first inference without type context.
+                let value_ty = infer_value_ty(self, TypeContext::default());
+
                 // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
                 // assigning the attributed by the normal mechanism.
                 let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
@@ -3633,7 +3705,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 place: Place::Type(meta_attr_ty, meta_attr_boundness),
                                 qualifiers,
                             } => {
-                                if invalid_assignment_to_final(qualifiers) {
+                                let value_ty =
+                                    infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
+
+                                if invalid_assignment_to_final(self, qualifiers) {
                                     return false;
                                 }
 
@@ -3666,7 +3741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                                         dunder_set_result.is_ok()
                                     } else {
-                                        ensure_assignable_to(meta_attr_ty)
+                                        ensure_assignable_to(self, value_ty, meta_attr_ty)
                                     };
 
                                 let assignable_to_instance_attribute = if meta_attr_boundness
@@ -3679,12 +3754,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     } =
                                         object_ty.instance_member(db, attribute)
                                     {
-                                        if invalid_assignment_to_final(qualifiers) {
+                                        let value_ty = infer_value_ty(
+                                            self,
+                                            TypeContext::new(Some(instance_attr_ty)),
+                                        );
+
+                                        if invalid_assignment_to_final(self, qualifiers) {
                                             return false;
                                         }
 
                                         (
-                                            ensure_assignable_to(instance_attr_ty),
+                                            ensure_assignable_to(self, value_ty, instance_attr_ty),
                                             instance_attr_boundness,
                                         )
                                     } else {
@@ -3717,7 +3797,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     qualifiers,
                                 } = object_ty.instance_member(db, attribute)
                                 {
-                                    if invalid_assignment_to_final(qualifiers) {
+                                    let value_ty = infer_value_ty(
+                                        self,
+                                        TypeContext::new(Some(instance_attr_ty)),
+                                    );
+
+                                    if invalid_assignment_to_final(self, qualifiers) {
                                         return false;
                                     }
 
@@ -3730,7 +3815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         );
                                     }
 
-                                    ensure_assignable_to(instance_attr_ty)
+                                    ensure_assignable_to(self, value_ty, instance_attr_ty)
                                 } else {
                                     if emit_diagnostics {
                                         if let Some(builder) =
@@ -3758,7 +3843,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         place: Place::Type(meta_attr_ty, meta_attr_boundness),
                         qualifiers,
                     } => {
-                        if invalid_assignment_to_final(qualifiers) {
+                        // We may have to perform multi-inference if the meta attribute is possibly unbound,
+                        // in which case we are required to perform the first inference without type context.
+                        infer_value_ty(self, TypeContext::default());
+
+                        let value_ty = infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
+                        if invalid_assignment_to_final(self, qualifiers) {
                             return false;
                         }
 
@@ -3784,7 +3874,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             dunder_set_result.is_ok()
                         } else {
-                            ensure_assignable_to(meta_attr_ty)
+                            ensure_assignable_to(self, value_ty, meta_attr_ty)
                         };
 
                         let assignable_to_class_attr = if meta_attr_boundness
@@ -3796,7 +3886,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .expect("called on Type::ClassLiteral or Type::SubclassOf")
                                     .place
                                 {
-                                    (ensure_assignable_to(class_attr_ty), class_attr_boundness)
+                                    let value_ty =
+                                        infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
+
+                                    (
+                                        ensure_assignable_to(self, value_ty, class_attr_ty),
+                                        class_attr_boundness,
+                                    )
                                 } else {
                                     (true, Boundness::PossiblyUnbound)
                                 };
@@ -3828,7 +3924,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .find_name_in_mro(db, attribute)
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
                         {
-                            if invalid_assignment_to_final(qualifiers) {
+                            let value_ty =
+                                infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
+
+                            if invalid_assignment_to_final(self, qualifiers) {
                                 return false;
                             }
 
@@ -3841,8 +3940,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 );
                             }
 
-                            ensure_assignable_to(class_attr_ty)
+                            ensure_assignable_to(self, value_ty, class_attr_ty)
                         } else {
+                            infer_value_ty(self, TypeContext::default());
+
                             let attribute_is_bound_on_instance =
                                 object_ty.to_instance(self.db()).is_some_and(|instance| {
                                     !instance
@@ -3884,6 +3985,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::ModuleLiteral(module) => {
                 if let Place::Type(attr_ty, _) = module.static_member(db, attribute).place {
+                    let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
+
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
                     if assignable {
                         true
@@ -3900,6 +4003,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         false
                     }
                 } else {
+                    infer_value_ty(self, TypeContext::default());
+
                     if emit_diagnostics {
                         if let Some(builder) =
                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
@@ -3922,22 +4027,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         target: &ast::Expr,
         value: &ast::Expr,
-        assigned_ty: Option<Type<'db>>,
+        infer_assigned_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Option<Type<'db>>,
     ) {
         match target {
-            ast::Expr::Name(name) => self.infer_definition(name),
+            ast::Expr::Name(name) => {
+                infer_assigned_ty(self, TypeContext::default());
+                self.infer_definition(name);
+            }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let assigned_ty = infer_assigned_ty(self, TypeContext::default());
+
                 if let Some(tuple_spec) =
                     assigned_ty.and_then(|ty| ty.tuple_instance_spec(self.db()))
                 {
                     let mut assigned_tys = tuple_spec.all_elements();
                     for element in elts {
-                        self.infer_target_impl(element, value, assigned_tys.next().copied());
+                        self.infer_target_impl(element, value, &mut |_, _| {
+                            assigned_tys.next().copied()
+                        });
                     }
                 } else {
                     for element in elts {
-                        self.infer_target_impl(element, value, None);
+                        self.infer_target_impl(element, value, &mut |_, _| None);
                     }
                 }
             }
@@ -3949,21 +4061,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ..
                 },
             ) => {
-                self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
-
                 let object_ty = self.infer_expression(object, TypeContext::default());
 
-                if let Some(assigned_ty) = assigned_ty {
-                    self.validate_attribute_assignment(
-                        attr_expr,
-                        object_ty,
-                        attr.id(),
-                        assigned_ty,
-                        true,
-                    );
-                }
+                let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
+                    let assigned_ty = infer_assigned_ty(builder, tcx).unwrap_or(Type::unknown());
+                    builder.store_expression_type(target, assigned_ty);
+                    assigned_ty
+                };
+
+                self.validate_attribute_assignment(
+                    attr_expr,
+                    object_ty,
+                    attr.id(),
+                    infer_assigned_ty,
+                    true,
+                );
             }
             ast::Expr::Subscript(subscript_expr) => {
+                let assigned_ty = infer_assigned_ty(self, TypeContext::default());
                 self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
 
                 if let Some(assigned_ty) = assigned_ty {
@@ -3972,6 +4087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {
                 // TODO: Remove this once we handle all possible assignment targets.
+                infer_assigned_ty(self, TypeContext::default());
                 self.infer_expression(target, TypeContext::default());
             }
         }
@@ -3982,6 +4098,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        let target = assignment.target(self.module());
+
+        self.add_binding(target.into(), definition, |builder, tcx| {
+            let target_ty = builder.infer_assignment_definition_impl(assignment, definition, tcx);
+            builder.store_expression_type(target, target_ty);
+            target_ty
+        });
+    }
+
+    fn infer_assignment_definition_impl(
+        &mut self,
+        assignment: &AssignmentDefinitionKind<'db>,
+        definition: Definition<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let value = assignment.value(self.module());
         let target = assignment.target(self.module());
 
@@ -3997,7 +4128,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
-                let tcx = TypeContext::default();
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
                     self.infer_standalone_expression_impl(value, standalone_expression, tcx)
@@ -4022,6 +4152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         self.infer_call_expression_impl(call_expr, callable_type, tcx)
                     };
+
                     self.store_expression_type(value, ty);
                     ty
                 } else {
@@ -4053,8 +4184,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             target_ty = Type::SpecialForm(special_form);
         }
 
-        self.store_expression_type(target, target_ty);
-        self.add_binding(target.into(), definition, target_ty);
+        target_ty
     }
 
     fn infer_legacy_typevar(
@@ -4564,7 +4694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let target_ty = self.infer_augment_assignment(assignment);
-        self.add_binding(assignment.into(), definition, target_ty);
+        self.add_binding(assignment.into(), definition, |_, _| target_ty);
     }
 
     fn infer_augment_assignment(&mut self, assignment: &ast::StmtAugAssign) -> Type<'db> {
@@ -4615,12 +4745,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             is_async: _,
         } = for_statement;
 
-        self.infer_target(target, iter, |builder, iter_expr| {
+        self.infer_target(target, iter, |builder, tcx| {
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
             builder
-                .infer_standalone_expression(iter_expr, TypeContext::default())
+                .infer_standalone_expression(iter, tcx)
                 .iterate(builder.db())
                 .homogeneous_element_type(builder.db())
         });
@@ -4664,7 +4794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.store_expression_type(target, loop_var_value_type);
-        self.add_binding(target.into(), definition, loop_var_value_type);
+        self.add_binding(target.into(), definition, |_, _| loop_var_value_type);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {
@@ -6126,19 +6256,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             is_async: _,
         } = comprehension;
 
-        self.infer_target(target, iter, |builder, iter_expr| {
+        self.infer_target(target, iter, |builder, tcx| {
             // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
                 infer_same_file_expression_type(
                     builder.db(),
-                    builder.index.expression(iter_expr),
-                    TypeContext::default(),
+                    builder.index.expression(iter),
+                    tcx,
                     builder.module(),
                 )
             } else {
-                builder.infer_standalone_expression(iter_expr, TypeContext::default())
+                builder.infer_standalone_expression(iter, tcx)
             }
             .iterate(builder.db())
             .homogeneous_element_type(builder.db())
@@ -6200,7 +6330,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.expressions.insert(target.into(), target_type);
-        self.add_binding(target.into(), definition, target_type);
+        self.add_binding(target.into(), definition, |_, _| target_type);
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
@@ -6230,12 +6360,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = named;
 
-        let value_ty = self.infer_expression(value, TypeContext::default());
         self.infer_expression(target, TypeContext::default());
 
-        self.add_binding(named.into(), definition, value_ty);
-
-        value_ty
+        self.add_binding(named.into(), definition, |builder, tcx| {
+            builder.infer_expression(value, tcx)
+        })
     }
 
     fn infer_if_expression(&mut self, if_expression: &ast::ExprIf) -> Type<'db> {
@@ -8363,8 +8492,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
         let db = self.db();
-        let try_dunder = |inference: &mut TypeInferenceBuilder<'db, '_>,
-                          policy: MemberLookupPolicy| {
+        let try_dunder = |inference: &mut Self, policy: MemberLookupPolicy| {
             let rich_comparison = |op| inference.infer_rich_comparison(left, right, op, policy);
             let membership_test_comparison = |op, range: TextRange| {
                 inference.infer_membership_test_comparison(left, right, op, range)

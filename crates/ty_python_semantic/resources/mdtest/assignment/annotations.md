@@ -144,6 +144,12 @@ reveal_type(q)  # revealed: dict[int | str, int]
 
 r: dict[int | str, int | str] = {1: 1, 2: 2, 3: 3}
 reveal_type(r)  # revealed: dict[int | str, int | str]
+
+s: dict[int | str, int | str]
+s = {1: 1, 2: 2, 3: 3}
+reveal_type(s)  # revealed: dict[int | str, int | str]
+(s := {1: 1, 2: 2, 3: 3})
+reveal_type(s)  # revealed: dict[int | str, int | str]
 ```
 
 ## Incorrect collection literal assignments are complained aobut
@@ -229,6 +235,63 @@ reveal_type(q)  # revealed: list[int]
 
 r: list[Literal[1, 2, 3, 4]] = [1, 2]
 reveal_type(r)  # revealed: list[Literal[1, 2, 3, 4]]
+
+s: list[Literal[1]]
+s = [1]
+reveal_type(s)  # revealed: list[Literal[1]]
+(s := [1])
+reveal_type(s)  # revealed: list[Literal[1]]
+```
+
+## Class attribute annotations are understood
+
+```py
+from typing import TypedDict, Literal
+
+class TD(TypedDict):
+    x: int
+
+class X:
+    a: list[Literal[1]]
+    b: list[int | str]
+    c: TD
+
+    d: TD = {"x": 1}
+
+def _(x: X):
+    x.a = [1]
+    reveal_type(x.a)  # revealed: list[Literal[1]]
+
+    x.b = [2]
+    reveal_type(x.b)  # revealed: list[int | str]
+
+    # error: [invalid-key] "Invalid key access on TypedDict `TD`: Unknown key "y""
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    x.c = {"y": 1}
+
+    x.c = {"x": 1}
+    reveal_type(x.c)  # revealed: TD
+
+    # error: [invalid-key] "Invalid key access on TypedDict `TD`: Unknown key "y""
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    X.d = {"y": 1}
+
+    X.d = {"x": 1}
+    reveal_type(X.d)  # revealed: TD
+```
+
+Diagnostics are not duplicated during attribute resolution:
+
+```py
+def _(x: X, flag: bool):
+    if flag:
+        i = 1
+
+    # error: [possibly-unresolved-reference] "Name `i` used when possibly not defined"
+    x.c = {"x": i}
+
+    # error: [possibly-unresolved-reference] "Name `i` used when possibly not defined"
+    X.d = {"x": i}
 ```
 
 ## PEP-604 annotations are supported
