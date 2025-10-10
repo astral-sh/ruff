@@ -1,0 +1,3 @@
+# parse_options: {"target-version": "3.8"}
+with (
+  open('foo.txt')) as foo: ...

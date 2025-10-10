@@ -2139,14 +2139,17 @@ impl<'src> Parser<'src> {
                 //   baz,
                 // ) as tup: ...
 
+                // test_ok single_parenthesized_item_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (
+                //   open('foo.txt')) as foo: ...
+
                 // test_err tuple_context_manager_py38
                 // # parse_options: {"target-version": "3.8"}
                 // # these cases are _syntactically_ valid before Python 3.9 because the `with` item
                 // # is parsed as a tuple, but this will always cause a runtime error, so we flag it
                 // # anyway
                 // with (foo, bar): ...
-                // with (
-                //   open('foo.txt')) as foo: ...
                 // with (
                 //   foo,
                 //   bar,
