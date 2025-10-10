@@ -1,7 +1,5 @@
 # Callables as descriptors?
 
-<!-- blacken-docs:off -->
-
 ```toml
 [environment]
 python-version = "3.14"
@@ -11,8 +9,8 @@ python-version = "3.14"
 
 Some common callable objects (functions, lambdas) are also bound-method descriptors. That is, they
 have a `__get__` method which returns a bound-method object that binds the receiver instance to the
-first argument (and thus the bound-method object has a different signature, lacking the first
-argument):
+first argument. The bound-method object therefore has a different signature, lacking the first
+argument:
 
 ```py
 from ty_extensions import CallableTypeOf
@@ -26,8 +24,8 @@ def _(
     accessed_on_class: CallableTypeOf[C1.method],
     accessed_on_instance: CallableTypeOf[C1().method],
 ):
-    reveal_type(accessed_on_class)     # revealed: (self: C1, x: int) -> str
-    reveal_type(accessed_on_instance)  # revealed:           (x: int) -> str
+    reveal_type(accessed_on_class)  # revealed: (self: C1, x: int) -> str
+    reveal_type(accessed_on_instance)  # revealed:        (x: int) -> str
 ```
 
 Other callable objects (`staticmethod` objects, instances of classes with a `__call__` method but no
@@ -46,7 +44,7 @@ def _(
     accessed_on_class: CallableTypeOf[C2.non_descriptor_callable],
     accessed_on_instance: CallableTypeOf[C2().non_descriptor_callable],
 ):
-    reveal_type(accessed_on_class)     # revealed: (c2: C2, x: int) -> str
+    reveal_type(accessed_on_class)  # revealed:    (c2: C2, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed: (c2: C2, x: int) -> str
 ```
 
@@ -60,7 +58,6 @@ class NonDescriptorCallable3:
 class C3:
     def method(self: C3, x: int) -> str:
         return str(x)
-
     non_descriptor_callable: NonDescriptorCallable3 = NonDescriptorCallable3()
 
     callable_m: Callable[[C3, int], str] = method
@@ -74,7 +71,7 @@ def _(
     method_accessed_on_instance: CallableTypeOf[C3().method],
     callable_accessed_on_instance: CallableTypeOf[C3().non_descriptor_callable],
 ):
-    reveal_type(method_accessed_on_instance)    # revealed:         (x: int) -> str
+    reveal_type(method_accessed_on_instance)  # revealed:           (x: int) -> str
     reveal_type(callable_accessed_on_instance)  # revealed: (c3: C3, x: int) -> str
 ```
 
@@ -110,13 +107,14 @@ certain use cases (at the cost of purity and simplicity).
 ## Use case: Decorating a method with a `Callable`-typed decorator
 
 A commonly used pattern in the ecosystem is to use a `Callable`-typed decorator on a method with the
-intention that it shouldn't influence the method's descriptor behavior. For example:
+intention that it shouldn't influence the method's descriptor behavior. For example, we treat
+`method_decorated` below as a bound method, even though its type is `Callable[[C1, int], str]`:
 
 ```py
 from typing import Callable
 
 # TODO: this could use a generic signature, but we don't support
-# `ParamSpec` and solving of typevars inside `Callable` types.
+# `ParamSpec` and solving of typevars inside `Callable` types yet.
 def memoize(f: Callable[[C1, int], str]) -> Callable[[C1, int], str]:
     raise NotImplementedError
 
@@ -145,4 +143,48 @@ class C2:
         return str(x)
 
 C2().method_decorated(1)
+```
+
+Note that we currently only apply this heuristic when calling a function such as `memoize` via the
+decorator syntax. This is inconsistent, because the above *should* be equivalent to the following,
+but here we emit errors:
+
+```py
+def memoize3(f: Callable[[C3, int], str]) -> Callable[[C3, int], str]:
+    raise NotImplementedError
+
+class C3:
+    def method(self, x: int) -> str:
+        return str(x)
+    method_decorated = memoize3(method)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+C3().method_decorated(1)
+```
+
+The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
+return type of `memoize` is actually related to the method that we pass in. But when `memoize` is
+applied as a decorator, it is reasonable to assume so.
+
+In general, a function call might however return a `Callable` that is unrelated to the argument
+passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
+This allows correct programs like the following to pass type checking (that are currently rejected
+by pyright and mypy with a heuristic that apparently applies in a wider range of situations):
+
+```py
+class SquareCalculator:
+    def __init__(self, post_process: Callable[[float], int]):
+        self.post_process = post_process
+
+    def __call__(self, x: float) -> int:
+        return self.post_process(x * x)
+
+def square_then(c: Callable[[float], int]) -> Callable[[float], int]:
+    return SquareCalculator(c)
+
+class Calculator:
+    square_then_round = square_then(round)
+
+reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
 ```

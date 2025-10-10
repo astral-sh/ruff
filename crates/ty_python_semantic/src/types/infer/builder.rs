@@ -2183,6 +2183,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if is_input_function_like
                         && let Some(callable_type) = return_ty.unwrap_as_callable_type()
                     {
+                        // When a method on a class is decorated with a function that returns a `Callable`, assume that
+                        // the returned callable is also function-like. See "Decorating a method with a `Callable`-typed
+                        // decorator" in `callables_as_descriptors.md` for the extended explanation.
                         Type::Callable(CallableType::new(
                             self.db(),
                             callable_type.signatures(self.db()),
