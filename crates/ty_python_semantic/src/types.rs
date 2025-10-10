@@ -1757,8 +1757,29 @@ impl<'db> Type<'db> {
                     )
                 })
                 .and(db, || {
+                    // For subtyping, we would want to check whether the *top materialization* of `self`
+                    // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
+                    // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
+                    // implementation already only returns true for `T.is_disjoint_from(U)` if the *top
+                    // materialization* of `T` is disjoint from the *top materialization* of `U`.
+                    //
+                    // Note that the implementation of redundancy here may be too strict from a
+                    // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
+                    // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
+                    // could be improved. For now, however, we err on the side of strictness for our
+                    // redundancy implementation: a fully complete implementation of redundancy may lead
+                    // to non-transitivity (highly undesirable); and pragmatically, a full implementation
+                    // of redundancy may not generally lead to simpler types in many situations.
+                    let self_ty = match relation {
+                        TypeRelation::Subtyping | TypeRelation::Redundancy => self,
+                        TypeRelation::Assignability => self.bottom_materialization(db),
+                    };
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
-                        self.is_disjoint_from_impl(
+                        let neg_ty = match relation {
+                            TypeRelation::Subtyping | TypeRelation::Redundancy => neg_ty,
+                            TypeRelation::Assignability => neg_ty.bottom_materialization(db),
+                        };
+                        self_ty.is_disjoint_from_impl(
                             db,
                             neg_ty,
                             disjointness_visitor,
@@ -2284,10 +2305,21 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type and `other` have no common elements.
+    /// Return true if `self & other` should simplify to `Never`:
+    /// if the intersection of the two types could never be inhabited by any
+    /// possible runtime value.
     ///
-    /// Note: This function aims to have no false positives, but might return
-    /// wrong `false` answers in some cases.
+    /// Our implementation of disjointness for non-fully-static types only
+    /// returns true if the *top materialization* of `self` has no overlap with
+    /// the *top materialization* of `other`.
+    ///
+    /// For example, `list[int]` is disjoint from `list[str]`: the two types have
+    /// no overlap. But `list[Any]` is not disjoint from `list[str]`: there exists
+    /// a fully static materialization of `list[Any]` (`list[str]`) that is a
+    /// subtype of `list[str]`
+    ///
+    /// This function aims to have no false positives, but might return wrong
+    /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_disjoint_from(db, other).is_always_satisfied()
     }
