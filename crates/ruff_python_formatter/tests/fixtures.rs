@@ -8,8 +8,8 @@ use ruff_python_ast::Mod;
 use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
-use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseOptions, Parsed, UnsupportedSyntaxError, parse};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
@@ -616,8 +616,7 @@ impl StmtVisitor {
         let index = LineIndex::from_source_text(source);
         let mut visitor = Self {
             nodes: Vec::new(),
-            pragma_comments: Indexer::from_tokens(parsed.tokens(), source)
-                .comment_ranges()
+            pragma_comments: CommentRanges::from(parsed.tokens())
                 .into_iter()
                 .filter(|comment_range| source[*comment_range].contains("invalid-syntax: allow"))
                 .map(|range| index.line_index(range.start()))
