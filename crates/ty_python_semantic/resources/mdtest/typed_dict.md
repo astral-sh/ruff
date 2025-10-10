@@ -5,6 +5,11 @@ specific value types for each valid key. Each string key can be either required 
 
 ## Basic
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Here, we define a `TypedDict` using the class-based syntax:
 
 ```py
@@ -103,6 +108,39 @@ eve2b = Person(age=22)
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
+```
+
+Also, the value types ​​declared in a `TypedDict` affect generic call inference:
+
+```py
+class Plot(TypedDict):
+    y: list[int]
+    x: list[int] | None
+
+plot1: Plot = {"y": [1, 2, 3], "x": None}
+
+def homogeneous_list[T](*args: T) -> list[T]:
+    return list(args)
+
+reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[Literal[1, 2, 3]]
+plot2: Plot = {"y": homogeneous_list(1, 2, 3), "x": None}
+reveal_type(plot2["y"])  # revealed: list[int]
+# TODO: no error
+# error: [invalid-argument-type]
+plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
+
+Y = "y"
+X = "x"
+
+plot4: Plot = {Y: [1, 2, 3], X: None}
+plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
+
+class Items(TypedDict):
+    items: list[int | str]
+
+items1: Items = {"items": homogeneous_list(1, 2, 3)}
+ITEMS = "items"
+items2: Items = {ITEMS: homogeneous_list(1, 2, 3)}
 ```
 
 Assignments to keys are also validated:
@@ -796,6 +834,18 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+
+class Items(TypedDict, Generic[T]):
+    items: list[T]
+
+def homogeneous_list(*args: T) -> list[T]:
+    return list(args)
+
+items1: Items[int] = {"items": [1, 2, 3]}
+items2: Items[str] = {"items": ["a", "b", "c"]}
+items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
+items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
+items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
 ```
 
 ### PEP-695 generics
@@ -817,6 +867,18 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+
+class Items[T](TypedDict):
+    items: list[T]
+
+def homogeneous_list[T](*args: T) -> list[T]:
+    return list(args)
+
+items1: Items[int] = {"items": [1, 2, 3]}
+items2: Items[str] = {"items": ["a", "b", "c"]}
+items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
+items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
+items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
 ```
 
 ## Recursive `TypedDict`
