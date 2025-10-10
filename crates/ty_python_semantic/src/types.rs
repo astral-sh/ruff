@@ -1014,6 +1014,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn unwrap_as_callable_type(self) -> Option<CallableType<'db>> {
+        match self {
+            Type::Callable(callable_type) => Some(callable_type),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
         self.into_dynamic()
             .expect("Expected a Type::Dynamic variant")
