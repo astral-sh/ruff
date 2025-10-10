@@ -689,7 +689,7 @@ def _(
     # revealed: (obj: type) -> None
     reveal_type(e)
 
-    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> Any) | None = None, doc: str | None = None) -> Unknown
+    # revealed: (fget: ((Any, /) -> Any) | None = EllipsisType, fset: ((Any, Any, /) -> None) | None = EllipsisType, fdel: ((Any, /) -> None) | None = EllipsisType, doc: str | None = EllipsisType) -> property
     reveal_type(f)
 
     # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
