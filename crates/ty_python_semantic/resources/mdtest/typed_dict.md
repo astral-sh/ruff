@@ -46,6 +46,46 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
+`TypedDict` keys do not have to be string literals, as long as they can be statically determined
+(inferred to be of type string `Literal`).
+
+```py
+from typing import Literal, Final
+
+NAME = "name"
+AGE = "age"
+
+def non_literal() -> str:
+    return "name"
+
+def name_or_age() -> Literal["name", "age"]:
+    return "name"
+
+carol: Person = {NAME: "Carol", AGE: 20}
+
+reveal_type(carol[NAME])  # revealed: str
+# error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
+reveal_type(carol[non_literal()])  # revealed: Unknown
+reveal_type(carol[name_or_age()])  # revealed: str | int | None
+
+FINAL_NAME: Final = "name"
+FINAL_AGE: Final = "age"
+
+def _():
+    carol: Person = {FINAL_NAME: "Carol", FINAL_AGE: 20}
+
+CAPITALIZED_NAME = "Name"
+
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "Name" - did you mean "name"?"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
+
+def age() -> Literal["age"] | None:
+    return "age"
+
+eve: Person = {"na" + "me": "Eve", age() or "age": 20}
+```
+
 The construction of a `TypedDict` is checked for type correctness:
 
 ```py

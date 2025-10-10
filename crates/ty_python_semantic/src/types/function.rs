@@ -72,7 +72,9 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
+use crate::types::display::DisplaySettings;
 use crate::types::generics::GenericContext;
+use crate::types::ide_support::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -80,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, all_members, binding_type, todo_type, walk_signature,
+    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
+    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -718,14 +720,15 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let updated_signature =
             self.signature(db)
-                .apply_type_mapping_impl(db, type_mapping, visitor);
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         let updated_last_definition_signature = self
             .last_definition_signature(db)
-            .apply_type_mapping_impl(db, type_mapping, visitor);
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         Self::new(
             db,
             self.literal(db),
@@ -1450,10 +1453,11 @@ impl KnownFunction {
                 {
                     let mut diag = builder.into_diagnostic("Revealed type");
                     let span = context.span(&call_expression.arguments.args[0]);
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("`{}`", revealed_type.display(db))),
-                    );
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        revealed_type
+                            .display_with(db, DisplaySettings::default().preserve_long_unions())
+                    )));
                 }
             }
 

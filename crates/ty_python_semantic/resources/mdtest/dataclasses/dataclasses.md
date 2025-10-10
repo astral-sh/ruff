@@ -544,6 +544,55 @@ class A:
     y: int
 ```
 
+### `kw_only` - Python 3.13
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class Employee:
+    e_id: int = field(kw_only=True, default=0)
+    name: str
+
+Employee("Alice")
+Employee(name="Alice")
+Employee(name="Alice", e_id=1)
+Employee(e_id=1, name="Alice")
+Employee("Alice", e_id=1)
+
+Employee("Alice", 1)  # error: [too-many-positional-arguments]
+```
+
+### `kw_only` - Python 3.14
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class Employee:
+    # Python 3.14 introduces a new `doc` parameter for `dataclasses.field`
+    e_id: int = field(kw_only=True, default=0, doc="Global employee ID")
+    name: str
+
+Employee("Alice")
+Employee(name="Alice")
+Employee(name="Alice", e_id=1)
+Employee(e_id=1, name="Alice")
+Employee("Alice", e_id=1)
+
+Employee("Alice", 1)  # error: [too-many-positional-arguments]
+```
+
 ### `slots`
 
 If a dataclass is defined with `slots=True`, the `__slots__` attribute is generated as a tuple. It

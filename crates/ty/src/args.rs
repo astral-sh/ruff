@@ -85,7 +85,7 @@ pub(crate) struct CheckCommand {
     ///    and use the minimum version from the specified range
     /// 2. Check for an activated or configured Python environment
     ///    and attempt to infer the Python version of that environment
-    /// 3. Fall back to the latest stable Python version supported by ty (currently Python 3.13)
+    /// 3. Fall back to the latest stable Python version supported by ty (see `ty check --help` output)
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 

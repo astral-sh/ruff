@@ -384,11 +384,11 @@ impl<'db> TypeContext<'db> {
     // specialization.
     fn known_specialization(
         &self,
-        known_class: KnownClass,
         db: &'db dyn Db,
+        known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         self.annotation
-            .and_then(|ty| ty.known_specialization(known_class, db))
+            .and_then(|ty| ty.known_specialization(db, known_class))
     }
 
     pub(crate) fn map_annotation(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
@@ -662,7 +662,7 @@ struct DefinitionInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
 
-    /// The definitions that are deferred.
+    /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
     /// The diagnostics for this region.
