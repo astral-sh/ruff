@@ -628,14 +628,16 @@ impl StmtVisitor {
         visitor
     }
 
-    /// Return the index of the statement node that contains `range`, if it exists, and if it is not
-    /// ignored by a pragma comment.
+    /// Return the index of the statement node that contains `range`, and if it is not ignored by a
+    /// pragma comment.
     fn node_id(&self, range: TextRange) -> Option<usize> {
-        let position = self
+        let (position, node_range) = self
             .nodes
             .iter()
-            .position(|node| node.contains_range(range))?;
-        let node_range = self.nodes[position];
+            .enumerate()
+            .filter(|(_, node)| node.contains_range(range))
+            .min_by_key(|(_, node)| node.len())
+            .expect("Expected an enclosing node in the AST");
 
         let line = self.index.line_index(node_range.start());
         if line

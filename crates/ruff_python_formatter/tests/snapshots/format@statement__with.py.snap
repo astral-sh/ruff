@@ -809,6 +809,16 @@ with (
 
 ### Unsupported Syntax Errors
 error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   --> with.py:333:10
+    |
+332 | if True:
+333 |     with (
+    |          ^
+334 |         anyio.CancelScope(shield=True)
+335 |         if get_running_loop()
+    |
+
+error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:359:6
     |
 357 |     pass
@@ -817,16 +827,6 @@ error[invalid-syntax]: Cannot use parentheses within a `with` statement on Pytho
     |      ^
 360 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 361 | ):
-    |
-
-error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
-   --> with.py:333:10
-    |
-332 | if True:
-333 |     with (
-    |          ^
-334 |         anyio.CancelScope(shield=True)
-335 |         if get_running_loop()
     |
 
 
