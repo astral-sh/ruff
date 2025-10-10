@@ -9,7 +9,7 @@ expression: lex_source(source)
         FStringStart,
         0..2,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -18,14 +18,14 @@ expression: lex_source(source)
         ),
         2..4,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringEnd,
         4..5,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (

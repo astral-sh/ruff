@@ -157,6 +157,9 @@ expression: lex_source(source)
             "",
         ),
         31..33,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         Colon,

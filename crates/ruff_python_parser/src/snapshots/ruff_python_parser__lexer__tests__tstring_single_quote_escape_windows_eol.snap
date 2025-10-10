@@ -9,7 +9,7 @@ expression: tstring_single_quote_escape_eol(WINDOWS_EOL)
         TStringStart,
         0..2,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -18,14 +18,14 @@ expression: tstring_single_quote_escape_eol(WINDOWS_EOL)
         ),
         2..20,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringEnd,
         20..21,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (

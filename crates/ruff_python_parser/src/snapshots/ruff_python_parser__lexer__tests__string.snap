@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
-snapshot_kind: text
 ---
 ## Tokens
 ```
@@ -20,12 +19,18 @@ snapshot_kind: text
             "single",
         ),
         9..17,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         String(
             "can\\'t",
         ),
         18..26,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         String(
@@ -41,12 +46,18 @@ snapshot_kind: text
             "\\t\\r\\n",
         ),
         34..42,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         String(
             "\\g",
         ),
         43..47,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         String(
@@ -54,7 +65,7 @@ snapshot_kind: text
         ),
         48..56,
         TokenFlags(
-            RAW_STRING_LOWERCASE,
+            SINGLE_QUOTES | RAW_STRING_LOWERCASE,
         ),
     ),
     (
@@ -62,12 +73,18 @@ snapshot_kind: text
             "\\420",
         ),
         57..63,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         String(
             "\\200\\0a",
         ),
         64..73,
+        TokenFlags(
+            SINGLE_QUOTES,
+        ),
     ),
     (
         Newline,

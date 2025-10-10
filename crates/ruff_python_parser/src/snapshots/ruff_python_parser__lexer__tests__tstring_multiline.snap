@@ -32,7 +32,7 @@ expression: lex_source(source)
         TStringStart,
         25..29,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -41,14 +41,14 @@ expression: lex_source(source)
         ),
         29..46,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
         TStringEnd,
         46..49,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (

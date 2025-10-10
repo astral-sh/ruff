@@ -762,6 +762,8 @@ impl<'src> Lexer<'src> {
 
         if quote == '"' {
             self.current_flags |= TokenFlags::DOUBLE_QUOTES;
+        } else if quote == '\'' {
+            self.current_flags |= TokenFlags::SINGLE_QUOTES;
         }
 
         if self.cursor.eat_char2(quote, quote) {
@@ -924,6 +926,8 @@ impl<'src> Lexer<'src> {
 
         if quote == '"' {
             self.current_flags |= TokenFlags::DOUBLE_QUOTES;
+        } else if quote == '\'' {
+            self.current_flags |= TokenFlags::SINGLE_QUOTES;
         }
 
         // If the next two characters are also the quote character, then we have a triple-quoted

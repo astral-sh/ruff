@@ -9,7 +9,7 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
         FStringStart,
         0..2,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -18,14 +18,14 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
         ),
         2..19,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringEnd,
         19..20,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
