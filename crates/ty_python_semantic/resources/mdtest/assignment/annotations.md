@@ -198,17 +198,11 @@ type IntList = list[int]
 m: IntList | None = [1, 2, 3]
 reveal_type(m)  # revealed: list[int]
 
-# TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[Literal[1, 2, 3]] | None`"
 n: list[typing.Literal[1, 2, 3]] | None = [1, 2, 3]
-# TODO: this should be `list[Literal[1, 2, 3]]` at this scope
-reveal_type(n)  # revealed: list[Literal[1, 2, 3]] | None
+reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
 
-# TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[Unknown | str]` is not assignable to `list[LiteralString] | None`"
 o: list[typing.LiteralString] | None = ["a", "b", "c"]
-# TODO: this should be `list[LiteralString]` at this scope
-reveal_type(o)  # revealed: list[LiteralString] | None
+reveal_type(o)  # revealed: list[LiteralString]
 
 p: dict[int, int] | None = {}
 reveal_type(p)  # revealed: dict[int, int]

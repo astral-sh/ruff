@@ -345,13 +345,10 @@ msg1 = Message(id=1)  # id required, content optional
 msg2 = Message(id=2, content="Hello")  # both provided
 msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
 msg4: Message = {"id": 4}  # id required, content optional
-# TODO: no error
-# error: [missing-typed-dict-key]
 msg5: Message = {ID: 5}  # id required, content optional
 
 def msg() -> Message:
-    # TODO: no error
-    return {ID: 1}  # error: [missing-typed-dict-key]
+    return {ID: 1}
 
 # Valid User constructions
 user1 = User(name="Alice", email="alice@example.com")  # required fields
