@@ -20,18 +20,20 @@ pub(crate) struct Member<'db> {
 
 impl Default for Member<'_> {
     fn default() -> Self {
-        Member::undeclared(PlaceAndQualifiers::default())
+        Member::inferred(PlaceAndQualifiers::default())
     }
 }
 
 impl<'db> Member<'db> {
-    pub(crate) fn undeclared(inner: PlaceAndQualifiers<'db>) -> Self {
+    /// Create a new [`Member`] whose type was inferred (rather than explicitly declared).
+    pub(crate) fn inferred(inner: PlaceAndQualifiers<'db>) -> Self {
         Self {
             inner,
             is_declared: false,
         }
     }
 
+    /// Create a new [`Member`] whose type was explicitly declared (rather than inferred).
     pub(crate) fn declared(inner: PlaceAndQualifiers<'db>) -> Self {
         Self {
             inner,
@@ -39,23 +41,28 @@ impl<'db> Member<'db> {
         }
     }
 
+    /// Create a new [`Member`] whose type was explicitly and definitively declared, i.e.
+    /// there is no control flow path in which it might be possibly undeclared.
     pub(crate) fn definitely_declared(ty: Type<'db>) -> Self {
         Self::declared(Place::bound(ty).into())
     }
 
+    /// Represents the absence of a member.
+    pub(crate) fn unbound() -> Self {
+        Self::inferred(PlaceAndQualifiers::default())
+    }
+
+    /// Returns `true` if the inner place is unbound (i.e. there is no such member).
     pub(crate) fn is_unbound(&self) -> bool {
         self.inner.place.is_unbound()
     }
 
-    /// Represents the absence of a member.
-    pub(crate) fn unbound() -> Self {
-        Self::undeclared(PlaceAndQualifiers::default())
-    }
-
+    /// Returns the inner type, unless it is definitely unbound.
     pub(crate) fn ignore_possibly_unbound(&self) -> Option<Type<'db>> {
         self.inner.place.ignore_possibly_unbound()
     }
 
+    /// Map a type transformation function over the type of this member.
     #[must_use]
     pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {

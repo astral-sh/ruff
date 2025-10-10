@@ -3039,7 +3039,7 @@ impl<'db> ClassLiteral<'db> {
                             index.expression(value),
                             TypeContext::default(),
                         );
-                        return Member::undeclared(
+                        return Member::inferred(
                             Place::bound(inferred_ty).with_qualifiers(all_qualifiers),
                         );
                     }
@@ -3241,7 +3241,7 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
-        Member::undeclared(if is_attribute_bound {
+        Member::inferred(if is_attribute_bound {
             Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
         } else {
             Place::Unbound.with_qualifiers(qualifiers)

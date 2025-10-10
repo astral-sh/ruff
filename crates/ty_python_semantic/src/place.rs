@@ -264,7 +264,7 @@ pub(crate) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                Member::undeclared(match inferred {
+                Member::inferred(match inferred {
                     Place::Unbound => Place::Unbound.with_qualifiers(qualifiers),
                     Place::Type(_, boundness) => {
                         Place::Type(ty, boundness).with_qualifiers(qualifiers)
