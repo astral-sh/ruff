@@ -117,8 +117,8 @@ impl ShowOneCommand {
             && self
                 .file_name
                 .as_ref()
-                .is_some_and(|name| name == task.cursor_name())
-            && self.index.is_some_and(|index| index == task.cursor.index)
+                .is_none_or(|name| name == task.cursor_name())
+            && self.index.is_none_or(|index| index == task.cursor.index)
     }
 }
 
