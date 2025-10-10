@@ -117,10 +117,10 @@ from typing import Callable
 
 # TODO: this could use a generic signature, but we don't support
 # `ParamSpec` and solving of typevars inside `Callable` types.
-def memoize(f: Callable[[C, int], str]) -> Callable[[C, int], str]:
+def memoize(f: Callable[[C1, int], str]) -> Callable[[C1, int], str]:
     raise NotImplementedError
 
-class C:
+class C1:
     def method(self, x: int) -> str:
         return str(x)
 
@@ -128,7 +128,21 @@ class C:
     def method_decorated(self, x: int) -> str:
         return str(x)
 
-C().method(1)
+C1().method(1)
 
-C().method_decorated(1)
+C1().method_decorated(1)
+```
+
+This also works with an argumentless `Callable` annotation:
+
+```py
+def memoize2(f: Callable) -> Callable:
+    raise NotImplementedError
+
+class C2:
+    @memoize2
+    def method_decorated(self, x: int) -> str:
+        return str(x)
+
+C2().method_decorated(1)
 ```
