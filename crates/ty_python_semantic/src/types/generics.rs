@@ -686,6 +686,7 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn is_subtype_in_invariant_position<'db>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
