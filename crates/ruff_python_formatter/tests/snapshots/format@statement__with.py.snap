@@ -817,7 +817,7 @@ error[invalid-syntax]: Cannot use parentheses within a `with` statement on Pytho
 334 |         anyio.CancelScope(shield=True)
 335 |         if get_running_loop()
     |
-info: If this is expected, you can suppress the diagnostic with an `# invalid-syntax: allow` comment on the line preceding the statement.
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
 
 error[invalid-syntax]: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
    --> with.py:359:6
@@ -829,7 +829,7 @@ error[invalid-syntax]: Cannot use parentheses within a `with` statement on Pytho
 360 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 361 | ):
     |
-info: If this is expected, you can suppress the diagnostic with an `# invalid-syntax: allow` comment on the line preceding the statement.
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
 
 
 ### Output 2
