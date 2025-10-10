@@ -130,8 +130,5 @@ class C:
 
 C().method(1)
 
-# TODO: We shouldn't issue any errors here
-# error: [missing-argument]
-# error: [invalid-argument-type]
 C().method_decorated(1)
 ```
