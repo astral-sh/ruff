@@ -480,6 +480,10 @@ fn ensure_unchanged_ast(
             let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, error);
             let span = Span::from(file.clone()).with_range(error.range());
             diag.annotate(Annotation::primary(span));
+            diag.info(
+                "If this is expected, you can suppress the diagnostic with an \
+                        `# invalid-syntax: allow` comment on the line preceding the statement.",
+            );
             diag
         })
         .collect::<Vec<_>>();

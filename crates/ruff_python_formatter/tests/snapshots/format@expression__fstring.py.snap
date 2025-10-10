@@ -2428,6 +2428,7 @@ error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on
 764 |
 765 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
+info: If this is expected, you can suppress the diagnostic with an `# invalid-syntax: allow` comment on the line preceding the statement.
 
 error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> fstring.py:763:13
@@ -2439,6 +2440,7 @@ error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on
 764 |
 765 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
+info: If this is expected, you can suppress the diagnostic with an `# invalid-syntax: allow` comment on the line preceding the statement.
 
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> fstring.py:763:14
@@ -2450,3 +2452,4 @@ error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python
 764 |
 765 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
+info: If this is expected, you can suppress the diagnostic with an `# invalid-syntax: allow` comment on the line preceding the statement.
