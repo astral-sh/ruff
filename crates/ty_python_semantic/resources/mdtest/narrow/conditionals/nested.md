@@ -310,13 +310,13 @@ no longer valid in the inner lazy scope.
 def f(l: list[str | None]):
     if l[0] is not None:
         def _():
-            reveal_type(l[0])  # revealed: str | None | Unknown
+            reveal_type(l[0])  # revealed: str | None
         l = [None]
 
 def f(l: list[str | None]):
     l[0] = "a"
     def _():
-        reveal_type(l[0])  # revealed: str | None | Unknown
+        reveal_type(l[0])  # revealed: str | None
     l = [None]
 
 def f(l: list[str | None]):
