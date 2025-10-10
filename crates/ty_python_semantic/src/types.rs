@@ -1731,12 +1731,19 @@ impl<'db> Type<'db> {
                     )
                 })
                 .and(db, || {
-                    // For subtyping/redundancy, we would want to check whether the *top materialization*
-                    // of `self` is disjoint from the *top materialization* of `neg_ty`. As an
-                    // optimization, however, we can avoid this explicit transformation here, since our
-                    // `Type::is_disjoint_from` implementation already only returns true for
-                    // `T.is_disjoint_from(U)` if the *top materialization* of `T` is disjoint from the
-                    // *top materialization* of `U`.
+                    // For subtyping, we would want to check whether the *top materialization* of `self`
+                    // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
+                    // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
+                    // implementation already only returns true for `T.is_disjoint_from(U)` if the *top
+                    // materialization* of `T` is disjoint from the *top materialization* of `U`.
+                    //
+                    // Note that the implementation of redundancy here may be too strict from a
+                    // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
+                    // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
+                    // could be improved. For now, however, we err on the side of strictness for our
+                    // redundancy implementation: a fully complete implementation of redundancy may lead
+                    // to non-transitivity (highly undesirable); and pragmatically, a full implementation
+                    // of redundancy may not generally lead to simpler types in many situations.
                     let self_ty = match relation {
                         TypeRelation::Subtyping | TypeRelation::Redundancy => self,
                         TypeRelation::Assignability => self.bottom_materialization(db),
@@ -2272,12 +2279,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if the top materialization of `self` has no overlap with the
-    /// top materialization of `other`.
+    /// Return true if `self & other` should simplify to `Never`:
+    /// if the intersection of the two types could never be inhabited by any
+    /// possible runtime value.
     ///
-    /// In other words, return true if there are no possible materializations
-    /// of the pair of types that could result in any possible runtime value
-    /// simultaneously inhabiting both types.
+    /// Our implementation of disjointness for non-fully-static types only
+    /// returns true if the *top materialization* of `self` has no overlap with
+    /// the *top materialization* of `other`.
     ///
     /// For example, `list[int]` is disjoint from `list[str]`: the two types have
     /// no overlap. But `list[Any]` is not disjoint from `list[str]`: there exists
