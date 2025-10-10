@@ -189,11 +189,12 @@ pub(crate) fn unused_async(
     };
 
     if !found_await_or_async {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             UnusedAsync {
                 name: name.to_string(),
             },
             function_def.identifier(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 }
