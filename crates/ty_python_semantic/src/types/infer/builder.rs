@@ -5357,6 +5357,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Retrieve the parameter type for the current argument in a given overload and its binding.
+            let db = self.db();
             let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
                 let argument_index = if binding.bound_type.is_some() {
                     argument_index + 1
@@ -5369,7 +5370,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 };
 
-                overload.signature.parameters()[*parameter_index].annotated_type()
+                let parameter_type =
+                    overload.signature.parameters()[*parameter_index].annotated_type()?;
+
+                // TODO: For now, skip any parameter annotations that mention any of the overload's
+                // typevars. There are two issues:
+                //
+                // First, if we include those typevars in the type context that we use to infer the
+                // corresponding argument type, the typevars might end up appearing in the inferred
+                // argument type as well. As part of analyzing this call, we're going to (try to)
+                // infer a specialization of those typevars, and would need to substitute those
+                // typevars in the inferred argument type. We can't do that easily at the moment,
+                // since specialization inference occurs _after_ we've inferred argument types, and
+                // we can't _update_ an expression's inferred type after the fact.
+                //
+                // Second, certain kinds of arguments themselves have typevars that we need to
+                // infer specializations for. (For instance, passing the result of _another_  call
+                // to the argument of _this_ call, where both are calls to generic functions.) In
+                // that case, we want to "tie together" the typevars of the two calls so that we
+                // can infer their specializations at the same time — or at least, for the
+                // specialization of one to influence the specialization of the other. It's not yet
+                // clear how we're going to do that. (We might have to start inferring constraint
+                // sets for each expression, instead of simple types?)
+                //
+                // Regardless, for now, the expedient "solution" is to not perform bidi type
+                // checking for these kinds of parameters.
+                if let Some(generic_context) = overload.signature.generic_context {
+                    let mentions_overload_typevars = any_over_type(
+                        db,
+                        parameter_type,
+                        &|ty| {
+                            ty.into_type_var().is_some_and(|bound_typevar| {
+                                generic_context.contains(db, bound_typevar)
+                            })
+                        },
+                        true,
+                    );
+                    if mentions_overload_typevars {
+                        return None;
+                    }
+                }
+
+                Some(parameter_type)
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with
