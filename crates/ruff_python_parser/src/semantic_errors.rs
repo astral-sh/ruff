@@ -133,6 +133,17 @@ impl SemanticSyntaxChecker {
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
+            Stmt::Global(ast::StmtGlobal { names, .. }) => {
+                for name in names {
+                    if ctx.is_bound_parameter(name) {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::GlobalParameter(name.to_string()),
+                            name.range,
+                        );
+                    }
+                }
+            }
             Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
             | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
                 if let Some(type_params) = type_params {
@@ -1125,6 +1136,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::GlobalParameter(name) => {
+                write!(f, "name `{name}` is parameter and global")
+            }
         }
     }
 }
@@ -1498,6 +1512,13 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
+
+    /// Represents a function parameter that is also declared as `global`.
+    ///
+    /// Declaring a parameter as `global` is invalid, since parameters are already
+    /// bound in the local scope of the function. Using `global` on them introduces
+    /// ambiguity and will result in a `SyntaxError`.
+    GlobalParameter(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1979,6 +2000,8 @@ pub trait SemanticSyntaxContext {
     fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
+
+    fn is_bound_parameter(&self, name: &str) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
