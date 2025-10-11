@@ -1594,6 +1594,18 @@ impl<'db> TupleSpecBuilder<'db> {
         }
     }
 
+    /// Return a new tuple-spec builder that reflects the union of this tuple and another tuple.
+    ///
+    /// For example, if `self` is a tuple-spec builder for `tuple[Literal[42], str]` and `other` is a
+    /// tuple-spec for `tuple[Literal[56], str]`, the result will be a tuple-spec builder for
+    /// `tuple[Literal[42, 56], str]`.
+    ///
+    /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
+    /// a tuple spec if both `self` and `other` have the exact same length. For example,
+    /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
+    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
+    /// `tuple[int | str | bytes, ...]`. We could consider improving this in the future if real-world
+    /// use cases arise.
     pub(crate) fn union(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
         match (&mut self, other) {
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
