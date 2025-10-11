@@ -197,3 +197,10 @@ for x in {**a, **b} or [None]:
 
 # https://github.com/astral-sh/ruff/issues/7127
 def f(a: "'b' or 'c'"): ...
+
+# https://github.com/astral-sh/ruff/issues/20703
+print(f"{b''}" or "bar")  # SIM222
+x = 1
+print(f"{x=}" or "bar")  # SIM222
+(lambda: 1) or True  # SIM222
+(i for i in range(1)) or "bar"  # SIM222
