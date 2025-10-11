@@ -1059,37 +1059,6 @@ mod tests {
         "DuplicateMatchKey"
     )]
     #[test_case(
-        "break_outside_loop",
-        "
-        for i in range(10):
-            break
-        else:
-            break
-
-        i = 0
-        while i < 10:
-            i += 1
-            break
-
-
-        def f():
-            for i in range(10):
-                break
-
-            break
-
-
-        class Foo:
-            break
-
-
-        break
-
-        ",
-        PythonVersion::PY310,
-        "BreakOutsideLoop"
-    )]
-    #[test_case(
         "duplicate_match_class_attribute",
         "
         match x:

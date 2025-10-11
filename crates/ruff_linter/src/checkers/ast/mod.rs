@@ -704,6 +704,11 @@ impl SemanticSyntaxContext for Checker<'_> {
                     );
                 }
             }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => {
+                if self.is_rule_enabled(Rule::BreakOutsideLoop) {
+                    self.report_diagnostic(pyflakes::rules::BreakOutsideLoop, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -714,7 +719,6 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
-            | SemanticSyntaxErrorKind::BreakOutsideLoop
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
             | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel
