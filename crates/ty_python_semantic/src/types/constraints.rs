@@ -60,7 +60,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use crate::Db;
-use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, UnionType};
+use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, UnionType};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
