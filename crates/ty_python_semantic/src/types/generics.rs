@@ -141,12 +141,20 @@ pub(crate) fn typing_self<'db>(
     .map(typevar_to_type)
 }
 
-#[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub struct GenericContextTypeVarOptions {
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub struct GenericContextTypeVar<'db> {
+    bound_typevar: BoundTypeVarInstance<'db>,
     should_promote_literals: bool,
 }
 
-impl GenericContextTypeVarOptions {
+impl<'db> GenericContextTypeVar<'db> {
+    fn new(bound_typevar: BoundTypeVarInstance<'db>) -> Self {
+        Self {
+            bound_typevar,
+            should_promote_literals: false,
+        }
+    }
+
     fn promote_literals(mut self) -> Self {
         self.should_promote_literals = true;
         self
@@ -162,10 +170,7 @@ impl GenericContextTypeVarOptions {
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
-    variables_inner: FxOrderMap<
-        BoundTypeVarIdentity<'db>,
-        (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions),
-    >,
+    variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -184,13 +189,13 @@ impl get_size2::GetSize for GenericContext<'_> {}
 impl<'db> GenericContext<'db> {
     fn from_variables(
         db: &'db dyn Db,
-        variables: impl IntoIterator<Item = (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions)>,
+        variables: impl IntoIterator<Item = GenericContextTypeVar<'db>>,
     ) -> Self {
         Self::new_internal(
             db,
             variables
                 .into_iter()
-                .map(|(btv, opts)| (btv.identity(db), (btv, opts)))
+                .map(|var| (var.bound_typevar.identity(db), var))
                 .collect::<FxOrderMap<_, _>>(),
         )
     }
@@ -218,7 +223,7 @@ impl<'db> GenericContext<'db> {
             db,
             type_params
                 .into_iter()
-                .map(|bound_typevar| (bound_typevar, GenericContextTypeVarOptions::default())),
+                .map(GenericContextTypeVar::new),
         )
     }
 
@@ -228,8 +233,8 @@ impl<'db> GenericContext<'db> {
         Self::from_variables(
             db,
             self.variables_inner(db)
-                .iter()
-                .map(|(_, (bound_typevar, options))| (*bound_typevar, options.promote_literals())),
+                .values()
+                .map(|var| var.promote_literals()),
         )
     }
 
@@ -239,9 +244,9 @@ impl<'db> GenericContext<'db> {
         Self::from_variables(
             db,
             self.variables_inner(db)
-                .iter()
-                .chain(other.variables_inner(db).iter())
-                .map(|(_, (bound_typevar, options))| (*bound_typevar, *options)),
+                .values()
+                .chain(other.variables_inner(db).values())
+                .copied(),
         )
     }
 
@@ -249,7 +254,7 @@ impl<'db> GenericContext<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
-        self.variables_inner(db).values().map(|(btv, _)| *btv)
+        self.variables_inner(db).values().map(|var| var.bound_typevar)
     }
 
     fn variable_from_type_param(
@@ -493,12 +498,7 @@ impl<'db> GenericContext<'db> {
     }
 
     fn heap_size(
-        (variables,): &(
-            FxOrderMap<
-                BoundTypeVarIdentity<'db>,
-                (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions),
-            >,
-        ),
+        (variables,): &(FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,),
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
@@ -1161,14 +1161,14 @@ impl<'db> SpecializationBuilder<'db> {
             .and_then(|annotation| annotation.specialization_of(self.db, None));
 
         let types = (generic_context.variables_inner(self.db).iter()).map(
-            |(identity, (variable, options))| {
+            |(identity, var)| {
                 let mut ty = self.types.get(identity).copied();
 
                 // When inferring a specialization for a generic class typevar from a constructor call,
                 // promote any typevars that are inferred as a literal to the corresponding instance type.
-                if options.should_promote_literals {
+                if var.should_promote_literals {
                     let tcx = tcx_specialization
-                        .and_then(|specialization| specialization.get(self.db, *variable));
+                        .and_then(|specialization| specialization.get(self.db, var.bound_typevar));
 
                     ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
                 }
