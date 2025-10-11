@@ -4,8 +4,8 @@ use ruff_python_semantic::{Binding, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
-    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, pyupgrade, ruff,
+    fastapi, flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments,
+    pep8_naming, pyflakes, pylint, pyupgrade, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -14,6 +14,8 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::FastApiRedundantResponseModel,
+        Rule::FastApiUnusedPathParameter,
         Rule::FunctionCallInDataclassDefaultArgument,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
@@ -237,7 +239,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
-        if scope.kind.is_function() {
+        if let ScopeKind::Function(function_def) = scope.kind {
             if checker.is_rule_enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
@@ -263,6 +265,12 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 Rule::InvalidFirstArgumentNameForMethod,
             ]) {
                 pep8_naming::rules::invalid_first_argument_name(checker, scope);
+            }
+            if checker.is_rule_enabled(Rule::FastApiRedundantResponseModel) {
+                fastapi::rules::fastapi_redundant_response_model(checker, function_def);
+            }
+            if checker.is_rule_enabled(Rule::FastApiUnusedPathParameter) {
+                fastapi::rules::fastapi_unused_path_parameter(checker, function_def);
             }
         }
     }
