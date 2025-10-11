@@ -9,7 +9,7 @@ expression: lex_source(source)
         TStringStart,
         0..4,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -18,7 +18,7 @@ expression: lex_source(source)
         ),
         4..6,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -45,7 +45,7 @@ expression: lex_source(source)
         ),
         14..16,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -58,14 +58,14 @@ expression: lex_source(source)
         ),
         17..19,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
         TStringEnd,
         19..22,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -76,7 +76,7 @@ expression: lex_source(source)
         TStringStart,
         23..27,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -85,7 +85,7 @@ expression: lex_source(source)
         ),
         27..29,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -112,7 +112,7 @@ expression: lex_source(source)
         ),
         37..61,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
@@ -125,14 +125,14 @@ expression: lex_source(source)
         ),
         62..64,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (
         TStringEnd,
         64..67,
         TokenFlags(
-            TRIPLE_QUOTED_STRING | T_STRING,
+            SINGLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
         ),
     ),
     (

@@ -9,7 +9,7 @@ expression: lex_source(source)
         FStringStart,
         0..2,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -18,7 +18,7 @@ expression: lex_source(source)
         ),
         2..3,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -39,14 +39,14 @@ expression: lex_source(source)
         FStringEnd,
         8..9,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringStart,
         10..12,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -55,7 +55,7 @@ expression: lex_source(source)
         ),
         12..14,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -76,14 +76,14 @@ expression: lex_source(source)
         FStringEnd,
         19..20,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringStart,
         21..23,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -92,21 +92,21 @@ expression: lex_source(source)
         ),
         23..31,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringEnd,
         31..32,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringStart,
         33..35,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -115,14 +115,14 @@ expression: lex_source(source)
         ),
         35..44,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
         FStringEnd,
         44..45,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (

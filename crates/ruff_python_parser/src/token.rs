@@ -38,6 +38,12 @@ impl Token {
         self.kind
     }
 
+    /// Returns the flags associated with this token.
+    #[inline]
+    pub const fn flags(&self) -> TokenFlags {
+        self.flags
+    }
+
     /// Returns the token as a tuple of (kind, range).
     #[inline]
     pub const fn as_tuple(&self) -> (TokenKind, TextRange) {
@@ -83,7 +89,7 @@ impl Token {
 
     /// Returns `true` if this is any kind of string token - including
     /// tokens in t-strings (which do not have type `str`).
-    const fn is_any_string(self) -> bool {
+    pub const fn is_any_string(self) -> bool {
         matches!(
             self.kind,
             TokenKind::String
@@ -729,25 +735,27 @@ impl fmt::Display for TokenKind {
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct TokenFlags: u8 {
+    pub struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
         const DOUBLE_QUOTES = 1 << 0;
+        /// The token is a string with single quotes (`'`).
+        const SINGLE_QUOTES = 1 << 1;
         /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
         /// quote characters (`"""` or `'''`).
-        const TRIPLE_QUOTED_STRING = 1 << 1;
+        const TRIPLE_QUOTED_STRING = 1 << 2;
 
         /// The token is a unicode string i.e., prefixed with `u` or `U`
-        const UNICODE_STRING = 1 << 2;
+        const UNICODE_STRING = 1 << 3;
         /// The token is a byte string i.e., prefixed with `b` or `B`
-        const BYTE_STRING = 1 << 3;
+        const BYTE_STRING = 1 << 4;
         /// The token is an f-string i.e., prefixed with `f` or `F`
-        const F_STRING = 1 << 4;
+        const F_STRING = 1 << 5;
         /// The token is a t-string i.e., prefixed with `t` or `T`
-        const T_STRING = 1 << 5;
+        const T_STRING = 1 << 6;
         /// The token is a raw string and the prefix character is in lowercase.
-        const RAW_STRING_LOWERCASE = 1 << 6;
+        const RAW_STRING_LOWERCASE = 1 << 7;
         /// The token is a raw string and the prefix character is in uppercase.
-        const RAW_STRING_UPPERCASE = 1 << 7;
+        const RAW_STRING_UPPERCASE = 1 << 8;
 
         /// The token is a raw string i.e., prefixed with `r` or `R`
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
@@ -812,28 +820,36 @@ impl StringFlags for TokenFlags {
 
 impl TokenFlags {
     /// Returns `true` if the token is an f-string.
-    pub(crate) const fn is_f_string(self) -> bool {
+    pub const fn is_f_string(self) -> bool {
         self.intersects(TokenFlags::F_STRING)
     }
 
     /// Returns `true` if the token is a t-string.
-    pub(crate) const fn is_t_string(self) -> bool {
+    pub const fn is_t_string(self) -> bool {
         self.intersects(TokenFlags::T_STRING)
     }
 
     /// Returns `true` if the token is a t-string.
-    pub(crate) const fn is_interpolated_string(self) -> bool {
+    pub const fn is_interpolated_string(self) -> bool {
         self.intersects(TokenFlags::T_STRING.union(TokenFlags::F_STRING))
     }
 
     /// Returns `true` if the token is a triple-quoted t-string.
-    pub(crate) fn is_triple_quoted_interpolated_string(self) -> bool {
+    pub const fn is_triple_quoted_interpolated_string(self) -> bool {
         self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_interpolated_string()
     }
 
     /// Returns `true` if the token is a raw string.
-    pub(crate) const fn is_raw_string(self) -> bool {
+    pub const fn is_raw_string(self) -> bool {
         self.intersects(TokenFlags::RAW_STRING)
+    }
+
+    /// Returns `true` when the flags contain an explicit double or single quotes.
+    ///
+    /// This is useful for determining whether an "unknown" token corresponds
+    /// to the start of a string.
+    pub const fn has_quotes(self) -> bool {
+        self.intersects(TokenFlags::DOUBLE_QUOTES) || self.intersects(TokenFlags::SINGLE_QUOTES)
     }
 }
 

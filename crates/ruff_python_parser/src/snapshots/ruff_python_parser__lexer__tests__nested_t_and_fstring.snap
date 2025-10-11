@@ -118,7 +118,7 @@ expression: lex_source(source)
         FStringStart,
         35..37,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -127,7 +127,7 @@ expression: lex_source(source)
         ),
         37..41,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -138,7 +138,7 @@ expression: lex_source(source)
         TStringStart,
         42..44,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -147,14 +147,14 @@ expression: lex_source(source)
         ),
         44..47,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringEnd,
         47..48,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -177,7 +177,7 @@ expression: lex_source(source)
         ),
         51..57,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (
@@ -215,7 +215,7 @@ expression: lex_source(source)
         FStringEnd,
         69..70,
         TokenFlags(
-            F_STRING,
+            SINGLE_QUOTES | F_STRING,
         ),
     ),
     (

@@ -9,7 +9,7 @@ expression: lex_source(source)
         TStringStart,
         0..2,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -18,7 +18,7 @@ expression: lex_source(source)
         ),
         2..3,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -39,14 +39,14 @@ expression: lex_source(source)
         TStringEnd,
         8..9,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringStart,
         10..12,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -55,7 +55,7 @@ expression: lex_source(source)
         ),
         12..14,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -76,14 +76,14 @@ expression: lex_source(source)
         TStringEnd,
         19..20,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringStart,
         21..23,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -92,21 +92,21 @@ expression: lex_source(source)
         ),
         23..31,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringEnd,
         31..32,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringStart,
         33..35,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
@@ -115,14 +115,14 @@ expression: lex_source(source)
         ),
         35..44,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (
         TStringEnd,
         44..45,
         TokenFlags(
-            T_STRING,
+            SINGLE_QUOTES | T_STRING,
         ),
     ),
     (

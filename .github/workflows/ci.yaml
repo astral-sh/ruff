@@ -721,7 +721,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Run ty completion evaluation"
-        run: cargo run --release --package ty_completion_eval -- all --threshold 0.1 --tasks /tmp/completion-evaluation-tasks.csv
+        run: cargo run --release --package ty_completion_eval -- all --threshold 0.4 --tasks /tmp/completion-evaluation-tasks.csv
       - name: "Ensure there are no changes"
         run: diff ./crates/ty_completion_eval/completion-evaluation-tasks.csv /tmp/completion-evaluation-tasks.csv
 
