@@ -8027,20 +8027,13 @@ impl<'db> TypeVarInstance<'db> {
             }),
         });
 
-        // Don't trigger creation of a new `TypeVarInstance` unnecessarily.
-        if new_bound_or_constraints == self._bound_or_constraints(db)
-            && new_default == self._default(db)
-        {
-            self
-        } else {
-            Self::new(
-                db,
-                self.identity(db),
-                new_bound_or_constraints,
-                self.explicit_variance(db),
-                new_default,
-            )
-        }
+        Self::new(
+            db,
+            self.identity(db),
+            new_bound_or_constraints,
+            self.explicit_variance(db),
+            new_default,
+        )
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
