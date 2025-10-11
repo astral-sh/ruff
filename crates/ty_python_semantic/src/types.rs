@@ -977,6 +977,10 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn has_type_var(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
+    }
+
     pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
@@ -1165,6 +1169,15 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
         if yes { self.negate(db) } else { *self }
+    }
+
+    /// Remove the union elements that are not related to `target`.
+    pub(crate) fn filter_disjoint_elements(self, db: &'db dyn Db, target: Type<'db>) -> Type<'db> {
+        if let Type::Union(union) = self {
+            union.filter(db, |elem| !elem.is_disjoint_from(db, target))
+        } else {
+            self
+        }
     }
 
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type

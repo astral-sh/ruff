@@ -125,9 +125,10 @@ def homogeneous_list[T](*args: T) -> list[T]:
 reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[Literal[1, 2, 3]]
 plot2: Plot = {"y": homogeneous_list(1, 2, 3), "x": None}
 reveal_type(plot2["y"])  # revealed: list[int]
-# TODO: no error
-# error: [invalid-argument-type]
+
 plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
+reveal_type(plot3["y"])  # revealed: list[int]
+reveal_type(plot3["x"])  # revealed: list[int] | None
 
 Y = "y"
 X = "x"
@@ -362,7 +363,7 @@ qualifiers override the class-level `total` setting, which sets the default (`to
 all keys are required by default, `total=False` means that all keys are non-required by default):
 
 ```py
-from typing_extensions import TypedDict, Required, NotRequired
+from typing_extensions import TypedDict, Required, NotRequired, Final
 
 # total=False by default, but id is explicitly Required
 class Message(TypedDict, total=False):
@@ -376,10 +377,17 @@ class User(TypedDict):
     email: Required[str]  # Explicitly required (redundant here)
     bio: NotRequired[str]  # Optional despite total=True
 
+ID: Final = "id"
+
 # Valid Message constructions
 msg1 = Message(id=1)  # id required, content optional
 msg2 = Message(id=2, content="Hello")  # both provided
 msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
+msg4: Message = {"id": 4}  # id required, content optional
+msg5: Message = {ID: 5}  # id required, content optional
+
+def msg() -> Message:
+    return {ID: 1}
 
 # Valid User constructions
 user1 = User(name="Alice", email="alice@example.com")  # required fields

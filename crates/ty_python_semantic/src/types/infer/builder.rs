@@ -79,6 +79,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
+use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -5101,9 +5102,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        if let Some(ty) =
-            self.infer_optional_expression(ret.value.as_deref(), TypeContext::default())
-        {
+        let tcx = if ret.value.is_some() {
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+                .map(|func| {
+                    // When inferring expressions within a function body,
+                    // the expected type passed should be the "raw" type,
+                    // i.e. type variables in the return type are non-inferable,
+                    // and the return types of async functions are not wrapped in `CoroutineType[...]`.
+                    TypeContext::new(func.last_definition_raw_signature(self.db()).return_ty)
+                })
+                .unwrap_or_default()
+        } else {
+            TypeContext::default()
+        };
+        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
             let range = ret
                 .value
                 .as_ref()
@@ -5899,6 +5911,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             return None;
         };
+
+        let tcx = tcx.map_annotation(|annotation| {
+            // Remove any union elements of `annotation` that are not related to `collection_ty`.
+            // e.g. `annotation: list[int] | None => list[int]` if `collection_ty: list`
+            let collection_ty = collection_class.to_instance(self.db());
+            annotation.filter_disjoint_elements(self.db(), collection_ty)
+        });
 
         // Extract the annotated type of `T`, if provided.
         let annotated_elt_tys = tcx
