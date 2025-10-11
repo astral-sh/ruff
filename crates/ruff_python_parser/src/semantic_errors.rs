@@ -1125,6 +1125,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::AlternateBindedPattern(name) => {
+                write!(f, "variable `{name}` is not bound in all patterns")
+            }
         }
     }
 }
@@ -1353,7 +1356,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1371,7 +1377,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1498,6 +1507,8 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
+
+    AlternateBindedPattern(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1748,12 +1759,48 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // test_ok multiple_assignment_in_case_pattern
                 // match 2:
                 //     case Class(x) | [x] | x: ...
+
+                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
+                    let Some(prev) = &previous_names else {
+                        previous_names = Some(visitor.names);
+                        continue;
+                    };
+                    if let Some(name) = prev.symmetric_difference(&visitor.names).next() {
+                        // test_err alternate_binded_pattern
+                        // match x:
+                        //     case [a] | [b]: ...
+                        //     case [a] | []: ...
+                        //     case (x, y) | (x,): ...
+                        //     case [a, _] | [a, b]: ...
+                        //     case (x, (y | z)): ...
+                        //     case [a] | [b] | [c]: ...
+                        //     case [] | [a]: ...
+                        //     case [a] | [C(x)]: ...
+                        //     case [[a] | [b]]: ...
+                        //     case [C(a)] | [C(b)]: ...
+                        //     case [C(D(a))] | [C(D(b))]: ...
+                        //     case [(a, b)] | [(c, d)]: ...
+
+                        // test_ok alternate_binded_pattern
+                        // match x:
+                        //     case [a] | [a]: ...
+                        //     case (x, y) | (x, y): ...
+                        //     case (x, (y | y)): ...
+                        //     case [a, _] | [a, _]: ...
+                        //     case [a] | [C(a)]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::AlternateBindedPattern(name.to_string()),
+                            pattern.range(),
+                        );
+                        break;
+                    }
                 }
             }
         }
