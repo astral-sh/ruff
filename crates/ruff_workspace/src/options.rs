@@ -2168,7 +2168,8 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Note that this setting has no effect when `from __future__ import annotations`
     /// is present, as `__future__` annotations are always treated equivalently
-    /// to quoted annotations.
+    /// to quoted annotations. Similarly, this setting has no effect on Python
+    /// versions after 3.14 because these annotations are also deferred.
     #[option(
         default = "false",
         value_type = "bool",
