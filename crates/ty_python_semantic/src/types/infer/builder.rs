@@ -375,9 +375,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Are we currently inferring types in file with deferred types?
-    /// This is true for stub files and files with `__future__.annotations`
+    /// This is true for stub files, for files with `__future__.annotations`, and
+    /// by default for all source files in Python 3.14 and later.
     fn defer_annotations(&self) -> bool {
-        self.index.has_future_annotations() || self.in_stub()
+        self.index.has_future_annotations()
+            || self.in_stub()
+            || Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY314
     }
 
     /// Are we currently in a context where name resolution should be deferred
@@ -5867,11 +5870,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let typed_dict_items = typed_dict.items(self.db());
 
         for item in items {
-            self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+            let key_ty = self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
 
-            if let Some(ast::Expr::StringLiteral(ref key)) = item.key
-                && let Some(key) = key.as_single_part_string()
-                && let Some(field) = typed_dict_items.get(key.as_str())
+            if let Some(Type::StringLiteral(key)) = key_ty
+                && let Some(field) = typed_dict_items.get(key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
             } else {
