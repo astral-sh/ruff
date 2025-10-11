@@ -702,8 +702,7 @@ A union of heterogeneous tuples provided to a variadic parameter:
 # - <https://github.com/pydata/xarray/blob/3572f4e70f2b12ef9935c1f8c3c1b74045d2a092/xarray/tests/test_groupby.py#L3058-L3059>
 
 def f2(a: str, b: bool): ...
-def f3(a=None, b=None, c=None, d=None, e=None): ...
-def f4(coinflip: bool):
+def f3(coinflip: bool):
     if coinflip:
         args = "foo", True
     else:
@@ -723,10 +722,12 @@ def f4(coinflip: bool):
     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `bool`, found `Literal[True] | tuple[Literal[True]]`"
     f2(*other_args)
 
+def f4(a=None, b=None, c=None, d=None, e=None): ...
+
 my_args = (("a", "b"), ("c", "d"), ("e", "f"))
 
 for tup in my_args:
-    f3(*tup, e=None)  # fine
+    f4(*tup, e=None)  # fine
 
 my_other_args = (
     ("a", "b", "c", "d", "e"),
@@ -734,8 +735,8 @@ my_other_args = (
 )
 
 for tup in my_other_args:
-    # error: [parameter-already-assigned] "Multiple values provided for parameter `e` of function `f3`"
-    f3(*tup, e=None)
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `e` of function `f4`"
+    f4(*tup, e=None)
 ```
 
 ### Mixed argument and parameter containing variadic

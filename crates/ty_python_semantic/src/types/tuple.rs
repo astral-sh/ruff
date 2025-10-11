@@ -1617,33 +1617,13 @@ impl<'db> TupleSpecBuilder<'db> {
                 self
             }
 
-            (
-                TupleSpecBuilder::Variable {
-                    prefix: prefix1,
-                    variable: variable1,
-                    suffix: suffix1,
-                },
-                Tuple::Variable(VariableLengthTuple {
-                    prefix: prefix2,
-                    variable: variable2,
-                    suffix: suffix2,
-                }),
-            ) if prefix1.len() == prefix2.len() && suffix1.len() == suffix2.len() => {
-                TupleSpecBuilder::Variable {
-                    prefix: prefix1
-                        .iter()
-                        .zip(prefix2)
-                        .map(|(elem1, elem2)| UnionType::from_elements(db, [elem1, elem2]))
-                        .collect(),
-                    variable: UnionType::from_elements(db, [variable1, variable2]),
-                    suffix: suffix1
-                        .iter()
-                        .zip(suffix2)
-                        .map(|(elem1, elem2)| UnionType::from_elements(db, [elem1, elem2]))
-                        .collect(),
-                }
-            }
-
+            // We *could* have a branch here where both `self` and `other` are mixed tuples
+            // with same-length prefixes and same-length suffixes. We *could* zip the two
+            // `prefix` vecs together, unioning each pair of elements to create a new `prefix`
+            // vec, and do the same for the `suffix` vecs. This would preserve the tuple specs
+            // of the union elements more closely. But it's hard to think of a test where this
+            // would actually lead to more precise inference, so it's probably not worth the
+            // complexity.
             _ => {
                 let unioned =
                     UnionType::from_elements(db, self.all_elements().chain(other.all_elements()));
