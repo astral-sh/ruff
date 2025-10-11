@@ -70,10 +70,8 @@ reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
 
 def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
-    reveal_type(tuple(x))  # revealed: tuple[int | bytes, str | bool]
-
-    # (more precise might be `tuple[int, str] | tuple[bytes, bool, bytes]`)
-    reveal_type(tuple(y))  # revealed: tuple[int | str | bytes, ...]
+    reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
+    reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
 ```
 
 ## Instantiating tuple subclasses
