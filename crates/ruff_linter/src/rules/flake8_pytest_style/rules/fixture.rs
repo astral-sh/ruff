@@ -898,7 +898,9 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
 /// PT020
 fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
     if is_pytest_yield_fixture(decorator, checker.semantic()) {
-        checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
+        let mut diagnostic =
+            checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 }
 
