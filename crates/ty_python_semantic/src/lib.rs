@@ -34,6 +34,7 @@ mod db;
 mod dunder_all;
 pub mod lint;
 pub(crate) mod list;
+mod member;
 mod module_name;
 mod module_resolver;
 mod node_key;
