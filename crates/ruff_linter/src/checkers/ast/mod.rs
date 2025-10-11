@@ -850,18 +850,20 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn is_bound_parameter(&self, name: &str) -> bool {
         for scope in self.semantic.current_scopes() {
             match scope.kind {
-                ScopeKind::Class(_) => return false,
+                ScopeKind::Class(_) => {
+                    continue;
+                }
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => {
-                    if let Some(binding_id) = scope.get(name) {
-                        let binding = self.semantic.binding(binding_id);
-                        if matches!(binding.kind, BindingKind::Argument) {
-                            return true;
-                        }
-                        if let Some(&shadowed_id) = self.semantic.shadowed_bindings.get(&binding_id)
-                        {
-                            let shadowed_binding = self.semantic.binding(shadowed_id);
-                            if matches!(shadowed_binding.kind, BindingKind::Argument) {
+                    if let Some(mut binding_id) = scope.get(name) {
+                        loop {
+                            let binding = self.semantic.binding(binding_id);
+                            if matches!(binding.kind, BindingKind::Argument) {
                                 return true;
+                            }
+                            if let Some(shadowed_id) = scope.shadowed_binding(binding_id) {
+                                binding_id = shadowed_id;
+                            } else {
+                                break;
                             }
                         }
                     }

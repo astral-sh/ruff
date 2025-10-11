@@ -1060,6 +1060,18 @@ mod tests {
             except Exception:
                 pass
 
+        def f(a):
+            a = 1
+            global a
+        
+        def f(a):
+            a = 1
+            a = 2
+            global a
+        
+        def f(a):
+            class Inner:
+                global a
         ",
         PythonVersion::PY310,
         "GlobalParameter"
