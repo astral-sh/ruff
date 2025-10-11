@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.12.1"
+version = "0.14.0"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -13,14 +13,14 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true }
+ruff_db = { workspace = true, features = ["junit", "serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
 ruff_python_codegen = { workspace = true }
+ruff_python_importer = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_semantic = { workspace = true }
@@ -52,10 +52,8 @@ path-absolutize = { workspace = true, features = [
     "once_cell_cache",
     "use_unix_paths_on_wasm",
 ] }
-pathdiff = { workspace = true }
 pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
-quick-junit = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }

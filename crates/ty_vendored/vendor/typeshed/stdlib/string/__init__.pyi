@@ -1,8 +1,24 @@
+"""A collection of string constants.
+
+Public module variables:
+
+whitespace -- a string containing all ASCII whitespace
+ascii_lowercase -- a string containing all ASCII lowercase letters
+ascii_uppercase -- a string containing all ASCII uppercase letters
+ascii_letters -- a string containing all ASCII letters
+digits -- a string containing all ASCII decimal digits
+hexdigits -- a string containing all ASCII hexadecimal digits
+octdigits -- a string containing all ASCII octal digits
+punctuation -- a string containing all ASCII punctuation characters
+printable -- a string containing all ASCII characters considered printable
+
+"""
+
 import sys
 from _typeshed import StrOrLiteralStr
 from collections.abc import Iterable, Mapping, Sequence
 from re import Pattern, RegexFlag
-from typing import Any, ClassVar, overload
+from typing import Any, ClassVar, Final, overload
 from typing_extensions import LiteralString
 
 __all__ = [
@@ -20,19 +36,31 @@ __all__ = [
     "Template",
 ]
 
-ascii_letters: LiteralString
-ascii_lowercase: LiteralString
-ascii_uppercase: LiteralString
-digits: LiteralString
-hexdigits: LiteralString
-octdigits: LiteralString
-punctuation: LiteralString
-printable: LiteralString
-whitespace: LiteralString
+whitespace: Final = " \t\n\r\v\f"
+ascii_lowercase: Final = "abcdefghijklmnopqrstuvwxyz"
+ascii_uppercase: Final = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+ascii_letters: Final[LiteralString]  # string too long
+digits: Final = "0123456789"
+hexdigits: Final = "0123456789abcdefABCDEF"
+octdigits: Final = "01234567"
+punctuation: Final = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+printable: Final[LiteralString]  # string too long
 
-def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr: ...
+def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr:
+    """capwords(s [,sep]) -> string
+
+    Split the argument into words using split, capitalize each
+    word using capitalize, and join the capitalized words using
+    join.  If the optional second argument sep is absent or None,
+    runs of whitespace characters are replaced by a single space
+    and leading and trailing whitespace are removed, otherwise
+    sep is used to split and join the words.
+
+    """
 
 class Template:
+    """A string class for supporting $-substitutions."""
+
     template: str
     delimiter: ClassVar[str]
     idpattern: ClassVar[str]

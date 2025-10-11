@@ -1,16 +1,18 @@
 use crate::Db;
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode,
 };
+use crate::semantic_index::scope::ScopeId;
+use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -60,6 +62,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
                 all_negative_narrowing_constraints_for_pattern(db, pattern)
             }
         }
+        PredicateNode::ReturnsNever(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
@@ -69,7 +72,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -82,7 +85,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -97,7 +100,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -108,7 +111,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -171,31 +174,16 @@ impl ClassInfoConstraintFunction {
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.default_specialization(db))
+                Type::instance(db, class.top_materialization(db))
             }
             ClassInfoConstraintFunction::IsSubclass => {
-                SubclassOfType::from(db, class.default_specialization(db))
+                SubclassOfType::from(db, class.top_materialization(db))
             }
         };
 
         match classinfo {
-            Type::Tuple(tuple) => UnionType::try_from_elements(
-                db,
-                tuple
-                    .tuple(db)
-                    .all_elements()
-                    .copied()
-                    .map(|element| self.generate_constraint(db, element)),
-            ),
-            Type::ClassLiteral(class_literal) => {
-                // At runtime (on Python 3.11+), this will return `True` for classes that actually
-                // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
-                if class_literal.is_known(db, KnownClass::Any) {
-                    None
-                } else {
-                    Some(constraint_fn(class_literal))
-                }
-            }
+            Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
+            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
@@ -219,7 +207,10 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
+            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
+                .typevar(db)
+                .bound_or_constraints(db)?
+            {
                 TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
                 TypeVarBoundOrConstraints::Constraints(constraints) => {
                     self.generate_constraint(db, Type::Union(constraints))
@@ -230,29 +221,40 @@ impl ClassInfoConstraintFunction {
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
 
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
+                UnionType::try_from_elements(
+                    db,
+                    tuple
+                        .all_elements()
+                        .map(|element| self.generate_constraint(db, *element)),
+                )
+            }),
+
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
             | Type::BoundMethod(_)
             | Type::BoundSuper(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::Callable(_)
             | Type::DataclassDecorator(_)
             | Type::Never
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::SpecialForm(_)
-            | Type::NominalInstance(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_) => None,
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_) => None,
         }
     }
 }
@@ -290,13 +292,13 @@ fn merge_constraints_or<'db>(
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
             }
             Entry::Vacant(entry) => {
-                entry.insert(Type::object(db));
+                entry.insert(Type::object());
             }
         }
     }
     for (key, value) in into.iter_mut() {
         if !from.contains_key(key) {
-            *value = Type::object(db);
+            *value = Type::object();
         }
     }
 }
@@ -309,11 +311,8 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
 
 fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
     match expr {
-        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
-        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
-        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
-        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
-        _ => None,
+        ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
+        _ => PlaceExpr::try_from_expr(expr),
     }
 }
 
@@ -347,6 +346,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::Pattern(pattern) => {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
+            PredicateNode::ReturnsNever(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
         if let Some(mut constraints) = constraints {
@@ -395,16 +395,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => {
                 self.evaluate_match_pattern_singleton(subject, *singleton)
             }
-            PatternPredicateKind::Class(cls) => self.evaluate_match_pattern_class(subject, *cls),
+            PatternPredicateKind::Class(cls, kind) => {
+                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
+            }
             PatternPredicateKind::Value(expr) => self.evaluate_match_pattern_value(subject, *expr),
             PatternPredicateKind::Or(predicates) => {
-                self.evaluate_match_pattern_or(subject, predicates)
+                self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
             PatternPredicateKind::Unsupported => None,
         }
     }
@@ -415,7 +421,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
-        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
+        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject, is_positive)
             .map(|mut constraints| {
                 negate_if(&mut constraints, self.db, !is_positive);
                 constraints
@@ -430,6 +436,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
+            PredicateNode::ReturnsNever(CallableAndCallExpr { callable, .. }) => {
+                callable.scope(self.db)
+            }
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }
@@ -437,7 +446,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     #[track_caller]
     fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
-            .place_id_by_expr(place_expr)
+            .place_id(place_expr)
             .expect("We should always have a place for every `PlaceExpr`")
     }
 
@@ -545,12 +554,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class.is_known(db, KnownClass::Bool) =>
+                        if instance.has_known_class(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
                             [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
                                 .into_iter()
+                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
+                        )
+                    }
+                    // Treat enums as a union of their members.
+                    Type::NominalInstance(instance)
+                        if enum_metadata(db, instance.class_literal(db)).is_some() =>
+                    {
+                        UnionType::from_elements(
+                            db,
+                            enum_member_literals(db, instance.class_literal(db), None)
+                                .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
                     }
@@ -576,7 +596,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class.is_known(self.db, KnownClass::Bool) =>
+                if instance.has_known_class(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))
@@ -595,23 +615,90 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
+    // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            match rhs_ty {
-                Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
-                    self.db,
-                    rhs_tuple.tuple(self.db).all_elements(),
-                )),
+            rhs_ty
+                .try_iterate(self.db)
+                .ok()
+                .map(|iterable| iterable.homogeneous_element_type(self.db))
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
+            let rhs_values = rhs_ty
+                .try_iterate(self.db)
+                .ok()?
+                .homogeneous_element_type(self.db);
 
-                Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
-                    self.db,
-                    string_literal
-                        .iter_each_char(self.db)
-                        .map(Type::StringLiteral),
-                )),
+            let mut builder = UnionBuilder::new(self.db);
 
-                _ => None,
+            // Add the narrowed values from the RHS first, to keep literals before broader types.
+            builder = builder.add(rhs_values);
+
+            if let Some(lhs_union) = lhs_ty.into_union() {
+                for element in lhs_union.elements(self.db) {
+                    // Keep only the non-single-valued portion of the original type.
+                    if !element.is_single_valued(self.db)
+                        && !element.is_literal_string()
+                        && !element.is_bool(self.db)
+                        && (!element.is_enum(self.db) || element.overrides_equality(self.db))
+                    {
+                        builder = builder.add(*element);
+                    }
+                }
             }
+            Some(builder.build())
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let rhs_values = rhs_ty
+            .try_iterate(self.db)
+            .ok()?
+            .homogeneous_element_type(self.db);
+
+        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            // Exclude the RHS values from the entire (single-valued) LHS domain.
+            let complement = IntersectionBuilder::new(self.db)
+                .add_positive(lhs_ty)
+                .add_negative(rhs_values)
+                .build();
+            Some(complement)
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
+            // Split LHS into single-valued portion and the rest. Exclude RHS values from the
+            // single-valued portion, keep the rest intact.
+            let mut single_builder = UnionBuilder::new(self.db);
+            let mut rest_builder = UnionBuilder::new(self.db);
+
+            if let Some(lhs_union) = lhs_ty.into_union() {
+                for element in lhs_union.elements(self.db) {
+                    if element.is_single_valued(self.db)
+                        || element.is_literal_string()
+                        || element.is_bool(self.db)
+                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
+                    {
+                        single_builder = single_builder.add(*element);
+                    } else {
+                        rest_builder = rest_builder.add(*element);
+                    }
+                }
+            }
+
+            let single_union = single_builder.build();
+            let rest_union = rest_builder.build();
+
+            let narrowed_single = IntersectionBuilder::new(self.db)
+                .add_positive(single_union)
+                .add_negative(rhs_values)
+                .build();
+
+            // Keep order: first literal complement, then broader arms.
+            let result = UnionBuilder::new(self.db)
+                .add(narrowed_single)
+                .add(rest_union)
+                .build();
+            Some(result)
         } else {
             None
         }
@@ -639,9 +726,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
             ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self
-                .evaluate_expr_in(lhs_ty, rhs_ty)
-                .map(|ty| ty.negate(self.db)),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }
@@ -687,8 +772,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // and that requires cross-symbol constraints, which we don't support yet.
             return None;
         }
-        let scope = self.scope();
-        let inference = infer_expression_types(self.db, expression);
+
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -698,10 +783,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let mut last_rhs_ty: Option<Type> = None;
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
-                inference.expression_type(left.scoped_expression_id(self.db, scope))
-            });
-            let rhs_ty = inference.expression_type(right.scoped_expression_id(self.db, scope));
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
+            let rhs_ty = inference.expression_type(right);
             last_rhs_ty = Some(rhs_ty);
 
             match left {
@@ -730,12 +813,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
-                    let rhs_class = match rhs_ty {
-                        Type::ClassLiteral(class) => class,
-                        Type::GenericAlias(alias) => alias.origin(self.db),
-                        _ => {
-                            continue;
-                        }
+                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                        continue;
                     };
 
                     let target = match &**args {
@@ -746,18 +825,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         _ => continue,
                     };
 
-                    let is_valid_constraint = if is_positive {
+                    let is_positive = if is_positive {
                         op == &ast::CmpOp::Is
                     } else {
                         op == &ast::CmpOp::IsNot
                     };
 
-                    if !is_valid_constraint {
+                    // `else`-branch narrowing for `if type(x) is Y` can only be done
+                    // if `Y` is a final class
+                    if !rhs_class.is_final(self.db) && !is_positive {
                         continue;
                     }
 
-                    let callable_type =
-                        inference.expression_type(callable.scoped_expression_id(self.db, scope));
+                    let callable_type = inference.expression_type(&**callable);
 
                     if callable_type
                         .into_class_literal()
@@ -766,7 +846,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         let place = self.expect_place(&target);
                         constraints.insert(
                             place,
-                            Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
+                            Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                .negate_if(self.db, !is_positive),
                         );
                     }
                 }
@@ -782,11 +863,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let scope = self.scope();
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
-        let callable_ty =
-            inference.expression_type(expr_call.func.scoped_expression_id(self.db, scope));
+        let callable_ty = inference.expression_type(&*expr_call.func);
 
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
@@ -797,8 +876,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None | Some(KnownFunction::RevealType)
                 ) =>
             {
-                let return_ty =
-                    inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
+                let return_ty = inference.expression_type(expr_call);
 
                 let (guarded_ty, place) = match return_ty {
                     // TODO: TypeGuard
@@ -824,7 +902,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 if function == KnownFunction::HasAttr {
                     let attr = inference
-                        .expression_type(second_arg.scoped_expression_id(self.db, scope))
+                        .expression_type(second_arg)
                         .into_string_literal()?
                         .value(self.db);
 
@@ -832,10 +910,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         return None;
                     }
 
-                    let constraint = Type::synthesized_protocol(
-                        self.db,
-                        [(attr, KnownClass::Object.to_instance(self.db))],
-                    );
+                    // Since `hasattr` only checks if an attribute is readable,
+                    // the type of the protocol member should be a read-only property that returns `object`.
+                    let constraint =
+                        Type::protocol_with_readonly_members(self.db, [(attr, Type::object())]);
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,
@@ -845,8 +923,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty =
-                    inference.expression_type(second_arg.scoped_expression_id(self.db, scope));
+                let class_info_ty = inference.expression_type(second_arg);
 
                 function
                     .generate_constraint(self.db, class_info_ty)
@@ -893,11 +970,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
+        kind: ClassPatternKind,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        if !kind.is_irrefutable() && !is_positive {
+            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
+            // we can still narrow the type of the match subject to `Point`. But in the negative case,
+            // we cannot exclude `Point` as a possibility.
+            return None;
+        }
+
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
+        let ty = infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module)
+            .to_instance(self.db)?;
 
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
@@ -910,7 +997,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, value, self.module);
+        let ty =
+            infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
@@ -918,12 +1006,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         predicates: &Vec<PatternPredicateKind<'db>>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
 
         predicates
             .iter()
-            .filter_map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject))
+            .filter_map(|predicate| {
+                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
+            })
             .reduce(|mut constraints, constraints_| {
                 merge_constraints_or(&mut constraints, &constraints_, db);
                 constraints
@@ -936,16 +1027,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression);
-        let scope = self.scope();
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
         let mut sub_constraints = expr_bool_op
             .values
             .iter()
             // filter our arms with statically known truthiness
             .filter(|expr| {
-                inference
-                    .expression_type(expr.scoped_expression_id(self.db, scope))
-                    .bool(self.db)
+                inference.expression_type(*expr).bool(self.db)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,
                         BoolOp::Or => Truthiness::AlwaysFalse,

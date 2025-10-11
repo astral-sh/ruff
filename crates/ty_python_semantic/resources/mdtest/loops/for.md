@@ -228,6 +228,44 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
 ```
 
+## Union type as iterable where `Iterator[]` is used as the return type of `__iter__`
+
+This test differs from the above tests in that `Iterator` (an abstract type) is used as the return
+annotation of the `__iter__` methods, rather than a concrete type being used as the return
+annotation.
+
+```py
+from typing import Iterator, Literal
+
+class IntIterator:
+    def __iter__(self) -> Iterator[int]:
+        return iter(range(42))
+
+class StrIterator:
+    def __iter__(self) -> Iterator[str]:
+        return iter("foo")
+
+def f(x: IntIterator | StrIterator):
+    for a in x:
+        reveal_type(a)  # revealed: int | str
+```
+
+Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods:
+
+```py
+def g(
+    a: tuple[int, ...] | tuple[str, ...],
+    b: list[str] | list[int],
+    c: Literal["foo", b"bar"],
+):
+    for x in a:
+        reveal_type(x)  # revealed: int | str
+    for y in b:
+        reveal_type(y)  # revealed: str | int
+    for z in c:
+        reveal_type(z)  # revealed: LiteralString | int
+```
+
 ## Union type as iterable where one union element has no `__iter__` method
 
 <!-- snapshot-diagnostics -->
@@ -363,7 +401,7 @@ for x in Bad():
     reveal_type(x)  # revealed: Unknown
 ```
 
-## `__iter__` returns an object with a possibly unbound `__next__` method
+## `__iter__` returns an object with a possibly missing `__next__` method
 
 ```py
 def _(flag: bool):
@@ -412,7 +450,7 @@ for y in Iterable2():
     reveal_type(y)  # revealed: Unknown
 ```
 
-## Possibly unbound `__iter__` and bad `__getitem__` method
+## Possibly missing `__iter__` and bad `__getitem__` method
 
 <!-- snapshot-diagnostics -->
 
@@ -438,12 +476,12 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int | bytes
 ```
 
-## Possibly unbound `__iter__` and not-callable `__getitem__`
+## Possibly missing `__iter__` and not-callable `__getitem__`
 
 This snippet tests that we infer the element type correctly in the following edge case:
 
 - `__iter__` is a method with the correct parameter spec that returns a valid iterator; BUT
-- `__iter__` is possibly unbound; AND
+- `__iter__` is possibly missing; AND
 - `__getitem__` is set to a non-callable type
 
 It's important that we emit a diagnostic here, but it's also important that we still use the return
@@ -466,7 +504,7 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int
 ```
 
-## Possibly unbound `__iter__` and possibly unbound `__getitem__`
+## Possibly missing `__iter__` and possibly missing `__getitem__`
 
 <!-- snapshot-diagnostics -->
 
@@ -560,7 +598,7 @@ for x in Iterable():
     reveal_type(x)  # revealed: int
 ```
 
-## Possibly unbound `__iter__` but definitely bound `__getitem__`
+## Possibly missing `__iter__` but definitely bound `__getitem__`
 
 Here, we should not emit a diagnostic: if `__iter__` is unbound, we should fallback to
 `__getitem__`:
@@ -694,7 +732,7 @@ def _(flag: bool):
         reveal_type(y)  # revealed: str | int
 ```
 
-## Possibly unbound `__iter__` and possibly invalid `__getitem__`
+## Possibly missing `__iter__` and possibly invalid `__getitem__`
 
 <!-- snapshot-diagnostics -->
 
@@ -738,6 +776,13 @@ def _(flag: bool, flag2: bool):
         reveal_type(y)  # revealed: bytes | str | int
 ```
 
+## Empty tuple is iterable
+
+```py
+for x in ():
+    reveal_type(x)  # revealed: Never
+```
+
 ## Never is iterable
 
 ```py
@@ -745,5 +790,56 @@ from typing_extensions import Never
 
 def f(never: Never):
     for x in never:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Unknown
+```
+
+## Iterating over literals
+
+```py
+from typing import Literal
+
+for char in "abcde":
+    reveal_type(char)  # revealed: Literal["a", "b", "c", "d", "e"]
+
+for char in b"abcde":
+    reveal_type(char)  # revealed: Literal[97, 98, 99, 100, 101]
+```
+
+## A class literal is iterable if it inherits from `Any`
+
+A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, since the
+`Any`/`Unknown` element in the MRO could materialize to a class with a custom metaclass that defines
+`__iter__` for all instances of the metaclass:
+
+```py
+from unresolved_module import SomethingUnknown  # error: [unresolved-import]
+from typing import Any, Iterable
+from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown
+
+class Foo(SomethingUnknown): ...
+
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+
+# TODO: these should pass
+static_assert(is_assignable_to(TypeOf[Foo], Iterable[Unknown]))  # error: [static-assert-error]
+static_assert(is_assignable_to(type[Foo], Iterable[Unknown]))  # error: [static-assert-error]
+
+# TODO: should not error
+# error: [not-iterable]
+for x in Foo:
+    reveal_type(x)  # revealed: Unknown
+
+class Bar(Any): ...
+
+reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Any, <class 'object'>]
+
+# TODO: these should pass
+static_assert(is_assignable_to(TypeOf[Bar], Iterable[Any]))  # error: [static-assert-error]
+static_assert(is_assignable_to(type[Bar], Iterable[Any]))  # error: [static-assert-error]
+
+# TODO: should not error
+# error: [not-iterable]
+for x in Bar:
+    # TODO: should reveal `Any`
+    reveal_type(x)  # revealed: Unknown
 ```

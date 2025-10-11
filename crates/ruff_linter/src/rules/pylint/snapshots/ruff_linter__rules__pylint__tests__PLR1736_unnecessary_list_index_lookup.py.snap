@@ -1,239 +1,227 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-unnecessary_list_index_lookup.py:7:6: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+ --> unnecessary_list_index_lookup.py:7:6
   |
 6 | def fix_these():
 7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
-  |      ^^^^^^^^^^^^^^ PLR1736
+  |      ^^^^^^^^^^^^^^
 8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
   |
-  = help: Use the loop variable directly
+help: Use the loop variable directly
+4  | 
+5  | 
+6  | def fix_these():
+   -     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
+7  +     [letter for index, letter in enumerate(letters)]  # PLR1736
+8  |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
+9  |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
+10 | 
 
-ℹ Safe fix
-4 4 | 
-5 5 | 
-6 6 | def fix_these():
-7   |-    [letters[index] for index, letter in enumerate(letters)]  # PLR1736
-  7 |+    [letter for index, letter in enumerate(letters)]  # PLR1736
-8 8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
-9 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
-10 10 | 
-
-unnecessary_list_index_lookup.py:8:6: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+ --> unnecessary_list_index_lookup.py:8:6
   |
 6 | def fix_these():
 7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
 8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
-  |      ^^^^^^^^^^^^^^ PLR1736
+  |      ^^^^^^^^^^^^^^
 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
   |
-  = help: Use the loop variable directly
+help: Use the loop variable directly
+5  | 
+6  | def fix_these():
+7  |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
+   -     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
+8  +     {letter for index, letter in enumerate(letters)}  # PLR1736
+9  |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
+10 | 
+11 |     for index, letter in enumerate(letters):
 
-ℹ Safe fix
-5 5 | 
-6 6 | def fix_these():
-7 7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
-8   |-    {letters[index] for index, letter in enumerate(letters)}  # PLR1736
-  8 |+    {letter for index, letter in enumerate(letters)}  # PLR1736
-9 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
-10 10 | 
-11 11 |     for index, letter in enumerate(letters):
-
-unnecessary_list_index_lookup.py:9:14: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:9:14
    |
  7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
  8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
  9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
-   |              ^^^^^^^^^^^^^^ PLR1736
+   |              ^^^^^^^^^^^^^^
 10 |
 11 |     for index, letter in enumerate(letters):
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+6  | def fix_these():
+7  |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
+8  |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
+   -     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
+9  +     {letter: letter for index, letter in enumerate(letters)}  # PLR1736
+10 | 
+11 |     for index, letter in enumerate(letters):
+12 |         print(letters[index])  # PLR1736
 
-ℹ Safe fix
-6  6  | def fix_these():
-7  7  |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
-8  8  |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
-9     |-    {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
-   9  |+    {letter: letter for index, letter in enumerate(letters)}  # PLR1736
-10 10 | 
-11 11 |     for index, letter in enumerate(letters):
-12 12 |         print(letters[index])  # PLR1736
-
-unnecessary_list_index_lookup.py:12:15: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:12:15
    |
 11 |     for index, letter in enumerate(letters):
 12 |         print(letters[index])  # PLR1736
-   |               ^^^^^^^^^^^^^^ PLR1736
+   |               ^^^^^^^^^^^^^^
 13 |         blah = letters[index]  # PLR1736
 14 |         assert letters[index]  == "d"  # PLR1736
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+9  |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
+10 | 
+11 |     for index, letter in enumerate(letters):
+   -         print(letters[index])  # PLR1736
+12 +         print(letter)  # PLR1736
+13 |         blah = letters[index]  # PLR1736
+14 |         assert letters[index]  == "d"  # PLR1736
+15 | 
 
-ℹ Safe fix
-9  9  |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
-10 10 | 
-11 11 |     for index, letter in enumerate(letters):
-12    |-        print(letters[index])  # PLR1736
-   12 |+        print(letter)  # PLR1736
-13 13 |         blah = letters[index]  # PLR1736
-14 14 |         assert letters[index]  == "d"  # PLR1736
-15 15 | 
-
-unnecessary_list_index_lookup.py:13:16: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:13:16
    |
 11 |     for index, letter in enumerate(letters):
 12 |         print(letters[index])  # PLR1736
 13 |         blah = letters[index]  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^
 14 |         assert letters[index]  == "d"  # PLR1736
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+10 | 
+11 |     for index, letter in enumerate(letters):
+12 |         print(letters[index])  # PLR1736
+   -         blah = letters[index]  # PLR1736
+13 +         blah = letter  # PLR1736
+14 |         assert letters[index]  == "d"  # PLR1736
+15 | 
+16 |     for index, letter in builtins.enumerate(letters):
 
-ℹ Safe fix
-10 10 | 
-11 11 |     for index, letter in enumerate(letters):
-12 12 |         print(letters[index])  # PLR1736
-13    |-        blah = letters[index]  # PLR1736
-   13 |+        blah = letter  # PLR1736
-14 14 |         assert letters[index]  == "d"  # PLR1736
-15 15 | 
-16 16 |     for index, letter in builtins.enumerate(letters):
-
-unnecessary_list_index_lookup.py:14:16: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:14:16
    |
 12 |         print(letters[index])  # PLR1736
 13 |         blah = letters[index]  # PLR1736
 14 |         assert letters[index]  == "d"  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^
 15 |
 16 |     for index, letter in builtins.enumerate(letters):
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+11 |     for index, letter in enumerate(letters):
+12 |         print(letters[index])  # PLR1736
+13 |         blah = letters[index]  # PLR1736
+   -         assert letters[index]  == "d"  # PLR1736
+14 +         assert letter  == "d"  # PLR1736
+15 | 
+16 |     for index, letter in builtins.enumerate(letters):
+17 |         print(letters[index])  # PLR1736
 
-ℹ Safe fix
-11 11 |     for index, letter in enumerate(letters):
-12 12 |         print(letters[index])  # PLR1736
-13 13 |         blah = letters[index]  # PLR1736
-14    |-        assert letters[index]  == "d"  # PLR1736
-   14 |+        assert letter  == "d"  # PLR1736
-15 15 | 
-16 16 |     for index, letter in builtins.enumerate(letters):
-17 17 |         print(letters[index])  # PLR1736
-
-unnecessary_list_index_lookup.py:17:15: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:17:15
    |
 16 |     for index, letter in builtins.enumerate(letters):
 17 |         print(letters[index])  # PLR1736
-   |               ^^^^^^^^^^^^^^ PLR1736
+   |               ^^^^^^^^^^^^^^
 18 |         blah = letters[index]  # PLR1736
 19 |         assert letters[index]  == "d"  # PLR1736
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+14 |         assert letters[index]  == "d"  # PLR1736
+15 | 
+16 |     for index, letter in builtins.enumerate(letters):
+   -         print(letters[index])  # PLR1736
+17 +         print(letter)  # PLR1736
+18 |         blah = letters[index]  # PLR1736
+19 |         assert letters[index]  == "d"  # PLR1736
+20 | 
 
-ℹ Safe fix
-14 14 |         assert letters[index]  == "d"  # PLR1736
-15 15 | 
-16 16 |     for index, letter in builtins.enumerate(letters):
-17    |-        print(letters[index])  # PLR1736
-   17 |+        print(letter)  # PLR1736
-18 18 |         blah = letters[index]  # PLR1736
-19 19 |         assert letters[index]  == "d"  # PLR1736
-20 20 | 
-
-unnecessary_list_index_lookup.py:18:16: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:18:16
    |
 16 |     for index, letter in builtins.enumerate(letters):
 17 |         print(letters[index])  # PLR1736
 18 |         blah = letters[index]  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^
 19 |         assert letters[index]  == "d"  # PLR1736
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+15 | 
+16 |     for index, letter in builtins.enumerate(letters):
+17 |         print(letters[index])  # PLR1736
+   -         blah = letters[index]  # PLR1736
+18 +         blah = letter  # PLR1736
+19 |         assert letters[index]  == "d"  # PLR1736
+20 | 
+21 | 
 
-ℹ Safe fix
-15 15 | 
-16 16 |     for index, letter in builtins.enumerate(letters):
-17 17 |         print(letters[index])  # PLR1736
-18    |-        blah = letters[index]  # PLR1736
-   18 |+        blah = letter  # PLR1736
-19 19 |         assert letters[index]  == "d"  # PLR1736
-20 20 | 
-21 21 | 
-
-unnecessary_list_index_lookup.py:19:16: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:19:16
    |
 17 |         print(letters[index])  # PLR1736
 18 |         blah = letters[index]  # PLR1736
 19 |         assert letters[index]  == "d"  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+16 |     for index, letter in builtins.enumerate(letters):
+17 |         print(letters[index])  # PLR1736
+18 |         blah = letters[index]  # PLR1736
+   -         assert letters[index]  == "d"  # PLR1736
+19 +         assert letter  == "d"  # PLR1736
+20 | 
+21 | 
+22 | def dont_fix_these():
 
-ℹ Safe fix
-16 16 |     for index, letter in builtins.enumerate(letters):
-17 17 |         print(letters[index])  # PLR1736
-18 18 |         blah = letters[index]  # PLR1736
-19    |-        assert letters[index]  == "d"  # PLR1736
-   19 |+        assert letter  == "d"  # PLR1736
-20 20 | 
-21 21 | 
-22 22 | def dont_fix_these():
-
-unnecessary_list_index_lookup.py:74:15: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:74:15
    |
 72 |     # PLR1736
 73 |     for index, list_item in enumerate(some_list, start=0):
 74 |         print(some_list[index])
-   |               ^^^^^^^^^^^^^^^^ PLR1736
+   |               ^^^^^^^^^^^^^^^^
 75 |
 76 |     # PLR1736
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+71 | 
+72 |     # PLR1736
+73 |     for index, list_item in enumerate(some_list, start=0):
+   -         print(some_list[index])
+74 +         print(list_item)
+75 | 
+76 |     # PLR1736
+77 |     for index, list_item in enumerate(some_list):
 
-ℹ Safe fix
-71 71 | 
-72 72 |     # PLR1736
-73 73 |     for index, list_item in enumerate(some_list, start=0):
-74    |-        print(some_list[index])
-   74 |+        print(list_item)
-75 75 | 
-76 76 |     # PLR1736
-77 77 |     for index, list_item in enumerate(some_list):
-
-unnecessary_list_index_lookup.py:78:15: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:78:15
    |
 76 |     # PLR1736
 77 |     for index, list_item in enumerate(some_list):
 78 |         print(some_list[index])
-   |               ^^^^^^^^^^^^^^^^ PLR1736
+   |               ^^^^^^^^^^^^^^^^
    |
-   = help: Use the loop variable directly
+help: Use the loop variable directly
+75 | 
+76 |     # PLR1736
+77 |     for index, list_item in enumerate(some_list):
+   -         print(some_list[index])
+78 +         print(list_item)
+79 | 
+80 | 
+81 | def nested_index_lookup():
 
-ℹ Safe fix
-75 75 | 
-76 76 |     # PLR1736
-77 77 |     for index, list_item in enumerate(some_list):
-78    |-        print(some_list[index])
-   78 |+        print(list_item)
-79 79 | 
-80 80 | 
-81 81 | def nested_index_lookup():
-
-unnecessary_list_index_lookup.py:85:18: PLR1736 [*] List index lookup in `enumerate()` loop
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:85:18
    |
 83 |     column_names = ["a", "b"]
 84 |     for index, column_name in enumerate(column_names):
 85 |         _ = data[column_names[index]]  # PLR1736
-   |                  ^^^^^^^^^^^^^^^^^^^ PLR1736
+   |                  ^^^^^^^^^^^^^^^^^^^
    |
-   = help: Use the loop variable directly
-
-ℹ Safe fix
-82 82 |     data = {"a": 1, "b": 2}
-83 83 |     column_names = ["a", "b"]
-84 84 |     for index, column_name in enumerate(column_names):
-85    |-        _ = data[column_names[index]]  # PLR1736
-   85 |+        _ = data[column_name]  # PLR1736
+help: Use the loop variable directly
+82 |     data = {"a": 1, "b": 2}
+83 |     column_names = ["a", "b"]
+84 |     for index, column_name in enumerate(column_names):
+   -         _ = data[column_names[index]]  # PLR1736
+85 +         _ = data[column_name]  # PLR1736

@@ -1,0 +1,77 @@
+name: ty ecosystem-report
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every Wednesday at 5:00 UTC:
+    - cron: 0 5 * * 3
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+
+jobs:
+  ty-ecosystem-report:
+    name: Create ecosystem report
+    runs-on: depot-ubuntu-22.04-32
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        with:
+          workspaces: "ruff"
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Create report
+        shell: bash
+        run: |
+          cd ruff
+
+          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+
+          cd ..
+
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@279f8a15b0e7f77213bf9096dbc2335a19ef89c5"
+
+          ecosystem-analyzer \
+            --verbose \
+            --repository ruff \
+            analyze \
+            --profile=release \
+            --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
+            --output ecosystem-diagnostics.json
+
+          mkdir dist
+
+          ecosystem-analyzer \
+            generate-report \
+            --max-diagnostics-per-project=1000 \
+            ecosystem-diagnostics.json \
+            --output dist/index.html
+
+      - name: "Deploy to Cloudflare Pages"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        id: deploy
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=ty-ecosystem --branch main --commit-hash ${GITHUB_SHA}

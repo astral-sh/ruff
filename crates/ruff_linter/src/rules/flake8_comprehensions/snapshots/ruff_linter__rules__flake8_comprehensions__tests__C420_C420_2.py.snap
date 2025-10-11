@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+---
+C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+ --> C420_2.py:1:7
+  |
+1 | foo or{x: None for x in bar}
+  |       ^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Replace with `dict.fromkeys(iterable, value)`)
+  - foo or{x: None for x in bar}
+1 + foo or dict.fromkeys(bar)
+2 | 
+3 | 
+4 | # C420 fix must make sure to insert a leading space if needed,

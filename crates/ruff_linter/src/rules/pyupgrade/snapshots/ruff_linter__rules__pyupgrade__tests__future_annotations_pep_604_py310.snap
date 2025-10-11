@@ -1,36 +1,34 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-future_annotations.py:40:4: UP045 [*] Use `X | None` for type annotations
+UP045 [*] Use `X | None` for type annotations
+  --> future_annotations.py:40:4
    |
 40 | x: Optional[int] = None
-   |    ^^^^^^^^^^^^^ UP045
+   |    ^^^^^^^^^^^^^
 41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |
-   = help: Convert to `X | None`
+help: Convert to `X | None`
+37 |     return y
+38 | 
+39 | 
+   - x: Optional[int] = None
+40 + x: int | None = None
+41 | 
+42 | MyList: TypeAlias = Union[List[int], List[str]]
 
-ℹ Safe fix
-37 37 |     return y
-38 38 | 
-39 39 | 
-40    |-x: Optional[int] = None
-   40 |+x: int | None = None
-41 41 | 
-42 42 | MyList: TypeAlias = Union[List[int], List[str]]
-
-future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
+UP007 [*] Use `X | Y` for type annotations
+  --> future_annotations.py:42:21
    |
 40 | x: Optional[int] = None
 41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
-   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Convert to `X | Y`
-
-ℹ Safe fix
-39 39 | 
-40 40 | x: Optional[int] = None
-41 41 | 
-42    |-MyList: TypeAlias = Union[List[int], List[str]]
-   42 |+MyList: TypeAlias = List[int] | List[str]
+help: Convert to `X | Y`
+39 | 
+40 | x: Optional[int] = None
+41 | 
+   - MyList: TypeAlias = Union[List[int], List[str]]
+42 + MyList: TypeAlias = List[int] | List[str]

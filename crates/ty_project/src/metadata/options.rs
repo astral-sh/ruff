@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::combine::Combine;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
@@ -12,7 +11,7 @@ use ordermap::OrderMap;
 use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
-    Span, SubDiagnostic,
+    Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -28,15 +27,26 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
+use ty_combine::Combine;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
     PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
     SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
 };
+use ty_static::EnvVars;
 
 #[derive(
-    Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -121,6 +131,9 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
+                        ValueSource::PythonVSCodeExtension => {
+                            PythonVersionSource::PythonVSCodeExtension
+                        }
                     },
                 });
 
@@ -140,6 +153,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
+                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
             };
 
             Some(PythonEnvironment::new(
@@ -162,6 +176,13 @@ impl Options {
             SitePackagesPaths::default()
         };
 
+        let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
+            // For now this is considered non-fatal, we don't Need this for anything.
+            python_environment.real_stdlib_path(system).map_err(|err| {
+                tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
+            }).ok()
+        });
+
         let python_version = options_python_version
             .or_else(|| {
                 python_environment
@@ -176,6 +197,7 @@ impl Options {
             project_root,
             project_name,
             site_packages_paths,
+            real_stdlib_path,
             system,
             vendored,
         )?;
@@ -197,6 +219,7 @@ impl Options {
         project_root: &SystemPath,
         project_name: &str,
         site_packages_paths: SitePackagesPaths,
+        real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> Result<SearchPaths, SearchPathValidationError> {
@@ -214,15 +237,16 @@ impl Options {
                 .map(|root| root.absolute(project_root, system))
                 .collect()
         } else {
+            let mut roots = vec![];
             let src = project_root.join("src");
 
-            let mut roots = if system.is_directory(&src) {
+            if system.is_directory(&src) {
                 // Default to `src` and the project root if `src` exists and the root hasn't been specified.
                 // This corresponds to the `src-layout`
                 tracing::debug!(
                     "Including `.` and `./src` in `environment.root` because a `./src` directory exists"
                 );
-                vec![project_root.to_path_buf(), src]
+                roots.push(src);
             } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
                 // `src-layout` but when the folder isn't called `src` but has the same name as the project.
                 // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
@@ -230,18 +254,35 @@ impl Options {
                     "Including `.` and `/{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists"
                 );
 
-                vec![project_root.to_path_buf(), project_root.join(project_name)]
+                roots.push(project_root.join(project_name));
             } else {
                 // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
                 tracing::debug!("Including `.` in `environment.root`");
-                vec![project_root.to_path_buf()]
-            };
+            }
+
+            let python = project_root.join("python");
+            if system.is_directory(&python)
+                && !system.is_file(&python.join("__init__.py"))
+                && !system.is_file(&python.join("__init__.pyi"))
+                && !roots.contains(&python)
+            {
+                // If a `./python` directory exists, include it as a source root. This is the recommended layout
+                // for maturin-based rust/python projects [1].
+                //
+                // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
+                tracing::debug!(
+                    "Including `./python` in `environment.root` because a `./python` directory exists"
+                );
+
+                roots.push(python);
+            }
 
             // Considering pytest test discovery conventions,
             // we also include the `tests` directory if it exists and is not a package.
             let tests_dir = project_root.join("tests");
             if system.is_directory(&tests_dir)
                 && !system.is_file(&tests_dir.join("__init__.py"))
+                && !system.is_file(&tests_dir.join("__init__.pyi"))
                 && !roots.contains(&tests_dir)
             {
                 // If the `tests` directory exists and is not a package, include it as a source root.
@@ -252,23 +293,65 @@ impl Options {
                 roots.push(tests_dir);
             }
 
+            // The project root should always be included, and should always come
+            // after any subdirectories such as `./src`, `./tests` and/or `./python`.
+            roots.push(project_root.to_path_buf());
+
             roots
         };
 
+        // collect the existing site packages
+        let mut extra_paths: Vec<SystemPathBuf> = environment
+            .extra_paths
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|path| path.absolute(project_root, system))
+            .collect();
+
+        // read all the paths off the PYTHONPATH environment variable, check
+        // they exist as a directory, and add them to the vec of extra_paths
+        // as they should be checked before site-packages just like python
+        // interpreter does
+        if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
+            for path in std::env::split_paths(python_path.as_str()) {
+                let path = match SystemPathBuf::from_path_buf(path) {
+                    Ok(path) => path,
+                    Err(path) => {
+                        tracing::debug!(
+                            "Skipping `{path}` listed in `PYTHONPATH` because the path is not valid UTF-8",
+                            path = path.display()
+                        );
+                        continue;
+                    }
+                };
+
+                let abspath = SystemPath::absolute(path, system.current_directory());
+
+                if !system.is_directory(&abspath) {
+                    tracing::debug!(
+                        "Skipping `{abspath}` listed in `PYTHONPATH` because the path doesn't exist or isn't a directory"
+                    );
+                    continue;
+                }
+
+                tracing::debug!(
+                    "Adding `{abspath}` from the `PYTHONPATH` environment variable to `extra_paths`"
+                );
+
+                extra_paths.push(abspath);
+            }
+        }
+
         let settings = SearchPathSettings {
-            extra_paths: environment
-                .extra_paths
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(|path| path.absolute(project_root, system))
-                .collect(),
+            extra_paths,
             src_roots,
             custom_typeshed: environment
                 .typeshed
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
+            real_stdlib_path,
         };
 
         settings.to_search_paths(system, vendored)
@@ -314,7 +397,7 @@ impl Options {
 
             if self.environment.or_default().root.is_some() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "The `src.root` setting was ignored in favor of the `environment.root` setting",
                 ));
             }
@@ -381,7 +464,16 @@ impl Options {
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -396,7 +488,7 @@ pub struct EnvironmentOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -428,8 +520,8 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.13""#,
-        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>"#,
+        default = r#""3.14""#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>"#,
         example = r#"
             python-version = "3.12"
         "#
@@ -458,15 +550,20 @@ pub struct EnvironmentOptions {
     )]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
-    /// or pyright's `stubPath` configuration setting.
+    /// User-provided paths that should take first priority in module resolution.
+    ///
+    /// This is an advanced option that should usually only be used for first-party or third-party
+    /// modules that are not installed into your Python environment in a conventional way.
+    /// Use the `python` option to specify the location of your Python environment.
+    ///
+    /// This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
+    /// configuration setting.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            extra-paths = ["~/shared/my-search-path"]
+            extra-paths = ["./shared/my-search-path"]
         "#
     )]
     pub extra_paths: Option<Vec<RelativePathBuf>>,
@@ -484,25 +581,43 @@ pub struct EnvironmentOptions {
     )]
     pub typeshed: Option<RelativePathBuf>,
 
-    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
+    /// Path to your project's Python environment or interpreter.
     ///
-    /// ty will search in the path's `site-packages` directories for type information and
-    /// third-party imports.
+    /// ty uses the `site-packages` directory of your project's Python environment
+    /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
-    /// This option is commonly used to specify the path to a virtual environment.
+    /// If you're using a project management tool such as uv, you should not generally need
+    /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
+    /// environment variable to point to your project's virtual environment. ty can also infer
+    /// the location of your environment from an activated Conda environment, and will look for
+    /// a `.venv` directory in the project root if none of the above apply.
+    ///
+    /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
+    /// (such as a shim) is not currently supported.
+    ///
+    /// This option can be used to point to virtual or system Python environments.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
         example = r#"
-            python = "./.venv"
+            python = "./custom-venv-location/.venv"
         "#
     )]
     pub python: Option<RelativePathBuf>,
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -577,6 +692,7 @@ pub struct SrcOptions {
     /// A list of file and directory patterns to exclude from type checking.
     ///
     /// Patterns follow a syntax similar to `.gitignore`:
+    ///
     /// - `./src/` matches only a directory
     /// - `./src` matches both files and directories
     /// - `src` matches files or directories named `src`
@@ -664,11 +780,14 @@ impl SrcOptions {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
+)]
 #[serde(rename_all = "kebab-case", transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
     #[cfg_attr(feature = "schemars", schemars(with = "schema::Rules"))]
+    #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -701,6 +820,10 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
+
+                        ValueSource::PythonVSCodeExtension => {
+                            unreachable!("Can't configure rules from the Python VSCode extension")
+                        }
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -802,7 +925,7 @@ fn build_include_filter(
                 Severity::Warning,
             )
             .sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "Remove the `include` option to match all files or add a pattern to match specific files",
             ));
 
@@ -844,15 +967,16 @@ fn build_include_filter(
                                     ))
                             } else {
                                 diagnostic.sub(SubDiagnostic::new(
-                                    Severity::Info,
+                                    SubDiagnosticSeverity::Info,
                                     format!("The pattern is defined in the `{}` option in your configuration file", context.include_name()),
                                 ))
                             }
                         }
                         ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
+                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
                     }
                 })?;
         }
@@ -873,7 +997,7 @@ fn build_include_filter(
             Severity::Error,
         );
         Box::new(diagnostic.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Please open an issue on the ty repository and share the patterns that caused the error.",
         )))
     })
@@ -926,15 +1050,18 @@ fn build_exclude_filter(
                                     ))
                             } else {
                                 diagnostic.sub(SubDiagnostic::new(
-                                    Severity::Info,
+                                    SubDiagnosticSeverity::Info,
                                     format!("The pattern is defined in the `{}` option in your configuration file", context.exclude_name()),
                                 ))
                             }
                         }
                         ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
+                        ValueSource::PythonVSCodeExtension => unreachable!(
+                            "Can't configure excludes from the Python VSCode extension"
+                        )
                     }
                 })?;
         }
@@ -947,7 +1074,7 @@ fn build_exclude_filter(
             Severity::Error,
         );
         Box::new(diagnostic.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Please open an issue on the ty repository and share the patterns that caused the error.",
         )))
     })
@@ -978,8 +1105,73 @@ impl GlobFilterContext {
     }
 }
 
+/// The diagnostic output format.
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum OutputFormat {
+    /// The default full mode will print "pretty" diagnostics.
+    ///
+    /// That is, color will be used when printing to a `tty`.
+    /// Moreover, diagnostic messages may include additional
+    /// context and annotations on the input to help understand
+    /// the message.
+    #[default]
+    Full,
+    /// Print diagnostics in a concise mode.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    ///
+    /// This may use color when printing to a `tty`.
+    Concise,
+    /// Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    Gitlab,
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
+}
+
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(self, OutputFormat::Full | OutputFormat::Concise)
+    }
+}
+
+impl From<OutputFormat> for DiagnosticFormat {
+    fn from(value: OutputFormat) -> Self {
+        match value {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -995,7 +1187,7 @@ pub struct TerminalOptions {
             output-format = "concise"
         "#
     )]
-    pub output_format: Option<RangedValue<DiagnosticFormat>>,
+    pub output_format: Option<RangedValue<OutputFormat>>,
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Defaults to `false`.
@@ -1039,7 +1231,18 @@ pub struct TerminalOptions {
 /// [tool.ty.overrides.rules]
 /// possibly-unresolved-reference = "ignore"
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, RustDoc)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Combine,
+    Serialize,
+    Deserialize,
+    RustDoc,
+    get_size2::GetSize,
+)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
@@ -1063,7 +1266,16 @@ impl Deref for OverridesOptions {
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1151,26 +1363,26 @@ impl RangedValue<OverrideOptions> {
 
             diagnostic = if self.rules.is_none() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "It has no `rules` table",
                 ));
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "Add a `[overrides.rules]` table...",
                 ))
             } else {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "The rules table is empty",
                 ));
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "Add a rule to `[overrides.rules]` to override specific rules...",
                 ))
             };
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "or remove the `[[overrides]]` section if there's nothing to override",
             ));
 
@@ -1205,23 +1417,23 @@ impl RangedValue<OverrideOptions> {
 
             diagnostic = if self.exclude.is_none() {
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "It has no `include` or `exclude` option restricting the files",
                 ))
             } else {
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "It has no `include` option and `exclude` is empty",
                 ))
             };
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "Restrict the files by adding a pattern to `include` or `exclude`...",
             ));
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the configuration should apply to all files",
             ));
 
@@ -1283,7 +1495,7 @@ impl RangedValue<OverrideOptions> {
 }
 
 /// The options for an override but without the include/exclude patterns.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
 pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.
@@ -1294,7 +1506,7 @@ pub(super) struct InnerOverrideOptions {
 #[derive(Debug)]
 pub struct ToSettingsError {
     diagnostic: Box<OptionDiagnostic>,
-    output_format: DiagnosticFormat,
+    output_format: OutputFormat,
     color: bool,
 }
 
@@ -1308,7 +1520,7 @@ impl ToSettingsError {
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let display_config = DisplayDiagnosticConfig::default()
-                    .format(self.error.output_format)
+                    .format(self.error.output_format.into())
                     .color(self.error.color);
 
                 write!(
@@ -1340,7 +1552,6 @@ impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use crate::DEFAULT_LINT_REGISTRY;
     use schemars::JsonSchema;
     use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{
@@ -1356,7 +1567,7 @@ mod schema {
         }
 
         fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-            let registry = &*DEFAULT_LINT_REGISTRY;
+            let registry = ty_python_semantic::default_lint_registry();
 
             let level_schema = generator.subschema_for::<Level>();
 
@@ -1407,7 +1618,7 @@ pub enum TyTomlError {
     TomlSyntax(#[from] toml::de::Error),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
@@ -1463,8 +1674,11 @@ impl OptionDiagnostic {
 /// This is a wrapper for options that actually get loaded from configuration files
 /// and the CLI, which also includes a `config_file_override` option that overrides
 /// default configuration discovery with an explicitly-provided path to a configuration file
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProjectOptionsOverrides {
     pub config_file_override: Option<SystemPathBuf>,
+    pub fallback_python_version: Option<RangedValue<PythonVersion>>,
+    pub fallback_python: Option<RelativePathBuf>,
     pub options: Options,
 }
 
@@ -1473,7 +1687,21 @@ impl ProjectOptionsOverrides {
         Self {
             config_file_override,
             options,
+            ..Self::default()
         }
+    }
+
+    pub fn apply_to(&self, options: Options) -> Options {
+        let mut combined = self.options.clone().combine(options);
+
+        // Set the fallback python version and path if set
+        combined.environment.combine_with(Some(EnvironmentOptions {
+            python_version: self.fallback_python_version.clone(),
+            python: self.fallback_python.clone(),
+            ..EnvironmentOptions::default()
+        }));
+
+        combined
     }
 }
 

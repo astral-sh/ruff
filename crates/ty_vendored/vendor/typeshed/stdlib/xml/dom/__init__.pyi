@@ -1,20 +1,39 @@
+"""W3C Document Object Model implementation for Python.
+
+The Python mapping of the Document Object Model is documented in the
+Python Library Reference in the section on the xml.dom package.
+
+This package contains the following modules:
+
+minidom -- A simple implementation of the Level 1 DOM with namespace
+           support added (based on the Level 2 specification) and other
+           minor Level 2 functionality.
+
+pulldom -- DOM builder supporting on-demand tree-building for selected
+           subtrees of the document.
+
+"""
+
 from typing import Any, Final, Literal
 
 from .domreg import getDOMImplementation as getDOMImplementation, registerDOMImplementation as registerDOMImplementation
 
 class Node:
-    ELEMENT_NODE: Literal[1]
-    ATTRIBUTE_NODE: Literal[2]
-    TEXT_NODE: Literal[3]
-    CDATA_SECTION_NODE: Literal[4]
-    ENTITY_REFERENCE_NODE: Literal[5]
-    ENTITY_NODE: Literal[6]
-    PROCESSING_INSTRUCTION_NODE: Literal[7]
-    COMMENT_NODE: Literal[8]
-    DOCUMENT_NODE: Literal[9]
-    DOCUMENT_TYPE_NODE: Literal[10]
-    DOCUMENT_FRAGMENT_NODE: Literal[11]
-    NOTATION_NODE: Literal[12]
+    """Class giving the NodeType constants."""
+
+    __slots__ = ()
+    ELEMENT_NODE: Final = 1
+    ATTRIBUTE_NODE: Final = 2
+    TEXT_NODE: Final = 3
+    CDATA_SECTION_NODE: Final = 4
+    ENTITY_REFERENCE_NODE: Final = 5
+    ENTITY_NODE: Final = 6
+    PROCESSING_INSTRUCTION_NODE: Final = 7
+    COMMENT_NODE: Final = 8
+    DOCUMENT_NODE: Final = 9
+    DOCUMENT_TYPE_NODE: Final = 10
+    DOCUMENT_FRAGMENT_NODE: Final = 11
+    NOTATION_NODE: Final = 12
 
 # ExceptionCode
 INDEX_SIZE_ERR: Final = 1
@@ -35,6 +54,10 @@ INVALID_ACCESS_ERR: Final = 15
 VALIDATION_ERR: Final = 16
 
 class DOMException(Exception):
+    """Abstract base class for DOM exceptions.
+    Exceptions with specific codes are specializations of this class.
+    """
+
     code: int
     def __init__(self, *args: Any, **kw: Any) -> None: ...
     def _get_code(self) -> int: ...
@@ -88,10 +111,12 @@ class ValidationErr(DOMException):
     code: Literal[16]
 
 class UserDataHandler:
-    NODE_CLONED: Literal[1]
-    NODE_IMPORTED: Literal[2]
-    NODE_DELETED: Literal[3]
-    NODE_RENAMED: Literal[4]
+    """Class giving the operation constants for UserDataHandler.handle()."""
+
+    NODE_CLONED: Final = 1
+    NODE_IMPORTED: Final = 2
+    NODE_DELETED: Final = 3
+    NODE_RENAMED: Final = 4
 
 XML_NAMESPACE: Final = "http://www.w3.org/XML/1998/namespace"
 XMLNS_NAMESPACE: Final = "http://www.w3.org/2000/xmlns/"

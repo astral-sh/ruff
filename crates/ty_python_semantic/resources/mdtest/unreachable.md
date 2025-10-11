@@ -198,7 +198,7 @@ import sys
 
 if sys.platform == "win32":
     # TODO: we should not emit an error here
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     sys.getwindowsversion()
 ```
 
@@ -250,7 +250,7 @@ def outer():
     x = 1
 
     def inner():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     while True:
         pass
 ```

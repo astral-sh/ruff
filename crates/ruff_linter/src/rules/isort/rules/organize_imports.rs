@@ -14,9 +14,7 @@ use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
-use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::isort::block::Block;
-use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{comments, format_imports};
 use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -40,12 +38,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// import pandas
 /// ```
 ///
-/// ## Preview
-/// When [`preview`](https://docs.astral.sh/ruff/preview/) mode is enabled, Ruff applies a stricter criterion
-/// for determining whether an import should be classified as first-party.
-/// Specifically, for an import of the form `import foo.bar.baz`, Ruff will
-/// check that `foo/bar`, relative to a [user-specified `src`](https://docs.astral.sh/ruff/settings/#src) directory, contains either
-/// the directory `baz` or else a file with the name `baz.py` or `baz.pyi`.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnsortedImports;
 
@@ -129,12 +121,6 @@ pub(crate) fn organize_imports(
         trailing_lines_end(block.imports.last().unwrap(), locator.contents())
     };
 
-    let match_source_strategy = if is_full_path_match_source_strategy_enabled(settings) {
-        MatchSourceStrategy::FullPath
-    } else {
-        MatchSourceStrategy::Root
-    };
-
     // Generate the sorted import block.
     let expected = format_imports(
         block,
@@ -148,7 +134,6 @@ pub(crate) fn organize_imports(
         source_type,
         target_version,
         &settings.isort,
-        match_source_strategy,
         tokens,
     );
 

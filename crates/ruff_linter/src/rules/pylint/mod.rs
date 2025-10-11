@@ -48,6 +48,7 @@ mod tests {
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
+    #[test_case(Rule::EmptyComment, Path::new("empty_comment_line_continuation.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::IfStmtMinMax, Path::new("if_stmt_min_max.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
@@ -413,19 +414,6 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn preview_useless_import_alias() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/import_aliasing_2/__init__.py"),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(Rule::UselessImportAlias)
             },
         )?;
         assert_diagnostics!(diagnostics);

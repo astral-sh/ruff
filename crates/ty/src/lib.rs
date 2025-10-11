@@ -1,11 +1,13 @@
 mod args;
 mod logging;
+mod printer;
 mod python_version;
 mod version;
 
 pub use args::Cli;
+use ty_static::EnvVars;
 
-use std::io::{self, BufWriter, Write, stdout};
+use std::fmt::Write;
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -13,23 +15,26 @@ use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
+use crate::printer::Printer;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
+use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use salsa::plumbing::ZalsaDatabase;
+use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{Db, DummyReporter, Reporter, watch};
+use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
     setup_rayon();
+    ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
@@ -41,6 +46,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
         Command::Check(check_args) => run_check(check_args),
         Command::Version => version().map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
+            use std::io::stdout;
+
             shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
@@ -48,18 +55,23 @@ pub fn run() -> anyhow::Result<ExitStatus> {
 }
 
 pub(crate) fn version() -> Result<()> {
-    let mut stdout = BufWriter::new(io::stdout().lock());
+    let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
     writeln!(stdout, "ty {}", &version_info)?;
     Ok(())
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();
-    countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
+
+    let printer = Printer::default().with_verbosity(verbosity);
 
     tracing::warn!(
         "ty is pre-release software and not ready for production use. \
@@ -114,9 +126,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
-    let options = args.into_options();
-    project_metadata.apply_options(options.clone());
     project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
@@ -124,8 +137,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.project().set_included_paths(&mut db, check_paths);
     }
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(project_options_overrides);
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(project_options_overrides, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -143,15 +156,20 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         main_loop.run(&mut db)?
     };
 
-    let mut stdout = stdout().lock();
-    match std::env::var("TY_MEMORY_REPORT").as_deref() {
+    let mut stdout = printer.stream_for_requested_summary().lock();
+    match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
-        _ => {}
+        Ok("full") => {
+            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
+        }
+        Ok(other) => {
+            tracing::warn!(
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
+            );
+        }
+        Err(_) => {}
     }
-
-    tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
 
     std::mem::forget(db);
 
@@ -194,12 +212,16 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
+    /// Interface for displaying information to the user.
+    printer: Printer,
+
     project_options_overrides: ProjectOptionsOverrides,
 }
 
 impl MainLoop {
     fn new(
         project_options_overrides: ProjectOptionsOverrides,
+        printer: Printer,
     ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
@@ -209,6 +231,7 @@ impl MainLoop {
                 receiver,
                 watcher: None,
                 project_options_overrides,
+                printer,
             },
             MainLoopCancellationToken { sender },
         )
@@ -222,41 +245,31 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-
-        // Do not show progress bars with `--watch`, indicatif does not seem to
-        // handle cancelling independent progress bars very well.
-        self.run_with_progress::<DummyReporter>(db)?;
+        self.run(db)?;
 
         Ok(ExitStatus::Success)
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        self.run_with_progress::<IndicatifReporter>(db)
-    }
-
-    fn run_with_progress<R>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
-    where
-        R: Reporter + Default + 'static,
-    {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
-        let result = self.main_loop::<R>(db);
+        let result = self.main_loop(db);
 
         tracing::debug!("Exiting main loop");
 
         result
     }
 
-    fn main_loop<R>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
-    where
-        R: Reporter + Default + 'static,
-    {
+    fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
+            if self.watcher.is_some() {
+                Printer::clear_screen()?;
+            }
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
@@ -265,9 +278,13 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
+                        let mut reporter = IndicatifReporter::from(self.printer);
+                        let bar = reporter.bar.clone();
+
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = R::default();
-                            db.check_with_reporter(&mut reporter)
+                            db.check_with_reporter(&mut reporter);
+                            reporter.bar.finish();
+                            reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -276,6 +293,7 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
+                                bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
@@ -288,7 +306,7 @@ impl MainLoop {
                 } => {
                     let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format)
+                        .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
                     if check_revision == revision {
@@ -296,30 +314,53 @@ impl MainLoop {
                             tracing::warn!("No python files found under the given path(s)");
                         }
 
-                        let mut stdout = stdout().lock();
+                        // TODO: We should have an official flag to silence workspace diagnostics.
+                        if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                            return Ok(ExitStatus::Success);
+                        }
+
+                        let is_human_readable = terminal_settings.output_format.is_human_readable();
 
                         if result.is_empty() {
-                            writeln!(stdout, "{}", "All checks passed!".green().bold())?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_success_summary(),
+                                    "{}",
+                                    "All checks passed!".green().bold()
+                                )?;
+                            }
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
-                            for diagnostic in result {
-                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
+                            let mut stdout = self.printer.stream_for_details().lock();
+                            let max_severity = result
+                                .iter()
+                                .map(Diagnostic::severity)
+                                .max()
+                                .unwrap_or(Severity::Info);
 
-                                max_severity = max_severity.max(diagnostic.severity());
+                            // Only render diagnostics if they're going to be displayed, since doing
+                            // so is expensive.
+                            if stdout.is_enabled() {
+                                write!(
+                                    stdout,
+                                    "{}",
+                                    DisplayDiagnostics::new(db, &display_config, &result)
+                                )?;
                             }
 
-                            writeln!(
-                                stdout,
-                                "Found {} diagnostic{}",
-                                diagnostics_count,
-                                if diagnostics_count > 1 { "s" } else { "" }
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_failure_summary(),
+                                    "Found {} diagnostic{}",
+                                    diagnostics_count,
+                                    if diagnostics_count > 1 { "s" } else { "" }
+                                )?;
+                            }
 
                             if max_severity.is_fatal() {
                                 tracing::warn!(
@@ -347,8 +388,6 @@ impl MainLoop {
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
                     }
-
-                    tracing::trace!("Counts after last check:\n{}", countme::get_all());
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -362,9 +401,7 @@ impl MainLoop {
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
-                    // TODO: Don't use Salsa internal APIs
-                    //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
-                    let _ = db.zalsa_mut();
+                    db.trigger_cancellation();
                     return Ok(ExitStatus::Success);
                 }
             }
@@ -377,28 +414,52 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-#[derive(Default)]
-struct IndicatifReporter(Option<indicatif::ProgressBar>);
+struct IndicatifReporter {
+    collector: CollectReporter,
 
-impl ty_project::Reporter for IndicatifReporter {
+    /// A reporter that is ready, containing a progress bar to report to.
+    ///
+    /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
+    /// do not initialize the bar too early as it may take a while to collect the number of files to
+    /// process and we don't want to display an empty "0/0" bar.
+    bar: indicatif::ProgressBar,
+
+    printer: Printer,
+}
+
+impl From<Printer> for IndicatifReporter {
+    fn from(printer: Printer) -> Self {
+        Self {
+            bar: indicatif::ProgressBar::hidden(),
+            collector: CollectReporter::default(),
+            printer,
+        }
+    }
+}
+
+impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
-        let progress = indicatif::ProgressBar::new(files as u64);
-        progress.set_style(
+        self.collector.set_files(files);
+
+        self.bar.set_length(files as u64);
+        self.bar.set_message("Checking");
+        self.bar.set_style(
             indicatif::ProgressStyle::with_template(
                 "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        progress.set_message("Checking");
-
-        self.0 = Some(progress);
+        self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_file(&self, _file: &ruff_db::files::File) {
-        if let Some(ref progress_bar) = self.0 {
-            progress_bar.inc(1);
-        }
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+        self.collector.report_checked_file(db, file, diagnostics);
+        self.bar.inc(1);
+    }
+
+    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+        self.collector.report_diagnostics(db, diagnostics);
     }
 }
 

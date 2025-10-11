@@ -12,14 +12,14 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                 .map(|member| {
 
                     quote_spanned!(
-                        member.span() => crate::combine::Combine::combine_with(&mut self.#member, other.#member)
+                        member.span() => ty_combine::Combine::combine_with(&mut self.#member, other.#member)
                     )
                 })
                 .collect();
 
             Ok(quote! {
                 #[automatically_derived]
-                impl crate::combine::Combine for #ident {
+                impl ty_combine::Combine for #ident {
                     #[allow(deprecated)]
                     fn combine_with(&mut self, other: Self) {
                         #(

@@ -3,7 +3,7 @@ use ruff_python_ast::ExprCall;
 use ruff_python_ast::PythonVersion;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_bugbear::rules::is_infinite_iterable;
+use crate::rules::flake8_bugbear::helpers::is_infinite_iterable;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -20,16 +20,22 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n)
 /// ```
 ///
 /// Use instead if the batches must be of uniform length:
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n, strict=True)
 /// ```
 ///
 /// Or if the batches can be of non-uniform length:
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n, strict=False)
 /// ```
 ///

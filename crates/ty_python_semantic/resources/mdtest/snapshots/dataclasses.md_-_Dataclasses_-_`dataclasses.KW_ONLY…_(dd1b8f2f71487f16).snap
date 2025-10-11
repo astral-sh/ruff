@@ -4,7 +4,7 @@ expression: snapshot
 ---
 ---
 mdtest name: dataclasses.md - Dataclasses - `dataclasses.KW_ONLY`
-mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses.md
+mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.md
 ---
 
 # Python source files
@@ -37,6 +37,34 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses.md
 23 |     e: bytes
 24 | 
 25 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+26 | def flag() -> bool:
+27 |     return True
+28 | 
+29 | @dataclass
+30 | class D:  # error: [duplicate-kw-only]
+31 |     x: int
+32 |     _1: KW_ONLY
+33 | 
+34 |     if flag():
+35 |         y: str
+36 |         _2: KW_ONLY
+37 |         z: float
+38 | from dataclasses import dataclass, KW_ONLY
+39 | 
+40 | @dataclass
+41 | class D:
+42 |     x: int
+43 |     _: KW_ONLY
+44 |     y: str
+45 | 
+46 | @dataclass
+47 | class E(D):
+48 |     z: bytes
+49 | 
+50 | # This should work: x=1 (positional), z=b"foo" (positional), y="foo" (keyword-only)
+51 | E(1, b"foo", y="foo")
+52 | 
+53 | reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
 ```
 
 # Diagnostics
@@ -109,6 +137,35 @@ info[revealed-type]: Revealed type
 24 |
 25 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
    |             ^^^^^^^^^^^^^^ `(self: Fails, a: int, *, c: str, e: bytes) -> None`
+26 | def flag() -> bool:
+27 |     return True
+   |
+
+```
+
+```
+error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
+  --> src/mdtest_snippet.py:30:7
+   |
+29 | @dataclass
+30 | class D:  # error: [duplicate-kw-only]
+   |       ^
+31 |     x: int
+32 |     _1: KW_ONLY
+   |
+info: `KW_ONLY` fields: `_1`, `_2`
+info: rule `duplicate-kw-only` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:53:13
+   |
+51 | E(1, b"foo", y="foo")
+52 |
+53 | reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
+   |             ^^^^^^^^^^ `(self: E, x: int, z: bytes, *, y: str) -> None`
    |
 
 ```

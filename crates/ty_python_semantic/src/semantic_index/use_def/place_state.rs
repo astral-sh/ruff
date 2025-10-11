@@ -71,16 +71,12 @@ impl ScopedDefinitionId {
     }
 }
 
-/// Can keep inline this many live bindings or declarations per place at a given time; more will
-/// go to heap.
-const INLINE_DEFINITIONS_PER_PLACE: usize = 4;
-
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
-    live_declarations: SmallVec<[LiveDeclaration; INLINE_DEFINITIONS_PER_PLACE]>,
+    live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
@@ -176,17 +172,35 @@ impl Declarations {
             }
         }
     }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.live_declarations.shrink_to_fit();
+        for declaration in &self.live_declarations {
+            reachability_constraints.mark_used(declaration.reachability_constraint);
+        }
+    }
 }
 
-/// A snapshot of a place state that can be used to resolve a reference in a nested eager scope.
-/// If there are bindings in a (non-class) scope , they are stored in `Bindings`.
+/// A snapshot of a place state that can be used to resolve a reference in a nested scope.
+/// If there are bindings in a (non-class) scope, they are stored in `Bindings`.
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) enum EagerSnapshot {
+pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
+}
+
+impl EnclosingSnapshot {
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        match self {
+            Self::Constraint(_) => {}
+            Self::Bindings(bindings) => {
+                bindings.finish(reachability_constraints);
+            }
+        }
+    }
 }
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
@@ -199,13 +213,20 @@ pub(super) struct Bindings {
     /// "unbound" binding.
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
-    live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_PLACE]>,
+    live_bindings: SmallVec<[LiveBinding; 2]>,
 }
 
 impl Bindings {
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
+    }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.live_bindings.shrink_to_fit();
+        for binding in &self.live_bindings {
+            reachability_constraints.mark_used(binding.reachability_constraint);
+        }
     }
 }
 
@@ -287,7 +308,7 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
-    fn merge(
+    pub(super) fn merge(
         &mut self,
         b: Self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -426,11 +447,17 @@ impl PlaceState {
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
     }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.declarations.finish(reachability_constraints);
+        self.bindings.finish(reachability_constraints);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ruff_index::Idx;
 
     use crate::semantic_index::predicate::ScopedPredicateId;
 
@@ -514,7 +541,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(0).into();
+        let predicate = ScopedPredicateId::new(0).into();
         sym.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         assert_bindings(&narrowing_constraints, &sym, &["1<0>"]);
@@ -533,7 +560,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(0).into();
+        let predicate = ScopedPredicateId::new(0).into();
         sym1a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
@@ -543,7 +570,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(0).into();
+        let predicate = ScopedPredicateId::new(0).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         sym1a.merge(
@@ -562,7 +589,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(1).into();
+        let predicate = ScopedPredicateId::new(1).into();
         sym2a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
@@ -572,7 +599,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(2).into();
+        let predicate = ScopedPredicateId::new(2).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         sym2a.merge(
@@ -591,7 +618,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(3).into();
+        let predicate = ScopedPredicateId::new(3).into();
         sym3a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let sym2b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);

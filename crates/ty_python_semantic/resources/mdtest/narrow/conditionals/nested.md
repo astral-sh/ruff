@@ -86,7 +86,7 @@ class B:
     reveal_type(a.x)  # revealed: Literal["a"]
 
 def f():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
 
@@ -96,7 +96,7 @@ class C:
     reveal_type(a.x)  # revealed: str | None
 
 def g():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: str | None
 
@@ -109,7 +109,7 @@ class D:
     reveal_type(a.x)  # revealed: Literal["a"]
 
 def h():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 # TODO: should be `str | None`
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
@@ -161,7 +161,7 @@ class _:
     a.b = B()
 
     class _:
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a.b.c1.d)  # revealed: D | None
         reveal_type(a.b.c1)  # revealed: C | None
 ```
@@ -190,7 +190,7 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
@@ -206,7 +206,7 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
@@ -238,6 +238,138 @@ def f(x: str | None):
 
         [reveal_type(x) for _ in range(1)]  # revealed: str
 
+    # When there is a reassignment, any narrowing constraints on the place are invalidated in lazy scopes.
+    x = None
+
+def f(x: str | None):
+    def _():
+        if x is not None:
+            def closure():
+                reveal_type(x)  # revealed: str | None
+    x = None
+
+def f(x: str | None):
+    def _(x: str | None):
+        if x is not None:
+            def closure():
+                reveal_type(x)  # revealed: str
+    x = None
+
+def f(x: str | None):
+    class C:
+        def _():
+            if x is not None:
+                def closure():
+                    reveal_type(x)  # revealed: str
+        x = None  # This assignment is not visible in the inner lazy scope, so narrowing is still valid.
+```
+
+If a variable defined in a private scope is never reassigned, narrowing remains in effect in the
+inner lazy scope.
+
+```py
+def f(const: str | None):
+    if const is not None:
+        def _():
+            # The `const is not None` narrowing constraint is still valid since `const` has not been reassigned
+            reveal_type(const)  # revealed: str
+
+        class C2:
+            reveal_type(const)  # revealed: str
+
+        [reveal_type(const) for _ in range(1)]  # revealed: str
+
+def f(const: str | None):
+    def _():
+        if const is not None:
+            def closure():
+                reveal_type(const)  # revealed: str
+```
+
+And even if there is an attribute or subscript assignment to the variable, narrowing of the variable
+is still valid in the inner lazy scope.
+
+```py
+def f(l: list[str | None] | None):
+    if l is not None:
+        def _():
+            reveal_type(l)  # revealed: list[str | None]
+        l[0] = None
+
+def f(a: A):
+    if a:
+        def _():
+            reveal_type(a)  # revealed: A & ~AlwaysFalsy
+    a.x = None
+```
+
+The opposite is not true, that is, if a root expression is reassigned, narrowing on the member are
+no longer valid in the inner lazy scope.
+
+```py
+def f(l: list[str | None]):
+    if l[0] is not None:
+        def _():
+            reveal_type(l[0])  # revealed: str | None | Unknown
+        l = [None]
+
+def f(l: list[str | None]):
+    l[0] = "a"
+    def _():
+        reveal_type(l[0])  # revealed: str | None | Unknown
+    l = [None]
+
+def f(l: list[str | None]):
+    l[0] = "a"
+    def _():
+        l: list[str | None] = [None]
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+
+    def _():
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+        l: list[str | None] = [None]
+
+def f(a: A):
+    if a.x is not None:
+        def _():
+            reveal_type(a.x)  # revealed: str | None
+    a = A()
+
+def f(a: A):
+    a.x = "a"
+    def _():
+        reveal_type(a.x)  # revealed: str | None
+    a = A()
+```
+
+Narrowing is also invalidated if a `nonlocal` declaration is made within a lazy scope.
+
+```py
+def f(non_local: str | None):
+    if non_local is not None:
+        def _():
+            nonlocal non_local
+            non_local = None
+
+        def _():
+            reveal_type(non_local)  # revealed: str | None
+
+def f(non_local: str | None):
+    def _():
+        nonlocal non_local
+        non_local = None
+    if non_local is not None:
+        def _():
+            reveal_type(non_local)  # revealed: str | None
+```
+
+The same goes for public variables, attributes, and subscripts, because it is difficult to track all
+of their changes.
+
+```py
+def f():
     if g is not None:
         def _():
             reveal_type(g)  # revealed: str | None
@@ -249,12 +381,13 @@ def f(x: str | None):
 
     if a.x is not None:
         def _():
-            reveal_type(a.x)  # revealed: Unknown | str | None
+            # Lazy nested scope narrowing is not performed on attributes/subscripts because it's difficult to track their changes.
+            reveal_type(a.x)  # revealed: str | None
 
         class D:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
-        [reveal_type(a.x) for _ in range(1)]  # revealed: (Unknown & ~None) | str
+        [reveal_type(a.x) for _ in range(1)]  # revealed: str
 
     if l[0] is not None:
         def _():
@@ -282,6 +415,9 @@ l: list[str | Literal[1] | None] = [None]
 
 def f(x: str | Literal[1] | None):
     class C:
+        # If we try to access a variable in a class before it has been defined,
+        # the lookup will fall back to global.
+        # error: [unresolved-reference]
         if x is not None:
             def _():
                 if x != 1:
@@ -293,6 +429,38 @@ def f(x: str | Literal[1] | None):
 
             [reveal_type(x) for _ in range(1) if x != 1]  # revealed: str
 
+        x = None
+
+    def _():
+        # No narrowing is performed on unresolved references.
+        # error: [unresolved-reference]
+        if x is not None:
+            def _():
+                if x != 1:
+                    reveal_type(x)  # revealed: None
+        x = None
+
+def f(const: str | Literal[1] | None):
+    class C:
+        if const is not None:
+            def _():
+                if const != 1:
+                    reveal_type(const)  # revealed: str
+
+            class D:
+                if const != 1:
+                    reveal_type(const)  # revealed: str
+
+            [reveal_type(const) for _ in range(1) if const != 1]  # revealed: str
+
+    def _():
+        if const is not None:
+            def _():
+                if const != 1:
+                    reveal_type(const)  # revealed: str
+
+def f():
+    class C:
         if g is not None:
             def _():
                 if g != 1:
@@ -305,11 +473,11 @@ def f(x: str | Literal[1] | None):
         if a.x is not None:
             def _():
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1]) | str | None
+                    reveal_type(a.x)  # revealed: str | None
 
             class D:
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1] & ~None) | str
+                    reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             def _():

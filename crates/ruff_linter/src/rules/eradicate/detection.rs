@@ -21,6 +21,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         (?:
             # Case-sensitive
             pyright
+        |   pyrefly
         |   mypy:
         |   type:\s*ignore
         |   SPDX-License-Identifier:

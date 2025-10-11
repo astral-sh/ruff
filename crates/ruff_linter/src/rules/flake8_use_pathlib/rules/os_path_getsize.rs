@@ -1,11 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::preview::is_fix_os_path_getsize_enabled;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprCall};
-use ruff_text_size::Ranged;
+use ruff_python_ast::ExprCall;
+
+use crate::checkers::ast::Checker;
+use crate::preview::is_fix_os_path_getsize_enabled;
+use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.path.getsize`.
@@ -44,7 +43,7 @@ use ruff_text_size::Ranged;
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
 /// - [Python documentation: `os.path.getsize`](https://docs.python.org/3/library/os.path.html#os.path.getsize)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
@@ -64,64 +63,18 @@ impl Violation for OsPathGetsize {
 }
 
 /// PTH202
-pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
-    if !matches!(
-        checker
-            .semantic()
-            .resolve_qualified_name(&call.func)
-            .as_ref()
-            .map(QualifiedName::segments),
-        Some(["os", "path", "getsize"])
-    ) {
+pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if segments != ["os", "path", "getsize"] {
         return;
     }
 
-    if call.arguments.len() != 1 {
-        return;
-    }
-
-    let Some(arg) = call.arguments.find_argument_value("filename", 0) else {
-        return;
-    };
-
-    let arg_code = checker.locator().slice(arg.range());
-    let range = call.range();
-
-    let applicability = if checker.comment_ranges().intersects(range) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
-
-    if is_fix_os_path_getsize_enabled(checker.settings()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-
-            let replacement = if is_path_call(checker, arg) {
-                format!("{arg_code}.stat().st_size")
-            } else {
-                format!("{binding}({arg_code}).stat().st_size")
-            };
-
-            Ok(
-                Fix::safe_edits(Edit::range_replacement(replacement, range), [import_edit])
-                    .with_applicability(applicability),
-            )
-        });
-    }
-}
-
-fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
-    expr.as_call_expr().is_some_and(|expr_call| {
-        checker
-            .semantic()
-            .resolve_qualified_name(&expr_call.func)
-            .is_some_and(|name| matches!(name.segments(), ["pathlib", "Path"]))
-    })
+    check_os_pathlib_single_arg_calls(
+        checker,
+        call,
+        "stat().st_size",
+        "filename",
+        is_fix_os_path_getsize_enabled(checker.settings()),
+        OsPathGetsize,
+        None,
+    );
 }

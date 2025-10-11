@@ -1,0 +1,52 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: async_for.md - Async - Error cases - No `__aiter__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing_extensions import reveal_type
+2 | 
+3 | class NotAsyncIterable: ...
+4 | 
+5 | async def foo():
+6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
+7 |     async for x in NotAsyncIterable():
+8 |         reveal_type(x)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `NotAsyncIterable` is not async-iterable
+ --> src/mdtest_snippet.py:7:20
+  |
+5 | async def foo():
+6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
+7 |     async for x in NotAsyncIterable():
+  |                    ^^^^^^^^^^^^^^^^^^
+8 |         reveal_type(x)  # revealed: Unknown
+  |
+info: It has no `__aiter__` method
+info: rule `not-iterable` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+ --> src/mdtest_snippet.py:8:21
+  |
+6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
+7 |     async for x in NotAsyncIterable():
+8 |         reveal_type(x)  # revealed: Unknown
+  |                     ^ `Unknown`
+  |
+
+```

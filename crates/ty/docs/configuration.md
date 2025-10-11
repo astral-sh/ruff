@@ -1,7 +1,7 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
-#### `rules`
+## `rules`
 
 Configures the enabled rules and their severity.
 
@@ -30,11 +30,16 @@ division-by-zero = "ignore"
 
 ## `environment`
 
-#### `extra-paths`
+### `extra-paths`
 
-List of user-provided paths that should take first priority in the module resolution.
-Examples in other type checkers are mypy's `MYPYPATH` environment variable,
-or pyright's `stubPath` configuration setting.
+User-provided paths that should take first priority in module resolution.
+
+This is an advanced option that should usually only be used for first-party or third-party
+modules that are not installed into your Python environment in a conventional way.
+Use the `python` option to specify the location of your Python environment.
+
+This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
+configuration setting.
 
 **Default value**: `[]`
 
@@ -44,19 +49,28 @@ or pyright's `stubPath` configuration setting.
 
 ```toml
 [tool.ty.environment]
-extra-paths = ["~/shared/my-search-path"]
+extra-paths = ["./shared/my-search-path"]
 ```
 
 ---
 
-#### `python`
+### `python`
 
-Path to the Python installation from which ty resolves type information and third-party dependencies.
+Path to your project's Python environment or interpreter.
 
-ty will search in the path's `site-packages` directories for type information and
-third-party imports.
+ty uses the `site-packages` directory of your project's Python environment
+to resolve third-party (and, in some cases, first-party) imports in your code.
 
-This option is commonly used to specify the path to a virtual environment.
+If you're using a project management tool such as uv, you should not generally need
+to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
+environment variable to point to your project's virtual environment. ty can also infer
+the location of your environment from an activated Conda environment, and will look for
+a `.venv` directory in the project root if none of the above apply.
+
+Passing a path to a Python executable is supported, but passing a path to a dynamic executable
+(such as a shim) is not currently supported.
+
+This option can be used to point to virtual or system Python environments.
 
 **Default value**: `null`
 
@@ -66,12 +80,12 @@ This option is commonly used to specify the path to a virtual environment.
 
 ```toml
 [tool.ty.environment]
-python = "./.venv"
+python = "./custom-venv-location/.venv"
 ```
 
 ---
 
-#### `python-platform`
+### `python-platform`
 
 Specifies the target platform that will be used to analyze the source code.
 If specified, ty will understand conditions based on comparisons with `sys.platform`, such
@@ -99,7 +113,7 @@ python-platform = "win32"
 
 ---
 
-#### `python-version`
+### `python-version`
 
 Specifies the version of Python that will be used to analyze the source code.
 The version should be specified as a string in the format `M.m` where `M` is the major version
@@ -119,9 +133,9 @@ For some language features, ty can also understand conditionals based on compari
 with `sys.version_info`. These are commonly found in typeshed, for example,
 to reflect the differing contents of the standard library across Python versions.
 
-**Default value**: `"3.13"`
+**Default value**: `"3.14"`
 
-**Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>`
+**Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>`
 
 **Example usage** (`pyproject.toml`):
 
@@ -132,7 +146,7 @@ python-version = "3.12"
 
 ---
 
-#### `root`
+### `root`
 
 The root paths of the project, used for finding first-party modules.
 
@@ -144,7 +158,7 @@ If left unspecified, ty will try to detect common project layouts and initialize
 * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
 * otherwise, default to `.` (flat layout)
 
-Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
 it will also be included in the first party search path.
 
 **Default value**: `null`
@@ -161,7 +175,7 @@ root = ["./src", "./lib", "./vendor"]
 
 ---
 
-#### `typeshed`
+### `typeshed`
 
 Optional path to a "typeshed" directory on disk for us to use for standard-library types.
 If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -213,7 +227,7 @@ possibly-unresolved-reference = "ignore"
 ```
 
 
-#### `exclude`
+### `exclude`
 
 A list of file and directory patterns to exclude from this override.
 
@@ -240,7 +254,7 @@ exclude = [
 
 ---
 
-#### `include`
+### `include`
 
 A list of file and directory patterns to include for this override.
 
@@ -266,7 +280,7 @@ include = [
 
 ---
 
-#### `rules`
+### `rules`
 
 Rule overrides for files matching the include/exclude patterns.
 
@@ -292,11 +306,12 @@ possibly-unresolved-reference = "ignore"
 
 ## `src`
 
-#### `exclude`
+### `exclude`
 
 A list of file and directory patterns to exclude from type checking.
 
 Patterns follow a syntax similar to `.gitignore`:
+
 - `./src/` matches only a directory
 - `./src` matches both files and directories
 - `src` matches files or directories named `src`
@@ -357,7 +372,7 @@ exclude = [
 
 ---
 
-#### `include`
+### `include`
 
 A list of files and directories to check. The `include` option
 follows a similar syntax to `.gitignore` but reversed:
@@ -396,7 +411,7 @@ include = [
 
 ---
 
-#### `respect-ignore-files`
+### `respect-ignore-files`
 
 Whether to automatically exclude files that are ignored by `.ignore`,
 `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
@@ -415,7 +430,7 @@ respect-ignore-files = false
 
 ---
 
-#### `root`
+### `root`
 
 > [!WARN] "Deprecated"
 > This option has been deprecated. Use `environment.root` instead.
@@ -446,7 +461,7 @@ root = "./app"
 
 ## `terminal`
 
-#### `error-on-warning`
+### `error-on-warning`
 
 Use exit code 1 if there are any warning-level diagnostics.
 
@@ -466,7 +481,7 @@ error-on-warning = true
 
 ---
 
-#### `output-format`
+### `output-format`
 
 The format to use for printing diagnostic messages.
 

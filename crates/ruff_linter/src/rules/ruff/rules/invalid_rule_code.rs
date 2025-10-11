@@ -6,6 +6,7 @@ use crate::checkers::ast::LintContext;
 use crate::noqa::{Code, Directive};
 use crate::noqa::{Codes, NoqaDirectives};
 use crate::registry::Rule;
+use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -81,7 +82,8 @@ pub(crate) fn invalid_noqa_code(
 
 fn code_is_valid(code: &Code, external: &[String]) -> bool {
     let code_str = code.as_str();
-    Rule::from_code(code_str).is_ok() || external.iter().any(|ext| code_str.starts_with(ext))
+    Rule::from_code(get_redirect_target(code_str).unwrap_or(code_str)).is_ok()
+        || external.iter().any(|ext| code_str.starts_with(ext))
 }
 
 fn all_codes_invalid_diagnostic(

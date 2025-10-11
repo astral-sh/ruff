@@ -5,7 +5,7 @@ from ctypes import _SimpleCData, c_char
 from multiprocessing.context import BaseContext
 from multiprocessing.synchronize import _LockLike
 from types import TracebackType
-from typing import Any, Generic, Literal, Protocol, TypeVar, overload
+from typing import Any, Generic, Literal, Protocol, TypeVar, overload, type_check_only
 
 __all__ = ["RawValue", "RawArray", "Value", "Array", "copy", "synchronized"]
 
@@ -13,15 +13,27 @@ _T = TypeVar("_T")
 _CT = TypeVar("_CT", bound=_CData)
 
 @overload
-def RawValue(typecode_or_type: type[_CT], *args: Any) -> _CT: ...
+def RawValue(typecode_or_type: type[_CT], *args: Any) -> _CT:
+    """
+    Returns a ctypes object allocated from shared memory
+    """
+
 @overload
 def RawValue(typecode_or_type: str, *args: Any) -> Any: ...
 @overload
-def RawArray(typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]: ...
+def RawArray(typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
+    """
+    Returns a ctypes array allocated from shared memory
+    """
+
 @overload
 def RawArray(typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any: ...
 @overload
-def Value(typecode_or_type: type[_CT], *args: Any, lock: Literal[False], ctx: BaseContext | None = None) -> _CT: ...
+def Value(typecode_or_type: type[_CT], *args: Any, lock: Literal[False], ctx: BaseContext | None = None) -> _CT:
+    """
+    Return a synchronization wrapper for a Value
+    """
+
 @overload
 def Value(
     typecode_or_type: type[_CT], *args: Any, lock: Literal[True] | _LockLike = True, ctx: BaseContext | None = None
@@ -37,7 +49,11 @@ def Value(
 @overload
 def Array(
     typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[False], ctx: BaseContext | None = None
-) -> _CT: ...
+) -> _CT:
+    """
+    Return a synchronization wrapper for a RawArray
+    """
+
 @overload
 def Array(
     typecode_or_type: type[c_char],
@@ -81,7 +97,7 @@ def synchronized(
 ) -> SynchronizedArray[_T]: ...
 @overload
 def synchronized(obj: _CT, lock: _LockLike | None = None, ctx: Any | None = None) -> SynchronizedBase[_CT]: ...
-
+@type_check_only
 class _AcquireFunc(Protocol):
     def __call__(self, block: bool = ..., timeout: float | None = ..., /) -> bool: ...
 

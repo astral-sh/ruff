@@ -108,10 +108,10 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 ///
 /// ## Example
 /// ```python
-/// import subprocess
+/// import my_custom_subprocess
 ///
 /// user_input = input("Enter a command: ")
-/// subprocess.run(user_input, shell=True)
+/// my_custom_subprocess.run(user_input, shell=True)
 /// ```
 ///
 /// ## References
@@ -265,14 +265,14 @@ impl Violation for StartProcessWithPartialPath {
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "*.py"])
+/// subprocess.Popen(["chmod", "777", "*.py"], shell=True)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "main.py"])
+/// subprocess.Popen(["chmod", "777", "main.py"], shell=True)
 /// ```
 ///
 /// ## References

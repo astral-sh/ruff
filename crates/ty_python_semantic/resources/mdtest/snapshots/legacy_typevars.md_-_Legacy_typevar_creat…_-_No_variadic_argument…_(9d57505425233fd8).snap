@@ -1,0 +1,52 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: legacy_typevars.md - Legacy typevar creation diagnostics - No variadic arguments
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typevars.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypeVar
+2 | 
+3 | types = (int, str)
+4 | 
+5 | # error: [invalid-legacy-type-variable]
+6 | T = TypeVar("T", *types)
+7 | 
+8 | # error: [invalid-legacy-type-variable]
+9 | S = TypeVar("S", **{"bound": int})
+```
+
+# Diagnostics
+
+```
+error[invalid-legacy-type-variable]: Starred arguments are not supported in `TypeVar` creation
+ --> src/mdtest_snippet.py:6:18
+  |
+5 | # error: [invalid-legacy-type-variable]
+6 | T = TypeVar("T", *types)
+  |                  ^^^^^^
+7 |
+8 | # error: [invalid-legacy-type-variable]
+  |
+info: rule `invalid-legacy-type-variable` is enabled by default
+
+```
+
+```
+error[invalid-legacy-type-variable]: Starred arguments are not supported in `TypeVar` creation
+ --> src/mdtest_snippet.py:9:18
+  |
+8 | # error: [invalid-legacy-type-variable]
+9 | S = TypeVar("S", **{"bound": int})
+  |                  ^^^^^^^^^^^^^^^^
+  |
+info: rule `invalid-legacy-type-variable` is enabled by default
+
+```

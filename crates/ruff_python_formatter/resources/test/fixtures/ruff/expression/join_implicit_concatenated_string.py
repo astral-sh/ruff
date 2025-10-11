@@ -104,16 +104,13 @@ f"{10 + len('bar')=}" f'{10 + len("bar")=}'
 # T-strings
 ##############################################################################
 
-# Escape `{` and `}` when merging a t-string with a string
-"a {not_a_variable}" t"b {10}" "c"
-
 # Join, and break expressions
 t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{
 expression
-}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" t"cccccccccccccccccccc {20999}" "more"
+}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" t"cccccccccccccccccccc {20999}" t"more"
 
 # Join, but don't break the expressions
-t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" t"cccccccccccccccccccc {20999}" "more"
+t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" t"cccccccccccccccccccc {20999}" t"more"
 
 t"test{
 expression
@@ -171,20 +168,9 @@ t"test" tR"test"
 
 "single" f""""single"""
 
-"single" t""""single"""
+t"single" t""""single"""
 
 b"single" b"""triple"""
-
-
-##############################################################################
-# Don't join t-strings and f-strings
-##############################################################################
-
-t"{interp}" f"{expr}"
-
-f"{expr}" t"{interp}"
-
-f"{expr}" "string" t"{interp}"
 
 
 ##############################################################################

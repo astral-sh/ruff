@@ -72,7 +72,14 @@ reveal_type(my_bool(0))  # revealed: bool
 
 ## Truthy values
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
+from typing import Literal
+
 reveal_type(bool(1))  # revealed: Literal[True]
 reveal_type(bool((0,)))  # revealed: Literal[True]
 reveal_type(bool("NON EMPTY"))  # revealed: Literal[True]
@@ -81,6 +88,42 @@ reveal_type(bool(True))  # revealed: Literal[True]
 def foo(): ...
 
 reveal_type(bool(foo))  # revealed: Literal[True]
+
+class SingleElementTupleSubclass(tuple[int]): ...
+
+reveal_type(bool(SingleElementTupleSubclass((0,))))  # revealed: Literal[True]
+reveal_type(SingleElementTupleSubclass.__bool__)  # revealed: (self: tuple[int], /) -> Literal[True]
+reveal_type(SingleElementTupleSubclass((1,)).__bool__)  # revealed: () -> Literal[True]
+
+# Unknown length, but we know the length is guaranteed to be >=2
+class MixedTupleSubclass(tuple[int, *tuple[str, ...], bytes]): ...
+
+reveal_type(bool(MixedTupleSubclass((1, b"foo"))))  # revealed: Literal[True]
+reveal_type(MixedTupleSubclass.__bool__)  # revealed: (self: tuple[int, *tuple[str, ...], bytes], /) -> Literal[True]
+reveal_type(MixedTupleSubclass((1, b"foo")).__bool__)  # revealed: () -> Literal[True]
+
+# Unknown length with an overridden `__bool__`:
+class VariadicTupleSubclassWithDunderBoolOverride(tuple[int, ...]):
+    def __bool__(self) -> Literal[True]:
+        return True
+
+reveal_type(bool(VariadicTupleSubclassWithDunderBoolOverride((1,))))  # revealed: Literal[True]
+reveal_type(VariadicTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def __bool__(self) -> Literal[True]
+
+# revealed: bound method VariadicTupleSubclassWithDunderBoolOverride.__bool__() -> Literal[True]
+reveal_type(VariadicTupleSubclassWithDunderBoolOverride().__bool__)
+
+# Same again but for a subclass of a fixed-length tuple:
+class EmptyTupleSubclassWithDunderBoolOverride(tuple[()]):
+    # TODO: we should reject this override as a Liskov violation:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+reveal_type(bool(EmptyTupleSubclassWithDunderBoolOverride(())))  # revealed: Literal[True]
+reveal_type(EmptyTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def __bool__(self) -> Literal[True]
+
+# revealed: bound method EmptyTupleSubclassWithDunderBoolOverride.__bool__() -> Literal[True]
+reveal_type(EmptyTupleSubclassWithDunderBoolOverride().__bool__)
 ```
 
 ## Falsy values
@@ -92,6 +135,12 @@ reveal_type(bool(None))  # revealed: Literal[False]
 reveal_type(bool(""))  # revealed: Literal[False]
 reveal_type(bool(False))  # revealed: Literal[False]
 reveal_type(bool())  # revealed: Literal[False]
+
+class EmptyTupleSubclass(tuple[()]): ...
+
+reveal_type(bool(EmptyTupleSubclass()))  # revealed: Literal[False]
+reveal_type(EmptyTupleSubclass.__bool__)  # revealed: (self: tuple[()], /) -> Literal[False]
+reveal_type(EmptyTupleSubclass().__bool__)  # revealed: () -> Literal[False]
 ```
 
 ## Ambiguous values
@@ -100,6 +149,13 @@ reveal_type(bool())  # revealed: Literal[False]
 reveal_type(bool([]))  # revealed: bool
 reveal_type(bool({}))  # revealed: bool
 reveal_type(bool(set()))  # revealed: bool
+
+class VariadicTupleSubclass(tuple[int, ...]): ...
+
+def f(x: tuple[int, ...], y: VariadicTupleSubclass):
+    reveal_type(bool(x))  # revealed: bool
+    reveal_type(x.__bool__)  # revealed: () -> bool
+    reveal_type(y.__bool__)  # revealed: () -> bool
 ```
 
 ## `__bool__` returning `NoReturn`

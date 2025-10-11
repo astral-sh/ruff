@@ -47,7 +47,12 @@ pub(crate) fn shebang_missing_python(
     shebang: &ShebangDirective,
     context: &LintContext,
 ) {
-    if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
+    if shebang.contains("python")
+        || shebang.contains("pytest")
+        || shebang.contains("uv run")
+        || shebang.contains("uvx")
+        || shebang.contains("uv tool run")
+    {
         return;
     }
 

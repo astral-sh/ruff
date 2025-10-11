@@ -41,7 +41,10 @@ serde = [
     "dep:ruff_cache",
     "compact_str/serde",
 ]
-get-size = ["dep:get-size2"]
+get-size = [
+    "dep:get-size2",
+    "ruff_text_size/get-size"
+]
 
 [lints]
 workspace = true

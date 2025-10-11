@@ -7,21 +7,37 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 > This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
 > guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
 
+## Finding ways to help
+
+We label issues that would be good for a first time contributor as
+[`good first issue`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+These usually do not require significant experience with Rust or the Ruff code base.
+
+We label issues that we think are a good opportunity for subsequent contributions as
+[`help wanted`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
+These require varying levels of experience with Rust and Ruff. Often, we want to accomplish these
+tasks but do not have the resources to do so ourselves.
+
+You don't need our permission to start on an issue we have labeled as appropriate for community
+contribution as described above. However, it's a good idea to indicate that you are going to work on
+an issue to avoid concurrent attempts to solve the same problem.
+
+Please check in with us before starting work on an issue that has not been labeled as appropriate
+for community contribution. We're happy to receive contributions for other issues, but it's
+important to make sure we have consensus on the solution to the problem first.
+
+Outside of issues with the labels above, issues labeled as
+[`bug`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22bug%22) are the
+best candidates for contribution. In contrast, issues labeled with `needs-decision` or
+`needs-design` are _not_ good candidates for contribution. Please do not open pull requests for
+issues with these labels.
+
+Please do not open pull requests for new features without prior discussion. While we appreciate
+exploration of new features, we will often close these pull requests immediately. Adding a
+new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
+team before it is appropriate to begin work on an implementation.
+
 ## The Basics
-
-Ruff welcomes contributions in the form of pull requests.
-
-For small changes (e.g., bug fixes), feel free to submit a PR.
-
-For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
-creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [Discord](https://discord.com/invite/astral-sh) to discuss your idea with the
-community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
-and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
-that are ready for contributions.
-
-If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
 ### Prerequisites
 
@@ -266,6 +282,13 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 ## MkDocs
 
+> [!NOTE]
+>
+> The documentation uses Material for MkDocs Insiders, which is closed-source software.
+> This means only members of the Astral organization can preview the documentation exactly as it
+> will appear in production.
+> Outside contributors can still preview the documentation, but there will be some differences. Consult [the Material for MkDocs documentation](https://squidfunk.github.io/mkdocs-material/insiders/benefits/#features) for which features are exclusively available in the insiders version.
+
 To preview any changes to the documentation locally:
 
 1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
@@ -298,9 +321,15 @@ them to [PyPI](https://pypi.org/project/ruff/).
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
 
-### Creating a new release
+### Installing tools
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+1. Install `npm`: `brew install npm` or similar
+
+### Creating a new release
+
+Commit each step of this process separately for easier review.
 
 1. Run `./scripts/release.sh`; this command will:
 
@@ -314,6 +343,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+    - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `pre-commit`
 
     Additionally, for minor releases:
 
@@ -353,13 +383,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 1. Verify the GitHub release:
 
-    1. The Changelog should match the content of `CHANGELOG.md`
-    1. Append the contributors from the `scripts/release.sh` script
+    1. The changelog should match the content of `CHANGELOG.md`
 
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and

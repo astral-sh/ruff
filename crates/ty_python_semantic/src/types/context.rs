@@ -1,7 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
-use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic};
+use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use super::{Type, TypeCheckDiagnostics, binding_type};
 
 use crate::lint::LintSource;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::function::FunctionDecorators;
 use crate::{
@@ -32,7 +32,7 @@ use crate::{
 /// ## Consuming
 /// It's important that the context is explicitly consumed before dropping by calling
 /// [`InferContext::finish`] and the returned diagnostics must be stored
-/// on the current [`TypeInference`](super::infer::TypeInference) result.
+/// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -40,6 +40,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     no_type_check: InNoTypeCheck,
+    multi_inference: bool,
     bomb: DebugDropBomb,
 }
 
@@ -50,6 +51,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             scope,
             module,
             file: scope.file(db),
+            multi_inference: false,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             no_type_check: InNoTypeCheck::default(),
             bomb: DebugDropBomb::new(
@@ -156,6 +158,18 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         DiagnosticGuardBuilder::new(self, id, severity)
     }
 
+    /// Returns `true` if the current expression is being inferred for a second
+    /// (or subsequent) time, with a potentially different bidirectional type
+    /// context.
+    pub(super) fn is_in_multi_inference(&self) -> bool {
+        self.multi_inference
+    }
+
+    /// Set the multi-inference state, returning the previous value.
+    pub(super) fn set_multi_inference(&mut self, multi_inference: bool) -> bool {
+        std::mem::replace(&mut self.multi_inference, multi_inference)
+    }
+
     pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {
         self.no_type_check = no_type_check;
     }
@@ -172,7 +186,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
                 // Inspect all ancestor function scopes by walking bottom up and infer the function's type.
                 let mut function_scope_tys = index
                     .ancestor_scopes(scope_id)
-                    .filter_map(|(_, scope)| scope.node().as_function(self.module()))
+                    .filter_map(|(_, scope)| scope.node().as_function())
                     .map(|node| binding_type(self.db, index.expect_single_definition(node)))
                     .filter_map(Type::into_function_literal);
 
@@ -288,7 +302,6 @@ impl LintDiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    #[expect(dead_code)]
     pub(super) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
         let ann = self.primary_annotation_mut().unwrap();
         ann.push_tag(tag);
@@ -331,7 +344,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         let mut diag = self.diag.take().unwrap();
 
         diag.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             match self.source {
                 LintSource::Default => format!("rule `{}` is enabled by default", diag.id()),
                 LintSource::Cli => format!("rule `{}` was selected on the command line", diag.id()),
@@ -399,7 +412,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        if !ctx.db.is_file_open(ctx.file) {
+        if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
         let lint_id = LintId::of(lint);
@@ -409,6 +422,11 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
+            return None;
+        }
+        // If this lint is being reported as part of multi-inference of a given expression,
+        // silence it to avoid duplicated diagnostics.
+        if ctx.is_in_multi_inference() {
             return None;
         }
         let id = DiagnosticId::Lint(lint.name());
@@ -573,7 +591,12 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
-        if !ctx.db.is_file_open(ctx.file) {
+        if !ctx.db.should_check_file(ctx.file) {
+            return None;
+        }
+        // If this lint is being reported as part of multi-inference of a given expression,
+        // silence it to avoid duplicated diagnostics.
+        if ctx.is_in_multi_inference() {
             return None;
         }
         Some(DiagnosticGuardBuilder { ctx, id, severity })

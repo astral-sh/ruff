@@ -1,44 +1,41 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
-B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handlers
+B013 [*] A length-one tuple literal is redundant in exception handlers
+ --> B013.py:5:8
   |
 3 | try:
 4 |     pass
 5 | except (ValueError,):
-  |        ^^^^^^^^^^^^^ B013
+  |        ^^^^^^^^^^^^^
 6 |     pass
 7 | except AttributeError:
   |
-  = help: Replace with `except ValueError`
+help: Replace with `except ValueError`
+2 | 
+3 | try:
+4 |     pass
+  - except (ValueError,):
+5 + except ValueError:
+6 |     pass
+7 | except AttributeError:
+8 |     pass
 
-ℹ Safe fix
-2 2 | 
-3 3 | try:
-4 4 |     pass
-5   |-except (ValueError,):
-  5 |+except ValueError:
-6 6 |     pass
-7 7 | except AttributeError:
-8 8 |     pass
-
-B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception handlers
+B013 [*] A length-one tuple literal is redundant in exception handlers
+  --> B013.py:13:7
    |
 11 | except (*retriable_exceptions,):
 12 |     pass
 13 | except(ValueError,):
-   |       ^^^^^^^^^^^^^ B013
+   |       ^^^^^^^^^^^^^
 14 |     pass
    |
-   = help: Replace with `except ValueError`
-
-ℹ Safe fix
-10 10 |     pass
-11 11 | except (*retriable_exceptions,):
-12 12 |     pass
-13    |-except(ValueError,):
-   13 |+except ValueError:
-14 14 |     pass
-15 15 | 
-16 16 | list_exceptions = [FileExistsError, FileNotFoundError]
+help: Replace with `except ValueError`
+10 |     pass
+11 | except (*retriable_exceptions,):
+12 |     pass
+   - except(ValueError,):
+13 + except ValueError:
+14 |     pass
+15 | 
+16 | list_exceptions = [FileExistsError, FileNotFoundError]

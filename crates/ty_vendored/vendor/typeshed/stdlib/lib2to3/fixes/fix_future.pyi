@@ -1,3 +1,8 @@
+"""Remove __future__ imports
+
+from __future__ import foo is replaced with an empty line.
+"""
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

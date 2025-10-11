@@ -6,18 +6,19 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
-use log::{debug, error, warn};
+use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_linter::message::create_panic_diagnostic;
 use rustc_hash::FxHashMap;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
-use ruff_linter::OldDiagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
-use ruff_linter::{IOError, fs, warn_user_once};
+use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
@@ -129,11 +130,7 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![OldDiagnostic::new(
-                            IOError { message },
-                            TextRange::default(),
-                            &dummy,
-                        )],
+                        vec![IOError { message }.into_diagnostic(TextRange::default(), &dummy)],
                         FxHashMap::default(),
                     )
                 } else {
@@ -166,7 +163,9 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics.inner.sort();
+    all_diagnostics
+        .inner
+        .sort_by(Diagnostic::ruff_start_ordering);
 
     // Store the caches.
     caches.persist()?;
@@ -195,21 +194,8 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = r"This indicates a bug in Ruff. If you could open an issue at:
-
-    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
-
-...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-";
-
-            error!(
-                "{}{}{} {message}\n{error}",
-                "Panicked while linting ".bold(),
-                fs::relativize_path(path).bold(),
-                ":".bold()
-            );
-
-            Ok(Diagnostics::default())
+            let diagnostic = create_panic_diagnostic(&error, Some(path));
+            Ok(Diagnostics::new(vec![diagnostic], FxHashMap::default()))
         }
     }
 }
@@ -224,7 +210,8 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
+    use ruff_linter::message::EmitterContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
@@ -277,18 +264,16 @@ mod test {
             UnsafeFixes::Enabled,
         )
         .unwrap();
-        let mut output = Vec::new();
 
-        TextEmitter::default()
-            .with_show_fix_status(true)
-            .emit(
-                &mut output,
-                &diagnostics.inner,
-                &EmitterContext::new(&FxHashMap::default()),
-            )
-            .unwrap();
-
-        let messages = String::from_utf8(output).unwrap();
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .hide_severity(true);
+        let messages = DisplayDiagnostics::new(
+            &EmitterContext::new(&FxHashMap::default()),
+            &config,
+            &diagnostics.inner,
+        )
+        .to_string();
 
         insta::with_settings!({
             omit_expression => true,

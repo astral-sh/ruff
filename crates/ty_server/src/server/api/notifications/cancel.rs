@@ -20,7 +20,7 @@ impl SyncNotificationHandler for CancelNotificationHandler {
             lsp_types::NumberOrString::String(id) => id.into(),
         };
 
-        let _ = client.cancel(session, id);
+        client.cancel(session, id);
 
         Ok(())
     }

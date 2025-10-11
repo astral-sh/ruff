@@ -16,14 +16,14 @@ use crate::system::{SystemPath, SystemPathBuf};
 /// The main usage of file roots is to determine a file's durability. But it can also be used
 /// to make a salsa query dependent on whether a file in a root has changed without writing any
 /// manual invalidation logic.
-#[salsa::input(debug)]
+#[salsa::input(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileRoot {
     /// The path of a root is guaranteed to never change.
     #[returns(deref)]
     pub path: SystemPathBuf,
 
     /// The kind of the root at the time of its creation.
-    kind_at_time_of_creation: FileRootKind,
+    pub kind_at_time_of_creation: FileRootKind,
 
     /// A revision that changes when the contents of the source root change.
     ///
@@ -37,7 +37,7 @@ impl FileRoot {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum FileRootKind {
     /// The root of a project.
     Project,
@@ -95,7 +95,10 @@ impl FileRoots {
         self.by_path.insert(route.clone(), root).unwrap();
 
         // Insert a path that matches all subdirectories and files
-        route.push_str("/{*filepath}");
+        if !route.ends_with("/") {
+            route.push('/');
+        }
+        route.push_str("{*filepath}");
 
         self.by_path.insert(route, root).unwrap();
         self.roots.push(root);

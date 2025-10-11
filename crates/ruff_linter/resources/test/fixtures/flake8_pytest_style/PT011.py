@@ -47,3 +47,7 @@ def test_error_match_is_empty():
 
     with pytest.raises(ValueError, match=f""):
         raise ValueError("Can't divide 1 by 0")
+
+def test_ok_t_string_match():
+    with pytest.raises(ValueError, match=t""):
+        raise ValueError("Can't divide 1 by 0")

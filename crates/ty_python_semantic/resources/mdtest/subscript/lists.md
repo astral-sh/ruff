@@ -9,15 +9,13 @@ A list can be indexed into with:
 
 ```py
 x = [1, 2, 3]
-reveal_type(x)  # revealed: list[Unknown]
+reveal_type(x)  # revealed: list[Unknown | int]
 
-# TODO reveal int
-reveal_type(x[0])  # revealed: Unknown
+reveal_type(x[0])  # revealed: Unknown | int
 
-# TODO reveal list[int]
-reveal_type(x[0:1])  # revealed: list[Unknown]
+reveal_type(x[0:1])  # revealed: list[Unknown | int]
 
-# error: [call-non-callable]
+# error: [invalid-argument-type]
 reveal_type(x["a"])  # revealed: Unknown
 ```
 
@@ -29,11 +27,9 @@ In assignment, we might also have a named assignment. This should also get type 
 x = [1, 2, 3]
 x[0 if (y := 2) else 1] = 5
 
-# TODO: better error than "method `__getitem__` not callable on type `list`"
-# error: [call-non-callable]
+# error: [invalid-assignment]
 x["a" if (y := 2) else 1] = 6
 
-# TODO: better error than "method `__getitem__` not callable on type `list`"
-# error: [call-non-callable]
+# error: [invalid-assignment]
 x["a" if (y := 2) else "b"] = 6
 ```

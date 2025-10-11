@@ -22,6 +22,8 @@ pub struct Message<'a> {
     pub(crate) title: &'a str,
     pub(crate) snippets: Vec<Snippet<'a>>,
     pub(crate) footer: Vec<Message<'a>>,
+    pub(crate) is_fixable: bool,
+    pub(crate) lineno_offset: usize,
 }
 
 impl<'a> Message<'a> {
@@ -49,6 +51,25 @@ impl<'a> Message<'a> {
         self.footer.extend(footer);
         self
     }
+
+    /// Whether or not the diagnostic for this message is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the `id` in an annotation header, if the
+    /// annotation also has `Level::None`.
+    pub fn is_fixable(mut self, yes: bool) -> Self {
+        self.is_fixable = yes;
+        self
+    }
+
+    /// Add an offset used for aligning the header sigil (`-->`) with the line number separators.
+    ///
+    /// For normal diagnostics this is computed automatically based on the lines to be rendered.
+    /// This is intended only for use in the formatter, where we don't render a snippet directly but
+    /// still want the header to align with the diff.
+    pub fn lineno_offset(mut self, offset: usize) -> Self {
+        self.lineno_offset = offset;
+        self
+    }
 }
 
 /// Structure containing the slice of text to be annotated and
@@ -65,6 +86,10 @@ pub struct Snippet<'a> {
     pub(crate) annotations: Vec<Annotation<'a>>,
 
     pub(crate) fold: bool,
+
+    /// The optional cell index in a Jupyter notebook, used for reporting source locations along
+    /// with the ranges on `annotations`.
+    pub(crate) cell_index: Option<usize>,
 }
 
 impl<'a> Snippet<'a> {
@@ -75,6 +100,7 @@ impl<'a> Snippet<'a> {
             source,
             annotations: vec![],
             fold: false,
+            cell_index: None,
         }
     }
 
@@ -103,6 +129,12 @@ impl<'a> Snippet<'a> {
         self.fold = fold;
         self
     }
+
+    /// Attach a Jupyter notebook cell index.
+    pub fn cell_index(mut self, index: Option<usize>) -> Self {
+        self.cell_index = index;
+        self
+    }
 }
 
 /// An annotation for a [`Snippet`].
@@ -114,11 +146,17 @@ pub struct Annotation<'a> {
     pub(crate) range: Range<usize>,
     pub(crate) label: Option<&'a str>,
     pub(crate) level: Level,
+    pub(crate) is_file_level: bool,
 }
 
 impl<'a> Annotation<'a> {
     pub fn label(mut self, label: &'a str) -> Self {
         self.label = Some(label);
+        self
+    }
+
+    pub fn hide_snippet(mut self, yes: bool) -> Self {
+        self.is_file_level = yes;
         self
     }
 }
@@ -145,6 +183,8 @@ impl Level {
             title,
             snippets: vec![],
             footer: vec![],
+            is_fixable: false,
+            lineno_offset: 0,
         }
     }
 
@@ -154,6 +194,7 @@ impl Level {
             range: span,
             label: None,
             level: self,
+            is_file_level: false,
         }
     }
 }

@@ -1,33 +1,32 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D209_D400.py:2:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+D209 [*] Multi-line docstring closing quotes should be on a separate line
+ --> D209_D400.py:2:5
   |
 1 |   def lorem():
 2 | /     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  | |________________________________________________________________________^ D209
+  | |________________________________________________________________________^
   |
-  = help: Move closing quotes to new line
+help: Move closing quotes to new line
+1 | def lorem():
+2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
+  -     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+3 +     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+4 +     """
 
-ℹ Safe fix
-1 1 | def lorem():
-2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
-3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
-  4 |+    """
-
-D209_D400.py:2:5: D400 [*] First line should end with a period
+D400 [*] First line should end with a period
+ --> D209_D400.py:2:5
   |
 1 |   def lorem():
 2 | /     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  | |________________________________________________________________________^ D400
+  | |________________________________________________________________________^
   |
-  = help: Add period
-
-ℹ Unsafe fix
-1 1 | def lorem():
-2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
-3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+help: Add period
+1 | def lorem():
+2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
+  -     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+3 +     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+note: This is an unsafe fix and may change runtime behavior

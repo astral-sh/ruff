@@ -154,6 +154,7 @@ shouldn't panic.
 ```py
 a: "1 or 2"
 b: "(x := 1)"
+# error: [invalid-type-form]
 c: "1 + 2"
 d: "lambda x: x"
 e: "x if True else y"

@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, parenthesize::parenthesized_range};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{self as ast, Expr, name::Name, parenthesize::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix};
-use ruff_python_ast::PythonVersion;
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
@@ -17,7 +16,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `name.method`.
     let attr = ast::ExprAttribute {
@@ -25,7 +24,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         attr: ast::Identifier::new(method.to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
@@ -34,16 +33,16 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
             args: Box::from([]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }
@@ -69,7 +68,7 @@ pub(super) fn replace_with_identity_check(
         ops: [op].into(),
         comparators: [ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
 
     let new_content = generator.expr(&new_expr);
@@ -345,12 +344,8 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
     let iter_in_source = locator.slice(iter);
 
     match iter {
-        ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
-            Cow::Owned(format!("({iter_in_source})"))
-        }
-        ast::Expr::Lambda(_) | ast::Expr::If(_)
-            if matches!(location, IterLocation::Comprehension) =>
-        {
+        Expr::Tuple(tuple) if !tuple.parenthesized => Cow::Owned(format!("({iter_in_source})")),
+        Expr::Lambda(_) | Expr::If(_) if matches!(location, IterLocation::Comprehension) => {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),

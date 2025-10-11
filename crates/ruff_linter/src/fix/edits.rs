@@ -370,8 +370,8 @@ pub(crate) fn adjust_indentation(
 
     // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
     // whitespace _within_ the string.
-    let contains_multiline_string =
-        indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range);
+    let contains_multiline_string = indexer.multiline_ranges().intersects(range)
+        || indexer.interpolated_string_ranges().intersects(range);
 
     // If the range has mixed indentation, we will use LibCST as well.
     let mixed_indentation = contents.universal_newlines().any(|line| {
@@ -618,7 +618,7 @@ mod tests {
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
-    use crate::{Edit, Fix, Locator, OldDiagnostic};
+    use crate::{Edit, Fix, Locator, Violation};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {
@@ -749,12 +749,12 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            let mut diagnostic = OldDiagnostic::new(
-                MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
+            // The choice of rule here is arbitrary.
+            let mut diagnostic = MissingNewlineAtEndOfFile.into_diagnostic(
                 TextRange::default(),
                 &SourceFileBuilder::new("<filename>", "<code>").finish(),
             );
-            diagnostic.fix = Some(Fix::safe_edits(
+            diagnostic.set_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));

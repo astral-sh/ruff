@@ -273,7 +273,14 @@ impl ModuleName {
         std::iter::successors(Some(self.clone()), Self::parent)
     }
 
-    pub(crate) fn from_import_statement<'db>(
+    /// Extracts a module name from the AST of a `from <module> import ...`
+    /// statement.
+    ///
+    /// `importing_file` must be the [`File`] that contains the import
+    /// statement.
+    ///
+    /// This handles relative import statements.
+    pub fn from_import_statement<'db>(
         db: &'db dyn Db,
         importing_file: File,
         node: &'db ast::StmtImportFrom,
@@ -285,10 +292,16 @@ impl ModuleName {
             range: _,
             node_index: _,
         } = node;
+        Self::from_identifier_parts(db, importing_file, module.as_deref(), *level)
+    }
 
-        let module = module.as_deref();
-
-        if let Some(level) = NonZeroU32::new(*level) {
+    pub(crate) fn from_identifier_parts(
+        db: &dyn Db,
+        importing_file: File,
+        module: Option<&str>,
+        level: u32,
+    ) -> Result<Self, ModuleNameResolutionError> {
+        if let Some(level) = NonZeroU32::new(level) {
             relative_module_name(db, importing_file, module, level)
         } else {
             module
@@ -345,12 +358,12 @@ fn relative_module_name(
         .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
     let mut level = level.get();
 
-    if module.kind().is_package() {
+    if module.kind(db).is_package() {
         level = level.saturating_sub(1);
     }
 
     let mut module_name = module
-        .name()
+        .name(db)
         .ancestors()
         .nth(level as usize)
         .ok_or(ModuleNameResolutionError::TooManyDots)?;
@@ -366,7 +379,7 @@ fn relative_module_name(
 /// Various ways in which resolving a [`ModuleName`]
 /// from an [`ast::StmtImport`] or [`ast::StmtImportFrom`] node might fail
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum ModuleNameResolutionError {
+pub enum ModuleNameResolutionError {
     /// The import statement has invalid syntax
     InvalidSyntax,
 

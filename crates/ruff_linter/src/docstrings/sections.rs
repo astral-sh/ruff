@@ -208,7 +208,7 @@ impl<'a> SectionContexts<'a> {
         self.contexts.len()
     }
 
-    pub(crate) fn iter(&self) -> SectionContextsIter {
+    pub(crate) fn iter(&self) -> SectionContextsIter<'_> {
         SectionContextsIter {
             docstring_body: self.docstring.body(),
             inner: self.contexts.iter(),

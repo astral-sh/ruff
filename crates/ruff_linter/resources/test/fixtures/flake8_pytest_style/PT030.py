@@ -32,3 +32,7 @@ def test_error_match_is_empty():
 
     with pytest.warns(UserWarning, match=f""):
         pass
+
+def test_ok_match_t_string():
+    with pytest.warns(UserWarning, match=t""):
+        pass

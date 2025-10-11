@@ -13,6 +13,8 @@ STDOUT: int
 DEVNULL: int
 
 class SubprocessStreamProtocol(streams.FlowControlMixin, protocols.SubprocessProtocol):
+    """Like StreamReaderProtocol, but for a subprocess."""
+
     stdin: streams.StreamWriter | None
     stdout: streams.StreamReader | None
     stderr: streams.StreamReader | None
@@ -29,7 +31,9 @@ class Process:
     ) -> None: ...
     @property
     def returncode(self) -> int | None: ...
-    async def wait(self) -> int: ...
+    async def wait(self) -> int:
+        """Wait until the process exit and return the process return code."""
+
     def send_signal(self, signal: int) -> None: ...
     def terminate(self) -> None: ...
     def kill(self) -> None: ...
@@ -60,7 +64,7 @@ if sys.version_info >= (3, 11):
         creationflags: int = 0,
         restore_signals: bool = True,
         start_new_session: bool = False,
-        pass_fds: Collection[int] = ...,
+        pass_fds: Collection[int] = (),
         group: None | str | int = None,
         extra_groups: None | Collection[str | int] = None,
         user: None | str | int = None,
@@ -92,7 +96,7 @@ if sys.version_info >= (3, 11):
         creationflags: int = 0,
         restore_signals: bool = True,
         start_new_session: bool = False,
-        pass_fds: Collection[int] = ...,
+        pass_fds: Collection[int] = (),
         group: None | str | int = None,
         extra_groups: None | Collection[str | int] = None,
         user: None | str | int = None,
@@ -126,7 +130,7 @@ elif sys.version_info >= (3, 10):
         creationflags: int = 0,
         restore_signals: bool = True,
         start_new_session: bool = False,
-        pass_fds: Collection[int] = ...,
+        pass_fds: Collection[int] = (),
         group: None | str | int = None,
         extra_groups: None | Collection[str | int] = None,
         user: None | str | int = None,
@@ -157,7 +161,7 @@ elif sys.version_info >= (3, 10):
         creationflags: int = 0,
         restore_signals: bool = True,
         start_new_session: bool = False,
-        pass_fds: Collection[int] = ...,
+        pass_fds: Collection[int] = (),
         group: None | str | int = None,
         extra_groups: None | Collection[str | int] = None,
         user: None | str | int = None,
@@ -191,7 +195,7 @@ else:  # >= 3.9
         creationflags: int = 0,
         restore_signals: bool = True,
         start_new_session: bool = False,
-        pass_fds: Collection[int] = ...,
+        pass_fds: Collection[int] = (),
         group: None | str | int = None,
         extra_groups: None | Collection[str | int] = None,
         user: None | str | int = None,
@@ -222,7 +226,7 @@ else:  # >= 3.9
         creationflags: int = 0,
         restore_signals: bool = True,
         start_new_session: bool = False,
-        pass_fds: Collection[int] = ...,
+        pass_fds: Collection[int] = (),
         group: None | str | int = None,
         extra_groups: None | Collection[str | int] = None,
         user: None | str | int = None,

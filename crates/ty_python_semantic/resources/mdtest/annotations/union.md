@@ -72,7 +72,7 @@ def f(x: Union) -> None:
 
 ## Implicit type aliases using new-style unions
 
-We don't recognise these as type aliases yet, but we also don't emit false-positive diagnostics if
+We don't recognize these as type aliases yet, but we also don't emit false-positive diagnostics if
 you use them in type expressions:
 
 ```toml

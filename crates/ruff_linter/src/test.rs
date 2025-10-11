@@ -2,14 +2,17 @@
 //! Helper functions for the tests of rule implementations.
 
 use std::borrow::Cow;
+use std::fmt;
 use std::path::Path;
 
 #[cfg(not(fuzzing))]
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
+};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -23,7 +26,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic, TextEmitter};
+use crate::message::{EmitterContext, create_syntax_error_diagnostic};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -31,6 +34,85 @@ use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
 use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
+
+/// Represents the difference between two diagnostic runs.
+#[derive(Debug)]
+pub(crate) struct DiagnosticsDiff {
+    /// Diagnostics that were removed (present in 'before' but not in 'after')
+    removed: Vec<Diagnostic>,
+    /// Diagnostics that were added (present in 'after' but not in 'before')
+    added: Vec<Diagnostic>,
+    /// Settings used before the change
+    settings_before: LinterSettings,
+    /// Settings used after the change
+    settings_after: LinterSettings,
+}
+
+impl fmt::Display for DiagnosticsDiff {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "--- Linter settings ---")?;
+        let settings_before_str = format!("{}", self.settings_before);
+        let settings_after_str = format!("{}", self.settings_after);
+        let diff = similar::TextDiff::from_lines(&settings_before_str, &settings_after_str);
+        for change in diff.iter_all_changes() {
+            match change.tag() {
+                similar::ChangeTag::Delete => write!(f, "-{change}")?,
+                similar::ChangeTag::Insert => write!(f, "+{change}")?,
+                similar::ChangeTag::Equal => (),
+            }
+        }
+        writeln!(f)?;
+
+        writeln!(f, "--- Summary ---")?;
+        writeln!(f, "Removed: {}", self.removed.len())?;
+        writeln!(f, "Added: {}", self.added.len())?;
+        writeln!(f)?;
+
+        if !self.removed.is_empty() {
+            writeln!(f, "--- Removed ---")?;
+            for diagnostic in &self.removed {
+                writeln!(f, "{}", print_messages(std::slice::from_ref(diagnostic)))?;
+            }
+            writeln!(f)?;
+        }
+
+        if !self.added.is_empty() {
+            writeln!(f, "--- Added ---")?;
+            for diagnostic in &self.added {
+                writeln!(f, "{}", print_messages(std::slice::from_ref(diagnostic)))?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Compare two sets of diagnostics and return the differences
+fn diff_diagnostics(
+    before: Vec<Diagnostic>,
+    after: Vec<Diagnostic>,
+    settings_before: &LinterSettings,
+    settings_after: &LinterSettings,
+) -> DiagnosticsDiff {
+    let mut removed = Vec::new();
+    let mut added = after;
+
+    for old_diag in before {
+        let Some(pos) = added.iter().position(|diag| diag == &old_diag) else {
+            removed.push(old_diag);
+            continue;
+        };
+        added.remove(pos);
+    }
+
+    DiagnosticsDiff {
+        removed,
+        added,
+        settings_before: settings_before.clone(),
+        settings_after: settings_after.clone(),
+    }
+}
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -42,16 +124,40 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 pub(crate) fn test_path(
     path: impl AsRef<Path>,
     settings: &LinterSettings,
-) -> Result<Vec<OldDiagnostic>> {
+) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
     let source_type = PySourceType::from(&path);
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
 }
 
+/// Test a file with two different settings and return the differences
+#[cfg(not(fuzzing))]
+pub(crate) fn test_path_with_settings_diff(
+    path: impl AsRef<Path>,
+    settings_before: &LinterSettings,
+    settings_after: &LinterSettings,
+) -> Result<DiagnosticsDiff> {
+    assert!(
+        format!("{settings_before}") != format!("{settings_after}"),
+        "Settings must be different for differential testing"
+    );
+
+    let diagnostics_before = test_path(&path, settings_before)?;
+    let diagnostic_after = test_path(&path, settings_after)?;
+
+    let diff = diff_diagnostics(
+        diagnostics_before,
+        diagnostic_after,
+        settings_before,
+        settings_after,
+    );
+    Ok(diff)
+}
+
 #[cfg(not(fuzzing))]
 pub(crate) struct TestedNotebook {
-    pub(crate) diagnostics: Vec<OldDiagnostic>,
+    pub(crate) diagnostics: Vec<Diagnostic>,
     pub(crate) source_notebook: Notebook,
     pub(crate) linted_notebook: Notebook,
 }
@@ -87,7 +193,7 @@ pub(crate) fn assert_notebook_path(
 }
 
 /// Run [`check_path`] on a snippet of Python code.
-pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<OldDiagnostic> {
+pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
     test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
@@ -111,7 +217,7 @@ pub(crate) fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &LinterSettings,
-) -> (Vec<OldDiagnostic>, Cow<'a, SourceKind>) {
+) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
     let options =
@@ -211,8 +317,7 @@ pub(crate) fn test_contents<'a>(
             if parsed.has_invalid_syntax() && !source_has_errors {
                 // Previous fix introduced a syntax error, abort
                 let fixes = print_diagnostics(messages, path, source_kind);
-                let syntax_errors =
-                    print_syntax_errors(parsed.errors(), path, &locator, &transformed);
+                let syntax_errors = print_syntax_errors(parsed.errors(), path, &transformed);
 
                 panic!(
                     "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
@@ -273,44 +378,48 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             }
 
             assert!(
-                !(fixable && diagnostic.suggestion().is_none()),
+                !(fixable && diagnostic.first_help_text().is_none()),
                 "Diagnostic emitted by {rule:?} is fixable but \
                 `Violation::fix_title` returns `None`"
             );
 
             // Not strictly necessary but adds some coverage for this code path by overriding the
             // noqa offset and the source file
-            let range = diagnostic.range();
-            diagnostic.noqa_offset = Some(directives.noqa_line_for.resolve(range.start()));
-            if let Some(annotation) = diagnostic.diagnostic.primary_annotation_mut() {
-                annotation.set_span(
-                    ruff_db::diagnostic::Span::from(source_code.clone()).with_range(range),
-                );
+            if let Some(range) = diagnostic.range() {
+                diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
+            }
+            // This part actually is necessary to avoid long relative paths in snapshots.
+            for annotation in diagnostic.annotations_mut() {
+                if let Some(range) = annotation.get_span().range() {
+                    annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                }
+            }
+            for sub in diagnostic.sub_diagnostics_mut() {
+                for annotation in sub.annotations_mut() {
+                    if let Some(range) = annotation.get_span().range() {
+                        annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                    }
+                }
             }
 
             diagnostic
         })
         .chain(parsed.errors().iter().map(|parse_error| {
-            OldDiagnostic::from_parse_error(parse_error, &locator, source_code.clone())
+            create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
         }))
-        .sorted()
+        .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
     (messages, transformed)
 }
 
-fn print_syntax_errors(
-    errors: &[ParseError],
-    path: &Path,
-    locator: &Locator,
-    source: &SourceKind,
-) -> String {
+fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) -> String {
     let filename = path.file_name().unwrap().to_string_lossy();
     let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
 
     let messages: Vec<_> = errors
         .iter()
         .map(|parse_error| {
-            OldDiagnostic::from_parse_error(parse_error, locator, source_file.clone())
+            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
         })
         .collect();
 
@@ -321,13 +430,9 @@ fn print_syntax_errors(
     }
 }
 
-/// Print the [`Message::Diagnostic`]s in `messages`.
-fn print_diagnostics(
-    mut diagnostics: Vec<OldDiagnostic>,
-    path: &Path,
-    source: &SourceKind,
-) -> String {
-    diagnostics.retain(|msg| !msg.is_syntax_error());
+/// Print the lint diagnostics in `diagnostics`.
+fn print_diagnostics(mut diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {
+    diagnostics.retain(|msg| !msg.is_invalid_syntax());
 
     if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&diagnostics, path, notebook)
@@ -337,46 +442,42 @@ fn print_diagnostics(
 }
 
 pub(crate) fn print_jupyter_messages(
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let mut output = Vec::new();
-
-    TextEmitter::default()
+    let config = DisplayDiagnosticConfig::default()
+        .format(DiagnosticFormat::Full)
+        .hide_severity(true)
         .with_show_fix_status(true)
-        .with_show_fix_diff(true)
-        .with_show_source(true)
-        .with_unsafe_fixes(UnsafeFixes::Enabled)
-        .emit(
-            &mut output,
-            diagnostics,
-            &EmitterContext::new(&FxHashMap::from_iter([(
-                path.file_name().unwrap().to_string_lossy().to_string(),
-                notebook.index().clone(),
-            )])),
-        )
-        .unwrap();
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
-    String::from_utf8(output).unwrap()
+    DisplayDiagnostics::new(
+        &EmitterContext::new(&FxHashMap::from_iter([(
+            path.file_name().unwrap().to_string_lossy().to_string(),
+            notebook.index().clone(),
+        )])),
+        &config,
+        diagnostics,
+    )
+    .to_string()
 }
 
-pub(crate) fn print_messages(diagnostics: &[OldDiagnostic]) -> String {
-    let mut output = Vec::new();
-
-    TextEmitter::default()
+pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
+    let config = DisplayDiagnosticConfig::default()
+        .format(DiagnosticFormat::Full)
+        .hide_severity(true)
         .with_show_fix_status(true)
-        .with_show_fix_diff(true)
-        .with_show_source(true)
-        .with_unsafe_fixes(UnsafeFixes::Enabled)
-        .emit(
-            &mut output,
-            diagnostics,
-            &EmitterContext::new(&FxHashMap::default()),
-        )
-        .unwrap();
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
-    String::from_utf8(output).unwrap()
+    DisplayDiagnostics::new(
+        &EmitterContext::new(&FxHashMap::default()),
+        &config,
+        diagnostics,
+    )
+    .to_string()
 }
 
 #[macro_export]
@@ -390,7 +491,7 @@ macro_rules! assert_diagnostics {
     }};
     ($value:expr, @$snapshot:literal) => {{
         insta::with_settings!({ omit_expression => true }, {
-            insta::assert_snapshot!($crate::test::print_messages(&$value), $snapshot);
+            insta::assert_snapshot!($crate::test::print_messages(&$value), @$snapshot);
         });
     }};
     ($name:expr, $value:expr) => {{
@@ -403,4 +504,66 @@ macro_rules! assert_diagnostics {
             insta::assert_snapshot!($crate::test::print_messages(&$value));
         });
     }};
+}
+
+#[macro_export]
+macro_rules! assert_diagnostics_diff {
+    ($snapshot:expr, $path:expr, $settings_before:expr, $settings_after:expr $(,)?) => {{
+        let diff = $crate::test::test_path_with_settings_diff($path, $settings_before, $settings_after)?;
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!($snapshot, format!("{}", diff));
+        });
+    }};
+    ($path:expr, $settings_before:expr, $settings_after:expr $(,)?) => {{
+        let diff = $crate::test::test_path_with_settings_diff($path, $settings_before, $settings_after)?;
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!(format!("{}", diff));
+        });
+    }};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_diff_diagnostics() -> Result<()> {
+        use crate::codes::Rule;
+        use ruff_db::diagnostic::{DiagnosticId, LintName};
+
+        let settings_before = LinterSettings::for_rule(Rule::Print);
+        let settings_after = LinterSettings::for_rule(Rule::UnusedImport);
+
+        let test_code = r#"
+import sys
+import unused_module
+
+def main():
+    print(sys.version)
+"#;
+
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_diff.py");
+        std::fs::write(&test_file, test_code)?;
+
+        let diff =
+            super::test_path_with_settings_diff(&test_file, &settings_before, &settings_after)?;
+
+        assert_eq!(diff.removed.len(), 1, "Should remove 1 print diagnostic");
+        assert_eq!(
+            diff.removed[0].id(),
+            DiagnosticId::Lint(LintName::of("print")),
+            "Should remove the print diagnostic"
+        );
+        assert_eq!(diff.added.len(), 1, "Should add 1 unused import diagnostic");
+        assert_eq!(
+            diff.added[0].id(),
+            DiagnosticId::Lint(LintName::of("unused-import")),
+            "Should add the unused import diagnostic"
+        );
+
+        std::fs::remove_file(test_file)?;
+
+        Ok(())
+    }
 }

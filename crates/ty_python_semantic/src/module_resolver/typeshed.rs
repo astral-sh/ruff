@@ -74,7 +74,7 @@ pub(crate) enum TypeshedVersionsParseErrorKind {
     VersionParseError(#[from] PythonVersionDeserializationError),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
@@ -230,7 +230,7 @@ impl fmt::Display for TypeshedVersions {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) enum PyVersionRange {
     AvailableFrom(RangeFrom<PythonVersion>),
     AvailableWithin(RangeInclusive<PythonVersion>),
@@ -304,6 +304,11 @@ impl fmt::Display for PyVersionRange {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::disallowed_methods,
+        reason = "These are tests, so it's fine to do I/O by-passing System."
+    )]
+
     use std::fmt::Write as _;
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
