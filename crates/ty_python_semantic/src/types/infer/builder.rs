@@ -2972,7 +2972,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bound_or_constraint,
             None, // explicit_variance
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
-            None, // original
         )));
         self.add_declaration_with_binding(
             node.into(),
@@ -4315,7 +4314,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bound_or_constraints,
             Some(variance),
             default,
-            None, // original
         )))
     }
 

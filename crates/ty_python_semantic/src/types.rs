@@ -7828,12 +7828,6 @@ pub struct TypeVarInstance<'db> {
     /// The default type for this TypeVar, if any. Don't use this field directly, use the
     /// `default_type` method instead (to evaluate any lazy default).
     _default: Option<TypeVarDefaultEvaluation<'db>>,
-
-    /// If this typevar was transformed from another typevar via `mark_typevars_inferable`, this
-    /// records the identity of the "original" typevar, so we can recognize them as the same
-    /// typevar in `bind_typevar`. TODO: this (and the `is_identical_to` methods) should be
-    /// removable once we remove `mark_typevars_inferable`.
-    pub(crate) original: Option<TypeVarInstance<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -7954,7 +7948,6 @@ impl<'db> TypeVarInstance<'db> {
                     .lazy_default(db)
                     .map(|ty| ty.normalized_impl(db, visitor).into()),
             }),
-            self.original(db),
         )
     }
 
@@ -7998,7 +7991,6 @@ impl<'db> TypeVarInstance<'db> {
                     .lazy_default(db)
                     .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
             }),
-            self.original(db),
         )
     }
 
@@ -8035,25 +8027,20 @@ impl<'db> TypeVarInstance<'db> {
             }),
         });
 
-        // Ensure that we only modify the `original` field if we are going to modify one or both of
-        // `_bound_or_constraints` and `_default`; don't trigger creation of a new
-        // `TypeVarInstance` unnecessarily.
-        let new_original = if new_bound_or_constraints == self._bound_or_constraints(db)
+        // Don't trigger creation of a new `TypeVarInstance` unnecessarily.
+        if new_bound_or_constraints == self._bound_or_constraints(db)
             && new_default == self._default(db)
         {
-            self.original(db)
+            self
         } else {
-            Some(self)
-        };
-
-        Self::new(
-            db,
-            self.identity(db),
-            new_bound_or_constraints,
-            self.explicit_variance(db),
-            new_default,
-            new_original,
-        )
+            Self::new(
+                db,
+                self.identity(db),
+                new_bound_or_constraints,
+                self.explicit_variance(db),
+                new_default,
+            )
+        }
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
@@ -8077,7 +8064,6 @@ impl<'db> TypeVarInstance<'db> {
             Some(bound_or_constraints.into()),
             self.explicit_variance(db),
             None, // _default
-            self.original(db),
         ))
     }
 
@@ -8259,7 +8245,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // _bound_or_constraints
             Some(variance),
             None, // _default
-            None, // original
         );
         Self::new(db, typevar, BindingContext::Synthetic)
     }
@@ -8282,7 +8267,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
             Some(TypeVarVariance::Invariant),
             None, // _default
-            None, // original
         );
         Self::new(db, typevar, binding_context)
     }

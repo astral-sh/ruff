@@ -128,7 +128,6 @@ pub(crate) fn typing_self<'db>(
         // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
         Some(TypeVarVariance::Invariant),
         None,
-        None,
     );
 
     bind_typevar(
