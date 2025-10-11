@@ -571,9 +571,7 @@ impl Display for DisplayRepresentation<'_> {
                     "<super: {pivot}, {owner}>",
                     pivot = Type::from(bound_super.pivot_class(self.db))
                         .display_with(self.db, self.settings.singleline()),
-                    owner = bound_super
-                        .owner(self.db)
-                        .into_type()
+                    owner = Type::from(bound_super.owner(self.db))
                         .display_with(self.db, self.settings.singleline())
                 )
             }
