@@ -19,5 +19,4 @@ def f():
 class Foo:
     break
 
-
 break

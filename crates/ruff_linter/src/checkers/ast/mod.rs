@@ -704,6 +704,11 @@ impl SemanticSyntaxContext for Checker<'_> {
                     );
                 }
             }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => {
+                if self.is_rule_enabled(Rule::BreakOutsideLoop) {
+                    self.report_diagnostic(pyflakes::rules::BreakOutsideLoop, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -811,18 +816,40 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
         )
     }
+
+    fn in_loop_context(&self) -> bool {
+        let mut cur_stmt = self.semantic.current_statement();
+
+        for parent in self.semantic.current_statements().skip(1) {
+            match parent {
+                Stmt::For(ast::StmtFor { orelse, .. })
+                | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+                    if !orelse.contains(cur_stmt) {
+                        return true;
+                    }
+                }
+                Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+                    break;
+                }
+                _ => {}
+            }
+            cur_stmt = parent;
+        }
+        false
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
-        if !stmt.is_function_def_stmt() {
-            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
-        }
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
+
+        if !stmt.is_function_def_stmt() {
+            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        }
 
         // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
         // we encounter a cell boundary.
