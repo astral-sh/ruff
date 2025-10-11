@@ -28,10 +28,9 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, TypeContext, TypeMapping, TypeRelation,
-    VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
+    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -443,19 +442,6 @@ impl<'db> Signature<'db> {
             definition: Some(definition),
             parameters,
             return_ty,
-        }
-    }
-
-    pub(super) fn mark_typevars_inferable(self, db: &'db dyn Db) -> Self {
-        if let Some(definition) = self.definition {
-            self.apply_type_mapping_impl(
-                db,
-                &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(definition))),
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
-            )
-        } else {
-            self
         }
     }
 

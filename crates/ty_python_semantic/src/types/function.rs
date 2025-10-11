@@ -353,28 +353,12 @@ impl<'db> OverloadLiteral<'db> {
         if function_node.is_async && !is_generator {
             signature = signature.wrap_coroutine_return_type(db);
         }
-        signature = signature.mark_typevars_inferable(db);
-
-        let pep695_ctx = function_node.type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(db, index, self.definition(db), type_params)
-        });
-        let legacy_ctx = GenericContext::from_function_params(
-            db,
-            self.definition(db),
-            signature.parameters(),
-            signature.return_ty,
-        );
-        // We need to update `signature.generic_context` here,
-        // because type variables in `GenericContext::variables` are still non-inferable.
-        signature.generic_context =
-            GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
 
         signature
     }
 
     /// Typed internally-visible "raw" signature for this function.
-    /// That is, type variables in parameter types and the return type remain non-inferable,
-    /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
+    /// That is, the return types of async functions are not wrapped in `CoroutineType[...]`.
     ///
     /// ## Warning
     ///
