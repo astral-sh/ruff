@@ -95,8 +95,9 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -2959,15 +2960,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
+        let identity =
+            TypeVarIdentity::new(self.db(), &name.id, Some(definition), TypeVarKind::Pep695);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
-            &name.id,
-            Some(definition),
+            identity,
             bound_or_constraint,
-            None,
+            None, // explicit_variance
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
-            TypeVarKind::Pep695,
-            None,
         )));
         self.add_declaration_with_binding(
             node.into(),
@@ -4297,15 +4297,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.insert(definition);
         }
 
+        let identity = TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::Legacy);
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
-            target_name,
-            Some(definition),
+            identity,
             bound_or_constraints,
             Some(variance),
             default,
-            TypeVarKind::Legacy,
-            None,
         )))
     }
 

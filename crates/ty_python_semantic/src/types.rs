@@ -1625,18 +1625,18 @@ impl<'db> Type<'db> {
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
             (Type::TypeVar(bound_typevar), Type::Union(union))
-                if !inferable.is_inferable(bound_typevar) && union.elements(db).contains(&self) =>
+                if !inferable.is_inferable(db, bound_typevar) && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(bound_typevar)
+                if !inferable.is_inferable(db, bound_typevar)
                     && intersection.positive(db).contains(&target) =>
             {
                 ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(bound_typevar)
+                if !inferable.is_inferable(db, bound_typevar)
                     && intersection.negative(db).contains(&target) =>
             {
                 ConstraintSet::from(false)
@@ -1648,8 +1648,8 @@ impl<'db> Type<'db> {
             // Note that this is not handled by the early return at the beginning of this method,
             // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
-                if !inferable.is_inferable(lhs_bound_typevar)
-                    && lhs_bound_typevar.is_identical_to(db, rhs_bound_typevar) =>
+                if !inferable.is_inferable(db, lhs_bound_typevar)
+                    && lhs_bound_typevar.identity(db) == rhs_bound_typevar.identity(db) =>
             {
                 ConstraintSet::from(true)
             }
@@ -1658,7 +1658,7 @@ impl<'db> Type<'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !inferable.is_inferable(bound_typevar)
+                if !inferable.is_inferable(db, bound_typevar)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -1691,7 +1691,7 @@ impl<'db> Type<'db> {
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(bound_typevar)
+                if !inferable.is_inferable(db, bound_typevar)
                     && !bound_typevar
                         .typevar(db)
                         .constraints(db)
@@ -1731,7 +1731,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeVar(bound_typevar), _)
-                if inferable.is_inferable(bound_typevar) && relation.is_assignability() =>
+                if inferable.is_inferable(db, bound_typevar) && relation.is_assignability() =>
             {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
@@ -1833,12 +1833,12 @@ impl<'db> Type<'db> {
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(bound_typevar) => {
+            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(db, bound_typevar) => {
                 ConstraintSet::from(false)
             }
 
             (_, Type::TypeVar(typevar))
-                if inferable.is_inferable(typevar)
+                if inferable.is_inferable(db, typevar)
                     && relation.is_assignability()
                     && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
                         !self
@@ -1869,7 +1869,7 @@ impl<'db> Type<'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(bound_typevar), _) | (_, Type::TypeVar(bound_typevar))
-                if inferable.is_inferable(bound_typevar) =>
+                if inferable.is_inferable(db, bound_typevar) =>
             {
                 ConstraintSet::from(false)
             }
@@ -2309,7 +2309,7 @@ impl<'db> Type<'db> {
             // never subtypes of any other variants
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
-                debug_assert!(!inferable.is_inferable(bound_typevar));
+                debug_assert!(!inferable.is_inferable(db, bound_typevar));
                 ConstraintSet::from(false)
             }
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
@@ -2552,7 +2552,7 @@ impl<'db> Type<'db> {
 
             (tvar @ Type::TypeVar(bound_typevar), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(bound_typevar)
+                if !inferable.is_inferable(db, bound_typevar)
                     && intersection.negative(db).contains(&tvar) =>
             {
                 ConstraintSet::from(true)
@@ -2563,7 +2563,7 @@ impl<'db> Type<'db> {
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
             (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(bound_typevar) =>
+                if !inferable.is_inferable(db, bound_typevar) =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => ConstraintSet::from(false),
@@ -7877,7 +7877,32 @@ pub enum TypeVarKind {
     TypingSelf,
 }
 
-/// A type variable that has not been bound to a generic context yet.
+/// The identity of a type variable.
+///
+/// This represents the core identity of a typevar, independent of its bounds or constraints. Two
+/// typevars have the same identity if they represent the same logical typevar, even if their
+/// bounds have been materialized differently.
+///
+/// # Ordering
+/// Ordering is based on the identity's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the identity was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypeVarIdentity<'db> {
+    /// The name of this TypeVar (e.g. `T`)
+    #[returns(ref)]
+    pub(crate) name: ast::name::Name,
+
+    /// The type var's definition (None if synthesized)
+    pub(crate) definition: Option<Definition<'db>>,
+
+    /// The kind of typevar (PEP 695, Legacy, or TypingSelf)
+    pub(crate) kind: TypeVarKind,
+}
+
+impl get_size2::GetSize for TypeVarIdentity<'_> {}
+
+/// A specific instance of a type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
 /// context, which might be specialized to a concrete type, you want [`BoundTypeVarInstance`]. This
@@ -7916,12 +7941,8 @@ pub enum TypeVarKind {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TypeVarInstance<'db> {
-    /// The name of this TypeVar (e.g. `T`)
-    #[returns(ref)]
-    name: ast::name::Name,
-
-    /// The type var's definition (None if synthesized)
-    pub definition: Option<Definition<'db>>,
+    /// The identity of this typevar
+    pub(crate) identity: TypeVarIdentity<'db>,
 
     /// The upper bound or constraint on the type of this TypeVar, if any. Don't use this field
     /// directly; use the `bound_or_constraints` (or `upper_bound` and `constraints`) methods
@@ -7934,14 +7955,6 @@ pub struct TypeVarInstance<'db> {
     /// The default type for this TypeVar, if any. Don't use this field directly, use the
     /// `default_type` method instead (to evaluate any lazy default).
     _default: Option<TypeVarDefaultEvaluation<'db>>,
-
-    pub kind: TypeVarKind,
-
-    /// If this typevar was transformed from another typevar via `mark_typevars_inferable`, this
-    /// records the identity of the "original" typevar, so we can recognize them as the same
-    /// typevar in `bind_typevar`. TODO: this (and the `is_identical_to` methods) should be
-    /// removable once we remove `mark_typevars_inferable`.
-    pub(crate) original: Option<TypeVarInstance<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -7987,6 +8000,18 @@ impl<'db> TypeVarInstance<'db> {
         BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context))
     }
 
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
+        self.identity(db).name(db)
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        self.identity(db).definition(db)
+    }
+
+    pub(crate) fn kind(self, db: &'db dyn Db) -> TypeVarKind {
+        self.identity(db).kind(db)
+    }
+
     pub(crate) fn is_self(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::TypingSelf)
     }
@@ -8030,8 +8055,7 @@ impl<'db> TypeVarInstance<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
-            self.name(db),
-            self.definition(db),
+            self.identity(db),
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
@@ -8051,8 +8075,6 @@ impl<'db> TypeVarInstance<'db> {
                     .lazy_default(db)
                     .map(|ty| ty.normalized_impl(db, visitor).into()),
             }),
-            self.kind(db),
-            self.original(db),
         )
     }
 
@@ -8064,8 +8086,7 @@ impl<'db> TypeVarInstance<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db),
-            self.definition(db),
+            self.identity(db),
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
@@ -8097,14 +8118,9 @@ impl<'db> TypeVarInstance<'db> {
                     .lazy_default(db)
                     .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
             }),
-            self.kind(db),
-            self.original(db),
         )
     }
 
-    fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self == other || (self.original(db) == Some(other) || other.original(db) == Some(self))
-    }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
         let bound_or_constraints = match self.bound_or_constraints(db)? {
@@ -8115,15 +8131,18 @@ impl<'db> TypeVarInstance<'db> {
                 TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?.into_union()?)
             }
         };
-        Some(Self::new(
+        let identity = TypeVarIdentity::new(
             db,
             Name::new(format!("{}'instance", self.name(db))),
-            None,
+            None, // definition
+            self.kind(db),
+        );
+        Some(Self::new(
+            db,
+            identity,
             Some(bound_or_constraints.into()),
             self.explicit_variance(db),
-            None,
-            self.kind(db),
-            self.original(db),
+            None, // _default
         ))
     }
 
@@ -8250,6 +8269,18 @@ impl<'db> BindingContext<'db> {
     }
 }
 
+/// The identity of a bound type variable.
+///
+/// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
+/// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
+/// if they represent the same logical typevar bound in the same context, even if their bounds
+/// have been materialized differently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub struct BoundTypeVarIdentity<'db> {
+    pub(crate) identity: TypeVarIdentity<'db>,
+    pub(crate) binding_context: BindingContext<'db>,
+}
+
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -8263,6 +8294,17 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Get the identity of this bound typevar.
+    ///
+    /// This is used for comparing whether two bound typevars represent the same logical typevar,
+    /// regardless of e.g. differences in their bounds or constraints due to materialization.
+    pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
+        BoundTypeVarIdentity {
+            identity: self.typevar(db).identity(db),
+            binding_context: self.binding_context(db),
+        }
+    }
+
     /// Create a new PEP 695 type variable that can be used in signatures
     /// of synthetic generic functions.
     pub(crate) fn synthetic(
@@ -8270,20 +8312,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         name: &'static str,
         variance: TypeVarVariance,
     ) -> Self {
-        Self::new(
+        let identity = TypeVarIdentity::new(
             db,
-            TypeVarInstance::new(
-                db,
-                Name::new_static(name),
-                None, // definition
-                None, // _bound_or_constraints
-                Some(variance),
-                None, // _default
-                TypeVarKind::Pep695,
-                None,
-            ),
-            BindingContext::Synthetic,
-        )
+            Name::new_static(name),
+            None, // definition
+            TypeVarKind::Pep695,
+        );
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            None, // _bound_or_constraints
+            Some(variance),
+            None, // _default
+        );
+        Self::new(db, typevar, BindingContext::Synthetic)
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -8292,32 +8334,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         upper_bound: Type<'db>,
         binding_context: BindingContext<'db>,
     ) -> Self {
-        Self::new(
+        let identity = TypeVarIdentity::new(
             db,
-            TypeVarInstance::new(
-                db,
-                Name::new_static("Self"),
-                None,
-                Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
-                Some(TypeVarVariance::Invariant),
-                None,
-                TypeVarKind::TypingSelf,
-                None,
-            ),
-            binding_context,
-        )
-    }
-
-    pub(crate) fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if self == other {
-            return true;
-        }
-
-        if self.binding_context(db) != other.binding_context(db) {
-            return false;
-        }
-
-        self.typevar(db).is_identical_to(db, other.typevar(db))
+            Name::new_static("Self"),
+            None, // definition
+            TypeVarKind::TypingSelf,
+        );
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
+            Some(TypeVarVariance::Invariant),
+            None, // _default
+        );
+        Self::new(db, typevar, binding_context)
     }
 
     pub(crate) fn variance_with_polarity(
