@@ -24,9 +24,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, IntersectionType,
-    KnownBoundMethodType, KnownClass, MaterializationKind, Protocol, ProtocolInstanceType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
+    UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
