@@ -134,3 +134,14 @@ FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(fo
 75 |     f.write(foobar)
    |
 help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
+
+FURB103 `open` and `write` should be replaced by `Path("test.json")....`
+   --> FURB103.py:154:6
+    |
+152 | data = {"price": 100}
+153 |
+154 | with open("test.json", "wb") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+155 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
+    |
+help: Replace with `Path("test.json")....`
