@@ -7750,7 +7750,32 @@ pub enum TypeVarKind {
     TypingSelf,
 }
 
-/// A type variable that has not been bound to a generic context yet.
+/// The identity of a type variable.
+///
+/// This represents the core identity of a typevar, independent of its bounds or constraints. Two
+/// typevars have the same identity if they represent the same logical typevar, even if their
+/// bounds have been materialized differently.
+///
+/// # Ordering
+/// Ordering is based on the identity's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the identity was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypeVarIdentity<'db> {
+    /// The name of this TypeVar (e.g. `T`)
+    #[returns(ref)]
+    pub(crate) name: ast::name::Name,
+
+    /// The type var's definition (None if synthesized)
+    pub(crate) definition: Option<Definition<'db>>,
+
+    /// The kind of typevar (PEP 695, Legacy, or TypingSelf)
+    pub(crate) kind: TypeVarKind,
+}
+
+impl get_size2::GetSize for TypeVarIdentity<'_> {}
+
+/// A specific instance of a type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
 /// context, which might be specialized to a concrete type, you want [`BoundTypeVarInstance`]. This
@@ -7782,33 +7807,6 @@ pub enum TypeVarKind {
 /// the typevar is defined and immediately bound to a single generic context. Just like in the
 /// legacy case, we will create a `TypeVarInstance` and [`BoundTypeVarInstance`], and the type of
 /// `T` at `[1]` and `[2]` will be that `TypeVarInstance` and `BoundTypeVarInstance`, respectively.
-
-/// The identity of a type variable.
-///
-/// This represents the core identity of a typevar, independent of its bounds or constraints.
-/// Two typevars have the same identity if they represent the same logical typevar, even if
-/// their bounds have been materialized differently.
-///
-/// # Ordering
-/// Ordering is based on the identity's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the identity was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct TypeVarIdentity<'db> {
-    /// The name of this TypeVar (e.g. `T`)
-    #[returns(ref)]
-    pub(crate) name: ast::name::Name,
-
-    /// The type var's definition (None if synthesized)
-    pub(crate) definition: Option<Definition<'db>>,
-
-    /// The kind of typevar (PEP 695, Legacy, or TypingSelf)
-    pub(crate) kind: TypeVarKind,
-}
-
-impl get_size2::GetSize for TypeVarIdentity<'_> {}
-
-/// A specific instance of a type variable with its bounds and constraints.
 ///
 /// # Ordering
 /// Ordering is based on the type var instance's salsa-assigned id and not on its values.
@@ -7881,17 +7879,14 @@ impl<'db> TypeVarInstance<'db> {
         BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context))
     }
 
-    /// Get the name of this typevar (forwarded from identity)
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         self.identity(db).name(db)
     }
 
-    /// Get the definition of this typevar (forwarded from identity)
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         self.identity(db).definition(db)
     }
 
-    /// Get the kind of this typevar (forwarded from identity)
     pub(crate) fn kind(self, db: &'db dyn Db) -> TypeVarKind {
         self.identity(db).kind(db)
     }
@@ -8215,17 +8210,10 @@ impl<'db> BindingContext<'db> {
 /// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
 /// if they represent the same logical typevar bound in the same context, even if their bounds
 /// have been materialized differently.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
-}
-
-// The Salsa heap is tracked separately for the inner types.
-impl get_size2::GetSize for BoundTypeVarIdentity<'_> {
-    fn get_heap_size(&self) -> usize {
-        0
-    }
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
@@ -8243,8 +8231,8 @@ impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 impl<'db> BoundTypeVarInstance<'db> {
     /// Get the identity of this bound typevar.
     ///
-    /// This is used for comparing whether two bound typevars represent the same logical
-    /// typevar, regardless of differences in their bounds due to materialization.
+    /// This is used for comparing whether two bound typevars represent the same logical typevar,
+    /// regardless of e.g. differences in their bounds or constraints due to materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
@@ -8265,19 +8253,15 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // definition
             TypeVarKind::Pep695,
         );
-
-        Self::new(
+        let typevar = TypeVarInstance::new(
             db,
-            TypeVarInstance::new(
-                db,
-                identity,
-                None, // _bound_or_constraints
-                Some(variance),
-                None, // _default
-                None, // original
-            ),
-            BindingContext::Synthetic,
-        )
+            identity,
+            None, // _bound_or_constraints
+            Some(variance),
+            None, // _default
+            None, // original
+        );
+        Self::new(db, typevar, BindingContext::Synthetic)
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -8292,19 +8276,15 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // definition
             TypeVarKind::TypingSelf,
         );
-
-        Self::new(
+        let typevar = TypeVarInstance::new(
             db,
-            TypeVarInstance::new(
-                db,
-                identity,
-                Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
-                Some(TypeVarVariance::Invariant),
-                None, // _default
-                None, // original
-            ),
-            binding_context,
-        )
+            identity,
+            Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
+            Some(TypeVarVariance::Invariant),
+            None, // _default
+            None, // original
+        );
+        Self::new(db, typevar, binding_context)
     }
 
     pub(crate) fn variance_with_polarity(

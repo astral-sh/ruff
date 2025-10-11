@@ -115,17 +115,14 @@ pub(crate) fn typing_self<'db>(
         Some(class.definition(db)),
         TypeVarKind::TypingSelf,
     );
-
+    let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(
+        db,
+        class.identity_specialization(db, typevar_to_type),
+    ));
     let typevar = TypeVarInstance::new(
         db,
         identity,
-        Some(
-            TypeVarBoundOrConstraints::UpperBound(Type::instance(
-                db,
-                class.identity_specialization(db, typevar_to_type),
-            ))
-            .into(),
-        ),
+        Some(bounds.into()),
         // According to the [spec], we can consider `Self`
         // equivalent to an invariant type variable
         // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
@@ -165,7 +162,10 @@ impl GenericContextTypeVarOptions {
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
-    variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions)>,
+    variables_inner: FxOrderMap<
+        BoundTypeVarIdentity<'db>,
+        (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions),
+    >,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -493,10 +493,12 @@ impl<'db> GenericContext<'db> {
     }
 
     fn heap_size(
-        (variables,): &(FxOrderMap<
-            BoundTypeVarIdentity<'db>,
-            (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions),
-        >,),
+        (variables,): &(
+            FxOrderMap<
+                BoundTypeVarIdentity<'db>,
+                (BoundTypeVarInstance<'db>, GenericContextTypeVarOptions),
+            >,
+        ),
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
