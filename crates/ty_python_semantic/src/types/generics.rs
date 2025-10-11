@@ -195,7 +195,7 @@ impl<'db> GenericContext<'db> {
             db,
             variables
                 .into_iter()
-                .map(|var| (var.bound_typevar.identity(db), var))
+                .map(|variable| (variable.bound_typevar.identity(db), variable))
                 .collect::<FxOrderMap<_, _>>(),
         )
     }
@@ -219,12 +219,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        Self::from_variables(
-            db,
-            type_params
-                .into_iter()
-                .map(GenericContextTypeVar::new),
-        )
+        Self::from_variables(db, type_params.into_iter().map(GenericContextTypeVar::new))
     }
 
     /// Returns a copy of this generic context where we will promote literal types in any inferred
@@ -234,7 +229,7 @@ impl<'db> GenericContext<'db> {
             db,
             self.variables_inner(db)
                 .values()
-                .map(|var| var.promote_literals()),
+                .map(|variable| variable.promote_literals()),
         )
     }
 
@@ -254,7 +249,9 @@ impl<'db> GenericContext<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
-        self.variables_inner(db).values().map(|var| var.bound_typevar)
+        self.variables_inner(db)
+            .values()
+            .map(|variable| variable.bound_typevar)
     }
 
     fn variable_from_type_param(
@@ -1160,22 +1157,21 @@ impl<'db> SpecializationBuilder<'db> {
             .annotation
             .and_then(|annotation| annotation.specialization_of(self.db, None));
 
-        let types = (generic_context.variables_inner(self.db).iter()).map(
-            |(identity, var)| {
+        let types =
+            (generic_context.variables_inner(self.db).iter()).map(|(identity, variable)| {
                 let mut ty = self.types.get(identity).copied();
 
                 // When inferring a specialization for a generic class typevar from a constructor call,
                 // promote any typevars that are inferred as a literal to the corresponding instance type.
-                if var.should_promote_literals {
-                    let tcx = tcx_specialization
-                        .and_then(|specialization| specialization.get(self.db, var.bound_typevar));
-
+                if variable.should_promote_literals {
+                    let tcx = tcx_specialization.and_then(|specialization| {
+                        specialization.get(self.db, variable.bound_typevar)
+                    });
                     ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
                 }
 
                 ty
-            },
-        );
+            });
 
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)
