@@ -2568,7 +2568,8 @@ impl<'db> Type<'db> {
             // and `Any`!) Different typevars might be disjoint, depending on their bounds and
             // constraints, which are handled below.
             (Type::TypeVar(self_bound_typevar), Type::TypeVar(other_bound_typevar))
-                if self_bound_typevar == other_bound_typevar =>
+                if !inferable.is_inferable(db, self_bound_typevar)
+                    && self_bound_typevar.identity(db) == other_bound_typevar.identity(db) =>
             {
                 ConstraintSet::from(false)
             }
