@@ -110,3 +110,28 @@ class Issue18298:
 
     def f3(self, arg: "None | float | None | int | None" = None) -> "None":  # PYI041 - with fix
         pass
+
+
+class FooStringConcat:
+    def good(self, arg: "i" "nt") -> "None":
+        ...
+
+    def bad(self, arg: "int " "| float | com" "plex") -> "None":
+        ...
+
+    def bad2(self, arg: "int | Union[flo" "at, complex]") -> "None":
+        ...
+
+    def bad3(self, arg: "Union[Union[float, com" "plex], int]") -> "None":
+        ...
+
+    def bad4(self, arg: "Union[float | complex, in" "t ]") -> "None":
+        ...
+
+    def bad5(self, arg: "int | "
+                        "(float | complex)") -> "None":
+        ...
+
+    def bad6(self, arg: "in\
+t | (float | compl" "ex)") -> "None":
+        ...

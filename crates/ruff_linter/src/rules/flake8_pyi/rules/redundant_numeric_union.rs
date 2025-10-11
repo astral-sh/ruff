@@ -143,18 +143,20 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_anno
         return;
     }
 
-    let string_annotation = unresolved_annotation
-        .as_string_literal_expr()
-        .map(|str| str.value.to_str());
+    let string_annotation = unresolved_annotation.as_string_literal_expr();
+    if string_annotation.is_some_and(|s| s.value.is_implicit_concatenated()) {
+        // No fix for concatenated string literals. They're rare and too complex to handle.
+        // https://github.com/astral-sh/ruff/issues/19184#issuecomment-3047695205
+        return;
+    }
 
     // Mark [`Fix`] as unsafe when comments are in range.
-    let applicability = if string_annotation.is_some_and(|s| s.contains('#'))
-        || checker.comment_ranges().intersects(annotation.range())
-    {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if string_annotation.is_some() || checker.comment_ranges().intersects(annotation.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     // Generate the flattened fix once.
     let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
