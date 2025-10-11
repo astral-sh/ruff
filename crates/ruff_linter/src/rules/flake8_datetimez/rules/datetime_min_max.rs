@@ -38,6 +38,9 @@ use crate::checkers::ast::Checker;
 ///
 /// datetime.datetime.max.replace(tzinfo=datetime.UTC)
 /// ```
+///
+/// ## References
+/// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
 pub(crate) struct DatetimeMinMax {
     min_max: MinMax,

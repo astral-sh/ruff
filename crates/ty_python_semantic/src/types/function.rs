@@ -72,7 +72,9 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
+use crate::types::display::DisplaySettings;
 use crate::types::generics::GenericContext;
+use crate::types::ide_support::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -80,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, all_members, binding_type, todo_type, walk_signature,
+    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
+    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -339,6 +341,48 @@ impl<'db> OverloadLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
+        let mut signature = self.raw_signature(db);
+
+        let scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let function_node = scope.node(db).expect_function().node(&module);
+        let index = semantic_index(db, scope.file(db));
+        let file_scope_id = scope.file_scope_id(db);
+        let is_generator = file_scope_id.is_generator_function(index);
+
+        if function_node.is_async && !is_generator {
+            signature = signature.wrap_coroutine_return_type(db);
+        }
+        signature = signature.mark_typevars_inferable(db);
+
+        let pep695_ctx = function_node.type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(db, index, self.definition(db), type_params)
+        });
+        let legacy_ctx = GenericContext::from_function_params(
+            db,
+            self.definition(db),
+            signature.parameters(),
+            signature.return_ty,
+        );
+        // We need to update `signature.generic_context` here,
+        // because type variables in `GenericContext::variables` are still non-inferable.
+        signature.generic_context =
+            GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
+
+        signature
+    }
+
+    /// Typed internally-visible "raw" signature for this function.
+    /// That is, type variables in parameter types and the return type remain non-inferable,
+    /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -400,11 +444,11 @@ impl<'db> OverloadLiteral<'db> {
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
-        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+        let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
         let file_scope_id = scope.file_scope_id(db);
-        let is_generator = file_scope_id.is_generator_function(index);
+
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
             db,
             self,
@@ -415,10 +459,9 @@ impl<'db> OverloadLiteral<'db> {
 
         Signature::from_function(
             db,
-            generic_context,
+            pep695_ctx,
             definition,
             function_stmt_node,
-            is_generator,
             has_implicitly_positional_first_parameter,
         )
     }
@@ -597,6 +640,18 @@ impl<'db> FunctionLiteral<'db> {
     fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition(db).signature(db)
     }
+
+    /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.last_definition(db).raw_signature(db)
+    }
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
@@ -665,14 +720,15 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let updated_signature =
             self.signature(db)
-                .apply_type_mapping_impl(db, type_mapping, visitor);
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         let updated_last_definition_signature = self
             .last_definition_signature(db)
-            .apply_type_mapping_impl(db, type_mapping, visitor);
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         Self::new(
             db,
             self.literal(db),
@@ -872,6 +928,17 @@ impl<'db> FunctionType<'db> {
         self.updated_last_definition_signature(db)
             .cloned()
             .unwrap_or_else(|| self.literal(db).last_definition_signature(db))
+    }
+
+    /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_fn=last_definition_signature_cycle_recover,
+        cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.literal(db).last_definition_raw_signature(db)
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
@@ -1386,10 +1453,11 @@ impl KnownFunction {
                 {
                     let mut diag = builder.into_diagnostic("Revealed type");
                     let span = context.span(&call_expression.arguments.args[0]);
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("`{}`", revealed_type.display(db))),
-                    );
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        revealed_type
+                            .display_with(db, DisplaySettings::default().preserve_long_unions())
+                    )));
                 }
             }
 

@@ -214,7 +214,7 @@ export default function Playground() {
 export const DEFAULT_SETTINGS = JSON.stringify(
   {
     environment: {
-      "python-version": "3.13",
+      "python-version": "3.14",
     },
     rules: {
       "undefined-reveal": "ignore",

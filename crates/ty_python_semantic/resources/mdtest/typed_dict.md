@@ -5,6 +5,11 @@ specific value types for each valid key. Each string key can be either required 
 
 ## Basic
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Here, we define a `TypedDict` using the class-based syntax:
 
 ```py
@@ -46,6 +51,46 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
+`TypedDict` keys do not have to be string literals, as long as they can be statically determined
+(inferred to be of type string `Literal`).
+
+```py
+from typing import Literal, Final
+
+NAME = "name"
+AGE = "age"
+
+def non_literal() -> str:
+    return "name"
+
+def name_or_age() -> Literal["name", "age"]:
+    return "name"
+
+carol: Person = {NAME: "Carol", AGE: 20}
+
+reveal_type(carol[NAME])  # revealed: str
+# error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
+reveal_type(carol[non_literal()])  # revealed: Unknown
+reveal_type(carol[name_or_age()])  # revealed: str | int | None
+
+FINAL_NAME: Final = "name"
+FINAL_AGE: Final = "age"
+
+def _():
+    carol: Person = {FINAL_NAME: "Carol", FINAL_AGE: 20}
+
+CAPITALIZED_NAME = "Name"
+
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "Name" - did you mean "name"?"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
+
+def age() -> Literal["age"] | None:
+    return "age"
+
+eve: Person = {"na" + "me": "Eve", age() or "age": 20}
+```
+
 The construction of a `TypedDict` is checked for type correctness:
 
 ```py
@@ -63,6 +108,40 @@ eve2b = Person(age=22)
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
+```
+
+Also, the value types ​​declared in a `TypedDict` affect generic call inference:
+
+```py
+class Plot(TypedDict):
+    y: list[int]
+    x: list[int] | None
+
+plot1: Plot = {"y": [1, 2, 3], "x": None}
+
+def homogeneous_list[T](*args: T) -> list[T]:
+    return list(args)
+
+reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[Literal[1, 2, 3]]
+plot2: Plot = {"y": homogeneous_list(1, 2, 3), "x": None}
+reveal_type(plot2["y"])  # revealed: list[int]
+
+plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
+reveal_type(plot3["y"])  # revealed: list[int]
+reveal_type(plot3["x"])  # revealed: list[int] | None
+
+Y = "y"
+X = "x"
+
+plot4: Plot = {Y: [1, 2, 3], X: None}
+plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
+
+class Items(TypedDict):
+    items: list[int | str]
+
+items1: Items = {"items": homogeneous_list(1, 2, 3)}
+ITEMS = "items"
+items2: Items = {ITEMS: homogeneous_list(1, 2, 3)}
 ```
 
 Assignments to keys are also validated:
@@ -284,7 +363,7 @@ qualifiers override the class-level `total` setting, which sets the default (`to
 all keys are required by default, `total=False` means that all keys are non-required by default):
 
 ```py
-from typing_extensions import TypedDict, Required, NotRequired
+from typing_extensions import TypedDict, Required, NotRequired, Final
 
 # total=False by default, but id is explicitly Required
 class Message(TypedDict, total=False):
@@ -298,10 +377,17 @@ class User(TypedDict):
     email: Required[str]  # Explicitly required (redundant here)
     bio: NotRequired[str]  # Optional despite total=True
 
+ID: Final = "id"
+
 # Valid Message constructions
 msg1 = Message(id=1)  # id required, content optional
 msg2 = Message(id=2, content="Hello")  # both provided
 msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
+msg4: Message = {"id": 4}  # id required, content optional
+msg5: Message = {ID: 5}  # id required, content optional
+
+def msg() -> Message:
+    return {ID: 1}
 
 # Valid User constructions
 user1 = User(name="Alice", email="alice@example.com")  # required fields
@@ -756,6 +842,18 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+
+class Items(TypedDict, Generic[T]):
+    items: list[T]
+
+def homogeneous_list(*args: T) -> list[T]:
+    return list(args)
+
+items1: Items[int] = {"items": [1, 2, 3]}
+items2: Items[str] = {"items": ["a", "b", "c"]}
+items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
+items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
+items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
 ```
 
 ### PEP-695 generics
@@ -777,6 +875,18 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+
+class Items[T](TypedDict):
+    items: list[T]
+
+def homogeneous_list[T](*args: T) -> list[T]:
+    return list(args)
+
+items1: Items[int] = {"items": [1, 2, 3]}
+items2: Items[str] = {"items": ["a", "b", "c"]}
+items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
+items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
+items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
 ```
 
 ## Recursive `TypedDict`

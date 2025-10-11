@@ -7,9 +7,9 @@ pub enum PythonVersion {
     Py37,
     #[value(name = "3.8")]
     Py38,
-    #[default]
     #[value(name = "3.9")]
     Py39,
+    #[default]
     #[value(name = "3.10")]
     Py310,
     #[value(name = "3.11")]
@@ -18,6 +18,8 @@ pub enum PythonVersion {
     Py312,
     #[value(name = "3.13")]
     Py313,
+    #[value(name = "3.14")]
+    Py314,
 }
 
 impl PythonVersion {
@@ -30,6 +32,7 @@ impl PythonVersion {
             Self::Py311 => "3.11",
             Self::Py312 => "3.12",
             Self::Py313 => "3.13",
+            Self::Py314 => "3.14",
         }
     }
 }
@@ -50,6 +53,7 @@ impl From<PythonVersion> for ruff_python_ast::PythonVersion {
             PythonVersion::Py311 => Self::PY311,
             PythonVersion::Py312 => Self::PY312,
             PythonVersion::Py313 => Self::PY313,
+            PythonVersion::Py314 => Self::PY314,
         }
     }
 }

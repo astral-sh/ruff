@@ -721,6 +721,75 @@ static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], No
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 ```
 
+## Intersections with non-fully-static negated elements
+
+A type can be _assignable_ to an intersection containing negated elements only if the _bottom_
+materialization of that type is disjoint from the _bottom_ materialization of all negated elements
+in the intersection. This differs from subtyping, which should do the disjointness check against the
+_top_ materialization of the negated elements.
+
+```py
+from typing_extensions import Any, Never, Sequence
+from ty_extensions import Not, is_assignable_to, static_assert
+
+# The bottom materialization of `tuple[Any]` is `tuple[Never]`,
+# which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
+# both assignable to `~tuple[Any]`
+static_assert(is_assignable_to(tuple[int], Not[tuple[Any]]))
+static_assert(is_assignable_to(tuple[()], Not[tuple[Any]]))
+
+# But the bottom materialization of `tuple[Any, ...]` is `tuple[Never, ...]`,
+# which simplifies to `tuple[()]`, so `tuple[int]` is still assignable to
+# `~tuple[Any, ...]`, but `tuple[()]` is not
+static_assert(is_assignable_to(tuple[int], Not[tuple[Any, ...]]))
+static_assert(not is_assignable_to(tuple[()], Not[tuple[Any, ...]]))
+
+# Similarly, the bottom materialization of `Sequence[Any]` is `Sequence[Never]`,
+# so `tuple[()]` is not assignable to `~Sequence[Any]`, and nor is `list[Never]`,
+# since both `tuple[()]` and `list[Never]` are subtypes of `Sequence[Never]`.
+# `tuple[int, ...]` is also not assignable to `~Sequence[Any]`, as although it is
+# not a subtype of `Sequence[Never]` it is also not disjoint from `Sequence[Never]`:
+# `tuple[()]` is a subtype of both `Sequence[Never]` and `tuple[int, ...]`, so
+# `tuple[int, ...]` and `Sequence[Never]` cannot be considered disjoint.
+#
+# Other `list` and `tuple` specializations *are* assignable to `~Sequence[Any]`,
+# however, since there are many fully static materializations of `Sequence[Any]`
+# that would be disjoint from a given `list` or `tuple` specialization.
+static_assert(not is_assignable_to(tuple[()], Not[Sequence[Any]]))
+static_assert(not is_assignable_to(list[Never], Not[Sequence[Any]]))
+static_assert(not is_assignable_to(tuple[int, ...], Not[Sequence[Any]]))
+
+# TODO: should pass (`tuple[int]` should be considered disjoint from `Sequence[Never]`)
+static_assert(is_assignable_to(tuple[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+
+# TODO: should pass (`list[int]` should be considered disjoint from `Sequence[Never]`)
+static_assert(is_assignable_to(list[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+
+# If the left-hand side is also not fully static,
+# the left-hand side will be assignable to the right if the bottom materialization
+# of the left-hand side is disjoint from the bottom materialization of all negated
+# elements on the right-hand side
+
+# `tuple[Any, ...]` cannot be assignable to `~tuple[Any, ...]`,
+# because the bottom materialization of `tuple[Any, ...]` is
+# `tuple[()]`, and `tuple[()]` is not disjoint from itself
+static_assert(not is_assignable_to(tuple[Any, ...], Not[tuple[Any, ...]]))
+
+# but `tuple[Any]` is assignable to `~tuple[Any]`,
+# as the bottom materialization of `tuple[Any]` is `Never`,
+# and `Never` *is* disjoint from itself
+static_assert(is_assignable_to(tuple[Any], Not[tuple[Any]]))
+
+# The same principle applies for non-fully-static `list` specializations.
+# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
+static_assert(is_assignable_to(list[Any], Not[list[Any]]))  # error: [static-assert-error]
+
+# `Bottom[list[Any]]` is `Never`, which is disjoint from `Bottom[Sequence[Any]]`
+# (which is `Sequence[Never]`).
+# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
+static_assert(is_assignable_to(list[Any], Not[Sequence[Any]]))  # error: [static-assert-error]
+```
+
 ## General properties
 
 See also: our property tests in `property_tests.rs`.

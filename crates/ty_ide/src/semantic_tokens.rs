@@ -13,9 +13,8 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
 use ty_python_semantic::{
-    HasType, SemanticModel,
-    semantic_index::definition::DefinitionKind,
-    types::{Type, definition_kind_for_name},
+    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
+    types::ide_support::definition_kind_for_name,
 };
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
