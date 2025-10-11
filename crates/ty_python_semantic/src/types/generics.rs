@@ -154,7 +154,11 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
 }
 
 impl<'a, 'db> InferableTypeVars<'a, 'db> {
-    pub(crate) fn is_inferable(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
+    pub(crate) fn is_inferable(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
         match self {
             InferableTypeVars::None => false,
             InferableTypeVars::One(typevars) => typevars.contains(&bound_typevar.identity(db)),
@@ -192,9 +196,12 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
         find_typevars(&mut typevars, self);
         format!(
             "[{}]",
-            typevars.into_iter().map(|btv_id| {
-                format!("{}@{:?}", btv_id.identity.name(db), btv_id.binding_context)
-            }).format(", ")
+            typevars
+                .into_iter()
+                .map(|btv_id| {
+                    format!("{}@{:?}", btv_id.identity.name(db), btv_id.binding_context)
+                })
+                .format(", ")
         )
     }
 }
@@ -339,7 +346,9 @@ impl<'db> GenericContext<'db> {
                 db: &'db dyn Db,
                 bound_typevar: BoundTypeVarInstance<'db>,
             ) {
-                self.typevars.borrow_mut().insert(bound_typevar.identity(db));
+                self.typevars
+                    .borrow_mut()
+                    .insert(bound_typevar.identity(db));
                 walk_bound_type_var_type(db, bound_typevar, self);
             }
 
@@ -451,7 +460,8 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> bool {
-        self.variables_inner(db).contains_key(&bound_typevar.identity(db))
+        self.variables_inner(db)
+            .contains_key(&bound_typevar.identity(db))
     }
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {

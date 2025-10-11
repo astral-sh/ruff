@@ -1625,7 +1625,8 @@ impl<'db> Type<'db> {
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
             (Type::TypeVar(bound_typevar), Type::Union(union))
-                if !inferable.is_inferable(db, bound_typevar) && union.elements(db).contains(&self) =>
+                if !inferable.is_inferable(db, bound_typevar)
+                    && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
@@ -8120,7 +8121,6 @@ impl<'db> TypeVarInstance<'db> {
             }),
         )
     }
-
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
         let bound_or_constraints = match self.bound_or_constraints(db)? {
