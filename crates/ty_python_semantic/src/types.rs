@@ -2417,7 +2417,9 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(self_bound_typevar),
                 Type::NonInferableTypeVar(other_bound_typevar),
-            ) if self_bound_typevar == other_bound_typevar => ConstraintSet::from(false),
+            ) if self_bound_typevar.identity(db) == other_bound_typevar.identity(db) => {
+                ConstraintSet::from(false)
+            }
 
             (tvar @ Type::NonInferableTypeVar(_), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::NonInferableTypeVar(_))
