@@ -655,6 +655,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         // airflow.datasets
         ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
+        ["airflow", "datasets", "DatasetEvent"] => Replacement::Message(
+            "`DatasetEvent` has been made private in Airflow 3. \
+             Use `dict[str, Any]` for the time being. \
+             An `AssetEvent` type will be added to the apache-airflow-task-sdk in a future version.",
+        ),
 
         // airflow.hooks
         ["airflow", "hooks", "base_hook", "BaseHook"] => Replacement::Rename {
