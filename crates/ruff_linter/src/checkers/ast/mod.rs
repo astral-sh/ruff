@@ -241,7 +241,6 @@ pub(crate) struct Checker<'a> {
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
     context: &'a LintContext<'a>,
-    current_statements: Vec<&'a Stmt>,
 }
 
 impl<'a> Checker<'a> {
@@ -291,7 +290,6 @@ impl<'a> Checker<'a> {
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
             context,
-            current_statements: Vec::new(),
         }
     }
 }
@@ -465,10 +463,6 @@ impl<'a> Checker<'a> {
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     pub(crate) const fn semantic(&self) -> &SemanticModel<'a> {
         &self.semantic
-    }
-
-    pub(crate) fn current_statements(&self) -> &Vec<&'a Stmt> {
-        &self.current_statements
     }
 
     /// The [`LinterSettings`] for the current analysis, including the enabled rules.
@@ -820,15 +814,13 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_loop_context(&self) -> bool {
-        let statements = self.current_statements();
-        let mut cur_stmt = statements.last();
+        let mut cur_stmt = self.semantic.current_statement();
 
-        for parent in statements.iter().rev().skip(1) {
-            match *parent {
+        for parent in self.semantic.current_statements().skip(1) {
+            match parent {
                 Stmt::For(ast::StmtFor { orelse, .. })
                 | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                    let in_orelse = orelse.contains(cur_stmt.unwrap());
-                    if !in_orelse {
+                    if !orelse.contains(cur_stmt) {
                         return true;
                     }
                 }
@@ -837,7 +829,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
                 _ => {}
             }
-            cur_stmt = Some(parent);
+            cur_stmt = parent;
         }
         false
     }
@@ -847,13 +839,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
-        self.current_statements.push(stmt);
-        if !stmt.is_function_def_stmt() {
-            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
-        }
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
+
+        if !stmt.is_function_def_stmt() {
+            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        }
 
         // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
         // we encounter a cell boundary.
@@ -1500,7 +1492,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
-        self.current_statements.pop();
         self.last_stmt_end = stmt.end();
     }
 
