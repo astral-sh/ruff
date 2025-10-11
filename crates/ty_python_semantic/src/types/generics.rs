@@ -198,9 +198,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
             "[{}]",
             typevars
                 .into_iter()
-                .map(|btv_id| {
-                    format!("{}@{:?}", btv_id.identity.name(db), btv_id.binding_context)
-                })
+                .map(|identity| identity.display(db))
                 .format(", ")
         )
     }
