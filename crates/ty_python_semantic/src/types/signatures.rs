@@ -28,9 +28,10 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
-    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownClass, MaterializationKind, NormalizedVisitor, TypeContext, TypeMapping, TypeRelation,
+    VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -414,10 +415,9 @@ impl<'db> Signature<'db> {
     /// Return a typed signature from a function definition.
     pub(super) fn from_function(
         db: &'db dyn Db,
-        generic_context: Option<GenericContext<'db>>,
+        pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
-        is_generator: bool,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let parameters = Parameters::from_parameters(
@@ -426,33 +426,17 @@ impl<'db> Signature<'db> {
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
         );
-        let return_ty = function_node.returns.as_ref().map(|returns| {
-            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
-            if function_node.is_async && !is_generator {
-                KnownClass::CoroutineType
-                    .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
-            } else {
-                plain_return_ty
-            }
-        });
+        let return_ty = function_node
+            .returns
+            .as_ref()
+            .map(|returns| definition_expression_type(db, definition, returns.as_ref()));
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
-
-        let full_generic_context = match (legacy_generic_context, generic_context) {
-            (Some(legacy_ctx), Some(ctx)) => {
-                if legacy_ctx
-                    .variables(db)
-                    .exactly_one()
-                    .is_ok_and(|bound_typevar| bound_typevar.typevar(db).is_self(db))
-                {
-                    Some(legacy_ctx.merge(db, ctx))
-                } else {
-                    // TODO: Raise a diagnostic — mixing PEP 695 and legacy typevars is not allowed
-                    Some(ctx)
-                }
-            }
-            (left, right) => left.or(right),
-        };
+        let full_generic_context = GenericContext::merge_pep695_and_legacy(
+            db,
+            pep695_generic_context,
+            legacy_generic_context,
+        );
 
         Self {
             generic_context: full_generic_context,
@@ -460,6 +444,27 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
+    }
+
+    pub(super) fn mark_typevars_inferable(self, db: &'db dyn Db) -> Self {
+        if let Some(definition) = self.definition {
+            self.apply_type_mapping_impl(
+                db,
+                &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(definition))),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
+        } else {
+            self
+        }
+    }
+
+    pub(super) fn wrap_coroutine_return_type(self, db: &'db dyn Db) -> Self {
+        let return_ty = self.return_ty.map(|return_ty| {
+            KnownClass::CoroutineType
+                .to_specialized_instance(db, [Type::any(), Type::any(), return_ty])
+        });
+        Self { return_ty, ..self }
     }
 
     /// Returns the signature which accepts any parameters and returns an `Unknown` type.

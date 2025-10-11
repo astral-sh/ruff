@@ -435,6 +435,28 @@ impl<'db> GenericContext<'db> {
         Some(Self::from_typevar_instances(db, variables))
     }
 
+    pub(crate) fn merge_pep695_and_legacy(
+        db: &'db dyn Db,
+        pep695_generic_context: Option<Self>,
+        legacy_generic_context: Option<Self>,
+    ) -> Option<Self> {
+        match (legacy_generic_context, pep695_generic_context) {
+            (Some(legacy_ctx), Some(ctx)) => {
+                if legacy_ctx
+                    .variables(db)
+                    .exactly_one()
+                    .is_ok_and(|bound_typevar| bound_typevar.typevar(db).is_self(db))
+                {
+                    Some(legacy_ctx.merge(db, ctx))
+                } else {
+                    // TODO: Raise a diagnostic — mixing PEP 695 and legacy typevars is not allowed
+                    Some(ctx)
+                }
+            }
+            (left, right) => left.or(right),
+        }
+    }
+
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
     /// list.
     pub(crate) fn from_base_classes(
@@ -1359,7 +1381,7 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
-        actual: Type<'db>,
+        mut actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -1390,6 +1412,10 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
+        // So, here we remove the union elements that are not related to `formal`.
+        actual = actual.filter_disjoint_elements(self.db, formal);
+
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
             // multiple union elements, we ideally want to express that _only one_ of them needs to
@@ -1415,9 +1441,15 @@ impl<'db> SpecializationBuilder<'db> {
                 // def _(y: str | int | None):
                 //     reveal_type(g(x))  # revealed: str | int
                 // ```
-                let formal_bound_typevars =
-                    (formal_union.elements(self.db).iter()).filter_map(|ty| ty.into_type_var());
-                let Ok(formal_bound_typevar) = formal_bound_typevars.exactly_one() else {
+                // We do not handle cases where the `formal` types contain other types that contain type variables
+                // to prevent incorrect specialization: e.g. `T = int | list[int]` for `formal: T | list[T], actual: int | list[int]`
+                // (the correct specialization is `T = int`).
+                let types_have_typevars = formal_union
+                    .elements(self.db)
+                    .iter()
+                    .filter(|ty| ty.has_type_var(self.db));
+                let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
+                else {
                     return Ok(());
                 };
                 if (actual_union.elements(self.db).iter()).any(|ty| ty.is_type_var()) {
@@ -1428,7 +1460,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if remaining_actual.is_never() {
                     return Ok(());
                 }
-                self.add_type_mapping(formal_bound_typevar, remaining_actual);
+                self.add_type_mapping(*formal_bound_typevar, remaining_actual);
             }
             (Type::Union(formal), _) => {
                 // Second, if the formal is a union, and precisely one union element _is_ a typevar (not
