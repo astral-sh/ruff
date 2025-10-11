@@ -46,6 +46,7 @@ pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
             None
         }
     }) {
-        checker.report_diagnostic(UnusedAnnotation { name }, range);
+        let mut diagnostic = checker.report_diagnostic(UnusedAnnotation { name }, range);
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 }
