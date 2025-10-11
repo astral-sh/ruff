@@ -1,9 +1,8 @@
-use rustc_hash::FxHashSet;
-
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_python_semantic::analyze::typing::find_binding_value;
-use ruff_python_semantic::{BindingId, SemanticModel};
+use ruff_python_semantic::analyze::typing::{find_binding_value, is_bytes, is_string};
+use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -81,8 +80,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let Some(fix_safety) = remove_affix_fix_safety(&removal_data, checker.semantic())
-            else {
+            let Some(applicability) = affix_applicability(&removal_data, checker.semantic()) else {
                 return;
             };
 
@@ -97,10 +95,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
             let edit = Edit::replacement(replacement, if_expr.start(), if_expr.end());
-            diagnostic.set_fix(match fix_safety {
-                FixSafety::Safe => Fix::safe_edit(edit),
-                FixSafety::Unsafe => Fix::unsafe_edit(edit),
-            });
+            diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
 }
@@ -115,8 +110,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let Some(fix_safety) = remove_affix_fix_safety(&removal_data, checker.semantic())
-            else {
+            let Some(applicability) = affix_applicability(&removal_data, checker.semantic()) else {
                 return;
             };
 
@@ -135,10 +129,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
             );
 
             let edit = Edit::replacement(replacement, if_stmt.start(), if_stmt.end());
-            diagnostic.set_fix(match fix_safety {
-                FixSafety::Safe => Fix::safe_edit(edit),
-                FixSafety::Unsafe => Fix::unsafe_edit(edit),
-            });
+            diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
 }
@@ -514,83 +505,89 @@ struct RemoveAffixData<'a> {
     affix_query: AffixQuery<'a>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum FixSafety {
-    Safe,
-    Unsafe,
-}
+/// Determines the applicability of the affix removal fix based on type information.
+///
+/// Returns:
+/// - `None` if the fix should be suppressed (incompatible types like tuple affixes)
+/// - `Some(Applicability::Safe)` if both text and affix are deterministically typed as str or bytes
+/// - `Some(Applicability::Unsafe)` if type information is unknown or uncertain
+fn affix_applicability(data: &RemoveAffixData, semantic: &SemanticModel) -> Option<Applicability> {
+    // Check for tuple affixes - these should be suppressed
+    if is_tuple_affix(data.affix_query.affix, semantic) {
+        return None;
+    }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum TypeKnowledge {
-    KnownStr,
-    KnownBytes,
-    KnownNonStr,
-    Unknown,
-}
+    let text_is_str = is_expr_string(data.text, semantic);
+    let text_is_bytes = is_expr_bytes(data.text, semantic);
+    let affix_is_str = is_expr_string(data.affix_query.affix, semantic);
+    let affix_is_bytes = is_expr_bytes(data.affix_query.affix, semantic);
 
-fn remove_affix_fix_safety(data: &RemoveAffixData, semantic: &SemanticModel) -> Option<FixSafety> {
-    let text_knowledge = classify_expr_type(data.text, semantic);
-    let affix_knowledge = classify_expr_type(data.affix_query.affix, semantic);
-
-    match (text_knowledge, affix_knowledge) {
-        (TypeKnowledge::KnownNonStr, _) | (_, TypeKnowledge::KnownNonStr) => None,
-        (TypeKnowledge::KnownStr, TypeKnowledge::KnownStr) => Some(FixSafety::Safe),
-        (TypeKnowledge::KnownBytes, TypeKnowledge::KnownBytes) => Some(FixSafety::Safe),
-        (TypeKnowledge::KnownStr, TypeKnowledge::KnownBytes)
-        | (TypeKnowledge::KnownBytes, TypeKnowledge::KnownStr) => None,
-        _ => Some(FixSafety::Unsafe),
+    match (text_is_str, text_is_bytes, affix_is_str, affix_is_bytes) {
+        // Both are deterministically str
+        (true, false, true, false) => Some(Applicability::Safe),
+        // Both are deterministically bytes
+        (false, true, false, true) => Some(Applicability::Safe),
+        // Type mismatch - suppress the fix
+        (true, false, false, true) | (false, true, true, false) => None,
+        // Unknown or ambiguous types - mark as unsafe
+        _ => Some(Applicability::Unsafe),
     }
 }
 
-fn classify_expr_type(expr: &ast::Expr, semantic: &SemanticModel) -> TypeKnowledge {
-    let mut seen = FxHashSet::default();
-    classify_expr_type_inner(expr, semantic, &mut seen)
+/// Check if an expression is a tuple or a variable bound to a tuple.
+fn is_tuple_affix(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    if matches!(expr, ast::Expr::Tuple(_)) {
+        return true;
+    }
+
+    if let ast::Expr::Name(name) = expr {
+        if let Some(binding_id) = semantic.only_binding(name) {
+            let binding = semantic.binding(binding_id);
+            if let Some(value) = find_binding_value(binding, semantic) {
+                return matches!(value, ast::Expr::Tuple(_));
+            }
+        }
+    }
+
+    false
 }
 
-fn classify_expr_type_inner(
+/// Check if an expression is deterministically a string literal or a variable bound to a string.
+fn is_expr_string(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    is_expr_type(
+        expr,
+        semantic,
+        |expr| expr.is_string_literal_expr() || expr.is_f_string_expr(),
+        is_string,
+    )
+}
+
+/// Check if an expression is deterministically a bytes literal or a variable bound to bytes.
+fn is_expr_bytes(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    is_expr_type(
+        expr,
+        semantic,
+        |expr| matches!(expr, ast::Expr::BytesLiteral(_)),
+        is_bytes,
+    )
+}
+
+fn is_expr_type(
     expr: &ast::Expr,
     semantic: &SemanticModel,
-    seen: &mut FxHashSet<BindingId>,
-) -> TypeKnowledge {
-    use ast::Expr;
-
-    match expr {
-        _ if expr.is_string_literal_expr() || expr.is_f_string_expr() => TypeKnowledge::KnownStr,
-        Expr::BytesLiteral(_) => TypeKnowledge::KnownBytes,
-        Expr::Name(name) => classify_name_expr_type(name, semantic, seen),
-        Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Tuple(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::Generator(_) => TypeKnowledge::KnownNonStr,
-        _ => TypeKnowledge::Unknown,
-    }
-}
-
-fn classify_name_expr_type(
-    name: &ast::ExprName,
-    semantic: &SemanticModel,
-    seen: &mut FxHashSet<BindingId>,
-) -> TypeKnowledge {
-    let Some(binding_id) = semantic.only_binding(name) else {
-        return TypeKnowledge::Unknown;
-    };
-
-    if !seen.insert(binding_id) {
-        return TypeKnowledge::Unknown;
+    literal_check: impl Fn(&ast::Expr) -> bool,
+    binding_check: impl Fn(&Binding, &SemanticModel) -> bool,
+) -> bool {
+    if literal_check(expr) {
+        return true;
     }
 
-    let binding = semantic.binding(binding_id);
-    if let Some(value) = find_binding_value(binding, semantic) {
-        return classify_expr_type_inner(value, semantic, seen);
+    if let ast::Expr::Name(name) = expr {
+        if let Some(binding_id) = semantic.only_binding(name) {
+            let binding = semantic.binding(binding_id);
+            return binding_check(binding, semantic);
+        }
     }
 
-    TypeKnowledge::Unknown
+    false
 }

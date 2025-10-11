@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-assertion_line: 62
 ---
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
   --> FURB188.py:7:5
@@ -22,7 +21,6 @@ help: Use removesuffix instead of assignment conditional upon endswith.
 8  | 
 9  |     return filename
 10 | 
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
   --> FURB188.py:14:5
@@ -44,7 +42,6 @@ help: Use removesuffix instead of assignment conditional upon endswith.
 15 | 
 16 |     return filename
 17 | 
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
   --> FURB188.py:21:12
@@ -62,7 +59,6 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 22 | 
 23 | 
 24 | def remove_extension_via_ternary_with_len(filename: str, extension: str) -> str:
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
   --> FURB188.py:25:12
@@ -80,7 +76,6 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 26 | 
 27 | 
 28 | def remove_prefix(filename: str) -> str:
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
   --> FURB188.py:29:12
@@ -98,7 +93,6 @@ help: Use removeprefix instead of ternary expression conditional upon startswith
 30 | 
 31 | 
 32 | def remove_prefix_via_len(filename: str, prefix: str) -> str:
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
   --> FURB188.py:33:12
@@ -116,7 +110,6 @@ help: Use removeprefix instead of ternary expression conditional upon startswith
 34 | 
 35 | 
 36 | # these should not
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    --> FURB188.py:146:9
@@ -177,7 +170,6 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 155 | 
 156 | def okay_steps():
 157 |     text = "!x!y!z"
-note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:158:5
