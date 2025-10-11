@@ -130,6 +130,14 @@ class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
     var: V
 
 
+# Test case for TypeVar with default but no bound
+W = TypeVar("W", default=int)
+
+
+class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
+    var: W
+
+
 # nested classes and functions are skipped
 class Outer:
     class Inner(Generic[T]):
