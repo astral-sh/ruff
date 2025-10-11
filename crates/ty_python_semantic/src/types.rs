@@ -1172,9 +1172,18 @@ impl<'db> Type<'db> {
     }
 
     /// Remove the union elements that are not related to `target`.
-    pub(crate) fn filter_disjoint_elements(self, db: &'db dyn Db, target: Type<'db>) -> Type<'db> {
+    pub(crate) fn filter_disjoint_elements(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> Type<'db> {
         if let Type::Union(union) = self {
-            union.filter(db, |elem| !elem.is_disjoint_from(db, target))
+            union.filter(db, |elem| {
+                !elem
+                    .when_disjoint_from(db, target, inferable)
+                    .is_always_satisfied()
+            })
         } else {
             self
         }

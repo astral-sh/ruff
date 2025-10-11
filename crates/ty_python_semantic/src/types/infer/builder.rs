@@ -5955,11 +5955,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        let inferable = generic_context.inferable_typevars(self.db());
         let tcx = tcx.map_annotation(|annotation| {
             // Remove any union elements of `annotation` that are not related to `collection_ty`.
             // e.g. `annotation: list[int] | None => list[int]` if `collection_ty: list`
             let collection_ty = collection_class.to_instance(self.db());
-            annotation.filter_disjoint_elements(self.db(), collection_ty)
+            annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
 
         // Extract the annotated type of `T`, if provided.
@@ -5968,8 +5969,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|specialization| specialization.types(self.db()));
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder =
-            SpecializationBuilder::new(self.db(), generic_context.inferable_typevars(self.db()));
+        let mut builder = SpecializationBuilder::new(self.db(), inferable);
 
         match annotated_elt_tys {
             // The annotated type acts as a constraint for `T`.
