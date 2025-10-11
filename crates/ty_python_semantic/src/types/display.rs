@@ -24,9 +24,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
-    UnionType, WrapperDescriptorKind, visitor,
+    BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, IntersectionType,
+    KnownBoundMethodType, KnownClass, MaterializationKind, Protocol, ProtocolInstanceType,
+    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -561,7 +561,7 @@ impl Display for DisplayRepresentation<'_> {
                 literal_name = enum_literal.name(self.db)
             ),
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                bound_typevar.display(self.db).fmt(f)
+                bound_typevar.identity(self.db).display(self.db).fmt(f)
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -600,24 +600,24 @@ impl Display for DisplayRepresentation<'_> {
     }
 }
 
-impl<'db> BoundTypeVarInstance<'db> {
+impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        DisplayBoundTypeVarInstance {
-            bound_typevar: self,
+        DisplayBoundTypeVarIdentity {
+            bound_typevar_identity: self,
             db,
         }
     }
 }
 
-struct DisplayBoundTypeVarInstance<'db> {
-    bound_typevar: BoundTypeVarInstance<'db>,
+struct DisplayBoundTypeVarIdentity<'db> {
+    bound_typevar_identity: BoundTypeVarIdentity<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayBoundTypeVarInstance<'_> {
+impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bound_typevar.typevar(self.db).name(self.db))?;
-        if let Some(binding_context) = self.bound_typevar.binding_context(self.db).name(self.db) {
+        f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
+        if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
             write!(f, "@{binding_context}")?;
         }
         Ok(())
