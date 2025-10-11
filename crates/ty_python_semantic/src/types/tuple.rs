@@ -1590,7 +1590,7 @@ impl<'db> TupleSpecBuilder<'db> {
                 prefix,
                 variable,
                 suffix,
-            } => Either::Right(prefix.iter().chain(suffix).chain(std::iter::once(variable))),
+            } => Either::Right(prefix.iter().chain(std::iter::once(variable)).chain(suffix)),
         }
     }
 
