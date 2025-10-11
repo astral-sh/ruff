@@ -80,9 +80,11 @@ impl Violation for RedundantNumericUnion {
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
-        checker.map_maybe_stringized_annotation(annotation, |resolved_annotation| {
-            check_annotation(checker, resolved_annotation, annotation);
-        });
+        check_annotation(
+            checker,
+            checker.map_maybe_stringized_annotation(annotation),
+            annotation,
+        );
     }
 }
 
