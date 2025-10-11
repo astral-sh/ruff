@@ -681,7 +681,6 @@ impl SemanticSyntaxChecker {
                 self.seen_futures_boundary = true;
             }
         }
-
         self.seen_module_docstring_boundary = true;
     }
 
