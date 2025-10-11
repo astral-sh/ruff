@@ -2960,12 +2960,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity = TypeVarIdentity::new(
-            self.db(),
-            &name.id,
-            Some(definition),
-            TypeVarKind::Pep695,
-        );
+        let identity =
+            TypeVarIdentity::new(self.db(), &name.id, Some(definition), TypeVarKind::Pep695);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             identity,
@@ -4302,12 +4298,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.insert(definition);
         }
 
-        let identity = TypeVarIdentity::new(
-            db,
-            target_name,
-            Some(definition),
-            TypeVarKind::Legacy,
-        );
+        let identity = TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::Legacy);
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
