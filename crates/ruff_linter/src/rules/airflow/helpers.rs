@@ -186,7 +186,8 @@ pub(crate) fn match_head(value: &Expr) -> Option<&ExprName> {
     }
 }
 
-/// Return the [`Fix`] that imports the new name and updates where the import is referenced.
+/// Return the [`Fix`] that
+/// imports the new name and updates where the import is referenced.
 /// This is used for cases that member name has changed.
 /// (e.g., `airflow.datasts.Dataset` to `airflow.sdk.Asset`)
 pub(crate) fn generate_import_edit(
@@ -208,9 +209,11 @@ pub(crate) fn generate_import_edit(
     Some(Fix::safe_edits(import_edit, [replacement_edit]))
 }
 
-/// Return the [`Fix`] that remove the original import and import the same name with new path.
+/// Return the [`Fix`] that
+/// removes the original import and imports the same name with new path.
 /// This is used for cases that member name has not changed.
-/// (e.g., `airflow.operators.pig_operator.PigOperator` to `airflow.providers.apache.pig.hooks.pig.PigCliHook`)
+/// (e.g., `airflow.operators.pig_operator.PigOperator` to
+///  `airflow.providers.apache.pig.operators.pig.PigOperator`)
 pub(crate) fn generate_remove_and_runtime_import_edit(
     expr: &Expr,
     checker: &Checker,
