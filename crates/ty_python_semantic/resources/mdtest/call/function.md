@@ -694,6 +694,50 @@ def _(
     f1(*args10)  # error: [invalid-argument-type]
 ```
 
+A union of heterogeneous tuples provided to a variadic parameter:
+
+```py
+# Test inspired by ecosystem code at:
+# - <https://github.com/home-assistant/core/blob/bde4eb50111a72f9717fe73ee5929e50eb06911b/homeassistant/components/lovelace/websocket.py#L50-L59>
+# - <https://github.com/pydata/xarray/blob/3572f4e70f2b12ef9935c1f8c3c1b74045d2a092/xarray/tests/test_groupby.py#L3058-L3059>
+
+def f2(a: str, b: bool): ...
+def f3(a=None, b=None, c=None, d=None, e=None): ...
+def f4(coinflip: bool):
+    if coinflip:
+        args = "foo", True
+    else:
+        args = "bar", False
+
+    # revealed: tuple[Literal["foo"], Literal[True]] | tuple[Literal["bar"], Literal[False]]
+    reveal_type(args)
+    f2(*args)  # fine
+
+    if coinflip:
+        other_args = "foo", True
+    else:
+        other_args = "bar", (True,)
+
+    # revealed: tuple[Literal["foo"], Literal[True]] | tuple[Literal["bar"], tuple[Literal[True]]]
+    reveal_type(other_args)
+    # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `bool`, found `Literal[True] | tuple[Literal[True]]`"
+    f2(*other_args)
+
+my_args = (("a", "b"), ("c", "d"), ("e", "f"))
+
+for tup in my_args:
+    f3(*tup, e=None)  # fine
+
+my_other_args = (
+    ("a", "b", "c", "d", "e"),
+    ("f", "g", "h", "i", "k"),
+)
+
+for tup in my_other_args:
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `e` of function `f3`"
+    f3(*tup, e=None)
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
