@@ -885,7 +885,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         .message(
                                             format_args!(
                                                 "Type variable `{self_typevar_name}` is bound \
-                                            in this enclosing scope",
+                                                in this enclosing scope",
                                             ),
                                         ),
                                     );
