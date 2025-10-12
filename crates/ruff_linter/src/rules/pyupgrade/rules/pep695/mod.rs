@@ -14,12 +14,13 @@ use ruff_python_ast::{
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::checkers::ast::Checker;
+use crate::preview::is_type_var_default_enabled;
+
 pub(crate) use non_pep695_generic_class::*;
 pub(crate) use non_pep695_generic_function::*;
 pub(crate) use non_pep695_type_alias::*;
 pub(crate) use private_type_parameter::*;
-
-use crate::checkers::ast::Checker;
 
 mod non_pep695_generic_class;
 mod non_pep695_generic_function;
@@ -140,6 +141,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             default,
         }: &'a TypeVar<'a>,
     ) -> Self {
+        let default = default.map(|expr| Box::new(expr.clone()));
         match kind {
             TypeParamKind::TypeVar => TypeParam::TypeVar(TypeParamTypeVar {
                 range: TextRange::default(),
@@ -180,19 +182,19 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
                     }
                     None => None,
                 },
-                default: default.map(|expr| Box::new((*expr).clone())),
+                default,
             }),
             TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 name: Identifier::new(*name, TextRange::default()),
-                default: default.map(|expr| Box::new((*expr).clone())),
+                default,
             }),
             TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 name: Identifier::new(*name, TextRange::default()),
-                default: default.map(|expr| Box::new((*expr).clone())),
+                default,
             }),
         }
     }
@@ -367,8 +369,16 @@ fn in_nested_context(checker: &Checker) -> bool {
 }
 
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
-fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
+/// Also returns `None` if any `TypeVar` has a default value and preview mode is not enabled.
+fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<TypeVar<'a>>> {
     if vars.is_empty() {
+        return None;
+    }
+
+    // If any type variables have defaults and preview mode is not enabled, skip the rule
+    if vars.iter().any(|tv| tv.default.is_some())
+        && !is_type_var_default_enabled(checker.settings())
+    {
         return None;
     }
 

@@ -469,6 +469,8 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
 129 | |     # comment7
 130 | | ) # comment8
     | |_^
+131 |
+132 |   # Test case for TypeVar with default - should be converted when preview mode is enabled
     |
 help: Use the `type` keyword
 119 |     | str

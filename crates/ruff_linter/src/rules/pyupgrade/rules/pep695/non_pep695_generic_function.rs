@@ -154,7 +154,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         }
     }
 
-    let Some(type_vars) = check_type_vars(type_vars) else {
+    let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;
     };
 
