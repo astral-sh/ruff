@@ -324,11 +324,23 @@ impl<'db> GenericContext<'db> {
         for base in bases {
             base.find_legacy_typevars(db, None, &mut variables);
         }
+
+        // If there are no legacy typevars mentioned in the base class list, we can return early.
         if variables.is_empty() {
             return None;
         }
+
+        // If there are legacy typevars, filter out the ones that are not bound by this class. (We
+        // do this as a post-processing step, instead of by passing in a parameter to
+        // `find_legaccy_typevars`, since there are very many classes that do not reference legacy
+        // typevars at all, and this avoids adding a salsa dependency on the class `Definition` in
+        // those cases.)
         let binding_context = BindingContext::Definition(definition());
         variables.retain(|bound_typevar| bound_typevar.binding_context(db) == binding_context);
+        if variables.is_empty() {
+            return None;
+        }
+
         Some(Self::from_typevar_instances(db, variables))
     }
 
