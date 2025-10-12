@@ -485,6 +485,7 @@ help: Replace with `Literal[...] | None`
 85 + print((Literal[1] | None)[0])  # Should become (Literal[1] | None)[0]
 86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
 87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
   --> PYI061.py:86:18
@@ -494,6 +495,7 @@ PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
 86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
    |                  ^^^^
 87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
    |
 help: Replace with `Literal[...] | None`
 83 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
@@ -502,6 +504,7 @@ help: Replace with `Literal[...] | None`
    - print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
 86 + print((Literal[1] | None) + 1)  # Should become (Literal[1] | None) + 1
 87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
   --> PYI061.py:87:18
@@ -510,6 +513,7 @@ PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
 86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
 87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
    |                  ^^^^
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
    |
 help: Replace with `Literal[...] | None`
 84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
@@ -517,3 +521,19 @@ help: Replace with `Literal[...] | None`
 86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
    - print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
 87 + print((Literal[1] | None) * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+
+PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
+  --> PYI061.py:88:19
+   |
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+   |                   ^^^^
+   |
+help: Replace with `Literal[...] | None`
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+   - print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+88 + print(((Literal[1] | None)).__dict__)  # Should become ((Literal[1] | None)).__dict__

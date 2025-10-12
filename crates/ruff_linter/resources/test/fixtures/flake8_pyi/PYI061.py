@@ -85,3 +85,4 @@ print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
 print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
 print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
 print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
