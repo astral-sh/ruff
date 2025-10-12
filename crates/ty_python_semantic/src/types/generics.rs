@@ -332,7 +332,7 @@ impl<'db> GenericContext<'db> {
 
         // If there are legacy typevars, filter out the ones that are not bound by this class. (We
         // do this as a post-processing step, instead of by passing in a parameter to
-        // `find_legaccy_typevars`, since there are very many classes that do not reference legacy
+        // `find_legacy_typevars`, since there are very many classes that do not reference legacy
         // typevars at all, and this avoids adding a salsa dependency on the class `Definition` in
         // those cases.)
         let binding_context = BindingContext::Definition(definition());
