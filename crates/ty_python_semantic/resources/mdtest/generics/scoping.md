@@ -260,6 +260,8 @@ class C[T]:
 
 ### Generic class within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Iterable
 
@@ -272,6 +274,8 @@ def f[T](x: T, y: T) -> None:
 ```
 
 ### Generic class within generic class
+
+<!-- snapshot-diagnostics -->
 
 ```py
 from typing import Iterable
