@@ -1458,6 +1458,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> Option<GenericContext<'db>> {
         GenericContext::from_base_classes(
             db,
+            self.definition(db),
             self.explicit_bases(db)
                 .iter()
                 .copied()

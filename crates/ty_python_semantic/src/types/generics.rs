@@ -317,11 +317,12 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
+        definition: Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            base.find_legacy_typevars(db, None, &mut variables);
+            base.find_legacy_typevars(db, Some(definition), &mut variables);
         }
         if variables.is_empty() {
             return None;
