@@ -71,6 +71,30 @@ reveal_type(generic_context(InheritedGenericPartiallySpecialized))
 reveal_type(generic_context(InheritedGenericFullySpecialized))
 ```
 
+In a nested class, references to legacy typevars in a containing class do _not_ cause the inner
+class to be generic.
+
+```py
+class OuterClass(Generic[T]):
+    class InnerClass(list[T]): ...
+
+    def method(self):
+        class InnerClassInMethod(list[T]): ...
+
+        # revealed: None
+        reveal_type(generic_context(InnerClassInMethod))
+
+    # revealed: None
+    reveal_type(generic_context(InnerClass))
+
+# revealed: tuple[T@OuterClass]
+reveal_type(generic_context(OuterClass))
+
+class F: ...
+# revealed: None
+reveal_type(generic_context(F))
+```
+
 If you don't specialize a generic base class, we use the default specialization, which maps each
 typevar to its default value or `Any`. Since that base class is fully specialized, it does not make
 the inheriting class generic.
