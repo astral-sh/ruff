@@ -12,42 +12,40 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing_extensions import reveal_type
- 2 | 
- 3 | class Iterator1:
- 4 |     def __next__(self, extra_arg) -> int:
- 5 |         return 42
- 6 | 
- 7 | class Iterator2:
- 8 |     __next__: None = None
- 9 | 
-10 | class Iterable1:
-11 |     def __iter__(self) -> Iterator1:
-12 |         return Iterator1()
-13 | 
-14 | class Iterable2:
-15 |     def __iter__(self) -> Iterator2:
-16 |         return Iterator2()
-17 | 
-18 | # error: [not-iterable]
-19 | for x in Iterable1():
-20 |     reveal_type(x)  # revealed: int
-21 | 
-22 | # error: [not-iterable]
-23 | for y in Iterable2():
-24 |     reveal_type(y)  # revealed: Unknown
+ 1 | class Iterator1:
+ 2 |     def __next__(self, extra_arg) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | class Iterator2:
+ 6 |     __next__: None = None
+ 7 | 
+ 8 | class Iterable1:
+ 9 |     def __iter__(self) -> Iterator1:
+10 |         return Iterator1()
+11 | 
+12 | class Iterable2:
+13 |     def __iter__(self) -> Iterator2:
+14 |         return Iterator2()
+15 | 
+16 | # error: [not-iterable]
+17 | for x in Iterable1():
+18 |     reveal_type(x)  # revealed: int
+19 | 
+20 | # error: [not-iterable]
+21 | for y in Iterable2():
+22 |     reveal_type(y)  # revealed: Unknown
 ```
 
 # Diagnostics
 
 ```
 error[not-iterable]: Object of type `Iterable1` is not iterable
-  --> src/mdtest_snippet.py:19:10
+  --> src/mdtest_snippet.py:17:10
    |
-18 | # error: [not-iterable]
-19 | for x in Iterable1():
+16 | # error: [not-iterable]
+17 | for x in Iterable1():
    |          ^^^^^^^^^^^
-20 |     reveal_type(x)  # revealed: int
+18 |     reveal_type(x)  # revealed: int
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
 info: Expected signature for `__next__` is `def __next__(self): ...`
@@ -56,41 +54,15 @@ info: rule `not-iterable` is enabled by default
 ```
 
 ```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:20:17
-   |
-18 | # error: [not-iterable]
-19 | for x in Iterable1():
-20 |     reveal_type(x)  # revealed: int
-   |                 ^ `int`
-21 |
-22 | # error: [not-iterable]
-   |
-
-```
-
-```
 error[not-iterable]: Object of type `Iterable2` is not iterable
-  --> src/mdtest_snippet.py:23:10
+  --> src/mdtest_snippet.py:21:10
    |
-22 | # error: [not-iterable]
-23 | for y in Iterable2():
+20 | # error: [not-iterable]
+21 | for y in Iterable2():
    |          ^^^^^^^^^^^
-24 |     reveal_type(y)  # revealed: Unknown
+22 |     reveal_type(y)  # revealed: Unknown
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
 info: rule `not-iterable` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:24:17
-   |
-22 | # error: [not-iterable]
-23 | for y in Iterable2():
-24 |     reveal_type(y)  # revealed: Unknown
-   |                 ^ `Unknown`
-   |
 
 ```
