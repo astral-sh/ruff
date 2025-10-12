@@ -114,6 +114,41 @@ def _(
     reveal_type(u5)  # revealed: bool | Literal[17]
 ```
 
+## Enum literals
+
+```py
+from enum import Enum
+from typing import Literal, Any
+from ty_extensions import Intersection
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+def _(
+    u1: Literal[Color.RED, Color.GREEN],
+    u2: Color | Literal[Color.RED],
+    u3: Literal[Color.RED] | Color,
+    u4: Literal[Color.RED] | Literal[Color.RED, Color.GREEN],
+    u5: Literal[Color.RED, Color.GREEN, Color.BLUE],
+    u6: Literal[Color.RED] | Literal[Color.GREEN] | Literal[Color.BLUE],
+) -> None:
+    reveal_type(u1)  # revealed: Literal[Color.RED, Color.GREEN]
+    reveal_type(u2)  # revealed: Color
+    reveal_type(u3)  # revealed: Color
+    reveal_type(u4)  # revealed: Literal[Color.RED, Color.GREEN]
+    reveal_type(u5)  # revealed: Color
+    reveal_type(u6)  # revealed: Color
+
+def _(
+    u1: Intersection[Literal[Color.RED], Any] | Literal[Color.RED],
+    u2: Literal[Color.RED] | Intersection[Literal[Color.RED], Any],
+):
+    reveal_type(u1)  # revealed: Literal[Color.RED]
+    reveal_type(u2)  # revealed: Literal[Color.RED]
+```
+
 ## Do not erase `Unknown`
 
 ```py
@@ -270,4 +305,75 @@ type BD = BB | BA
 def _(c: BC, d: BD):
     reveal_type(c)  # revealed: Literal[b""]
     reveal_type(d)  # revealed: Literal[b""]
+```
+
+## Unions of tuples
+
+A union of a fixed-length tuple and a variable-length tuple must be collapsed to the variable-length
+element, never to the fixed-length element (`tuple[()] | tuple[Any, ...]` -> `tuple[Any, ...]`, not
+`tuple[()]`).
+
+```py
+from typing import Any
+
+def f(
+    a: tuple[()] | tuple[int, ...],
+    b: tuple[int, ...] | tuple[()],
+    c: tuple[int] | tuple[str, ...],
+    d: tuple[str, ...] | tuple[int],
+    e: tuple[()] | tuple[Any, ...],
+    f: tuple[Any, ...] | tuple[()],
+    g: tuple[Any, ...] | tuple[Any | str, ...],
+    h: tuple[Any | str, ...] | tuple[Any, ...],
+):
+    reveal_type(a)  # revealed: tuple[int, ...]
+    reveal_type(b)  # revealed: tuple[int, ...]
+    reveal_type(c)  # revealed: tuple[int] | tuple[str, ...]
+    reveal_type(d)  # revealed: tuple[str, ...] | tuple[int]
+    reveal_type(e)  # revealed: tuple[Any, ...]
+    reveal_type(f)  # revealed: tuple[Any, ...]
+    reveal_type(g)  # revealed: tuple[Any | str, ...]
+    reveal_type(h)  # revealed: tuple[Any | str, ...]
+```
+
+## Unions of other generic containers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Bivariant[T]: ...
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def receive(self, input: T) -> None: ...
+
+class Invariant[T]:
+    mutable_attribute: T
+
+def _(
+    a: Bivariant[Any] | Bivariant[Any | str],
+    b: Bivariant[Any | str] | Bivariant[Any],
+    c: Covariant[Any] | Covariant[Any | str],
+    d: Covariant[Any | str] | Covariant[Any],
+    e: Contravariant[Any | str] | Contravariant[Any],
+    f: Contravariant[Any] | Contravariant[Any | str],
+    g: Invariant[Any] | Invariant[Any | str],
+    h: Invariant[Any | str] | Invariant[Any],
+):
+    reveal_type(a)  # revealed: Bivariant[Any]
+    reveal_type(b)  # revealed: Bivariant[Any | str]
+    reveal_type(c)  # revealed: Covariant[Any | str]
+    reveal_type(d)  # revealed: Covariant[Any | str]
+    reveal_type(e)  # revealed: Contravariant[Any]
+    reveal_type(f)  # revealed: Contravariant[Any]
+    reveal_type(g)  # revealed: Invariant[Any] | Invariant[Any | str]
+    reveal_type(h)  # revealed: Invariant[Any | str] | Invariant[Any]
 ```

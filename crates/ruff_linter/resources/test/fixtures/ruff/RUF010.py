@@ -52,3 +52,15 @@ f"{repr(lambda: 1)}"
 f"{repr(x := 2)}"
 
 f"{str(object=3)}"
+
+f"{str(x for x in [])}"
+
+f"{str((x for x in []))}"
+
+# Debug text cases - should not trigger RUF010
+f"{str(1)=}"
+f"{ascii(1)=}"
+f"{repr(1)=}"
+f"{str('hello')=}"
+f"{ascii('hello')=}"
+f"{repr('hello')=}"

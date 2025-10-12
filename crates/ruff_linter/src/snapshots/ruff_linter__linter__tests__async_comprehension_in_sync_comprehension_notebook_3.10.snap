@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-resources/test/fixtures/syntax_errors/async_comprehension.ipynb:3:5: SyntaxError: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+invalid-syntax: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+ --> resources/test/fixtures/syntax_errors/async_comprehension.ipynb:3:5
   |
 1 | async def elements(n): yield n
 2 | [x async for x in elements(5)]  # okay, async at top level

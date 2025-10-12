@@ -34,7 +34,7 @@ class _:
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
-    reveal_type(a.x)  # revealed: Unknown | int | None
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
@@ -135,9 +135,9 @@ a.b = B()
 reveal_type(a.b)  # revealed: B
 reveal_type(a.b.c1)  # revealed: C | None
 reveal_type(a.b.c2)  # revealed: C | None
-# error: [possibly-unbound-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(a.b.c1.d)  # revealed: D | None
-# error: [possibly-unbound-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
@@ -206,30 +206,26 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-# TODO: should be ChainMap[int, int]
-reveal_type(cm)  # revealed: ChainMap[Unknown, Unknown]
+reveal_type(cm)  # revealed: ChainMap[Unknown | int, Unknown | int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
 reveal_type(b[0])  # revealed: Literal[0]
 reveal_type(dd[0])  # revealed: Literal[0]
-# TODO: should be Literal[0]
-reveal_type(cm[0])  # revealed: Unknown
+reveal_type(cm[0])  # revealed: Literal[0]
 
 class C:
     reveal_type(l[0])  # revealed: Literal[0]
     reveal_type(d[0])  # revealed: Literal[0]
     reveal_type(b[0])  # revealed: Literal[0]
     reveal_type(dd[0])  # revealed: Literal[0]
-    # TODO: should be Literal[0]
-    reveal_type(cm[0])  # revealed: Unknown
+    reveal_type(cm[0])  # revealed: Literal[0]
 
 [reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(d[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(b[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(dd[0]) for _ in range(1)]  # revealed: Literal[0]
-# TODO: should be Literal[0]
-[reveal_type(cm[0]) for _ in range(1)]  # revealed: Unknown
+[reveal_type(cm[0]) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
     reveal_type(l[0])  # revealed: int | None
@@ -244,8 +240,7 @@ class D(TypedDict):
 
 td = D(x=1, label="a")
 td["x"] = 0
-# TODO: should be Literal[0]
-reveal_type(td["x"])  # revealed: @Todo(TypedDict)
+reveal_type(td["x"])  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does["not"]["exist"] = 0
@@ -253,7 +248,7 @@ does["not"]["exist"] = 0
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 
 non_subscriptable = 1
-# error: [non-subscriptable]
+# error: [invalid-assignment]
 non_subscriptable[0] = 0
 # error: [non-subscriptable]
 reveal_type(non_subscriptable[0])  # revealed: Unknown
@@ -299,11 +294,11 @@ class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
 
 def _():
-    # error: [possibly-unbound-attribute]
-    reveal_type(b.a.x[0])  # revealed: Unknown | int | None
-    # error: [possibly-unbound-attribute]
-    reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
-    reveal_type(b.a)  # revealed: Unknown | A | None
+    # error: [possibly-missing-attribute]
+    reveal_type(b.a.x[0])  # revealed: int | None
+    # error: [possibly-missing-attribute]
+    reveal_type(b.a.x)  # revealed: list[int | None]
+    reveal_type(b.a)  # revealed: A | None
 ```
 
 ## Invalid assignments are not used for narrowing
@@ -318,7 +313,7 @@ def f(c: C, s: str):
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
 
-    # TODO: This assignment is invalid and should result in an error.
+    # error: [invalid-assignment] "Method `__setitem__` of type `Overload[(key: SupportsIndex, value: int, /) -> None, (key: slice[Any, Any, Any], value: Iterable[int], /) -> None]` cannot be called with a key of type `Literal[0]` and a value of type `str` on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int
 ```

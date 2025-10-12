@@ -4,6 +4,7 @@
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
 use std::fmt::Formatter;
 
+use ruff_db::diagnostic::SecondaryCode;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
@@ -48,6 +49,18 @@ impl PartialEq<&str> for NoqaCode {
 
 impl PartialEq<NoqaCode> for &str {
     fn eq(&self, other: &NoqaCode) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialEq<NoqaCode> for SecondaryCode {
+    fn eq(&self, other: &NoqaCode) -> bool {
+        &self.as_str() == other
+    }
+}
+
+impl PartialEq<SecondaryCode> for NoqaCode {
+    fn eq(&self, other: &SecondaryCode) -> bool {
         other.eq(self)
     }
 }
@@ -321,12 +334,15 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncFunctionWithTimeout),
         (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncBusyWait),
         (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncZeroSleep),
-        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::LongSleepNotForever),
+        (Flake8Async, "116") => (RuleGroup::Stable, rules::flake8_async::rules::LongSleepNotForever),
         (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
+        (Flake8Async, "212") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction),
         (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::CreateSubprocessInAsyncFunction),
         (Flake8Async, "221") => (RuleGroup::Stable, rules::flake8_async::rules::RunProcessInAsyncFunction),
         (Flake8Async, "222") => (RuleGroup::Stable, rules::flake8_async::rules::WaitForProcessInAsyncFunction),
         (Flake8Async, "230") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOpenCallInAsyncFunction),
+        (Flake8Async, "240") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingPathMethodInAsyncFunction),
+        (Flake8Async, "250") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingInputInAsyncFunction),
         (Flake8Async, "251") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingSleepInAsyncFunction),
 
         // flake8-builtins
@@ -379,6 +395,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
         (Flake8Bugbear, "911") => (RuleGroup::Stable, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
+        (Flake8Bugbear, "912") => (RuleGroup::Preview, rules::flake8_bugbear::rules::MapWithoutExplicitStrict),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
@@ -548,7 +565,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "035") => (RuleGroup::Stable, rules::pyupgrade::rules::DeprecatedImport),
         (Pyupgrade, "036") => (RuleGroup::Stable, rules::pyupgrade::rules::OutdatedVersionBlock),
         (Pyupgrade, "037") => (RuleGroup::Stable, rules::pyupgrade::rules::QuotedAnnotation),
-        (Pyupgrade, "038") => (RuleGroup::Deprecated, rules::pyupgrade::rules::NonPEP604Isinstance),
+        (Pyupgrade, "038") => (RuleGroup::Removed, rules::pyupgrade::rules::NonPEP604Isinstance),
         (Pyupgrade, "039") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryClassParentheses),
         (Pyupgrade, "040") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695TypeAlias),
         (Pyupgrade, "041") => (RuleGroup::Stable, rules::pyupgrade::rules::TimeoutErrorAlias),
@@ -559,7 +576,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "046") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericFunction),
         (Pyupgrade, "049") => (RuleGroup::Stable, rules::pyupgrade::rules::PrivateTypeParameter),
-        (Pyupgrade, "050") => (RuleGroup::Preview, rules::pyupgrade::rules::UselessClassMetaclassType),
+        (Pyupgrade, "050") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessClassMetaclassType),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -758,7 +775,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (PandasVet, "013") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasUseOfDotStack),
         (PandasVet, "015") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasUseOfPdMerge),
         (PandasVet, "101") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasNuniqueConstantSeriesCheck),
-        (PandasVet, "901") => (RuleGroup::Deprecated, rules::pandas_vet::rules::PandasDfVariableName),
+        (PandasVet, "901") => (RuleGroup::Removed, rules::pandas_vet::rules::PandasDfVariableName),
 
         // flake8-errmsg
         (Flake8ErrMsg, "101") => (RuleGroup::Stable, rules::flake8_errmsg::rules::RawStringInException),
@@ -815,8 +832,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
         (Flake8Pyi, "057") => (RuleGroup::Stable, rules::flake8_pyi::rules::ByteStringUsage),
-        (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
-        (Flake8Pyi, "061") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantNoneLiteral),
+        (Flake8Pyi, "059") => (RuleGroup::Stable, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "061") => (RuleGroup::Stable, rules::flake8_pyi::rules::RedundantNoneLiteral),
         (Flake8Pyi, "062") => (RuleGroup::Stable, rules::flake8_pyi::rules::DuplicateLiteralMember),
         (Flake8Pyi, "063") => (RuleGroup::Stable, rules::flake8_pyi::rules::Pep484StylePositionalOnlyParameter),
         (Flake8Pyi, "064") => (RuleGroup::Stable, rules::flake8_pyi::rules::RedundantFinalLiteral),
@@ -906,30 +923,30 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tryceratops, "401") => (RuleGroup::Stable, rules::tryceratops::rules::VerboseLogMessage),
 
         // flake8-use-pathlib
-        (Flake8UsePathlib, "100") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathAbspath),
-        (Flake8UsePathlib, "101") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsChmod),
-        (Flake8UsePathlib, "102") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsMkdir),
-        (Flake8UsePathlib, "103") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsMakedirs),
-        (Flake8UsePathlib, "104") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsRename),
-        (Flake8UsePathlib, "105") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsReplace),
-        (Flake8UsePathlib, "106") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsRmdir),
-        (Flake8UsePathlib, "107") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsRemove),
-        (Flake8UsePathlib, "108") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsUnlink),
-        (Flake8UsePathlib, "109") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsGetcwd),
-        (Flake8UsePathlib, "110") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathExists),
-        (Flake8UsePathlib, "111") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathExpanduser),
-        (Flake8UsePathlib, "112") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathIsdir),
-        (Flake8UsePathlib, "113") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathIsfile),
-        (Flake8UsePathlib, "114") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathIslink),
-        (Flake8UsePathlib, "115") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsReadlink),
+        (Flake8UsePathlib, "100") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathAbspath),
+        (Flake8UsePathlib, "101") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsChmod),
+        (Flake8UsePathlib, "102") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsMkdir),
+        (Flake8UsePathlib, "103") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsMakedirs),
+        (Flake8UsePathlib, "104") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRename),
+        (Flake8UsePathlib, "105") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsReplace),
+        (Flake8UsePathlib, "106") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRmdir),
+        (Flake8UsePathlib, "107") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRemove),
+        (Flake8UsePathlib, "108") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsUnlink),
+        (Flake8UsePathlib, "109") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsGetcwd),
+        (Flake8UsePathlib, "110") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathExists),
+        (Flake8UsePathlib, "111") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathExpanduser),
+        (Flake8UsePathlib, "112") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathIsdir),
+        (Flake8UsePathlib, "113") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathIsfile),
+        (Flake8UsePathlib, "114") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathIslink),
+        (Flake8UsePathlib, "115") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsReadlink),
         (Flake8UsePathlib, "116") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsStat),
-        (Flake8UsePathlib, "117") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathIsabs),
+        (Flake8UsePathlib, "117") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathIsabs),
         (Flake8UsePathlib, "118") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathJoin),
-        (Flake8UsePathlib, "119") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathBasename),
-        (Flake8UsePathlib, "120") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathDirname),
-        (Flake8UsePathlib, "121") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathSamefile),
+        (Flake8UsePathlib, "119") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathBasename),
+        (Flake8UsePathlib, "120") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathDirname),
+        (Flake8UsePathlib, "121") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathSamefile),
         (Flake8UsePathlib, "122") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsPathSplitext),
-        (Flake8UsePathlib, "123") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::BuiltinOpen),
+        (Flake8UsePathlib, "123") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::BuiltinOpen),
         (Flake8UsePathlib, "124") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::PyPath),
         (Flake8UsePathlib, "201") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory),
         (Flake8UsePathlib, "202") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathGetsize),
@@ -941,7 +958,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
         (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
         (Flake8UsePathlib, "210") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
-        (Flake8UsePathlib, "211") => (RuleGroup::Preview, rules::flake8_use_pathlib::violations::OsSymlink),
+        (Flake8UsePathlib, "211") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsSymlink),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringFormat),
@@ -1017,7 +1034,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
         (Ruff, "040") => (RuleGroup::Stable, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryNestedLiteral),
-        (Ruff, "043") => (RuleGroup::Preview, rules::ruff::rules::PytestRaisesAmbiguousPattern),
+        (Ruff, "043") => (RuleGroup::Stable, rules::ruff::rules::PytestRaisesAmbiguousPattern),
         (Ruff, "045") => (RuleGroup::Preview, rules::ruff::rules::ImplicitClassVarInDataclass),
         (Ruff, "046") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::NeedlessElse),
@@ -1031,11 +1048,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Stable, rules::ruff::rules::StarmapZip),
-        (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
+        (Ruff, "059") => (RuleGroup::Stable, rules::ruff::rules::UnusedUnpackedVariable),
         (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
         (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "063") => (RuleGroup::Preview, rules::ruff::rules::AccessAnnotationsFromClassDict),
         (Ruff, "064") => (RuleGroup::Preview, rules::ruff::rules::NonOctalPermissions),
+        (Ruff, "065") => (RuleGroup::Preview, rules::ruff::rules::LoggingEagerConversion),
+
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
@@ -1065,6 +1084,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
+        #[cfg(any(feature = "test-rules", test))]
+        (Ruff, "990") => (RuleGroup::Preview, rules::ruff::rules::PanicyTestRule),
 
 
         // flake8-django
@@ -1091,11 +1112,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // airflow
         (Airflow, "001") => (RuleGroup::Stable, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
-        (Airflow, "002") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
-        (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
-        (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
-        (Airflow, "311") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedUpdate),
-        (Airflow, "312") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
+        (Airflow, "002") => (RuleGroup::Stable, rules::airflow::rules::AirflowDagNoScheduleArgument),
+        (Airflow, "301") => (RuleGroup::Stable, rules::airflow::rules::Airflow3Removal),
+        (Airflow, "302") => (RuleGroup::Stable, rules::airflow::rules::Airflow3MovedToProvider),
+        (Airflow, "311") => (RuleGroup::Stable, rules::airflow::rules::Airflow3SuggestedUpdate),
+        (Airflow, "312") => (RuleGroup::Stable, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
 
         // perflint
         (Perflint, "101") => (RuleGroup::Stable, rules::perflint::rules::UnnecessaryListCast),
@@ -1122,7 +1143,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "105") => (RuleGroup::Stable, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
-        (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
+        (Refurb, "116") => (RuleGroup::Stable, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         (Refurb, "122") => (RuleGroup::Stable, rules::refurb::rules::ForLoopWrites),
         (Refurb, "129") => (RuleGroup::Stable, rules::refurb::rules::ReadlinesInFor),

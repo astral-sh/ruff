@@ -15,6 +15,83 @@ use std::{
 use tempfile::TempDir;
 
 #[test]
+fn test_quiet_output() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "x: int = 1")?;
+
+    // By default, we emit an "all checks passed" message
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // With `quiet`, the message is not displayed
+    assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    let case = CliTest::with_file("test.py", "x: int = 'foo'")?;
+
+    // By default, we emit a diagnostic
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
+     --> test.py:1:1
+      |
+    1 | x: int = 'foo'
+      | ^
+      |
+    info: rule `invalid-assignment` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    // With `quiet`, the diagnostic is not displayed, just the summary message
+    assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // We allow `-q`
+    assert_cmd_snapshot!(case.command().arg("-q"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // And repeated `-qq`
+    assert_cmd_snapshot!(case.command().arg("-qq"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @r"
@@ -186,7 +263,10 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -400,7 +480,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command(),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -412,7 +492,10 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
@@ -421,14 +504,17 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###
+    "
     );
 
     // Now check only the `tests` and `other.py` files.
@@ -447,7 +533,10 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
@@ -456,7 +545,10 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
@@ -515,9 +607,99 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unresolved-reference] test.py:2:7: Name `x` used when not defined
-    error[non-subscriptable] test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    test.py:2:7: warning[unresolved-reference] Name `x` used when not defined
+    test.py:3:7: error[non-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn gitlab_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r#"("fingerprint": ")[a-z0-9]+(",)"#, "$1[FINGERPRINT]$2");
+    let _s = settings.bind_to_scope();
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab").arg("--warn").arg("unresolved-reference")
+        .env("CI_PROJECT_DIR", case.project_dir), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "check_name": "unresolved-reference",
+        "description": "unresolved-reference: Name `x` used when not defined",
+        "severity": "minor",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 2,
+              "column": 7
+            },
+            "end": {
+              "line": 2,
+              "column": 8
+            }
+          }
+        }
+      },
+      {
+        "check_name": "non-subscriptable",
+        "description": "non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
+        "severity": "major",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 3,
+              "column": 7
+            },
+            "end": {
+              "line": 3,
+              "column": 8
+            }
+          }
+        }
+      }
+    ]
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn github_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (non-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=8::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
@@ -550,7 +732,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info[revealed-type] test.py:5:13: Revealed type: `Literal["hello"]`
+    test.py:5:13: info[revealed-type] Revealed type: `Literal["hello"]`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -583,7 +765,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
      --> test.py:4:13
       |
     2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
       |

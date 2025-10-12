@@ -236,7 +236,7 @@ impl SystemPath {
     ///
     /// [`CurDir`]: camino::Utf8Component::CurDir
     #[inline]
-    pub fn components(&self) -> camino::Utf8Components {
+    pub fn components(&self) -> camino::Utf8Components<'_> {
         self.0.components()
     }
 
@@ -504,8 +504,8 @@ impl ToOwned for SystemPath {
 pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
 impl get_size2::GetSize for SystemPathBuf {
-    fn get_heap_size(&self) -> usize {
-        self.0.capacity()
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (self.0.capacity(), tracker)
     }
 }
 
@@ -762,7 +762,7 @@ impl SystemVirtualPath {
 }
 
 /// An owned, virtual path on [`System`](`super::System`) (akin to [`String`]).
-#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub struct SystemVirtualPathBuf(String);
 
 impl SystemVirtualPathBuf {

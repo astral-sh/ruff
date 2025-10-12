@@ -13,7 +13,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import type { Workspace } from "ty_wasm";
+import { FileHandle, Workspace } from "ty_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
@@ -22,6 +22,7 @@ import SecondaryPanel, {
   SecondaryTool,
 } from "./SecondaryPanel";
 import Diagnostics, { Diagnostic } from "./Diagnostics";
+import VendoredFileBanner from "./VendoredFileBanner";
 import { FileId, ReadonlyFiles } from "../Playground";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
@@ -49,6 +50,10 @@ export interface Props {
   onRemoveFile(workspace: Workspace, file: FileId): void;
 
   onSelectFile(id: FileId): void;
+
+  onSelectVendoredFile(handle: FileHandle): void;
+
+  onClearVendoredFile(): void;
 }
 
 export default function Chrome({
@@ -61,6 +66,8 @@ export default function Chrome({
   onRemoveFile,
   onSelectFile,
   onChangeFile,
+  onSelectVendoredFile,
+  onClearVendoredFile,
 }: Props) {
   const workspace = use(workspacePromise);
 
@@ -77,6 +84,24 @@ export default function Chrome({
     onRenameFile(workspace, file, newName);
     editorRef.current?.editor.focus();
   };
+
+  const handleBackToUserFile = useCallback(() => {
+    if (editorRef.current && files.selected != null) {
+      const selectedFile = files.index.find(
+        (file) => file.id === files.selected,
+      );
+      if (selectedFile != null) {
+        const monaco = editorRef.current.monaco;
+        const fileUri = monaco.Uri.file(selectedFile.name);
+        const userModel = monaco.editor.getModel(fileUri);
+
+        if (userModel != null) {
+          onClearVendoredFile();
+          editorRef.current.editor.setModel(userModel);
+        }
+      }
+    }
+  }, [files.selected, files.index, onClearVendoredFile]);
 
   const handleSecondaryToolSelected = useCallback(
     (tool: SecondaryTool | null) => {
@@ -134,7 +159,12 @@ export default function Chrome({
     [workspace, files.index, onRemoveFile],
   );
 
-  const checkResult = useCheckResult(files, workspace, secondaryTool);
+  const checkResult = useCheckResult(
+    files,
+    workspace,
+    secondaryTool,
+    files.currentVendoredFile ?? null,
+  );
 
   return (
     <>
@@ -153,11 +183,25 @@ export default function Chrome({
             <Panel
               id="main"
               order={0}
-              className="flex flex-col gap-2 my-4"
+              className={`flex flex-col gap-2 ${files.currentVendoredFile ? "mb-4" : "my-4"}`}
               minSize={10}
             >
               <PanelGroup id="vertical" direction="vertical">
-                <Panel minSize={10} className="my-2" order={0}>
+                <Panel
+                  minSize={10}
+                  className={files.currentVendoredFile ? "mb-2" : "my-2"}
+                  order={0}
+                >
+                  {files.currentVendoredFile != null && (
+                    <VendoredFileBanner
+                      currentVendoredFile={files.currentVendoredFile}
+                      selectedFile={{
+                        id: files.selected,
+                        name: selectedFileName,
+                      }}
+                      onBackToUserFile={handleBackToUserFile}
+                    />
+                  )}
                   <Editor
                     theme={theme}
                     visible={true}
@@ -169,6 +213,9 @@ export default function Chrome({
                     onMount={handleEditorMount}
                     onChange={(content) => onChangeFile(workspace, content)}
                     onOpenFile={onSelectFile}
+                    onVendoredFileChange={onSelectVendoredFile}
+                    onBackToUserFile={handleBackToUserFile}
+                    isViewingVendoredFile={files.currentVendoredFile != null}
                   />
                   {checkResult.error ? (
                     <div
@@ -182,8 +229,8 @@ export default function Chrome({
                       <ErrorMessage>{checkResult.error}</ErrorMessage>
                     </div>
                   ) : null}
-                  <VerticalResizeHandle />
                 </Panel>
+                <VerticalResizeHandle />
                 <Panel
                   id="diagnostics"
                   minSize={3}
@@ -231,22 +278,26 @@ function useCheckResult(
   files: ReadonlyFiles,
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
+  currentVendoredFileHandle: FileHandle | null,
 ): CheckResult {
   const deferredContent = useDeferredValue(
     files.selected == null ? null : files.contents[files.selected],
   );
 
   return useMemo(() => {
-    if (files.selected == null || deferredContent == null) {
-      return {
-        diagnostics: [],
-        error: null,
-        secondary: null,
-      };
-    }
+    // Determine which file handle to use
+    const currentHandle =
+      currentVendoredFileHandle ??
+      (files.selected == null ? null : files.handles[files.selected]);
 
-    const currentHandle = files.handles[files.selected];
-    if (currentHandle == null || !isPythonFile(currentHandle)) {
+    const isVendoredFile = currentVendoredFileHandle != null;
+
+    // Regular file handling
+    if (
+      currentHandle == null ||
+      deferredContent == null ||
+      !isPythonFile(currentHandle)
+    ) {
       return {
         diagnostics: [],
         error: null,
@@ -255,7 +306,10 @@ function useCheckResult(
     }
 
     try {
-      const diagnostics = workspace.checkFile(currentHandle);
+      // Don't run diagnostics for vendored files - always empty
+      const diagnostics = isVendoredFile
+        ? []
+        : workspace.checkFile(currentHandle);
 
       let secondary: SecondaryPanelResult = null;
 
@@ -276,10 +330,15 @@ function useCheckResult(
             break;
 
           case "Run":
-            secondary = {
-              status: "ok",
-              content: "",
-            };
+            secondary = isVendoredFile
+              ? {
+                  status: "error",
+                  error: "Cannot run vendored/standard library files",
+                }
+              : {
+                  status: "ok",
+                  content: "",
+                };
             break;
         }
       } catch (error: unknown) {
@@ -289,8 +348,7 @@ function useCheckResult(
         };
       }
 
-      // Eagerly convert the diagnostic to avoid out of bound errors
-      // when the diagnostics are "deferred".
+      // Convert diagnostics (empty array for vendored files)
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
@@ -305,9 +363,6 @@ function useCheckResult(
         secondary,
       };
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(e);
-
       return {
         diagnostics: [],
         error: formatError(e),
@@ -320,6 +375,7 @@ function useCheckResult(
     files.selected,
     files.handles,
     secondaryTool,
+    currentVendoredFileHandle,
   ]);
 }
 

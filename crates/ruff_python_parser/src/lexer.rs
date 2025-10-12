@@ -1687,7 +1687,7 @@ impl<'a> LexedText<'a> {
 }
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
-pub fn lex(source: &str, mode: Mode) -> Lexer {
+pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
 

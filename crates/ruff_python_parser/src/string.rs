@@ -41,7 +41,7 @@ impl From<StringType> for Expr {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InterpolatedStringKind {
     FString,
     TString,
@@ -287,7 +287,7 @@ impl StringParser {
             return Ok(ast::InterpolatedStringLiteralElement {
                 value: self.source,
                 range: self.range,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             });
         };
 
@@ -365,7 +365,7 @@ impl StringParser {
         Ok(ast::InterpolatedStringLiteralElement {
             value: value.into_boxed_str(),
             range: self.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -387,7 +387,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }));
         }
 
@@ -397,7 +397,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }));
         };
 
@@ -435,7 +435,7 @@ impl StringParser {
             value: value.into_boxed_slice(),
             range: self.range,
             flags: self.flags.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }))
     }
 
@@ -446,7 +446,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }));
         }
 
@@ -456,7 +456,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }));
         };
 
@@ -494,7 +494,7 @@ impl StringParser {
             value: value.into_boxed_str(),
             range: self.range,
             flags: self.flags.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }))
     }
 
@@ -850,58 +850,58 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_t_string_concat_1() {
+    fn test_parse_t_string_concat_1_error() {
         let source = "'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_t_string_concat_2() {
+    fn test_parse_t_string_concat_2_error() {
         let source = "'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_t_string_concat_3() {
+    fn test_parse_t_string_concat_3_error() {
         let source = "'Hello ' t'world{\"!\"}'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_t_string_concat_4() {
+    fn test_parse_t_string_concat_4_error() {
         let source = "'Hello ' t'world{\"!\"}' 'again!'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_u_t_string_concat_1() {
+    fn test_parse_u_t_string_concat_1_error() {
         let source = "u'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_u_t_string_concat_2() {
+    fn test_parse_u_t_string_concat_2_error() {
         let source = "u'Hello ' t'world' '!'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_f_t_string_concat_1() {
+    fn test_parse_f_t_string_concat_1_error() {
         let source = "f'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_f_t_string_concat_2() {
+    fn test_parse_f_t_string_concat_2_error() {
         let source = "f'Hello ' t'world' '!'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 

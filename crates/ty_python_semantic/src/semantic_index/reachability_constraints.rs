@@ -201,12 +201,16 @@ use rustc_hash::FxHashMap;
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{RequiresExplicitReExport, imported_symbol};
-use crate::semantic_index::expression::Expression;
+use crate::rank::RankBitBox;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    Predicates, ScopedPredicateId,
 };
-use crate::types::{Truthiness, Type, infer_expression_type};
+use crate::types::{
+    IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
+    infer_expression_type, static_expression_truthiness,
+};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -282,6 +286,10 @@ impl ScopedReachabilityConstraintId {
     fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
+
+    fn as_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl Idx for ScopedReachabilityConstraintId {
@@ -305,15 +313,76 @@ const AMBIGUOUS: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId
 const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
+fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+    let ty = match singleton {
+        ruff_python_ast::Singleton::None => Type::none(db),
+        ruff_python_ast::Singleton::True => Type::BooleanLiteral(true),
+        ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
+    };
+    debug_assert!(ty.is_singleton(db));
+    ty
+}
+
+/// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
+/// match that pattern.
+fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
+    match kind {
+        PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
+        PatternPredicateKind::Value(value) => {
+            infer_expression_type(db, *value, TypeContext::default())
+        }
+        PatternPredicateKind::Class(class_expr, kind) => {
+            if kind.is_irrefutable() {
+                infer_expression_type(db, *class_expr, TypeContext::default())
+                    .to_instance(db)
+                    .unwrap_or(Type::Never)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Or(predicates) => {
+            UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
+        }
+        PatternPredicateKind::As(pattern, _) => pattern
+            .as_deref()
+            .map(|p| pattern_kind_to_type(db, p))
+            .unwrap_or_else(Type::object),
+        PatternPredicateKind::Unsupported => Type::Never,
+    }
+}
+
+/// Go through the list of previous match cases, and accumulate a union of all types that were already
+/// matched by these patterns.
+fn type_excluded_by_previous_patterns<'db>(
+    db: &'db dyn Db,
+    mut predicate: PatternPredicate<'db>,
+) -> Type<'db> {
+    let mut builder = UnionBuilder::new(db);
+    while let Some(previous) = predicate.previous_predicate(db) {
+        predicate = *previous;
+
+        if predicate.guard(db).is_none() {
+            builder = builder.add(pattern_kind_to_type(db, predicate.kind(db)));
+        }
+    }
+    builder.build()
+}
+
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
-    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    /// The interior TDD nodes that were marked as used when being built.
+    used_interiors: Box<[InteriorNode]>,
+    /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
+    /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
+    /// index of that node in the `used_interiors` vector.
+    used_indices: RankBitBox,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -334,14 +403,50 @@ pub(crate) struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
+        let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
+        let used_interiors = (self.interiors.into_iter())
+            .zip(self.interior_used)
+            .filter_map(|(interior, used)| used.then_some(interior))
+            .collect();
         ReachabilityConstraints {
-            interiors: self.interiors,
+            used_interiors,
+            used_indices,
         }
     }
 
-    /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
-    /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
-    /// any internal node, since they are leaf nodes.
+    /// Marks that a particular TDD node is used. This lets us throw away interior nodes that were
+    /// only calculated for intermediate values, and which don't need to be included in the final
+    /// built result.
+    pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
+        if !node.is_terminal() && !self.interior_used[node] {
+            self.interior_used[node] = true;
+            let node = self.interiors[node];
+            self.mark_used(node.if_true);
+            self.mark_used(node.if_ambiguous);
+            self.mark_used(node.if_false);
+        }
+    }
+
+    /// Implements the ordering that determines which level a TDD node appears at.
+    ///
+    /// Each interior node checks the value of a single variable (for us, a `Predicate`).
+    /// TDDs are ordered such that every path from the root of the graph to the leaves must
+    /// check each variable at most once, and must check each variable in the same order.
+    ///
+    /// We can choose any ordering that we want, as long as it's consistent — with the
+    /// caveat that terminal nodes must always be last in the ordering, since they are the
+    /// leaf nodes of the graph.
+    ///
+    /// We currently compare interior nodes by looking at the Salsa IDs of each variable's
+    /// `Predicate`, since this is already available and easy to compare. We also _reverse_
+    /// the comparison of those Salsa IDs. The Salsa IDs are assigned roughly sequentially
+    /// while traversing the source code. Reversing the comparison means `Predicate`s that
+    /// appear later in the source will tend to be placed "higher" (closer to the root) in
+    /// the TDD graph. We have found empirically that this leads to smaller TDD graphs [1],
+    /// since there are often repeated combinations of `Predicate`s from earlier in the
+    /// file.
+    ///
+    /// [1]: https://github.com/astral-sh/ruff/pull/20098
     fn cmp_atoms(
         &self,
         a: ScopedReachabilityConstraintId,
@@ -354,7 +459,12 @@ impl ReachabilityConstraintsBuilder {
         } else if b.is_terminal() {
             Ordering::Less
         } else {
-            self.interiors[a].atom.cmp(&self.interiors[b].atom)
+            // See https://github.com/astral-sh/ruff/pull/20098 for an explanation of why this
+            // ordering is reversed.
+            self.interiors[a]
+                .atom
+                .cmp(&self.interiors[b].atom)
+                .reverse()
         }
     }
 
@@ -367,10 +477,10 @@ impl ReachabilityConstraintsBuilder {
             return node.if_true;
         }
 
-        *self
-            .interior_cache
-            .entry(node)
-            .or_insert_with(|| self.interiors.push(node))
+        *self.interior_cache.entry(node).or_insert_with(|| {
+            self.interior_used.push(false);
+            self.interiors.push(node)
+        })
     }
 
     /// Adds a new reachability constraint that checks a single [`Predicate`].
@@ -578,7 +688,21 @@ impl ReachabilityConstraints {
                 ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.interiors[id],
+                _ => {
+                    // `id` gives us the index of this node in the IndexVec that we used when
+                    // constructing this BDD. When finalizing the builder, we threw away any
+                    // interior nodes that weren't marked as used. The `used_indices` bit vector
+                    // lets us verify that this node was marked as used, and the rank of that bit
+                    // in the bit vector tells us where this node lives in the "condensed"
+                    // `used_interiors` vector.
+                    let raw_index = id.as_u32() as usize;
+                    debug_assert!(
+                        self.used_indices.get_bit(raw_index).unwrap_or(false),
+                        "all used reachability constraints should have been marked as used",
+                    );
+                    let index = self.used_indices.rank(raw_index) as usize;
+                    self.used_interiors[index]
+                }
             };
             let predicate = &predicates[node.atom];
             match Self::analyze_single(db, predicate) {
@@ -592,12 +716,11 @@ impl ReachabilityConstraints {
     fn analyze_single_pattern_predicate_kind<'db>(
         db: &'db dyn Db,
         predicate_kind: &PatternPredicateKind<'db>,
-        subject: Expression<'db>,
+        subject_ty: Type<'db>,
     ) -> Truthiness {
         match predicate_kind {
             PatternPredicateKind::Value(value) => {
-                let subject_ty = infer_expression_type(db, subject);
-                let value_ty = infer_expression_type(db, *value);
+                let value_ty = infer_expression_type(db, *value, TypeContext::default());
 
                 if subject_ty.is_single_valued(db) {
                     Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -606,15 +729,7 @@ impl ReachabilityConstraints {
                 }
             }
             PatternPredicateKind::Singleton(singleton) => {
-                let subject_ty = infer_expression_type(db, subject);
-
-                let singleton_ty = match singleton {
-                    ruff_python_ast::Singleton::None => Type::none(db),
-                    ruff_python_ast::Singleton::True => Type::BooleanLiteral(true),
-                    ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
-                };
-
-                debug_assert!(singleton_ty.is_singleton(db));
+                let singleton_ty = singleton_to_type(db, *singleton);
 
                 if subject_ty.is_equivalent_to(db, singleton_ty) {
                     Truthiness::AlwaysTrue
@@ -626,10 +741,21 @@ impl ReachabilityConstraints {
             }
             PatternPredicateKind::Or(predicates) => {
                 use std::ops::ControlFlow;
+
+                let mut excluded_types = vec![];
                 let (ControlFlow::Break(truthiness) | ControlFlow::Continue(truthiness)) =
                     predicates
                         .iter()
-                        .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject))
+                        .map(|p| {
+                            let narrowed_subject_ty = IntersectionBuilder::new(db)
+                                .add_positive(subject_ty)
+                                .add_negative(UnionType::from_elements(db, excluded_types.iter()))
+                                .build();
+
+                            excluded_types.push(pattern_kind_to_type(db, p));
+
+                            Self::analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
+                        })
                         // this is just a "max", but with a slight optimization: `AlwaysTrue` is the "greatest" possible element, so we short-circuit if we get there
                         .try_fold(Truthiness::AlwaysFalse, |acc, next| match (acc, next) {
                             (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => {
@@ -644,13 +770,20 @@ impl ReachabilityConstraints {
                         });
                 truthiness
             }
-            PatternPredicateKind::Class(class_expr) => {
-                let subject_ty = infer_expression_type(db, subject);
-                let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
+            PatternPredicateKind::Class(class_expr, kind) => {
+                let class_ty =
+                    infer_expression_type(db, *class_expr, TypeContext::default()).to_instance(db);
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {
-                        Truthiness::AlwaysTrue
+                        if kind.is_irrefutable() {
+                            Truthiness::AlwaysTrue
+                        } else {
+                            // A class pattern like `case Point(x=0, y=0)` is not irrefutable,
+                            // i.e. it does not match all instances of `Point`. This means that
+                            // we can't tell for sure if this pattern will match or not.
+                            Truthiness::Ambiguous
+                        }
                     } else if subject_ty.is_disjoint_from(db, class_ty) {
                         Truthiness::AlwaysFalse
                     } else {
@@ -658,15 +791,26 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
+                .unwrap_or(Truthiness::AlwaysTrue),
             PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
         }
     }
 
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
+        let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+
+        let narrowed_subject_ty = IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_negative(type_excluded_by_previous_patterns(db, predicate))
+            .build();
+
         let truthiness = Self::analyze_single_pattern_predicate_kind(
             db,
             predicate.kind(db),
-            predicate.subject(db),
+            narrowed_subject_ty,
         );
 
         if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
@@ -679,27 +823,84 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+        let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
+
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                let ty = infer_expression_type(db, test_expr);
-                ty.bool(db).negate_if(!predicate.is_positive)
+                static_expression_truthiness(db, test_expr).negate_if(!predicate.is_positive)
+            }
+            PredicateNode::ReturnsNever(CallableAndCallExpr {
+                callable,
+                call_expr,
+            }) => {
+                // We first infer just the type of the callable. In the most likely case that the
+                // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
+                // doing so allows us to avoid the more expensive work of inferring the entire call
+                // expression (which could involve inferring argument types to possibly run the overload
+                // selection algorithm).
+                // Avoiding this on the happy-path is important because these constraints can be
+                // very large in number, since we add them on all statement level function calls.
+                let ty = infer_expression_type(db, callable, TypeContext::default());
+
+                // Short-circuit for well known types that are known not to return `Never` when called.
+                // Without the short-circuit, we've seen that threads keep blocking each other
+                // because they all try to acquire Salsa's `CallableType` lock that ensures each type
+                // is only interned once. The lock is so heavily congested because there are only
+                // very few dynamic types, in which case Salsa's sharding the locks by value
+                // doesn't help much.
+                // See <https://github.com/astral-sh/ty/issues/968>.
+                if matches!(ty, Type::Dynamic(_)) {
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                }
+
+                let overloads_iterator =
+                    if let Some(Type::Callable(callable)) = ty.into_callable(db) {
+                        callable.signatures(db).overloads.iter()
+                    } else {
+                        return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                    };
+
+                let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
+                    .fold((true, true), |(none, all), overload| {
+                        let overload_returns_never =
+                            overload.return_ty.is_some_and(|return_type| {
+                                return_type.is_equivalent_to(db, Type::Never)
+                            });
+
+                        (
+                            none && !overload_returns_never,
+                            all && overload_returns_never,
+                        )
+                    });
+
+                if no_overloads_return_never {
+                    Truthiness::AlwaysFalse
+                } else if all_overloads_return_never {
+                    Truthiness::AlwaysTrue
+                } else {
+                    let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                    if call_expr_ty.is_equivalent_to(db, Type::Never) {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::AlwaysFalse
+                    }
+                }
+                .negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
                 let place_table = place_table(db, star_import.scope(db));
-                let symbol_name = place_table
-                    .place_expr(star_import.symbol_id(db))
-                    .expect_name();
+                let symbol = place_table.symbol(star_import.symbol_id(db));
                 let referenced_file = star_import.referenced_file(db);
 
                 let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {
                     Some(all_names) => {
-                        if all_names.contains(symbol_name) {
+                        if all_names.contains(symbol.name()) {
                             Some(RequiresExplicitReExport::No)
                         } else {
                             tracing::trace!(
                                 "Symbol `{}` (via star import) not found in `__all__` of `{}`",
-                                symbol_name,
+                                symbol.name(),
                                 referenced_file.path(db)
                             );
                             return Truthiness::AlwaysFalse;
@@ -708,8 +909,13 @@ impl ReachabilityConstraints {
                     None => None,
                 };
 
-                match imported_symbol(db, referenced_file, symbol_name, requires_explicit_reexport)
-                    .place
+                match imported_symbol(
+                    db,
+                    referenced_file,
+                    symbol.name(),
+                    requires_explicit_reexport,
+                )
+                .place
                 {
                     crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
                         Truthiness::AlwaysTrue

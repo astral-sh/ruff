@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B008_extended.py:24:51: B008 Do not perform function call `Depends` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B008 Do not perform function call `Depends` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_extended.py:24:51
    |
 24 | def error_due_to_missing_import(data: List[str] = Depends(None)):
-   |                                                   ^^^^^^^^^^^^^ B008
+   |                                                   ^^^^^^^^^^^^^
 25 |     ...
    |
 
-B008_extended.py:36:15: B008 Do not perform function call `OtherClass` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B008 Do not perform function call `OtherClass` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_extended.py:36:15
    |
 36 | def error(obj=OtherClass()):
-   |               ^^^^^^^^^^^^ B008
+   |               ^^^^^^^^^^^^
 37 |     ...
    |
 
-B008_extended.py:48:17: B008 Do not perform function call `L` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B008 Do not perform function call `L` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_extended.py:48:17
    |
 47 | def okay(obj = N()): ...
 48 | def error(obj = L()): ...
-   |                 ^^^ B008
+   |                 ^^^
    |

@@ -33,6 +33,9 @@ impl fmt::Debug for TextSize {
 }
 
 impl TextSize {
+    /// A `TextSize` of zero.
+    pub const ZERO: TextSize = TextSize::new(0);
+
     /// Creates a new `TextSize` at the given `offset`.
     ///
     /// # Examples

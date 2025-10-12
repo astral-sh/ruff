@@ -60,7 +60,7 @@ fn config_option_ignored_but_validated() {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME))
                 .arg("version")
-                .args(["--config", "foo = bar"]), @r#"
+                .args(["--config", "foo = bar"]), @r"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -77,12 +77,11 @@ fn config_option_ignored_but_validated() {
         TOML parse error at line 1, column 7
           |
         1 | foo = bar
-          |       ^
-        invalid string
-        expected `"`, `'`
+          |       ^^^
+        string values must be quoted, expected literal string
 
         For more information, try '--help'.
-        "#
+        "
         );
     });
 }

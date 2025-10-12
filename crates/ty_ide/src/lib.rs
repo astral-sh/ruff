@@ -1,22 +1,55 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
+mod all_symbols;
 mod completion;
-mod db;
+mod doc_highlights;
+mod docstring;
+mod document_symbols;
 mod find_node;
 mod goto;
+mod goto_declaration;
+mod goto_definition;
+mod goto_references;
+mod goto_type_definition;
 mod hover;
+mod importer;
 mod inlay_hints;
 mod markup;
+mod references;
+mod rename;
+mod selection_range;
+mod semantic_tokens;
+mod signature_help;
+mod stub_mapping;
+mod symbols;
+mod workspace_symbols;
 
-pub use completion::completion;
-pub use db::Db;
-pub use goto::goto_type_definition;
+pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
+pub use doc_highlights::document_highlights;
+pub use document_symbols::document_symbols;
+pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use goto_references::goto_references;
 pub use hover::hover;
-pub use inlay_hints::inlay_hints;
+pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
 pub use markup::MarkupKind;
+pub use references::ReferencesMode;
+pub use rename::{can_rename, rename};
+pub use selection_range::selection_range;
+pub use semantic_tokens::{
+    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
+};
+pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
+pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
+pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
+use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -75,6 +108,15 @@ pub struct NavigationTarget {
 }
 
 impl NavigationTarget {
+    /// Creates a new `NavigationTarget` where the focus and full range are identical.
+    pub fn new(file: File, range: TextRange) -> Self {
+        Self {
+            file,
+            focus_range: range,
+            full_range: range,
+        }
+    }
+
     pub fn file(&self) -> File {
         self.file
     }
@@ -88,16 +130,63 @@ impl NavigationTarget {
     }
 }
 
+/// Specifies the kind of reference operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReferenceKind {
+    /// A read reference to a symbol (e.g., using a variable's value)
+    Read,
+    /// A write reference to a symbol (e.g., assigning to a variable)
+    Write,
+    /// Neither a read or a write (e.g., a function or class declaration)
+    Other,
+}
+
+/// Target of a reference with information about the kind of operation.
+/// Unlike `NavigationTarget`, this type is specifically designed for references
+/// and contains only a single range (not separate focus/full ranges) and
+/// includes information about whether the reference is a read or write operation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ReferenceTarget {
+    file_range: FileRange,
+    kind: ReferenceKind,
+}
+
+impl ReferenceTarget {
+    /// Creates a new `ReferenceTarget`.
+    pub fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
+        Self {
+            file_range: FileRange::new(file, range),
+            kind,
+        }
+    }
+
+    pub fn file(&self) -> File {
+        self.file_range.file()
+    }
+
+    pub fn range(&self) -> TextRange {
+        self.file_range.range()
+    }
+
+    pub fn file_range(&self) -> FileRange {
+        self.file_range
+    }
+
+    pub fn kind(&self) -> ReferenceKind {
+        self.kind
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NavigationTargets(smallvec::SmallVec<[NavigationTarget; 1]>);
 
 impl NavigationTargets {
     fn single(target: NavigationTarget) -> Self {
-        Self(smallvec::smallvec![target])
+        Self(smallvec::smallvec_inline![target])
     }
 
     fn empty() -> Self {
-        Self(smallvec::SmallVec::new())
+        Self(smallvec::SmallVec::new_const())
     }
 
     fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {
@@ -153,7 +242,8 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::Union(union) => union
-                .iter(db)
+                .elements(db)
+                .iter()
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
@@ -199,13 +289,19 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::TestDb;
+    use camino::Utf8Component;
     use insta::internals::SettingsBindDropGuard;
+
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::files::{File, FileRootKind, system_path_to_file};
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_codegen::Stylist;
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
+    use ty_project::ProjectMetadata;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
@@ -219,7 +315,7 @@ mod tests {
     }
 
     pub(super) struct CursorTest {
-        pub(super) db: TestDb,
+        pub(super) db: ty_project::TestDb,
         pub(super) cursor: Cursor,
         _insta_settings_guard: SettingsBindDropGuard,
     }
@@ -258,11 +354,17 @@ mod tests {
         }
     }
 
-    /// The file and offset into that file containing
-    /// a `<CURSOR>` marker.
+    /// The file and offset into that file where a `<CURSOR>` marker
+    /// is located.
+    ///
+    /// (Along with other information about that file, such as the
+    /// parsed AST.)
     pub(super) struct Cursor {
         pub(super) file: File,
         pub(super) offset: TextSize,
+        pub(super) parsed: ParsedModuleRef,
+        pub(super) source: SourceText,
+        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -274,30 +376,10 @@ mod tests {
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = TestDb::new();
-            let mut cursor: Option<Cursor> = None;
-            for &Source {
-                ref path,
-                ref contents,
-                cursor_offset,
-            } in &self.sources
-            {
-                db.write_file(path, contents)
-                    .expect("write to memory file system to be successful");
-                let Some(offset) = cursor_offset else {
-                    continue;
-                };
-
-                let file = system_path_to_file(&db, path).expect("newly written file to existing");
-                // This assert should generally never trip, since
-                // we have an assert on `CursorTestBuilder::source`
-                // to ensure we never have more than one marker.
-                assert!(
-                    cursor.is_none(),
-                    "found more than one source that contains `<CURSOR>`"
-                );
-                cursor = Some(Cursor { file, offset });
-            }
+            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
 
             let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
                 .to_search_paths(db.system(), db.vendored())
@@ -312,8 +394,55 @@ mod tests {
                 },
             );
 
+            let mut cursor: Option<Cursor> = None;
+            for &Source {
+                ref path,
+                ref contents,
+                cursor_offset,
+            } in &self.sources
+            {
+                db.write_file(path, contents)
+                    .expect("write to memory file system to be successful");
+
+                // Add a root for the top-most component.
+                let top = path.components().find_map(|c| match c {
+                    Utf8Component::Normal(c) => Some(c),
+                    _ => None,
+                });
+                if let Some(top) = top {
+                    let top = SystemPath::new(top);
+                    if db.system().is_directory(top) {
+                        db.files()
+                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                    }
+                }
+
+                let file = system_path_to_file(&db, path).expect("newly written file to existing");
+
+                if let Some(offset) = cursor_offset {
+                    // This assert should generally never trip, since
+                    // we have an assert on `CursorTestBuilder::source`
+                    // to ensure we never have more than one marker.
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+                    let source = source_text(&db, file);
+                    let parsed = parsed_module(&db, file).load(&db);
+                    let stylist =
+                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                    cursor = Some(Cursor {
+                        file,
+                        offset,
+                        parsed,
+                        source,
+                        stylist,
+                    });
+                }
+            }
+
             let mut insta_settings = insta::Settings::clone_current();
-            insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+            insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
             // Filter out TODO types because they are different between debug and release builds.
             insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
 
@@ -329,12 +458,12 @@ mod tests {
         pub(super) fn source(
             &mut self,
             path: impl Into<SystemPathBuf>,
-            contents: impl Into<String>,
+            contents: impl AsRef<str>,
         ) -> &mut CursorTestBuilder {
             const MARKER: &str = "<CURSOR>";
 
             let path = path.into();
-            let contents = contents.into();
+            let contents = dedent(contents.as_ref()).into_owned();
             let Some(cursor_offset) = contents.find(MARKER) else {
                 self.sources.push(Source {
                     path,

@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+ --> RUF013_1.py:4:12
+  |
+4 | def f(arg: int = None):  # RUF013
+  |            ^^^
+5 |     pass
+  |
+help: Convert to `T | None`
+1 | # No `typing.Optional` import
+2 + from __future__ import annotations
+3 | 
+4 | 
+  - def f(arg: int = None):  # RUF013
+5 + def f(arg: int | None = None):  # RUF013
+6 |     pass
+note: This is an unsafe fix and may change runtime behavior

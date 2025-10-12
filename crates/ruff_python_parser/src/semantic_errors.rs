@@ -3,16 +3,16 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
-use std::fmt::Display;
-
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
     comparable::ComparableExpr,
+    helpers,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::fmt::Display;
 
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
@@ -58,9 +58,59 @@ impl SemanticSyntaxChecker {
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
-                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+            Stmt::ImportFrom(StmtImportFrom {
+                range,
+                module,
+                level,
+                names,
+                ..
+            }) => {
+                if matches!(module.as_deref(), Some("__future__")) {
+                    for name in names {
+                        if !is_known_future_feature(&name.name) {
+                            // test_ok valid_future_feature
+                            // from __future__ import annotations
+
+                            // test_err invalid_future_feature
+                            // from __future__ import invalid_feature
+                            // from __future__ import annotations, invalid_feature
+                            // from __future__ import invalid_feature_1, invalid_feature_2
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::FutureFeatureNotDefined(
+                                    name.name.to_string(),
+                                ),
+                                name.range,
+                            );
+                        }
+                    }
+                    if self.seen_futures_boundary {
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                    }
+                }
+                for alias in names {
+                    if alias.name.as_str() == "*" && !ctx.in_module_scope() {
+                        // test_err import_from_star
+                        // def f1():
+                        //     from module import *
+                        // class C:
+                        //     from module import *
+                        // def f2():
+                        //     from ..module import *
+                        // def f3():
+                        //     from module import *, *
+
+                        // test_ok import_from_star
+                        // from module import *
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::NonModuleImportStar(
+                                helpers::format_import_from(*level, module.as_deref()).to_string(),
+                            ),
+                            *range,
+                        );
+                        break;
+                    }
                 }
             }
             Stmt::Match(match_stmt) => {
@@ -356,6 +406,40 @@ impl SemanticSyntaxChecker {
                 SemanticSyntaxErrorKind::InvalidStarExpression,
                 expr.range(),
             );
+        }
+    }
+
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr_ctx: ExprContext,
+        elts: &[Expr],
+        range: TextRange,
+    ) {
+        if expr_ctx.is_store() {
+            let mut has_starred = false;
+            for elt in elts {
+                if elt.is_starred_expr() {
+                    if has_starred {
+                        // test_err multiple_starred_assignment_target
+                        // (*a, *b) = (1, 2)
+                        // [*a, *b] = (1, 2)
+                        // (*a, *b, c) = (1, 2, 3)
+                        // [*a, *b, c] = (1, 2, 3)
+                        // (*a, *b, (*c, *d)) = (1, 2)
+
+                        // test_ok multiple_starred_assignment_target
+                        // (*a, b) = (1, 2)
+                        // (*_, normed), *_ = [(1,), 2]
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                            range,
+                        );
+                        return;
+                    }
+                    has_starred = true;
+                }
+            }
         }
     }
 
@@ -709,10 +793,34 @@ impl SemanticSyntaxChecker {
             }
             Expr::YieldFrom(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+                if ctx.in_function_scope() && ctx.in_async_context() {
+                    // test_err yield_from_in_async_function
+                    // async def f(): yield from x
+
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::YieldFromInAsyncFunction,
+                        expr.range(),
+                    );
+                }
             }
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
                 Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
+            }
+            Expr::Tuple(ast::ExprTuple {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            })
+            | Expr::List(ast::ExprList {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            }) => {
+                Self::multiple_star_expression(ctx, *expr_ctx, elts, *range);
             }
             Expr::Lambda(ast::ExprLambda {
                 parameters: Some(parameters),
@@ -890,6 +998,22 @@ impl SemanticSyntaxChecker {
     }
 }
 
+fn is_known_future_feature(name: &str) -> bool {
+    matches!(
+        name,
+        "nested_scopes"
+            | "generators"
+            | "division"
+            | "absolute_import"
+            | "with_statement"
+            | "print_function"
+            | "unicode_literals"
+            | "barry_as_FLUFL"
+            | "generator_stop"
+            | "annotations"
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
@@ -952,6 +1076,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
+            SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { name, start: _ } => {
+                write!(f, "name `{name}` is used prior to nonlocal declaration")
+            }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("Starred expression cannot be used here")
             }
@@ -977,7 +1104,34 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
                 write!(f, "nonlocal declaration not allowed at module level")
             }
+            SemanticSyntaxErrorKind::NonlocalAndGlobal(name) => {
+                write!(f, "name `{name}` is nonlocal and global")
+            }
+            SemanticSyntaxErrorKind::AnnotatedGlobal(name) => {
+                write!(f, "annotated name `{name}` can't be global")
+            }
+            SemanticSyntaxErrorKind::AnnotatedNonlocal(name) => {
+                write!(f, "annotated name `{name}` can't be nonlocal")
+            }
+            SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
+                f.write_str("`yield from` statement in async function; use `async for` instead")
+            }
+            SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
+                write!(f, "`from {name} import *` only allowed at module level")
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                write!(f, "Two starred expressions in assignment")
+            }
+            SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                write!(f, "Future feature `{name}` is not defined")
+            }
         }
+    }
+}
+
+impl Ranged for SemanticSyntaxError {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -1201,6 +1355,24 @@ pub enum SemanticSyntaxErrorKind {
     /// [#111123]: https://github.com/python/cpython/issues/111123
     LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
+    /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f():
+    ///     counter = 0
+    ///     def increment():
+    ///         print(f"Adding 1 to {counter}")
+    ///         nonlocal counter  # SyntaxError: name 'counter' is used prior to nonlocal declaration
+    ///         counter += 1
+    /// ```
+    ///
+    /// ## Known Issues
+    ///
+    /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
+    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
     ///
@@ -1301,6 +1473,31 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a nonlocal declaration at module level
     NonlocalDeclarationAtModuleLevel,
+
+    /// Represents the same variable declared as both nonlocal and global
+    NonlocalAndGlobal(String),
+
+    /// Represents a type annotation on a variable that's been declared global
+    AnnotatedGlobal(String),
+
+    /// Represents a type annotation on a variable that's been declared nonlocal
+    AnnotatedNonlocal(String),
+
+    /// Represents the use of `yield from` inside an asynchronous function.
+    YieldFromInAsyncFunction,
+
+    /// Represents the use of `from <module> import *` outside module scope.
+    NonModuleImportStar(String),
+
+    /// Represents the use of more than one starred expression in an assignment.
+    ///
+    /// Python only allows a single starred target when unpacking values on the
+    /// left-hand side of an assignment. Using multiple starred expressions makes
+    /// the statement invalid and results in a `SyntaxError`.
+    MultipleStarredExpressions,
+
+    /// Represents the use of a `__future__` feature that is not defined.
+    FutureFeatureNotDefined(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

@@ -47,3 +47,19 @@ def _():
     from builtin import open
 
     with open(p) as _: ...  # No error
+
+file = "file_1.py"
+
+rename(file, "file_2.py")
+
+rename(
+    # commment 1
+    file, # comment 2
+    "file_2.py"
+    ,
+    # comment 3
+)
+
+rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
+
+rename(file, "file_2.py", src_dir_fd=1)

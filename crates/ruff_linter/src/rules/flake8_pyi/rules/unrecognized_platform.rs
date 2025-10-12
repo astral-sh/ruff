@@ -21,7 +21,9 @@ use crate::registry::Rule;
 ///
 /// ## Example
 /// ```pyi
-/// if sys.platform.startswith("linux"):
+/// import sys
+///
+/// if sys.platform == "xunil"[::-1]:
 ///     # Linux specific definitions
 ///     ...
 /// else:
@@ -31,6 +33,8 @@ use crate::registry::Rule;
 ///
 /// Instead, use a simple string comparison, such as `==` or `!=`:
 /// ```pyi
+/// import sys
+///
 /// if sys.platform == "linux":
 ///     # Linux specific definitions
 ///     ...
@@ -65,11 +69,15 @@ impl Violation for UnrecognizedPlatformCheck {
 ///
 /// ## Example
 /// ```pyi
+/// import sys
+///
 /// if sys.platform == "linus": ...
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// import sys
+///
 /// if sys.platform == "linux": ...
 /// ```
 ///

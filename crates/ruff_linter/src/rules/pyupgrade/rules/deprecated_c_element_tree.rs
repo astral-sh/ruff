@@ -14,12 +14,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// from xml.etree import cElementTree
+/// from xml.etree import cElementTree as ET
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// from xml.etree import ElementTree
+/// from xml.etree import ElementTree as ET
 /// ```
 ///
 /// ## References
@@ -43,6 +43,7 @@ where
     T: Ranged,
 {
     let mut diagnostic = checker.report_diagnostic(DeprecatedCElementTree, node.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     let contents = checker.locator().slice(node);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         contents.replacen("cElementTree", "ElementTree", 1),

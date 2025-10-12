@@ -46,6 +46,7 @@ class MDTestRunner:
                 CRATE_NAME,
                 "--no-run",
                 "--color=always",
+                "--test=mdtest",
                 "--message-format",
                 message_format,
             ],

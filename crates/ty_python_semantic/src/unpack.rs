@@ -5,9 +5,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{FileScopeId, ScopeId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
 
 /// This ingredient represents a single unpacking.
 ///
@@ -27,7 +26,7 @@ use crate::semantic_index::place::{FileScopeId, ScopeId};
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct Unpack<'db> {
     pub(crate) file: File,
 
@@ -45,9 +44,10 @@ pub(crate) struct Unpack<'db> {
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
     pub(crate) value: UnpackValue<'db>,
-
-    count: countme::Count<Unpack<'static>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
     pub(crate) fn target<'ast>(
@@ -56,16 +56,6 @@ impl<'db> Unpack<'db> {
         parsed: &'ast ParsedModuleRef,
     ) -> &'ast ast::Expr {
         self._target(db).node(parsed)
-    }
-
-    /// Returns the scope in which the unpack value expression belongs.
-    ///
-    /// The scope in which the target and value expression belongs to are usually the same
-    /// except in generator expressions and comprehensions (list/dict/set), where the value
-    /// expression of the first generator is evaluated in the outer scope, while the ones in the subsequent
-    /// generators are evaluated in the comprehension scope.
-    pub(crate) fn value_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.value_file_scope(db).to_scope_id(db, self.file(db))
     }
 
     /// Returns the scope where the unpack target expression belongs to.
@@ -80,7 +70,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackValue<'db> {
     /// The kind of unpack expression
     kind: UnpackKind,
@@ -98,18 +88,6 @@ impl<'db> UnpackValue<'db> {
         self.expression
     }
 
-    /// Returns the [`ScopedExpressionId`] of the underlying expression.
-    pub(crate) fn scoped_expression_id(
-        self,
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        module: &ParsedModuleRef,
-    ) -> ScopedExpressionId {
-        self.expression()
-            .node_ref(db, module)
-            .scoped_expression_id(db, scope)
-    }
-
     /// Returns the expression as an [`AnyNodeRef`].
     pub(crate) fn as_any_node_ref<'ast>(
         self,
@@ -124,18 +102,38 @@ impl<'db> UnpackValue<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum EvaluationMode {
+    Sync,
+    Async,
+}
+
+impl EvaluationMode {
+    pub(crate) const fn from_is_async(is_async: bool) -> Self {
+        if is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        }
+    }
+
+    pub(crate) const fn is_async(self) -> bool {
+        matches!(self, EvaluationMode::Async)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
-    Iterable,
+    Iterable { mode: EvaluationMode },
     /// An context manager expression like the one in a `with` statement.
-    ContextManager,
+    ContextManager { mode: EvaluationMode },
     /// An expression that is being assigned to a target.
     Assign,
 }
 
 /// The position of the target element in an unpacking.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum UnpackPosition {
     /// The target element is in the first position of the unpacking.
     First,

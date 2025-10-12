@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
@@ -19,7 +20,6 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
@@ -29,7 +29,7 @@ mod tests {
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, OldDiagnostic, assert_diagnostics, directives};
+    use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -374,6 +374,170 @@ mod tests {
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
+    }
+
+    #[test_case(Rule::UnusedImport, Path::new("F401_35.py"))]
+    fn f401_allowed_unused_imports_top_level_module(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                pyflakes: pyflakes::settings::Settings {
+                    allowed_unused_imports: vec!["hvplot".to_string()],
+                    ..pyflakes::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_2.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_3.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_4.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_5.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_6.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_7.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_8.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_9.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_10.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_11.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_12.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_13.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_14.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_15.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_16.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_17.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_18.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_19.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_20.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_35.py"))]
+    fn f401_preview_refined_submodule_handling_diffs(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview_diff__{}", path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
+        Ok(())
+    }
+
+    #[test_case(
+        r"
+        import a
+        import a.b
+        import a.c",
+        "f401_multiple_unused_submodules"
+    )]
+    #[test_case(
+        r"
+        import a
+        import a.b
+        a.foo()",
+        "f401_use_top_member"
+    )]
+    #[test_case(
+        r"
+        import a
+        import a.b
+        a.foo()
+        a.bar()",
+        "f401_use_top_member_twice"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between imports
+        import a
+        a.foo()
+        import a.b",
+        "f401_use_top_member_before_second_import"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between imports
+        import a
+        a.foo()
+        a = 1
+        import a.b",
+        "f401_use_top_member_and_redefine_before_second_import"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between imports
+        import a
+        a.foo()
+        import a.b
+        a = 1",
+        "f401_use_top_member_then_import_then_redefine"
+    )]
+    #[test_case(
+        r#"
+        import a
+        import a.b
+        __all__ = ["a"]"#,
+        "f401_use_in_dunder_all"
+    )]
+    #[test_case(
+        r"
+        import a.c
+        import a.b
+        a.foo()",
+        "f401_import_submodules_but_use_top_level"
+    )]
+    #[test_case(
+        r"
+        import a.c
+        import a.b.d
+        a.foo()",
+        "f401_import_submodules_different_lengths_but_use_top_level"
+    )]
+    #[test_case(
+        r"
+        # refined logic only applied _within_ scope
+        import a
+        def foo():
+            import a.b
+            a.foo()",
+        "f401_import_submodules_in_function_scope"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between bindings
+        import a
+        a.b
+        import a.b",
+        "f401_use_in_between_imports"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between bindings
+        import a.b
+        a
+        import a",
+        "f401_use_in_between_imports"
+    )]
+    fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
+        let diagnostics = test_contents(
+            &SourceKind::Python(dedent(contents).to_string()),
+            Path::new("f401_preview_submodule.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::UnusedImport)
+            },
+        )
+        .0;
+        assert_diagnostics!(snapshot, diagnostics);
     }
 
     #[test]
@@ -737,6 +901,7 @@ mod tests {
 
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
+    #[track_caller]
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
@@ -771,11 +936,11 @@ mod tests {
             &parsed,
             target_version,
         );
-        messages.sort_by_key(Ranged::start);
+        messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages
             .iter()
-            .filter(|msg| !msg.is_syntax_error())
-            .map(OldDiagnostic::name)
+            .filter(|msg| !msg.is_invalid_syntax())
+            .map(Diagnostic::name)
             .collect::<Vec<_>>();
         let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
         assert_eq!(actual, expected);
@@ -901,6 +1066,42 @@ mod tests {
         // Use of the C{__annotations__} in module scope should not emit
         // an undefined name warning when version is greater than or equal to 3.6.
         flakes("__annotations__", &[]);
+    }
+
+    #[test]
+    fn module_warningregistry() {
+        // Using __warningregistry__ should not be considered undefined.
+        flakes("__warningregistry__", &[]);
+    }
+
+    #[test]
+    fn module_annotate_py314_available() {
+        // __annotate__ is available starting in Python 3.14.
+        let diagnostics = crate::test::test_snippet(
+            "__annotate__",
+            &crate::settings::LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY314.into(),
+                ..crate::settings::LinterSettings::for_rules(vec![
+                    crate::codes::Rule::UndefinedName,
+                ])
+            },
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn module_annotate_pre_py314_undefined() {
+        // __annotate__ is not available before Python 3.14.
+        let diagnostics = crate::test::test_snippet(
+            "__annotate__",
+            &crate::settings::LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY313.into(),
+                ..crate::settings::LinterSettings::for_rules(vec![
+                    crate::codes::Rule::UndefinedName,
+                ])
+            },
+        );
+        assert_eq!(diagnostics.len(), 1);
     }
 
     #[test]
@@ -3568,7 +3769,7 @@ lambda: fu
         def f(a: A) -> A: pass
         class A: pass
         ",
-            &[Rule::UndefinedName, Rule::UndefinedName],
+            &[],
         );
         flakes(
             r"
@@ -3582,7 +3783,7 @@ lambda: fu
         a: A
         class A: pass
         ",
-            &[Rule::UndefinedName],
+            &[],
         );
         flakes(
             r"

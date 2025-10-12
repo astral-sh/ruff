@@ -163,7 +163,7 @@ fn stem(path: &str) -> &str {
 }
 
 /// Infer the [`Visibility`] of a module from its path.
-pub(crate) fn module_visibility(module: &Module) -> Visibility {
+pub(crate) fn module_visibility(module: Module) -> Visibility {
     match &module.source {
         ModuleSource::Path(path) => {
             if path.iter().any(|m| is_private_module(m)) {

@@ -13,6 +13,8 @@ pub(crate) struct ImportBinding<'a> {
     pub(crate) range: TextRange,
     /// The range of the import's parent statement.
     pub(crate) parent_range: Option<TextRange>,
+    /// Whether the binding needs `from __future__ import annotations` to be imported.
+    pub(crate) needs_future_import: bool,
 }
 
 impl Ranged for ImportBinding<'_> {

@@ -19,12 +19,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// foo = 'bar\'s'
+/// foo = "bar\"s"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo = "bar's"
+/// foo = 'bar"s'
 /// ```
 ///
 /// ## Formatter compatibility

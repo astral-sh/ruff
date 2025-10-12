@@ -4,7 +4,7 @@ References:
 
 - <https://typing.python.org/en/latest/spec/callables.html#callable>
 
-Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
+Note that `typing.Callable` is deprecated at runtime, in favor of `collections.abc.Callable` (see:
 <https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
 `typing.Callable` is not currently planned, and the canonical location of the stub for the symbol in
 typeshed is still `typing.pyi`.
@@ -58,8 +58,6 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
-<!-- pull-types:skip -->
-
 Using a parameter list:
 
 ```py
@@ -85,6 +83,21 @@ Or something else that's invalid in a type expression generally:
 
 def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### Invalid parameters and return type
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+            {1, 2}, 2  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -343,7 +356,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: def __init__(self) -> None
+    reveal_type(c.__init__)  # revealed: bound method object.__init__() -> None
     reveal_type(c.__class__)  # revealed: type
     reveal_type(c.__call__)  # revealed: (int, /) -> int
 ```
@@ -379,13 +392,19 @@ from inspect import getattr_static
 
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
-        c.__qualname__  # okay
+        reveal_type(c.__qualname__)  # revealed: object
+
+        # TODO: should be `property`
+        # (or complain that we don't know that `type(c)` has the attribute at all!)
+        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+
         # `hasattr` only guarantees that an attribute is readable.
+        #
         # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
         result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: Never
+        reveal_type(result)  # revealed: property
         if isinstance(result, property) and result.fset:
             c.__qualname__ = "my_callable"  # okay
 ```

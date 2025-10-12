@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+---
+A003 Python builtin is shadowed by method `property` from line 26
+  --> A003.py:31:7
+   |
+29 |     id = 1
+30 |
+31 |     @[property][0]
+   |       ^^^^^^^^
+32 |     def f(self, x=[id]):
+33 |         return x
+   |
+
+A003 Python builtin is shadowed by class attribute `id` from line 29
+  --> A003.py:32:20
+   |
+31 |     @[property][0]
+32 |     def f(self, x=[id]):
+   |                    ^^
+33 |         return x
+   |
+
+A003 Python builtin is shadowed by class attribute `bin` from line 35
+  --> A003.py:36:12
+   |
+35 |     bin = 2
+36 |     foo = [bin]
+   |            ^^^
+   |

@@ -6,9 +6,11 @@ use ruff_db::source::{line_index, source_text};
 use ty_ide::goto_type_definition;
 use ty_project::ProjectDatabase;
 
-use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToLink};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
@@ -18,22 +20,24 @@ impl RequestHandler for GotoTypeDefinitionRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
-    fn document_url(params: &GotoTypeDefinitionParams) -> Cow<Url> {
+    fn document_url(params: &GotoTypeDefinitionParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: GotoTypeDefinitionParams,
     ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 
         let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
@@ -51,7 +55,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
 
         if snapshot
             .resolved_client_capabilities()
-            .type_definition_link_support
+            .supports_type_definition_link()
         {
             let src = Some(ranged.range);
             let links: Vec<_> = ranged
@@ -70,3 +74,5 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
         }
     }
 }
+
+impl RetriableRequestHandler for GotoTypeDefinitionRequestHandler {}

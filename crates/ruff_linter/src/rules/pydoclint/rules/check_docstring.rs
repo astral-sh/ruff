@@ -238,6 +238,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// ## Example
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -256,6 +259,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// Use instead:
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -446,7 +452,7 @@ impl<'a> DocstringSections<'a> {
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
-fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
+fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName<'_>> {
     match style {
         Some(SectionStyle::Google) => parse_entries_google(content),
         Some(SectionStyle::Numpy) => parse_entries_numpy(content),
@@ -468,7 +474,7 @@ fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedNam
 ///     FasterThanLightError: If speed is greater than the speed of light.
 ///     DivisionByZero: If attempting to divide by zero.
 /// ```
-fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
+fn parse_entries_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     for potential in content.lines() {
         let Some(colon_idx) = potential.find(':') else {
@@ -490,7 +496,7 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
 /// DivisionByZero
 ///     If attempting to divide by zero.
 /// ```
-fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
+fn parse_entries_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut lines = content.lines();
     let Some(dashes) = lines.next() else {

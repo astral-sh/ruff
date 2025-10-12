@@ -1,37 +1,35 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
+UP001 [*] `__metaclass__ = type` is implied
+ --> UP001.py:2:5
   |
 1 | class A:
 2 |     __metaclass__ = type
-  |     ^^^^^^^^^^^^^^^^^^^^ UP001
+  |     ^^^^^^^^^^^^^^^^^^^^
   |
-  = help: Remove `__metaclass__ = type`
+help: Remove `__metaclass__ = type`
+1 | class A:
+  -     __metaclass__ = type
+2 +     pass
+3 | 
+4 | 
+5 | class B:
 
-ℹ Safe fix
-1 1 | class A:
-2   |-    __metaclass__ = type
-  2 |+    pass
-3 3 | 
-4 4 | 
-5 5 | class B:
-
-UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
+UP001 [*] `__metaclass__ = type` is implied
+ --> UP001.py:6:5
   |
 5 | class B:
 6 |     __metaclass__ = type
-  |     ^^^^^^^^^^^^^^^^^^^^ UP001
+  |     ^^^^^^^^^^^^^^^^^^^^
 7 |
 8 |     def __init__(self) -> None:
   |
-  = help: Remove `__metaclass__ = type`
-
-ℹ Safe fix
-3 3 | 
-4 4 | 
-5 5 | class B:
-6   |-    __metaclass__ = type
-7 6 | 
-8 7 |     def __init__(self) -> None:
-9 8 |         pass
+help: Remove `__metaclass__ = type`
+3 | 
+4 | 
+5 | class B:
+  -     __metaclass__ = type
+6 | 
+7 |     def __init__(self) -> None:
+8 |         pass

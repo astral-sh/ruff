@@ -139,6 +139,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 binding,
                 range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
+                needs_future_import: false, // TODO(brent) See #19359.
             };
 
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.start())

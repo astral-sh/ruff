@@ -36,8 +36,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     return x
 /// ```
 ///
+/// ## See also
+///
+/// This rule applies only to unpacked assignments. For regular assignments, see
+/// [`unused-variable`][F841].
+///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [F841]: https://docs.astral.sh/ruff/rules/unused-variable/
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedUnpackedVariable {
     pub name: String,
@@ -93,4 +100,6 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
+    // Add Unnecessary tag for unused unpacked variables
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

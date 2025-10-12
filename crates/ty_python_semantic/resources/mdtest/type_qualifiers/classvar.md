@@ -9,6 +9,7 @@ For more details on the semantics of pure class variables, see [this test](../at
 ## Basic
 
 ```py
+import typing
 from typing import ClassVar, Annotated
 
 class C:
@@ -17,13 +18,14 @@ class C:
     c: ClassVar[Annotated[int, "the annotation for c"]] = 1
     d: ClassVar = 1
     e: "ClassVar[int]" = 1
+    f: typing.ClassVar = 1
 
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
-# TODO: should be Unknown | Literal[1]
-reveal_type(C.d)  # revealed: Unknown
+reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
+reveal_type(C.f)  # revealed: Unknown | Literal[1]
 
 c = C()
 
@@ -37,6 +39,31 @@ c.c = 2
 c.d = 2
 # error: [invalid-attribute-access]
 c.e = 2
+# error: [invalid-attribute-access]
+c.f = 3
+```
+
+## From stubs
+
+This is a regression test for a bug where we did not properly keep track of type qualifiers when
+accessed from stub files.
+
+`module.pyi`:
+
+```pyi
+from typing import ClassVar
+
+class C:
+    a: ClassVar[int]
+```
+
+`main.py`:
+
+```py
+from module import C
+
+c = C()
+c.a = 2  # error: [invalid-attribute-access]
 ```
 
 ## Conflicting type qualifiers
@@ -64,24 +91,6 @@ c = C()
 c.a = 2
 ```
 
-and similarly here:
-
-```py
-class Base:
-    a: ClassVar[int] = 1
-
-class Derived(Base):
-    if flag():
-        a: int
-
-reveal_type(Derived.a)  # revealed: int
-
-d = Derived()
-
-# error: [invalid-attribute-access]
-d.a = 2
-```
-
 ## Too many arguments
 
 ```py
@@ -105,13 +114,49 @@ class C:
     y: int | ClassVar[str]
 ```
 
-## Used outside of a class
+## Illegal positions
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import ClassVar
 
-# TODO: this should be an error
+# error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
 x: ClassVar[int] = 1
+
+class C:
+    def __init__(self) -> None:
+        # error: [invalid-type-form] "`ClassVar` annotations are not allowed for non-name targets"
+        self.x: ClassVar[int] = 1
+
+        # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
+        y: ClassVar[int] = 1
+
+# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+def f(x: ClassVar[int]) -> None:
+    pass
+
+# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+def f[T](x: ClassVar[T]) -> T:
+    return x
+
+# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+def f() -> ClassVar[int]:
+    return 1
+
+# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+def f[T](x: T) -> ClassVar[T]:
+    return x
+
+# TODO: this should be an error
+class Foo(ClassVar[tuple[int]]): ...
+
+# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
+# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
+reveal_type(Foo.__mro__)
 ```
 
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

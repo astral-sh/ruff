@@ -18,11 +18,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import os
+///
 /// os.getenv(1)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import os
+///
 /// os.getenv("1")
 /// ```
 #[derive(ViolationMetadata)]

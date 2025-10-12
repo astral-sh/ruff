@@ -7,56 +7,54 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_star
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..156,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 121..127,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 121..127,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 121..127,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 123..126,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Starred(
-                                                            ExprStarred {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 124..125,
-                                                                value: Name(
-                                                                    ExprName {
-                                                                        node_index: AtomicNodeIndex(..),
-                                                                        range: 125..125,
-                                                                        id: Name(""),
-                                                                        ctx: Invalid,
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                    TString {
+                                        range: 121..127,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 123..126,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Starred(
+                                                        ExprStarred {
+                                                            node_index: NodeIndex(None),
+                                                            range: 124..125,
+                                                            value: Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 125..125,
+                                                                    id: Name(""),
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },
@@ -65,68 +63,66 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 128..141,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 128..141,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 128..141,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 130..140,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Starred(
-                                                            ExprStarred {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 131..139,
-                                                                value: BoolOp(
-                                                                    ExprBoolOp {
-                                                                        node_index: AtomicNodeIndex(..),
-                                                                        range: 132..139,
-                                                                        op: And,
-                                                                        values: [
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: AtomicNodeIndex(..),
-                                                                                    range: 132..133,
-                                                                                    id: Name("x"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: AtomicNodeIndex(..),
-                                                                                    range: 138..139,
-                                                                                    id: Name("y"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                    TString {
+                                        range: 128..141,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 130..140,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Starred(
+                                                        ExprStarred {
+                                                            node_index: NodeIndex(None),
+                                                            range: 131..139,
+                                                            value: BoolOp(
+                                                                ExprBoolOp {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 132..139,
+                                                                    op: And,
+                                                                    values: [
+                                                                        Name(
+                                                                            ExprName {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 132..133,
+                                                                                id: Name("x"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        Name(
+                                                                            ExprName {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 138..139,
+                                                                                id: Name("y"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                },
+                                                            ),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },
@@ -135,59 +131,57 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 142..155,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 142..155,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 142..155,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 144..154,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Starred(
-                                                            ExprStarred {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 145..153,
-                                                                value: Yield(
-                                                                    ExprYield {
-                                                                        node_index: AtomicNodeIndex(..),
-                                                                        range: 146..153,
-                                                                        value: Some(
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: AtomicNodeIndex(..),
-                                                                                    range: 152..153,
-                                                                                    id: Name("x"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
+                                    TString {
+                                        range: 142..155,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 144..154,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Starred(
+                                                        ExprStarred {
+                                                            node_index: NodeIndex(None),
+                                                            range: 145..153,
+                                                            value: Yield(
+                                                                ExprYield {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 146..153,
+                                                                    value: Some(
+                                                                        Name(
+                                                                            ExprName {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 152..153,
+                                                                                id: Name("x"),
+                                                                                ctx: Load,
+                                                                            },
                                                                         ),
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },

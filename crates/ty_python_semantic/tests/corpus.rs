@@ -116,13 +116,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             .with_context(|| format!("Failed to read test file: {path}"))?;
 
         let mut check_with_file_name = |path: &SystemPath| {
-            if relative_path.file_name() == Some("types.pyi") {
-                println!(
-                    "Skipping {relative_path:?}: paths with `types.pyi` as their final segment cause a stack overflow"
-                );
-                return;
-            }
-
             db.memory_file_system().write_file_all(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
@@ -251,7 +244,7 @@ impl ruff_db::Db for CorpusDb {
 
 #[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
-    fn is_file_open(&self, file: File) -> bool {
+    fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
 

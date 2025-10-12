@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use ruff_python_trivia::CommentRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
@@ -66,9 +66,9 @@ pub(crate) fn check_noqa(
         }
 
         let noqa_offsets = diagnostic
-            .parent
+            .parent()
             .into_iter()
-            .chain(std::iter::once(diagnostic.start()))
+            .chain(diagnostic.range().map(TextRange::start).into_iter())
             .map(|position| noqa_line_for.resolve(position))
             .unique();
 

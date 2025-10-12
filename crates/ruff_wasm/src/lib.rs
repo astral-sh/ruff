@@ -19,7 +19,7 @@ use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pret
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
@@ -57,7 +57,7 @@ export interface Diagnostic {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: Option<String>,
+    pub code: String,
     pub message: String,
     pub start_location: Location,
     pub end_location: Location,
@@ -77,9 +77,30 @@ struct ExpandedEdit {
     content: Option<String>,
 }
 
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -96,6 +117,7 @@ pub fn run() {
 #[wasm_bindgen]
 pub struct Workspace {
     settings: Settings,
+    position_encoding: SourcePositionEncoding,
 }
 
 #[wasm_bindgen]
@@ -105,7 +127,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -114,7 +136,10 @@ impl Workspace {
             .into_settings(Path::new("."))
             .map_err(into_error)?;
 
-        Ok(Workspace { settings })
+        Ok(Workspace {
+            settings,
+            position_encoding: position_encoding.into(),
+        })
     }
 
     #[wasm_bindgen(js_name = defaultSettings)]
@@ -182,7 +207,7 @@ impl Workspace {
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            directives::Flags::empty(),
+            directives::Flags::from_settings(&self.settings.linter),
             &locator,
             &indexer,
         );
@@ -207,23 +232,34 @@ impl Workspace {
 
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|msg| ExpandedMessage {
-                code: msg.secondary_code().map(ToString::to_string),
-                message: msg.body().to_string(),
-                start_location: source_code.line_column(msg.start()).into(),
-                end_location: source_code.line_column(msg.end()).into(),
-                fix: msg.fix().map(|fix| ExpandedFix {
-                    message: msg.suggestion().map(ToString::to_string),
-                    edits: fix
-                        .edits()
-                        .iter()
-                        .map(|edit| ExpandedEdit {
-                            location: source_code.line_column(edit.start()).into(),
-                            end_location: source_code.line_column(edit.end()).into(),
-                            content: edit.content().map(ToString::to_string),
-                        })
-                        .collect(),
-                }),
+            .map(|msg| {
+                let range = msg.range().unwrap_or_default();
+                ExpandedMessage {
+                    code: msg.secondary_code_or_id().to_string(),
+                    message: msg.body().to_string(),
+                    start_location: source_code
+                        .source_location(range.start(), self.position_encoding)
+                        .into(),
+                    end_location: source_code
+                        .source_location(range.end(), self.position_encoding)
+                        .into(),
+                    fix: msg.fix().map(|fix| ExpandedFix {
+                        message: msg.first_help_text().map(ToString::to_string),
+                        edits: fix
+                            .edits()
+                            .iter()
+                            .map(|edit| ExpandedEdit {
+                                location: source_code
+                                    .source_location(edit.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(edit.end(), self.position_encoding)
+                                    .into(),
+                                content: edit.content().map(ToString::to_string),
+                            })
+                            .collect(),
+                    }),
+                }
             })
             .collect();
 
@@ -287,7 +323,7 @@ impl<'a> ParsedModule<'a> {
         })
     }
 
-    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext<'_>>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
@@ -306,14 +342,37 @@ impl<'a> ParsedModule<'a> {
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Location {
     pub row: OneIndexed,
+    /// The character offset from the start of the line.
+    ///
+    /// The semantic of the offset depends on the [`PositionEncoding`] used when creating
+    /// the [`Workspace`].
     pub column: OneIndexed,
 }
 
-impl From<LineColumn> for Location {
-    fn from(value: LineColumn) -> Self {
+impl From<SourceLocation> for Location {
+    fn from(value: SourceLocation) -> Self {
         Self {
             row: value.line,
-            column: value.column,
+            column: value.character_offset,
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+#[wasm_bindgen]
+pub enum PositionEncoding {
+    #[default]
+    Utf8,
+    Utf16,
+    Utf32,
+}
+
+impl From<PositionEncoding> for SourcePositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::Utf8 => Self::Utf8,
+            PositionEncoding::Utf16 => Self::Utf16,
+            PositionEncoding::Utf32 => Self::Utf32,
         }
     }
 }

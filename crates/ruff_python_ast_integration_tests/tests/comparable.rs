@@ -51,26 +51,10 @@ fn concatenated_fstrings_compare_equal() -> Result<(), ParseError> {
 
 #[test]
 fn concatenated_tstrings_compare_equal() -> Result<(), ParseError> {
-    let split_contents = r#"t"{foo!r} this" r"\n raw" t" and {bar!s} that""#;
+    let split_contents = r#"t"{foo!r} this" rt"\n raw" t" and {bar!s} that""#;
     let value_contents = r#"t"{foo!r} this\\n raw and {bar!s} that""#;
 
     assert_comparable(split_contents, value_contents)
-}
-
-#[test]
-fn concatenated_f_and_t_strings_interwoven_compare_equal() -> Result<(), ParseError> {
-    let split_contents = r#"f"{foo} this " t"{bar}" "baz""#;
-    let value_contents = r#"f"{foo}" t" this {bar}" "baz""#;
-
-    assert_comparable(split_contents, value_contents)
-}
-
-#[test]
-fn concatenated_f_and_t_strings_compare_unequal_when_swapped() -> Result<(), ParseError> {
-    let f_then_t_contents = r#"f"{foo!r} this" r"\n raw" t" and {bar!s} that""#;
-    let t_then_f_contents = r#"t"{foo!r} this" r"\n raw" f" and {bar!s} that""#;
-
-    assert_noncomparable(f_then_t_contents, t_then_f_contents)
 }
 
 #[test]
@@ -79,12 +63,4 @@ fn t_strings_literal_order_matters_compare_unequal() -> Result<(), ParseError> {
     let literal_then_interp_contents = r#"t"bar{foo}""#;
 
     assert_noncomparable(interp_then_literal_contents, literal_then_interp_contents)
-}
-
-#[test]
-fn t_strings_empty_concat_equal() -> Result<(), ParseError> {
-    let empty_literal = r#""" t"hey{foo}""#;
-    let empty_f_string = r#"f""t"hey{foo}""#;
-
-    assert_comparable(empty_literal, empty_f_string)
 }

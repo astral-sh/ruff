@@ -27,6 +27,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
+/// import asyncio
+///
 /// raise asyncio.TimeoutError
 /// ```
 ///
@@ -128,7 +130,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 id: Name::new_static("TimeoutError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             remaining.insert(0, node.into());
         }
@@ -140,7 +142,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))

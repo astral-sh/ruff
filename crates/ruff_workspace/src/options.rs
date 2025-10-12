@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
@@ -250,7 +251,7 @@ pub struct Options {
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -298,8 +299,8 @@ pub struct Options {
     /// code upgrades, like rewriting type annotations. Ruff will not propose
     /// changes using features that are not available in the given version.
     ///
-    /// For example, to represent supporting Python >=3.10 or ==3.10
-    /// specify `target-version = "py310"`.
+    /// For example, to represent supporting Python >=3.11 or ==3.11
+    /// specify `target-version = "py311"`.
     ///
     /// If you're already using a `pyproject.toml` file, we recommend
     /// `project.requires-python` instead, as it's based on Python packaging
@@ -326,8 +327,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py39""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313""#,
+        default = r#""py310""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313" | "py314""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -529,6 +530,22 @@ pub struct LintOptions {
         "#
     )]
     pub typing_extensions: Option<bool>,
+
+    /// Whether to allow rules to add `from __future__ import annotations` in cases where this would
+    /// simplify a fix or enable a new diagnostic.
+    ///
+    /// For example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks
+    /// if `__future__` annotations are enabled.
+    ///
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable `from __future__ import annotations` imports
+            future-annotations = true
+        "#
+    )]
+    pub future_annotations: Option<bool>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -1632,7 +1649,9 @@ impl<'de> Deserialize<'de> for Alias {
 }
 
 impl Flake8ImportConventionsOptions {
-    pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
+    pub fn try_into_settings(
+        self,
+    ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
                 .into_iter()
@@ -1648,11 +1667,22 @@ impl Flake8ImportConventionsOptions {
             );
         }
 
-        flake8_import_conventions::settings::Settings {
-            aliases,
+        let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        for (module, alias) in aliases {
+            let normalized_alias = alias.nfkc().collect::<String>();
+            if normalized_alias == "__debug__" {
+                anyhow::bail!(
+                    "Invalid alias for module '{module}': alias normalizes to '__debug__', which is not allowed."
+                );
+            }
+            normalized_aliases.insert(module, normalized_alias);
+        }
+
+        Ok(flake8_import_conventions::settings::Settings {
+            aliases: normalized_aliases,
             banned_aliases: self.banned_aliases.unwrap_or_default(),
             banned_from: self.banned_from.unwrap_or_default(),
-        }
+        })
     }
 }
 
@@ -1996,7 +2026,8 @@ pub struct Flake8TidyImportsOptions {
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
-    /// block, or some other nested context).
+    /// block, or some other nested context). This also affects the rule `import-outside-top-level`
+    /// if `banned-module-level-imports` is enabled.
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str]"#,
@@ -2271,6 +2302,9 @@ pub struct IsortOptions {
 
     /// Order imports by type, which is determined by case, in addition to
     /// alphabetically.
+    ///
+    /// Note that this option takes precedence over the
+    /// [`case-sensitive`](#lint_isort_case-sensitive) setting when enabled.
     #[option(
         default = r#"true"#,
         value_type = "bool",
@@ -2293,6 +2327,9 @@ pub struct IsortOptions {
     pub force_sort_within_sections: Option<bool>,
 
     /// Sort imports taking into account case sensitivity.
+    ///
+    /// Note that the [`order-by-type`](#lint_isort_order-by-type) setting will
+    /// take precedence over this one when enabled.
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -3586,7 +3623,7 @@ pub struct FormatOptions {
     /// Setting `skip-magic-trailing-comma = true` changes the formatting to:
     ///
     /// ```python
-    /// # The arguments remain on separate lines because of the trailing comma after `b`
+    /// # The arguments are collapsed to a single line because the trailing comma is ignored
     /// def test(a, b):
     ///     pass
     /// ```
@@ -3824,6 +3861,19 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub detect_string_imports: Option<bool>,
+    /// The minimum number of dots in a string to consider it a valid import.
+    ///
+    /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
+    /// For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`)
+    /// would be considered valid imports.
+    #[option(
+        default = "2",
+        value_type = "usize",
+        example = r#"
+            string-imports-min-dots = 2
+        "#
+    )]
+    pub string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
@@ -3895,6 +3945,7 @@ pub struct LintOptionsWire {
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
     typing_extensions: Option<bool>,
+    future_annotations: Option<bool>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3950,6 +4001,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
+            future_annotations,
         } = value;
 
         LintOptions {
@@ -4006,6 +4058,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
+            future_annotations,
         }
     }
 }

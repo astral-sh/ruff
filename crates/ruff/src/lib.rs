@@ -9,10 +9,11 @@ use std::sync::mpsc::channel;
 use anyhow::Result;
 use clap::CommandFactory;
 use colored::Colorize;
-use log::warn;
+use log::{error, warn};
 use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::OutputFormat;
@@ -131,6 +132,7 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
+        ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[expect(clippy::print_stderr)]
@@ -203,12 +205,18 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let cli_output_format_set = args.output_format.is_some();
     let (cli, config_arguments) = args.partition(global_options)?;
-
+    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    if cli_output_format_set && !pyproject_config.settings.formatter.preview.is_enabled() {
+        warn_user_once!(
+            "The --output-format flag for the formatter is unstable and requires preview mode to use."
+        );
+    }
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
-        commands::format::format(cli, &config_arguments)
+        commands::format::format(cli, &config_arguments, &pyproject_config)
     }
 }
 
@@ -439,10 +447,31 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer)?;
+            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
         }
 
         if !cli.exit_zero {
+            let max_severity = diagnostics
+                .inner
+                .iter()
+                .map(Diagnostic::severity)
+                .max()
+                .unwrap_or(Severity::Info);
+            if max_severity.is_fatal() {
+                // When a panic/fatal error is reported, prompt the user to open an issue on github.
+                // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
+                // message here instead of attaching it to the diagnostic ensures that we only print
+                // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
+                // the message from being captured by tools parsing the normal output.
+                let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
+
+https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+";
+                error!("{message}");
+                return Ok(ExitStatus::Error);
+            }
             if cli.diff {
                 // If we're printing a diff, we always want to exit non-zero if there are
                 // any fixable violations (since we've printed the diff, but not applied the

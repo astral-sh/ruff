@@ -9,13 +9,13 @@ use crate::{
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
 };
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::OldDiagnostic,
     package::PackageRoot,
     packaging::detect_package_root,
     settings::flags,
@@ -163,7 +163,7 @@ pub(crate) fn check(
             .into_iter()
             .zip(noqa_edits)
             .filter_map(|(message, noqa_edit)| {
-                if message.is_syntax_error() && !show_syntax_errors {
+                if message.is_invalid_syntax() && !show_syntax_errors {
                     None
                 } else {
                     Some(to_lsp_diagnostic(
@@ -228,17 +228,17 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: &OldDiagnostic,
+    diagnostic: &Diagnostic,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let diagnostic_range = diagnostic.range();
+    let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
-    let suggestion = diagnostic.suggestion();
+    let suggestion = diagnostic.first_help_text();
     let code = diagnostic.secondary_code();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
@@ -287,7 +287,7 @@ fn to_lsp_diagnostic(
         let code = code.to_string();
         (
             Some(severity(&code)),
-            tags(&code),
+            tags(diagnostic),
             Some(lsp_types::NumberOrString::String(code)),
         )
     } else {
@@ -301,7 +301,7 @@ fn to_lsp_diagnostic(
             severity,
             tags,
             code,
-            code_description: diagnostic.to_url().and_then(|url| {
+            code_description: diagnostic.to_ruff_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(&url).ok()?,
                 })
@@ -338,12 +338,17 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
     }
 }
 
-fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
-    match code {
-        // F401: <module> imported but unused
-        // F841: local variable <name> is assigned to but never used
-        // RUF059: Unused unpacked variable
-        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
-        _ => None,
-    }
+fn tags(diagnostic: &Diagnostic) -> Option<Vec<lsp_types::DiagnosticTag>> {
+    diagnostic.primary_tags().map(|tags| {
+        tags.iter()
+            .map(|tag| match tag {
+                ruff_db::diagnostic::DiagnosticTag::Unnecessary => {
+                    lsp_types::DiagnosticTag::UNNECESSARY
+                }
+                ruff_db::diagnostic::DiagnosticTag::Deprecated => {
+                    lsp_types::DiagnosticTag::DEPRECATED
+                }
+            })
+            .collect()
+    })
 }

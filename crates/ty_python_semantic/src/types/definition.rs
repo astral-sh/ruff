@@ -7,7 +7,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TypeDefinition<'db> {
-    Module(Module),
+    Module(Module<'db>),
     Class(Definition<'db>),
     Function(Definition<'db>),
     TypeVar(Definition<'db>),
@@ -31,7 +31,7 @@ impl TypeDefinition<'_> {
     pub fn full_range(&self, db: &dyn Db) -> Option<FileRange> {
         match self {
             Self::Module(module) => {
-                let file = module.file()?;
+                let file = module.file(db)?;
                 let source = source_text(db, file);
                 Some(FileRange::new(file, TextRange::up_to(source.text_len())))
             }

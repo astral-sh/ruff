@@ -57,6 +57,7 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
     {
         let mut diagnostic = checker.report_diagnostic(TypingTextStrAlias, expr.range());
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "str",

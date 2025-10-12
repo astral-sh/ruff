@@ -219,7 +219,7 @@ def f(x: C | D):
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [possibly-unbound-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` may be missing"
     s.b
 
 def f(flag: bool):
@@ -259,7 +259,7 @@ def f(flag: bool):
     reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` may be missing"
     reveal_type(s.a)  # revealed: str
 ```
 
@@ -331,6 +331,9 @@ instance or a subclass of the first. If either condition is violated, a `TypeErr
 runtime.
 
 ```py
+import typing
+import collections
+
 def f(x: int):
     # error: [invalid-super-argument] "`int` is not a valid class"
     super(x, x)
@@ -367,6 +370,19 @@ reveal_type(super(B, A))
 reveal_type(super(B, object))
 
 super(object, object()).__class__
+
+# Not all objects valid in a class's bases list are valid as the first argument to `super()`.
+# For example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to `super()`.
+#
+# error: [invalid-super-argument] "`typing.ChainMap` is not a valid class"
+reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
+
+# Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
+# but it *is* valid as the first argument to `super()`.
+reveal_type(super(typing.Generic, typing.SupportsInt))  # revealed: <super: typing.Generic, <class 'SupportsInt'>>
+
+def _(x: type[typing.Any], y: typing.Any):
+    reveal_type(super(x, y))  # revealed: <super: Any, Any>
 ```
 
 ### Instance Member Access via `super`

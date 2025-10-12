@@ -1,0 +1,213 @@
+---
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.14
+
+--- Summary ---
+Removed: 10
+Added: 0
+
+--- Removed ---
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:17:22
+   |
+17 | @app.post("/items/", response_model=Item)
+   |                      ^^^^^^^^^^^^^^^^^^^
+18 | async def create_item(item: Item) -> Item:
+19 |     return item
+   |
+help: Remove argument
+14 | # Errors
+15 | 
+16 | 
+   - @app.post("/items/", response_model=Item)
+17 + @app.post("/items/")
+18 | async def create_item(item: Item) -> Item:
+19 |     return item
+20 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:22:22
+   |
+22 | @app.post("/items/", response_model=list[Item])
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+23 | async def create_item(item: Item) -> list[Item]:
+24 |     return item
+   |
+help: Remove argument
+19 |     return item
+20 | 
+21 | 
+   - @app.post("/items/", response_model=list[Item])
+22 + @app.post("/items/")
+23 | async def create_item(item: Item) -> list[Item]:
+24 |     return item
+25 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:27:22
+   |
+27 | @app.post("/items/", response_model=List[Item])
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | async def create_item(item: Item) -> List[Item]:
+29 |     return item
+   |
+help: Remove argument
+24 |     return item
+25 | 
+26 | 
+   - @app.post("/items/", response_model=List[Item])
+27 + @app.post("/items/")
+28 | async def create_item(item: Item) -> List[Item]:
+29 |     return item
+30 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:32:22
+   |
+32 | @app.post("/items/", response_model=Dict[str, Item])
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 | async def create_item(item: Item) -> Dict[str, Item]:
+34 |     return item
+   |
+help: Remove argument
+29 |     return item
+30 | 
+31 | 
+   - @app.post("/items/", response_model=Dict[str, Item])
+32 + @app.post("/items/")
+33 | async def create_item(item: Item) -> Dict[str, Item]:
+34 |     return item
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:37:22
+   |
+37 | @app.post("/items/", response_model=str)
+   |                      ^^^^^^^^^^^^^^^^^^
+38 | async def create_item(item: Item) -> str:
+39 |     return item
+   |
+help: Remove argument
+34 |     return item
+35 | 
+36 | 
+   - @app.post("/items/", response_model=str)
+37 + @app.post("/items/")
+38 | async def create_item(item: Item) -> str:
+39 |     return item
+40 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:42:21
+   |
+42 | @app.get("/items/", response_model=Item)
+   |                     ^^^^^^^^^^^^^^^^^^^
+43 | async def create_item(item: Item) -> Item:
+44 |     return item
+   |
+help: Remove argument
+39 |     return item
+40 | 
+41 | 
+   - @app.get("/items/", response_model=Item)
+42 + @app.get("/items/")
+43 | async def create_item(item: Item) -> Item:
+44 |     return item
+45 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:47:21
+   |
+47 | @app.get("/items/", response_model=Item)
+   |                     ^^^^^^^^^^^^^^^^^^^
+48 | @app.post("/items/", response_model=Item)
+49 | async def create_item(item: Item) -> Item:
+   |
+help: Remove argument
+44 |     return item
+45 | 
+46 | 
+   - @app.get("/items/", response_model=Item)
+47 + @app.get("/items/")
+48 | @app.post("/items/", response_model=Item)
+49 | async def create_item(item: Item) -> Item:
+50 |     return item
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:48:22
+   |
+47 | @app.get("/items/", response_model=Item)
+48 | @app.post("/items/", response_model=Item)
+   |                      ^^^^^^^^^^^^^^^^^^^
+49 | async def create_item(item: Item) -> Item:
+50 |     return item
+   |
+help: Remove argument
+45 | 
+46 | 
+47 | @app.get("/items/", response_model=Item)
+   - @app.post("/items/", response_model=Item)
+48 + @app.post("/items/")
+49 | async def create_item(item: Item) -> Item:
+50 |     return item
+51 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+  --> FAST001.py:53:24
+   |
+53 | @router.get("/items/", response_model=Item)
+   |                        ^^^^^^^^^^^^^^^^^^^
+54 | async def create_item(item: Item) -> Item:
+55 |     return item
+   |
+help: Remove argument
+50 |     return item
+51 | 
+52 | 
+   - @router.get("/items/", response_model=Item)
+53 + @router.get("/items/")
+54 | async def create_item(item: Item) -> Item:
+55 |     return item
+56 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST001 [*] FastAPI route with redundant `response_model` argument
+   --> FAST001.py:118:23
+    |
+116 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
+117 |     # Error
+118 |     @app_arg.get("/", response_model=str)
+    |                       ^^^^^^^^^^^^^^^^^^
+119 |     async def get_root() -> str:
+120 |         return "Hello World!"
+    |
+help: Remove argument
+115 | 
+116 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
+117 |     # Error
+    -     @app_arg.get("/", response_model=str)
+118 +     @app_arg.get("/")
+119 |     async def get_root() -> str:
+120 |         return "Hello World!"
+121 | 
+note: This is an unsafe fix and may change runtime behavior

@@ -1,14 +1,15 @@
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
+use crate::types::enums::is_single_member_enum;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
+    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, KnownModule};
-use hashbrown::HashSet;
+use crate::{Db, module_resolver::KnownModule};
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
@@ -25,6 +26,10 @@ pub(crate) enum Ty {
     StringLiteral(&'static str),
     LiteralString,
     BytesLiteral(&'static str),
+    // An enum literal variant, using `uuid.SafeUUID` as base
+    EnumLiteral(&'static str),
+    // A single-member enum literal, using `dataclasses.MISSING`
+    SingleMemberEnumLiteral,
     // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
     BuiltinInstance(&'static str),
     /// Members of the `abc` stdlib module
@@ -55,6 +60,10 @@ pub(crate) enum Ty {
         params: CallableParams,
         returns: Option<Box<Ty>>,
     },
+    /// `unittest.mock.Mock` is interesting because it is a nominal instance type
+    /// where the class has `Any` in its MRO
+    UnittestMockInstance,
+    UnittestMockLiteral,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -106,7 +115,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,
@@ -131,6 +140,23 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
+            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
+                db,
+                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+                    .place
+                    .expect_type()
+                    .expect_class_literal(),
+                Name::new(name),
+            )),
+            Ty::SingleMemberEnumLiteral => {
+                let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
+                    .place
+                    .expect_type();
+                debug_assert!(
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db)))
+                );
+                ty
+            }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
@@ -144,6 +170,13 @@ impl Ty {
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type(),
+            Ty::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
+                .place
+                .expect_type(),
+            Ty::UnittestMockInstance => Ty::UnittestMockLiteral
+                .into_type(db)
+                .to_instance(db)
+                .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
@@ -162,13 +195,13 @@ impl Ty {
             }
             Ty::FixedLengthTuple(tys) => {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
-                TupleType::from_elements(db, elements)
+                Type::heterogeneous_tuple(db, elements)
             }
             Ty::VariableLengthTuple(prefix, variable, suffix) => {
                 let prefix = prefix.into_iter().map(|ty| ty.into_type(db));
                 let variable = variable.into_type(db);
                 let suffix = suffix.into_iter().map(|ty| ty.into_type(db));
-                TupleType::mixed(db, prefix, variable, suffix)
+                Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
@@ -223,11 +256,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
     // Update this if new non-fully-static types are added below.
-    let fully_static_index = 3;
+    let fully_static_index = 5;
     let types = &[
         Ty::Any,
         Ty::Unknown,
         Ty::SubclassOfAny,
+        Ty::UnittestMockLiteral,
+        Ty::UnittestMockInstance,
         // Add fully static types below, dynamic types above.
         // Update `fully_static_index` above if adding new dynamic types!
         Ty::Never,
@@ -239,6 +274,10 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
         Ty::LiteralString,
         Ty::BytesLiteral(""),
         Ty::BytesLiteral("\x00"),
+        Ty::EnumLiteral("safe"),
+        Ty::EnumLiteral("unsafe"),
+        Ty::EnumLiteral("unknown"),
+        Ty::SingleMemberEnumLiteral,
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
@@ -338,7 +377,7 @@ fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
 
 fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<Param> {
     let mut params: Vec<Param> = vec![];
-    let mut used_names = HashSet::new();
+    let mut used_names = FxHashSet::default();
 
     // First, choose the number of parameters to generate.
     for _ in 0..*g.choose(&[0, 1, 2, 3, 4, 5]).unwrap() {

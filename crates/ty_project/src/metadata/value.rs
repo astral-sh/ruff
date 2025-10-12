@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::combine::Combine;
 use crate::glob::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
@@ -15,8 +14,9 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use toml::Spanned;
+use ty_combine::Combine;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub enum ValueSource {
     /// Value loaded from a project's configuration file.
     ///
@@ -27,6 +27,9 @@ pub enum ValueSource {
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
+
+    /// The value comes from an LSP client configuration.
+    PythonVSCodeExtension,
 }
 
 impl ValueSource {
@@ -34,6 +37,7 @@ impl ValueSource {
         match self {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
+            ValueSource::PythonVSCodeExtension => None,
         }
     }
 
@@ -80,7 +84,7 @@ impl Drop for ValueSourceGuard {
 ///
 /// This ensures that two resolved configurations are identical even if the position of a value has changed
 /// or if the values were loaded from different sources.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, get_size2::GetSize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RangedValue<T> {
@@ -103,6 +107,14 @@ impl<T> RangedValue<T> {
 
     pub fn cli(value: T) -> Self {
         Self::with_range(value, ValueSource::Cli, TextRange::default())
+    }
+
+    pub fn python_extension(value: T) -> Self {
+        Self::with_range(
+            value,
+            ValueSource::PythonVSCodeExtension,
+            TextRange::default(),
+        )
     }
 
     pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
@@ -313,6 +325,7 @@ where
     Ord,
     Hash,
     Combine,
+    get_size2::GetSize,
 )]
 #[serde(transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -325,6 +338,10 @@ impl RelativePathBuf {
 
     pub fn cli(path: impl AsRef<SystemPath>) -> Self {
         Self::new(path, ValueSource::Cli)
+    }
+
+    pub fn python_extension(path: impl AsRef<SystemPath>) -> Self {
+        Self::new(path, ValueSource::PythonVSCodeExtension)
     }
 
     /// Returns the relative path as specified by the user.
@@ -354,7 +371,7 @@ impl RelativePathBuf {
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli => system.current_directory(),
+            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
         };
 
         SystemPath::absolute(&self.0, relative_to)
@@ -378,6 +395,7 @@ impl fmt::Display for RelativePathBuf {
     Ord,
     Hash,
     Combine,
+    get_size2::GetSize,
 )]
 #[serde(transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -409,7 +427,7 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli => system.current_directory(),
+            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;

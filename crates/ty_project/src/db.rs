@@ -1,18 +1,18 @@
-use std::panic::{AssertUnwindSafe, RefUnwindSafe};
+use std::fmt::Formatter;
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use std::{cmp, fmt};
 
+pub use self::changes::ChangeResult;
+use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
-use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
-use crate::{Project, ProjectMetadata, Reporter};
+use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::Event;
-use salsa::plumbing::ZalsaDatabase;
-use ty_ide::Db as IdeDb;
+use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -21,6 +21,8 @@ mod changes;
 #[salsa::db]
 pub trait Db: SemanticDb {
     fn project(&self) -> Project;
+
+    fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
 #[salsa::db]
@@ -33,7 +35,7 @@ pub struct ProjectDatabase {
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 
-    // IMPORTANT: This field must be the last because we use `zalsa_mut` (drops all other storage references)
+    // IMPORTANT: This field must be the last because we use `trigger_cancellation` (drops all other storage references)
     // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
     // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
     // we try to mutably borrow using `Arc::get_mut` (like `system`).
@@ -80,17 +82,24 @@ impl ProjectDatabase {
         Ok(db)
     }
 
-    /// Checks all open files in the project and its dependencies.
+    /// Checks the files in the project and its dependencies as per the project's check mode.
+    ///
+    /// Use [`set_check_mode`] to update the check mode.
+    ///
+    /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
-        self.project().check(self, reporter)
+        let mut collector = CollectReporter::default();
+        self.project().check(self, &mut collector);
+        collector.into_sorted(self)
     }
 
-    /// Checks all open files in the project and its dependencies, using the given reporter.
-    pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
-        let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, reporter)
+    /// Checks the files in the project and its dependencies, using the given reporter.
+    ///
+    /// Use [`set_check_mode`] to update the check mode.
+    ///
+    /// [`set_check_mode`]: ProjectDatabase::set_check_mode
+    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) {
+        self.project().check(self, reporter);
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -98,40 +107,79 @@ impl ProjectDatabase {
         self.project().check_file(self, file)
     }
 
+    /// Set the check mode for the project.
+    pub fn set_check_mode(&mut self, mode: CheckMode) {
+        if self.project().check_mode(self) != mode {
+            tracing::debug!("Updating project to check {mode}");
+            self.project().set_check_mode(self).to(mode);
+        }
+    }
+
     /// Returns a mutable reference to the system.
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
     pub fn system_mut(&mut self) -> &mut dyn System {
-        // TODO: Use a more official method to cancel other queries.
-        // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
-        let _ = self.zalsa_mut();
+        self.trigger_cancellation();
 
-        Arc::get_mut(&mut self.system)
-            .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
+        Arc::get_mut(&mut self.system).expect(
+            "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
+        )
     }
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let salsa_db = self as &dyn salsa::Database;
+        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let mut ingredients = memory_usage
+            .structs
+            .into_iter()
+            .filter(|ingredient| ingredient.count() > 0)
+            .collect::<Vec<_>>();
+        let mut memos = memory_usage
+            .queries
+            .into_iter()
+            .filter(|(_, memos)| memos.count() > 0)
+            .collect::<Vec<_>>();
 
-        let mut ingredients = salsa_db.structs_info();
-        let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+        ingredients.sort_by_key(|ingredient| {
+            let heap_size = ingredient.heap_size_of_fields().unwrap_or_else(|| {
+                // Salsa currently does not expose a way to track the heap size of interned
+                // query arguments.
+                if !ingredient.debug_name().contains("interned_arguments") {
+                    tracing::warn!(
+                        "expected `heap_size` to be provided by Salsa struct `{}`",
+                        ingredient.debug_name()
+                    );
+                }
 
-        ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
-        memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+                0
+            });
+
+            cmp::Reverse(ingredient.size_of_fields() + heap_size)
+        });
+
+        memos.sort_by_key(|(query, memo)| {
+            let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
+                tracing::warn!("expected `heap_size` to be provided by Salsa query `{query}`");
+                0
+            });
+
+            cmp::Reverse(memo.size_of_fields() + heap_size)
+        });
 
         let mut total_fields = 0;
         let mut total_metadata = 0;
         for ingredient in &ingredients {
-            total_metadata += ingredient.size_of_metadata();
             total_fields += ingredient.size_of_fields();
+            total_fields += ingredient.heap_size_of_fields().unwrap_or(0);
+            total_metadata += ingredient.size_of_metadata();
         }
 
         let mut total_memo_fields = 0;
         let mut total_memo_metadata = 0;
         for (_, memo) in &memos {
             total_memo_fields += memo.size_of_fields();
+            total_memo_fields += memo.heap_size_of_fields().unwrap_or(0);
             total_memo_metadata += memo.size_of_metadata();
         }
 
@@ -142,6 +190,38 @@ impl ProjectDatabase {
             total_memo_metadata,
             ingredients,
             memos,
+        }
+    }
+}
+
+impl std::fmt::Debug for ProjectDatabase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProjectDatabase")
+            .field("project", &self.project)
+            .field("files", &self.files)
+            .field("system", &self.system)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+#[cfg_attr(test, derive(serde::Serialize))]
+pub enum CheckMode {
+    /// Checks the open files in the project.
+    OpenFiles,
+
+    /// Checks all files in the project, ignoring the open file set.
+    ///
+    /// This includes virtual files, such as those opened in an editor.
+    #[default]
+    AllFiles,
+}
+
+impl fmt::Display for CheckMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CheckMode::OpenFiles => write!(f, "open files"),
+            CheckMode::AllFiles => write!(f, "all files"),
         }
     }
 }
@@ -234,12 +314,15 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA STRUCTS=======")?;
 
                 for ingredient in ingredients {
+                    let size_of_fields =
+                        ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(
                         f,
                         "{:<50} metadata={:<8} fields={:<8} count={}",
                         format!("`{}`", ingredient.debug_name()),
                         format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         ingredient.count()
                     )?;
                 }
@@ -247,13 +330,16 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA QUERIES=======")?;
 
                 for (query_fn, memo) in memos {
+                    let size_of_fields =
+                        memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
 
                     writeln!(
                         f,
                         "    metadata={:<8} fields={:<8} count={}",
                         format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(memo.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         memo.count()
                     )?;
                 }
@@ -297,8 +383,8 @@ impl SalsaMemoryDump {
         struct DisplayShort<'a>(&'a SalsaMemoryDump);
 
         fn round_memory(total: usize) -> usize {
-            // Round the number to the nearest power of 1.1. This gives us a
-            // 5% threshold before the memory usage number is considered to have
+            // Round the number to the nearest power of 1.05. This gives us a
+            // 2.5% threshold before the memory usage number is considered to have
             // changed.
             //
             // TODO: Small changes in memory usage may cause the number to be rounded
@@ -307,7 +393,7 @@ impl SalsaMemoryDump {
             // over time that are unrelated to the current change. Ideally we could compare
             // the exact numbers across runs and compute the difference, but we don't have
             // the infrastructure for that currently.
-            const BASE: f64 = 1.1;
+            const BASE: f64 = 1.05;
             BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
         }
 
@@ -357,16 +443,10 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
-impl IdeDb for ProjectDatabase {}
-
-#[salsa::db]
 impl SemanticDb for ProjectDatabase {
-    fn is_file_open(&self, file: File) -> bool {
-        let Some(project) = &self.project else {
-            return false;
-        };
-
-        project.is_file_open(self, file)
+    fn should_check_file(&self, file: File) -> bool {
+        self.project
+            .is_some_and(|project| project.should_check_file(self, file))
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -375,7 +455,7 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        &DEFAULT_LINT_REGISTRY
+        ty_python_semantic::default_lint_registry()
     }
 }
 
@@ -406,6 +486,10 @@ impl Db for ProjectDatabase {
     fn project(&self) -> Project {
         self.project.unwrap()
     }
+
+    fn dyn_clone(&self) -> Box<dyn Db> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(feature = "format")]
@@ -423,7 +507,7 @@ mod format {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
@@ -434,7 +518,6 @@ pub(crate) mod tests {
     use ty_python_semantic::Program;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 
-    use crate::DEFAULT_LINT_REGISTRY;
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
 
@@ -442,7 +525,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     #[derive(Clone)]
-    pub(crate) struct TestDb {
+    pub struct TestDb {
         storage: salsa::Storage<Self>,
         events: Events,
         files: Files,
@@ -452,7 +535,7 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        pub(crate) fn new(project: ProjectMetadata) -> Self {
+        pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
@@ -477,7 +560,7 @@ pub(crate) mod tests {
 
     impl TestDb {
         /// Takes the salsa events.
-        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+        pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
 
             std::mem::take(&mut *events)
@@ -515,7 +598,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
-        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+        fn should_check_file(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
         }
 
@@ -524,7 +607,7 @@ pub(crate) mod tests {
         }
 
         fn lint_registry(&self) -> &LintRegistry {
-            &DEFAULT_LINT_REGISTRY
+            ty_python_semantic::default_lint_registry()
         }
     }
 
@@ -532,6 +615,10 @@ pub(crate) mod tests {
     impl Db for TestDb {
         fn project(&self) -> Project {
             self.project.unwrap()
+        }
+
+        fn dyn_clone(&self) -> Box<dyn Db> {
+            Box::new(self.clone())
         }
     }
 

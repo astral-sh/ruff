@@ -16,6 +16,8 @@ reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
 reveal_type(__builtins__)  # revealed: Any
+# error: [possibly-unresolved-reference] "Name `__warningregistry__` used when possibly not defined"
+reveal_type(__warningregistry__)  # revealed: dict[Any, int]
 
 import sys
 
@@ -71,10 +73,12 @@ __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is no
 ```py
 import module
 
-reveal_type(module.__file__)  # revealed: Unknown | None
+reveal_type(module.__file__)  # revealed: None
 reveal_type(module.__path__)  # revealed: list[str]
 reveal_type(module.__doc__)  # revealed: Unknown
-reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
+reveal_type(module.__spec__)  # revealed: ModuleSpec | None
+# error: [unresolved-attribute]
+reveal_type(module.__warningregistry__)  # revealed: Unknown
 
 def nested_scope():
     global __loader__
@@ -93,7 +97,7 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = EllipsisType) -> None
 
 # For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
 # unset, but we follow typeshed here):
@@ -119,7 +123,7 @@ reveal_type(typing.__getattr__)  # revealed: Unknown
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
 
 It's impossible to override the `__dict__` attribute of `types.ModuleType` instances from inside the
-module; we should prioritise the attribute in the `types.ModuleType` stub over a variable named
+module; we should prioritize the attribute in the `types.ModuleType` stub over a variable named
 `__dict__` in the module's global namespace:
 
 `foo.py`:
@@ -193,6 +197,7 @@ typeshed = "/typeshed"
 
 ```pyi
 class object: ...
+class tuple: ...
 class int: ...
 class bytes: ...
 

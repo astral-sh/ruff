@@ -96,6 +96,12 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
+    // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
+    // (attributes, subscripts, or slices).
+    if contains_side_effecting_sub_expression(&generator.target) {
+        return;
+    }
+
     // Don't suggest `dict.fromkeys` if the value is not a constant or constant-like.
     if !is_constant_like(dict_comp.value.as_ref()) {
         return;
@@ -203,17 +209,26 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         },
         keywords: Box::from([]),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         arguments: args,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    })
+}
+
+fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+    any_over_expr(target, &|expr| {
+        matches!(
+            expr,
+            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+        )
     })
 }

@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC502_numpy.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+  --> DOC502_numpy.py:7:5
    |
  5 |   # DOC502
  6 |   def calculate_speed(distance: float, time: float) -> float:
@@ -25,12 +26,13 @@ DOC502_numpy.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterTh
 24 | |     FasterThanLightError
 25 | |         If speed is greater than the speed of light.
 26 | |     """
-   | |_______^ DOC502
+   | |_______^
 27 |       return distance / time
    |
-   = help: Remove `FasterThanLightError` from the docstring
+help: Remove `FasterThanLightError` from the docstring
 
-DOC502_numpy.py:32:5: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+  --> DOC502_numpy.py:32:5
    |
 30 |   # DOC502
 31 |   def calculate_speed(distance: float, time: float) -> float:
@@ -56,12 +58,13 @@ DOC502_numpy.py:32:5: DOC502 Raised exceptions are not explicitly raised: `Faste
 51 | |     DivisionByZero
 52 | |         If attempting to divide by zero.
 53 | |     """
-   | |_______^ DOC502
+   | |_______^
 54 |       return distance / time
    |
-   = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
+help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
 
-DOC502_numpy.py:59:5: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+  --> DOC502_numpy.py:59:5
    |
 57 |   # DOC502
 58 |   def calculate_speed(distance: float, time: float) -> float:
@@ -87,8 +90,8 @@ DOC502_numpy.py:59:5: DOC502 Raised exception is not explicitly raised: `Divisio
 78 | |     DivisionByZero
 79 | |         If attempting to divide by zero.
 80 | |     """
-   | |_______^ DOC502
+   | |_______^
 81 |       try:
 82 |           return distance / time
    |
-   = help: Remove `DivisionByZero` from the docstring
+help: Remove `DivisionByZero` from the docstring

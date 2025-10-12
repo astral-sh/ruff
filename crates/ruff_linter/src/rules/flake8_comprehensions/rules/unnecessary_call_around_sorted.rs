@@ -32,12 +32,15 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as `reversed()` and `reverse=True` will
-/// yield different results in the event of custom sort keys or equality
-/// functions. Specifically, `reversed()` will reverse the order of the
-/// collection, while `sorted()` with `reverse=True` will perform a stable
+/// This rule's fix is marked as unsafe for `reversed()` cases, as `reversed()`
+/// and `reverse=True` will yield different results in the event of custom sort
+/// keys or equality functions. Specifically, `reversed()` will reverse the order
+/// of the collection, while `sorted()` with `reverse=True` will perform a stable
 /// reverse sort, which will preserve the order of elements that compare as
 /// equal.
+///
+/// The fix is marked as safe for `list()` cases, as removing `list()` around
+/// `sorted()` does not change the behavior.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryCallAroundSorted {
     func: UnnecessaryFunction,

@@ -422,6 +422,35 @@ def func(a: dict[str, int]) -> list[dict[str, int]]:
         services = a["services"]
         return services
 
+
+# See: https://github.com/astral-sh/ruff/issues/14052
+def outer() -> list[object]:
+    @register
+    async def inner() -> None:
+        print(layout)
+
+    layout = [...]
+    return layout
+
+def outer() -> list[object]:
+    with open("") as f:
+        async def inner() -> None:
+            print(layout)
+
+    layout = [...]
+    return layout
+
+
+def outer() -> list[object]:
+    def inner():
+        with open("") as f:
+            async def inner_inner() -> None:
+                print(layout)
+
+    layout = [...]
+    return layout
+
+
 # See: https://github.com/astral-sh/ruff/issues/18411
 def f():
     (#=

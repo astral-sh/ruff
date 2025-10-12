@@ -34,6 +34,7 @@ pub(in crate::server) enum BackgroundSchedule {
 /// while local tasks have exclusive access and can modify it as they please. Keep in mind that
 /// local tasks will **block** the main event loop, so only use local tasks if you **need**
 /// mutable state access or you need the absolute lowest latency possible.
+#[must_use]
 pub(in crate::server) enum Task {
     Background(BackgroundTaskBuilder),
     Sync(SyncTask),
@@ -83,9 +84,7 @@ impl Task {
         R: Serialize + Send + 'static,
     {
         Self::sync(move |_, client| {
-            if let Err(err) = client.respond(&id, result) {
-                tracing::error!("Unable to send immediate response: {err}");
-            }
+            client.respond(&id, result);
         })
     }
 
