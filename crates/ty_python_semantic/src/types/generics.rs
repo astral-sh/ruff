@@ -14,11 +14,11 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType,
-    binding_type, declaration_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -317,16 +317,18 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
-        definition: Definition<'db>,
+        definition: impl FnOnce() -> Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            base.find_legacy_typevars(db, Some(definition), &mut variables);
+            base.find_legacy_typevars(db, None, &mut variables);
         }
         if variables.is_empty() {
             return None;
         }
+        let binding_context = BindingContext::Definition(definition());
+        variables.retain(|bound_typevar| bound_typevar.binding_context(db) == binding_context);
         Some(Self::from_typevar_instances(db, variables))
     }
 
