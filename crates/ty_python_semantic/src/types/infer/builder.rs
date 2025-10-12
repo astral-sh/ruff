@@ -882,10 +882,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 .full_range(self.db(), self.module())
                                                 .into(),
                                         )
-                                        .message(format_args!(
-                                            "Type variable `{}` is bound in this enclosing scope",
-                                            self_typevar_name,
-                                        )),
+                                        .message(
+                                            format_args!(
+                                                "Type variable `{self_typevar_name}` is bound \
+                                            in this enclosing scope",
+                                            ),
+                                        ),
                                     );
                                 }
                             }
