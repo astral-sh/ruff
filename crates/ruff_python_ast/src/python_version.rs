@@ -55,9 +55,8 @@ impl PythonVersion {
         Self::PY37
     }
 
-    // TODO: change this to 314 when it is released
     pub const fn latest() -> Self {
-        Self::PY313
+        Self::PY314
     }
 
     /// The latest Python version supported in preview
@@ -68,8 +67,8 @@ impl PythonVersion {
     }
 
     pub const fn latest_ty() -> Self {
-        // Make sure to update the default value for  `EnvironmentOptions::python_version` when bumping this version.
-        Self::PY313
+        // Make sure to update the default value for `EnvironmentOptions::python_version` when bumping this version.
+        Self::PY314
     }
 
     pub const fn as_tuple(self) -> (u8, u8) {
@@ -94,7 +93,7 @@ impl PythonVersion {
 
 impl Default for PythonVersion {
     fn default() -> Self {
-        Self::PY39
+        Self::PY310
     }
 }
 

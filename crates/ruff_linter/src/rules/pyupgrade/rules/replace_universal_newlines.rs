@@ -68,6 +68,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
         };
 
         let mut diagnostic = checker.report_diagnostic(ReplaceUniversalNewlines, arg.range());
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 
         if call.arguments.find_keyword("text").is_some() {
             diagnostic.try_set_fix(|| {

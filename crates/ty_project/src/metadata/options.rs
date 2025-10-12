@@ -520,8 +520,8 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.13""#,
-        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>"#,
+        default = r#""3.14""#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>"#,
         example = r#"
             python-version = "3.12"
         "#
@@ -550,9 +550,14 @@ pub struct EnvironmentOptions {
     )]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
-    /// or pyright's `stubPath` configuration setting.
+    /// User-provided paths that should take first priority in module resolution.
+    ///
+    /// This is an advanced option that should usually only be used for first-party or third-party
+    /// modules that are not installed into your Python environment in a conventional way.
+    /// Use the `python` option to specify the location of your Python environment.
+    ///
+    /// This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
+    /// configuration setting.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
@@ -576,18 +581,27 @@ pub struct EnvironmentOptions {
     )]
     pub typeshed: Option<RelativePathBuf>,
 
-    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
+    /// Path to your project's Python environment or interpreter.
     ///
-    /// ty will search in the path's `site-packages` directories for type information and
-    /// third-party imports.
+    /// ty uses the `site-packages` directory of your project's Python environment
+    /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
-    /// This option is commonly used to specify the path to a virtual environment.
+    /// If you're using a project management tool such as uv, you should not generally need
+    /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
+    /// environment variable to point to your project's virtual environment. ty can also infer
+    /// the location of your environment from an activated Conda environment, and will look for
+    /// a `.venv` directory in the project root if none of the above apply.
+    ///
+    /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
+    /// (such as a shim) is not currently supported.
+    ///
+    /// This option can be used to point to virtual or system Python environments.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
         example = r#"
-            python = "./.venv"
+            python = "./custom-venv-location/.venv"
         "#
     )]
     pub python: Option<RelativePathBuf>,

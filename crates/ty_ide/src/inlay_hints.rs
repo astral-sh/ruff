@@ -6,7 +6,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::types::ide_support::inlay_hint_function_argument_details;
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]

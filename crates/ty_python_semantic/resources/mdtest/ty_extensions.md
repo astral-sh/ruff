@@ -493,16 +493,14 @@ def _(
     c5: CallableTypeOf[Foo(42).__call__],
     c6: CallableTypeOf[Foo(42).returns_self],
     c7: CallableTypeOf[Foo.class_method],
+    c8: CallableTypeOf[Foo(42)],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int
     reveal_type(c3)  # revealed: (x: int, y: str) -> None
-
-    # TODO: should be `(x: int) -> Foo`
-    reveal_type(c4)  # revealed: (...) -> Foo
-
+    reveal_type(c4)  # revealed: (x: int) -> Foo
     reveal_type(c5)  #  revealed: (x: int) -> str
-
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
+    reveal_type(c8)  # revealed: (x: int) -> str
 ```

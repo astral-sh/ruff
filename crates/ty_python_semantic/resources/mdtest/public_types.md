@@ -263,7 +263,7 @@ if flag():
     x = 1
 
     def f() -> None:
-        reveal_type(x)  # revealed: Unknown | Literal[1, 2]
+        reveal_type(x)  # revealed: Literal[1, 2]
     # Function only used inside this branch
     f()
 
@@ -339,7 +339,7 @@ class A: ...
 
 def f(x: A):
     # TODO: no error
-    # error: [invalid-assignment] "Object of type `mdtest_snippet.A | mdtest_snippet.A` is not assignable to `mdtest_snippet.A`"
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.A @ src/mdtest_snippet.py:12 | mdtest_snippet.A @ src/mdtest_snippet.py:13` is not assignable to `mdtest_snippet.A @ src/mdtest_snippet.py:13`"
     x = A()
 ```
 

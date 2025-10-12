@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_2.py:4:22
+  |
+2 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
+3 |
+4 | def foobar(foor, bar={}):    
+  |                      ^^
+5 |     """
+6 |     """                    
+  |
+help: Replace with `None`; initialize within function
+1 | # Docstring followed by whitespace with no newline
+2 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
+3 | 
+  - def foobar(foor, bar={}):    
+4 + def foobar(foor, bar=None):    
+5 |     """
+6 |     """                    
+note: This is an unsafe fix and may change runtime behavior

@@ -533,6 +533,45 @@ static_assert(not is_subtype_of(int, Not[Literal[3]]))
 static_assert(not is_subtype_of(Literal[1], Intersection[int, Not[Literal[1]]]))
 ```
 
+## Intersections with non-fully-static negated elements
+
+A type can be a _subtype_ of an intersection containing negated elements only if the _top_
+materialization of that type is disjoint from the _top_ materialization of all negated elements in
+the intersection. This differs from assignability, which should do the disjointness check against
+the _bottom_ materialization of the negated elements.
+
+```py
+from typing_extensions import Any, Never, Sequence
+from ty_extensions import Not, is_subtype_of, static_assert
+
+# The top materialization of `tuple[Any]` is `tuple[object]`,
+# which is disjoint from `tuple[()]` but not `tuple[int]`,
+# so `tuple[()]` is a subtype of `~tuple[Any]` but `tuple[int]`
+# is not.
+static_assert(is_subtype_of(tuple[()], Not[tuple[Any]]))
+static_assert(not is_subtype_of(tuple[int], Not[tuple[Any]]))
+static_assert(not is_subtype_of(tuple[Any], Not[tuple[Any]]))
+
+# The top materialization of `tuple[Any, ...]` is `tuple[object, ...]`,
+# so no tuple type can be considered a subtype of `~tuple[Any, ...]`
+static_assert(not is_subtype_of(tuple[()], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[int], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[int, ...], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[object, ...], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[Any, ...], Not[tuple[Any, ...]]))
+
+# Similarly, the top materialization of `Sequence[Any]` is `Sequence[object]`,
+# so no sequence type can be considered a subtype of `~Sequence[Any]`.
+static_assert(not is_subtype_of(tuple[()], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[int], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[int, ...], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[object, ...], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[Any, ...], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(list[Never], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(list[Any], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(list[int], Not[Sequence[Any]]))
+```
+
 ## Special types
 
 ### `Never`
@@ -830,6 +869,42 @@ static_assert(not is_subtype_of(object, Any))
 static_assert(is_subtype_of(int, Any | int))
 static_assert(is_subtype_of(Intersection[Any, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Any]))
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Covariant[Any], Covariant[Any]))
+static_assert(not is_subtype_of(Covariant[Any], Covariant[int]))
+static_assert(not is_subtype_of(Covariant[int], Covariant[Any]))
+static_assert(is_subtype_of(Covariant[Any], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[Any]))
+
+class Contravariant[T]:
+    def receive(self, input: T): ...
+
+static_assert(not is_subtype_of(Contravariant[Any], Contravariant[Any]))
+static_assert(not is_subtype_of(Contravariant[Any], Contravariant[int]))
+static_assert(not is_subtype_of(Contravariant[int], Contravariant[Any]))
+static_assert(not is_subtype_of(Contravariant[Any], Contravariant[object]))
+static_assert(is_subtype_of(Contravariant[object], Contravariant[Any]))
+
+class Invariant[T]:
+    mutable_attribute: T
+
+static_assert(not is_subtype_of(Invariant[Any], Invariant[Any]))
+static_assert(not is_subtype_of(Invariant[Any], Invariant[int]))
+static_assert(not is_subtype_of(Invariant[int], Invariant[Any]))
+static_assert(not is_subtype_of(Invariant[Any], Invariant[object]))
+static_assert(not is_subtype_of(Invariant[object], Invariant[Any]))
+
+class Bivariant[T]: ...
+
+static_assert(is_subtype_of(Bivariant[Any], Bivariant[Any]))
+static_assert(is_subtype_of(Bivariant[Any], Bivariant[int]))
+static_assert(is_subtype_of(Bivariant[int], Bivariant[Any]))
+static_assert(is_subtype_of(Bivariant[Any], Bivariant[object]))
+static_assert(is_subtype_of(Bivariant[object], Bivariant[Any]))
 ```
 
 The same for `Unknown`:

@@ -6,7 +6,7 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -16,7 +16,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::check_types;
+use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
@@ -377,8 +377,14 @@ fn run_test(
                     by_line: line_failures,
                 }),
             };
+
+            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+            // since they make snapshots very noisy!
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics);
+                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
+                    diagnostic.id() != DiagnosticId::RevealedType
+                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+                }));
             }
 
             failure
