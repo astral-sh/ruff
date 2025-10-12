@@ -1,0 +1,34 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: "lex(r#\"uU\"hello\"\"#, Mode::Module, TextSize::default())"
+---
+## Tokens
+```
+[
+    (
+        String(
+            "hello",
+        ),
+        0..9,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
+    ),
+    (
+        Newline,
+        9..9,
+    ),
+]
+```
+## Errors
+```
+[
+    LexicalError {
+        error: IncompatibleStringPrefixes(
+            'u',
+            'U',
+        ),
+        location: 0..2,
+    },
+]
+```

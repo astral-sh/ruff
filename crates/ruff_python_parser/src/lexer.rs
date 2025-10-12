@@ -621,13 +621,23 @@ impl<'src> Lexer<'src> {
                 self.cursor.bump();
                 quote
             }),
-            (_, second) if is_quote(self.cursor.second()) => {
-                self.try_double_char_prefix([first, second]).then(|| {
+            (_, second) if is_quote(self.cursor.second()) => self
+                .try_double_char_prefix([first, second])
+                .and_then(|prefix_kind| {
+                    if matches!(prefix_kind, DoubleCharPrefix::Incompatible) {
+                        // This produces an `Unknown` token but we do not
+                        // record it - instead the contents inside the quotes
+                        // is parsed as an ordinary string with empty prefix.
+                        self.push_error(LexicalError::new(
+                            LexicalErrorType::IncompatibleStringPrefixes(first, second),
+                            // We include both characters from the prefix
+                            // in the range
+                            self.token_range().add_end(TextSize::new(1)),
+                        ));
+                    }
                     self.cursor.bump();
-                    // SAFETY: Safe because of the `is_quote` check in this match arm's guard
-                    self.cursor.bump().unwrap()
-                })
-            }
+                    self.cursor.bump()
+                }),
             _ => None,
         };
 
@@ -729,8 +739,10 @@ impl<'src> Lexer<'src> {
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_double_char_prefix(&mut self, value: [char; 2]) -> bool {
+    /// Returns [`DoubleCharPrefix::Valid`] if it matches a valid double character prefix,
+    /// [`DoubleCharPrefix::Invalid`] if it matches an invalid combination of character prefixes,
+    /// and `None` otherwise.
+    fn try_double_char_prefix(&mut self, value: [char; 2]) -> Option<DoubleCharPrefix> {
         match value {
             ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
                 self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_LOWERCASE;
@@ -750,9 +762,14 @@ impl<'src> Lexer<'src> {
             ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => {
                 self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_UPPERCASE;
             }
-            _ => return false,
+            // remaining combinations incompatible prefixes
+            [
+                'b' | 'B' | 'r' | 'R' | 'u' | 'U' | 'f' | 'F' | 't' | 'T',
+                'b' | 'B' | 'r' | 'R' | 'u' | 'U' | 'f' | 'F' | 't' | 'T',
+            ] => return Some(DoubleCharPrefix::Incompatible),
+            _ => return None,
         }
-        true
+        Some(DoubleCharPrefix::Valid)
     }
 
     /// Lex a f-string or t-string start token if positioned at the start of an f-string or t-string.
@@ -1585,6 +1602,12 @@ impl State {
 }
 
 #[derive(Copy, Clone, Debug)]
+enum DoubleCharPrefix {
+    Valid,
+    Incompatible,
+}
+
+#[derive(Copy, Clone, Debug)]
 enum Radix {
     Binary,
     Octal,
@@ -1745,6 +1768,7 @@ mod tests {
         }
     }
 
+    #[track_caller]
     fn lex(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
         let mut lexer = Lexer::new(source, mode, start_offset);
         let mut tokens = Vec::new();
@@ -2725,6 +2749,7 @@ t"{(lambda x:{x})}"
         );
     }
 
+    #[track_caller]
     fn lex_tstring_error(source: &str) -> InterpolatedStringErrorType {
         let output = lex(source, Mode::Module, TextSize::default());
         match output
@@ -2767,5 +2792,14 @@ t"{(lambda x:{x})}"
             lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    #[test]
+    fn test_repeated_string_prefix_error() {
+        assert_snapshot!(lex(r#"uU"hello""#, Mode::Module, TextSize::default()));
+    }
+    #[test]
+    fn test_invalid_string_prefix_error() {
+        assert_snapshot!(lex(r#"uf"hello""#, Mode::Module, TextSize::default()));
     }
 }
