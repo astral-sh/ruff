@@ -35,7 +35,7 @@ pub(crate) fn is_gettext_func_call(
     if semantic.seen_module(Modules::BUILTINS)
         && matches!(
             qualified_name.segments(),
-            ["" | "builtins", id] if functions_names.contains(&Name::new(id)),
+            ["builtins", id] if functions_names.contains(&Name::new(id)),
         )
     {
         return true;
