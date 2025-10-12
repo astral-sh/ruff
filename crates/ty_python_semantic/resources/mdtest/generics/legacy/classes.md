@@ -71,27 +71,24 @@ reveal_type(generic_context(InheritedGenericPartiallySpecialized))
 reveal_type(generic_context(InheritedGenericFullySpecialized))
 ```
 
-In a nested class, references to legacy typevars in a containing class do _not_ cause the inner
-class to be generic.
+In a nested class, references to typevars in an enclosing class are not allowed, but if they are
+present, they are not included in the class's generic context.
 
 ```py
 class OuterClass(Generic[T]):
+    # error: [invalid-generic-class] "Generic class `InnerClass` must not reference type variables bound in an enclosing scope"
     class InnerClass(list[T]): ...
-
-    def method(self):
-        class InnerClassInMethod(list[T]): ...
-        # revealed: None
-        reveal_type(generic_context(InnerClassInMethod))
     # revealed: None
     reveal_type(generic_context(InnerClass))
 
+    def method(self):
+        # error: [invalid-generic-class] "Generic class `InnerClassInMethod` must not reference type variables bound in an enclosing scope"
+        class InnerClassInMethod(list[T]): ...
+        # revealed: None
+        reveal_type(generic_context(InnerClassInMethod))
+
 # revealed: tuple[T@OuterClass]
 reveal_type(generic_context(OuterClass))
-
-class F: ...
-
-# revealed: None
-reveal_type(generic_context(F))
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each

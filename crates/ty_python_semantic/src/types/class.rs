@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
@@ -24,6 +25,7 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
+use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
@@ -33,7 +35,7 @@ use crate::types::{
     declaration_type, determine_upper_bound, infer_definition_types,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet, Program,
+    Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_symbol,
@@ -1464,6 +1466,61 @@ impl<'db> ClassLiteral<'db> {
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
         )
+    }
+
+    /// Returns all of the typevars that are referenced in this class's definition. This includes
+    /// any typevars bound in its generic context, as well as any typevars mentioned in its base
+    /// class list. (This is used to ensure that classes do not bind or reference typevars from
+    /// enclosing generic contexts.)
+    pub(crate) fn typevars_referenced_in_definition(
+        self,
+        db: &'db dyn Db,
+    ) -> FxOrderSet<BoundTypeVarInstance<'db>> {
+        struct CollectTypeVars<'db> {
+            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars.borrow_mut().insert(bound_typevar);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
+                            // If we have already seen this type, we can skip it.
+                            return;
+                        }
+                        walk_non_atomic_type(db, non_atomic_type, self);
+                    }
+                }
+            }
+        }
+
+        let visitor = CollectTypeVars {
+            typevars: RefCell::new(FxOrderSet::default()),
+            seen_types: RefCell::new(FxIndexSet::default()),
+        };
+        if let Some(generic_context) = self.generic_context(db) {
+            for bound_typevar in generic_context.variables(db) {
+                visitor.visit_bound_type_var_type(db, bound_typevar);
+            }
+        }
+        for base in self.explicit_bases(db) {
+            visitor.visit_type(db, *base);
+        }
+        visitor.typevars.into_inner()
     }
 
     /// Returns the generic context that should be inherited by any constructor methods of this

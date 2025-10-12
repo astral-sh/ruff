@@ -24,7 +24,7 @@ use crate::{Db, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
-fn enclosing_generic_contexts<'db>(
+pub(crate) fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
     scope: FileScopeId,
@@ -426,6 +426,15 @@ impl<'db> GenericContext<'db> {
         let other_variables = other.variables_inner(db);
         self.variables(db)
             .all(|bound_typevar| other_variables.contains_key(&bound_typevar))
+    }
+
+    pub(crate) fn binds_named_typevar(
+        self,
+        db: &'db dyn Db,
+        name: &'db ast::name::Name,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        self.variables(db)
+            .find(|self_bound_typevar| self_bound_typevar.typevar(db).name(db) == name)
     }
 
     pub(crate) fn binds_typevar(

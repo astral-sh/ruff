@@ -77,7 +77,7 @@ use crate::types::diagnostic::{
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{GenericContext, bind_typevar, enclosing_generic_contexts};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
@@ -91,11 +91,11 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    BindingContext, CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
     TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
@@ -838,6 +838,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // (6) If the class is generic, verify that its generic context does not violate any of
+            // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
                 class.inherited_legacy_generic_context(self.db()),
@@ -854,7 +856,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check that a dataclass does not have more than one `KW_ONLY`.
+            let scope = class.body_scope(self.db()).scope(self.db());
+            if let Some(parent) = scope.parent() {
+                for self_typevar in class.typevars_referenced_in_definition(self.db()) {
+                    let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                    for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                        if let Some(other_typevar) =
+                            enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                        {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_GENERIC_CLASS, &class_node.name)
+                            {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Generic class `{}` must not reference type variables \
+                                    bound in an enclosing scope",
+                                    class_node.name,
+                                ));
+                                if let BindingContext::Definition(other_definition) =
+                                    other_typevar.binding_context(self.db())
+                                {
+                                    diagnostic.annotate(
+                                        Annotation::primary(
+                                            other_definition
+                                                .full_range(self.db(), self.module())
+                                                .into(),
+                                        )
+                                        .message(format_args!(
+                                            "Type variable `{}` is bound in this enclosing scope",
+                                            self_typevar_name,
+                                        )),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // (7) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
