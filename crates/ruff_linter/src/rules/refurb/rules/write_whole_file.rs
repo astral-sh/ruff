@@ -162,7 +162,6 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
     let method_name = &attr.attr;
 
     if method_name != "write"
-        || !attr.value.is_name_expr()
         || call.arguments.args.len() != 1
         || !call.arguments.keywords.is_empty()
     {
