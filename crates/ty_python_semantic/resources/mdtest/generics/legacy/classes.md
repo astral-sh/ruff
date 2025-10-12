@@ -80,10 +80,8 @@ class OuterClass(Generic[T]):
 
     def method(self):
         class InnerClassInMethod(list[T]): ...
-
         # revealed: None
         reveal_type(generic_context(InnerClassInMethod))
-
     # revealed: None
     reveal_type(generic_context(InnerClass))
 
@@ -91,6 +89,7 @@ class OuterClass(Generic[T]):
 reveal_type(generic_context(OuterClass))
 
 class F: ...
+
 # revealed: None
 reveal_type(generic_context(F))
 ```
