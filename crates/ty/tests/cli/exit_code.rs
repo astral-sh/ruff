@@ -6,7 +6,7 @@ use crate::CliTest;
 fn only_warnings() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -21,8 +21,7 @@ fn only_warnings() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -37,7 +36,7 @@ fn only_info() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -52,8 +51,7 @@ fn only_info() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -68,7 +66,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -83,8 +81,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -93,7 +90,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -108,8 +105,7 @@ fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -127,7 +123,7 @@ fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Resul
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -142,8 +138,7 @@ fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Resul
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -158,7 +153,7 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -183,8 +178,7 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -199,7 +193,7 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -224,8 +218,7 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -240,7 +233,7 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -265,8 +258,7 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
