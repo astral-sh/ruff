@@ -47,14 +47,22 @@ impl Violation for TypingTextStrAlias {
 
 /// UP019
 pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::TYPING) {
+    if !checker
+        .semantic()
+        .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
+    {
         return;
     }
 
     if checker
         .semantic()
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["typing" | "typing_extensions", "Text"]
+            )
+        })
     {
         let mut diagnostic = checker.report_diagnostic(TypingTextStrAlias, expr.range());
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
