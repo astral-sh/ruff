@@ -16,7 +16,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::check_types;
+use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
@@ -383,7 +383,7 @@ fn run_test(
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
                     diagnostic.id() != DiagnosticId::RevealedType
-                        && !diagnostic.id().is_lint_named("undefined-reveal")
+                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
                 }));
             }
 

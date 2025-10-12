@@ -1568,7 +1568,7 @@ declare_lint! {
     /// ```python
     /// reveal_type(1)  # NameError: name 'reveal_type' is not defined
     /// ```
-    pub(crate) static UNDEFINED_REVEAL = {
+    pub static UNDEFINED_REVEAL = {
         summary: "detects usages of `reveal_type` without importing it",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
