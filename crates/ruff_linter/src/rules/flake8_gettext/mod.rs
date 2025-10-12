@@ -19,8 +19,7 @@ pub(crate) fn is_gettext_func_call(
         .map(ast::ExprName::id)
         .is_some_and(|id| functions_names.contains(id))
     {
-    if let Some(name) = func.as_name_expr() {
-        return functions_names.contains(name.id);
+        return true;
     }
 
     if !is_extended_i18n_function_matching_enabled(checker.settings()) {
