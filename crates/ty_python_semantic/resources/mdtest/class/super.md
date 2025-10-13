@@ -14,8 +14,15 @@ common usage.
 
 ### Explicit Super Object
 
+<!-- snapshot-diagnostics -->
+
 `super(pivot_class, owner)` performs attribute lookup along the MRO, starting immediately after the
 specified pivot class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class A:
@@ -34,21 +41,15 @@ reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>,
 
 super(C, C()).a
 super(C, C()).b
-# error: [unresolved-attribute] "Type `<super: <class 'C'>, C>` has no attribute `c`"
-super(C, C()).c
+super(C, C()).c  # error: [unresolved-attribute]
 
 super(B, C()).a
-# error: [unresolved-attribute] "Type `<super: <class 'B'>, C>` has no attribute `b`"
-super(B, C()).b
-# error: [unresolved-attribute] "Type `<super: <class 'B'>, C>` has no attribute `c`"
-super(B, C()).c
+super(B, C()).b  # error: [unresolved-attribute]
+super(B, C()).c  # error: [unresolved-attribute]
 
-# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `a`"
-super(A, C()).a
-# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `b`"
-super(A, C()).b
-# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `c`"
-super(A, C()).c
+super(A, C()).a  # error: [unresolved-attribute]
+super(A, C()).b  # error: [unresolved-attribute]
+super(A, C()).c  # error: [unresolved-attribute]
 
 reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
 reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
@@ -56,11 +57,79 @@ reveal_type(super(C, C()).aa)  # revealed: int
 reveal_type(super(C, C()).bb)  # revealed: int
 ```
 
+Examples of explicit `super()` with unusual types. We allow almost any type to be passed as the
+second argument to `super()` -- the only exceptions are "pure abstract" types such as `Callable` and
+synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`object` nominal type.
+
+```py
+import types
+from typing_extensions import Callable, TypeIs, Literal, TypedDict
+
+def f(): ...
+
+class Foo[T]:
+    def method(self): ...
+    @property
+    def some_property(self): ...
+
+type Alias = int
+
+class SomeTypedDict(TypedDict):
+    x: int
+    y: bytes
+
+# revealed: <super: <class 'object'>, FunctionType>
+reveal_type(super(object, f))
+# revealed: <super: <class 'object'>, WrapperDescriptorType>
+reveal_type(super(object, types.FunctionType.__get__))
+# revealed: <super: <class 'object'>, GenericAlias>
+reveal_type(super(object, Foo[int]))
+# revealed: <super: <class 'object'>, _SpecialForm>
+reveal_type(super(object, Literal))
+# revealed: <super: <class 'object'>, TypeAliasType>
+reveal_type(super(object, Alias))
+# revealed: <super: <class 'object'>, MethodType>
+reveal_type(super(object, Foo().method))
+# revealed: <super: <class 'object'>, property>
+reveal_type(super(object, Foo.some_property))
+
+def g(x: object) -> TypeIs[list[object]]:
+    return isinstance(x, list)
+
+def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
+    if hasattr(x, "bar"):
+        # revealed: <Protocol with members 'bar'>
+        reveal_type(x)
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super(object, x))
+
+    # error: [invalid-super-argument]
+    # revealed: Unknown
+    reveal_type(super(object, z))
+
+    is_list = g(x)
+    # revealed: TypeIs[list[object] @ x]
+    reveal_type(is_list)
+    # revealed: <super: <class 'object'>, bool>
+    reveal_type(super(object, is_list))
+
+    # revealed: <super: <class 'object'>, dict[Literal["x", "y"], int | bytes]>
+    reveal_type(super(object, y))
+```
+
 ### Implicit Super Object
+
+<!-- snapshot-diagnostics -->
 
 The implicit form `super()` is same as `super(__class__, <first argument>)`. The `__class__` refers
 to the class that contains the function where `super()` is used. The first argument refers to the
 current method’s first parameter (typically `self` or `cls`).
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from __future__ import annotations
@@ -74,6 +143,7 @@ class B(A):
     def __init__(self, a: int):
         # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, B>`
         reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super(object, super()))  # revealed: <super: <class 'object'>, super>
         super().__init__(a)
 
     @classmethod
@@ -84,6 +154,123 @@ class B(A):
 
 super(B, B(42)).__init__(42)
 super(B, B).f()
+```
+
+Some examples with unusual annotations for `self` or `cls`:
+
+```py
+import enum
+from typing import Any, Self, Never, Protocol, Callable
+from ty_extensions import Intersection
+
+class BuilderMeta(type):
+    def __new__(
+        cls: type[Any],
+        name: str,
+        bases: tuple[type, ...],
+        dct: dict[str, Any],
+    ) -> BuilderMeta:
+        # revealed: <super: <class 'BuilderMeta'>, Any>
+        s = reveal_type(super())
+        # revealed: Any
+        return reveal_type(s.__new__(cls, name, bases, dct))
+
+class BuilderMeta2(type):
+    def __new__(
+        cls: type[BuilderMeta2],
+        name: str,
+        bases: tuple[type, ...],
+        dct: dict[str, Any],
+    ) -> BuilderMeta2:
+        # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
+        s = reveal_type(super())
+        # TODO: should be `BuilderMeta2` (needs https://github.com/astral-sh/ty/issues/501)
+        # revealed:  Unknown
+        return reveal_type(s.__new__(cls, name, bases, dct))
+
+class Foo[T]:
+    x: T
+
+    def method(self: Any):
+        reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
+
+        if isinstance(self, Foo):
+            reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
+
+    def method2(self: Foo[T]):
+        # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
+        reveal_type(super())
+
+    def method3(self: Foo):
+        # revealed: <super: <class 'Foo'>, Foo[Unknown]>
+        reveal_type(super())
+
+    def method4(self: Self):
+        # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
+        reveal_type(super())
+
+    def method5[S: Foo[int]](self: S, other: S) -> S:
+        # revealed: <super: <class 'Foo'>, Foo[int]>
+        reveal_type(super())
+        return self
+
+    def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
+        # revealed: <super: <class 'Foo'>, Foo[int]> | <super: <class 'Foo'>, Foo[str]>
+        reveal_type(super())
+        return self
+
+    def method7[S](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+    def method8[S: int](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+    def method9[S: (int, str)](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+    def method10[S: Callable[..., str]](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+type Alias = Bar
+
+class Bar:
+    def method(self: Alias):
+        # revealed: <super: <class 'Bar'>, Bar>
+        reveal_type(super())
+
+    def pls_dont_call_me(self: Never):
+        # revealed: <super: <class 'Bar'>, Unknown>
+        reveal_type(super())
+
+    def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+        # revealed: <super: <class 'Bar'>, Bar>
+        reveal_type(super())
+
+class P(Protocol):
+    def method(self: P):
+        # revealed: <super: <class 'P'>, P>
+        reveal_type(super())
+
+class E(enum.Enum):
+    X = 1
+
+    def method(self: E):
+        match self:
+            case E.X:
+                # revealed: <super: <class 'E'>, E>
+                reveal_type(super())
 ```
 
 ### Unbound Super Object
@@ -167,11 +354,19 @@ class A:
 ## Built-ins and Literals
 
 ```py
+from enum import Enum
+
 reveal_type(super(bool, True))  # revealed: <super: <class 'bool'>, bool>
 reveal_type(super(bool, bool()))  # revealed: <super: <class 'bool'>, bool>
 reveal_type(super(int, bool()))  # revealed: <super: <class 'int'>, bool>
 reveal_type(super(int, 3))  # revealed: <super: <class 'int'>, int>
 reveal_type(super(str, ""))  # revealed: <super: <class 'str'>, str>
+reveal_type(super(bytes, b""))  # revealed: <super: <class 'bytes'>, bytes>
+
+class E(Enum):
+    X = 42
+
+reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
 ```
 
 ## Descriptor Behavior with Super
@@ -342,7 +537,7 @@ def f(x: int):
     # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
     super(IntAlias, 0)
 
-# error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, Literal[""])` call"
+# error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
 # revealed: Unknown
 reveal_type(super(int, str()))
 
