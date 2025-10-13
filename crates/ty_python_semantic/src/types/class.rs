@@ -1382,7 +1382,7 @@ impl get_size2::GetSize for ClassLiteral<'_> {}
 
 #[expect(clippy::ref_option)]
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn pep695_generic_context_cycle_recover<'db>(
+fn generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
     _count: u32,
@@ -1391,7 +1391,7 @@ fn pep695_generic_context_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn pep695_generic_context_cycle_initial<'db>(
+fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
@@ -1431,7 +1431,11 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_fn=generic_context_cycle_recover,
+        cycle_initial=generic_context_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let file = scope.file(db);
@@ -1454,6 +1458,11 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
+    #[salsa::tracked(
+        cycle_fn=generic_context_cycle_recover,
+        cycle_initial=generic_context_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn inherited_legacy_generic_context(
         self,
         db: &'db dyn Db,
