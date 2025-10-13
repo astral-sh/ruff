@@ -1476,6 +1476,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
+        #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
             seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
@@ -1508,10 +1509,7 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
-        let visitor = CollectTypeVars {
-            typevars: RefCell::new(FxIndexSet::default()),
-            seen_types: RefCell::new(FxIndexSet::default()),
-        };
+        let visitor = CollectTypeVars::default();
         if let Some(generic_context) = self.generic_context(db) {
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, bound_typevar);
