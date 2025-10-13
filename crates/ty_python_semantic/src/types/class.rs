@@ -2891,7 +2891,7 @@ impl<'db> ClassLiteral<'db> {
                         if boundness == Boundness::Bound {
                             if is_declared {
                                 // We found a definitely-declared attribute. Discard possibly collected
-                                // inferred types from superclasses and return the declared type.
+                                // inferred types from subclasses and return the declared type.
                                 return member;
                             }
 
