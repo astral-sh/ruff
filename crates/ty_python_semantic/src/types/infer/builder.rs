@@ -2175,7 +2175,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .try_call(self.db(), &CallArguments::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
-                Ok(return_ty) => return_ty,
+                Ok(return_ty) => {
+                    let is_input_function_like = inferred_ty
+                        .into_callable(self.db())
+                        .and_then(Type::unwrap_as_callable_type)
+                        .is_some_and(|callable| callable.is_function_like(self.db()));
+                    if is_input_function_like
+                        && let Some(callable_type) = return_ty.unwrap_as_callable_type()
+                    {
+                        // When a method on a class is decorated with a function that returns a `Callable`, assume that
+                        // the returned callable is also function-like. See "Decorating a method with a `Callable`-typed
+                        // decorator" in `callables_as_descriptors.md` for the extended explanation.
+                        Type::Callable(CallableType::new(
+                            self.db(),
+                            callable_type.signatures(self.db()),
+                            true,
+                        ))
+                    } else {
+                        return_ty
+                    }
+                }
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, (*decorator_node).into());
                     bindings.return_type(self.db())
