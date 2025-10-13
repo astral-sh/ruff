@@ -942,6 +942,7 @@ impl<'src> Lexer<'src> {
                 let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
                     self.cursor.skip_to_end();
 
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
                     return self.push_error(LexicalError::new(
                         LexicalErrorType::UnclosedStringError,
                         self.token_range(),
@@ -977,6 +978,7 @@ impl<'src> Lexer<'src> {
                     memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
                 else {
                     self.cursor.skip_to_end();
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
 
                     return self.push_error(LexicalError::new(
                         LexicalErrorType::StringError,
@@ -1009,6 +1011,7 @@ impl<'src> Lexer<'src> {
 
                 match quote_or_newline {
                     '\r' | '\n' => {
+                        self.current_flags |= TokenFlags::UNCLOSED_STRING;
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
                             self.token_range(),

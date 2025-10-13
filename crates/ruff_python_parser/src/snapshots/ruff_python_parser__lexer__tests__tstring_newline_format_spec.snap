@@ -64,6 +64,9 @@ expression: "lex_invalid(source, Mode::Module)"
     (
         Unknown,
         18..19,
+        TokenFlags(
+            UNCLOSED_STRING,
+        ),
     ),
     (
         Newline,
@@ -134,6 +137,9 @@ expression: "lex_invalid(source, Mode::Module)"
     (
         Unknown,
         47..48,
+        TokenFlags(
+            UNCLOSED_STRING,
+        ),
     ),
     (
         Newline,
