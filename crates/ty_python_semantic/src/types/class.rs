@@ -7,7 +7,6 @@ use super::{
     function::FunctionType, infer_expression_type, infer_unpack_types,
 };
 use crate::FxOrderMap;
-use crate::member::Member;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::{NodeWithScopeKind, Scope};
@@ -22,6 +21,7 @@ use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
+use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
@@ -37,8 +37,8 @@ use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
-        Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_member,
-        known_module_symbol, place_from_bindings, place_from_declarations,
+        Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, known_module_symbol,
+        place_from_bindings, place_from_declarations,
     },
     semantic_index::{
         attribute_assignments,
@@ -3272,7 +3272,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    pub(crate) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
