@@ -89,6 +89,7 @@ mod generics;
 pub mod ide_support;
 mod infer;
 mod instance;
+mod member;
 mod mro;
 mod narrow;
 mod protocol_class;
