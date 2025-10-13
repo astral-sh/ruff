@@ -112,34 +112,40 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  98 |         reveal_type(super())
  99 |         return self
 100 | 
-101 | type Alias = Bar
-102 | 
-103 | class Bar:
-104 |     def method(self: Alias):
-105 |         # revealed: <super: <class 'Bar'>, Bar>
-106 |         reveal_type(super())
-107 | 
-108 |     def pls_dont_call_me(self: Never):
-109 |         # revealed: <super: <class 'Bar'>, Unknown>
-110 |         reveal_type(super())
-111 | 
-112 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
-113 |         # revealed: <super: <class 'Bar'>, Bar>
-114 |         reveal_type(super())
-115 | 
-116 | class P(Protocol):
-117 |     def method(self: P):
-118 |         # revealed: <super: <class 'P'>, P>
-119 |         reveal_type(super())
-120 | 
-121 | class E(enum.Enum):
-122 |     X = 1
-123 | 
-124 |     def method(self: E):
-125 |         match self:
-126 |             case E.X:
-127 |                 # revealed: <super: <class 'E'>, E>
-128 |                 reveal_type(super())
+101 |     def method10[S: Callable[..., str]](self: S, other: S) -> S:
+102 |         # error: [invalid-super-argument]
+103 |         # revealed: Unknown
+104 |         reveal_type(super())
+105 |         return self
+106 | 
+107 | type Alias = Bar
+108 | 
+109 | class Bar:
+110 |     def method(self: Alias):
+111 |         # revealed: <super: <class 'Bar'>, Bar>
+112 |         reveal_type(super())
+113 | 
+114 |     def pls_dont_call_me(self: Never):
+115 |         # revealed: <super: <class 'Bar'>, Unknown>
+116 |         reveal_type(super())
+117 | 
+118 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+119 |         # revealed: <super: <class 'Bar'>, Bar>
+120 |         reveal_type(super())
+121 | 
+122 | class P(Protocol):
+123 |     def method(self: P):
+124 |         # revealed: <super: <class 'P'>, P>
+125 |         reveal_type(super())
+126 | 
+127 | class E(enum.Enum):
+128 |     X = 1
+129 | 
+130 |     def method(self: E):
+131 |         match self:
+132 |             case E.X:
+133 |                 # revealed: <super: <class 'E'>, E>
+134 |                 reveal_type(super())
 ```
 
 # Diagnostics
@@ -154,7 +160,8 @@ error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<c
    |                     ^^^^^^^
 87 |         return self
    |
-info: Type variable `S` has `object` as its implicit upper bound, which is not an instance or subclass
+info: Type variable `S` has `object` as its implicit upper bound
+info: `object` is not an instance or subclass of `<class 'Foo'>`
 info: rule `invalid-super-argument` is enabled by default
 
 ```
@@ -169,7 +176,8 @@ error[invalid-super-argument]: `S@method8` is not an instance or subclass of `<c
    |                     ^^^^^^^
 93 |         return self
    |
-info: Type variable `S` has upper bound `int`, which is not an instance or subclass
+info: Type variable `S` has upper bound `int`
+info: `int` is not an instance or subclass of `<class 'Foo'>`
 info: rule `invalid-super-argument` is enabled by default
 
 ```
@@ -185,7 +193,22 @@ error[invalid-super-argument]: `S@method9` is not an instance or subclass of `<c
 99 |         return self
    |
 info: Type variable `S` has constraints `int, str`
-info: All constraints must be instances or subclasses for this `super()` call to be valid
+info: `int | str` is not an instance or subclass of `<class 'Foo'>`
+info: rule `invalid-super-argument` is enabled by default
+
+```
+
+```
+error[invalid-super-argument]: `S@method10` is a type variable with an abstract/structural type as its bounds or constraints, in `super(<class 'Foo'>, S@method10)` call
+   --> src/mdtest_snippet.py:104:21
+    |
+102 |         # error: [invalid-super-argument]
+103 |         # revealed: Unknown
+104 |         reveal_type(super())
+    |                     ^^^^^^^
+105 |         return self
+    |
+info: Type variable `S` has upper bound `(...) -> str`
 info: rule `invalid-super-argument` is enabled by default
 
 ```

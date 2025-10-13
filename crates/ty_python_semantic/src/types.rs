@@ -11242,20 +11242,32 @@ impl<'db> EnumLiteralType<'db> {
     }
 }
 
+/// Enumeration of ways in which a `super()` call can cause us to emit a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoundSuperError<'db> {
+    /// The second argument to `super()` (which may have been implicitly provided by
+    /// the Python interpreter) has an abstract or structural type.
+    /// It's impossible to determine whether a `Callable` type or a synthesized protocol
+    /// type is an instance or subclass of the pivot class, so these are rejected.
     AbstractOwnerType {
         owner_type: Type<'db>,
-        error_context: Option<TypeVarInstance<'db>>,
-    },
-    InvalidPivotClassType {
         pivot_class: Type<'db>,
+        /// If `owner_type` is a type variable, this contains the type variable instance
+        typevar_context: Option<TypeVarInstance<'db>>,
     },
+    /// The first argument to `super()` (which may have been implicitly provided by
+    /// the Python interpreter) is not a valid class type.
+    InvalidPivotClassType { pivot_class: Type<'db> },
+    /// The second argument to `super()` was not a subclass or instance of the first argument.
+    /// (Note that both arguments may have been implicitly provided by the Python interpreter.)
     FailingConditionCheck {
         pivot_class: Type<'db>,
         owner: Type<'db>,
-        error_context: Option<TypeVarInstance<'db>>,
+        /// If `owner_type` is a type variable, this contains the type variable instance
+        typevar_context: Option<TypeVarInstance<'db>>,
     },
+    /// It was a single-argument `super()` call, but we were unable to determine
+    /// the implicit arguments provided by the Python interpreter.
     UnavailableImplicitArguments,
 }
 
@@ -11264,15 +11276,25 @@ impl<'db> BoundSuperError<'db> {
         match self {
             BoundSuperError::AbstractOwnerType {
                 owner_type,
-                error_context,
+                pivot_class,
+                typevar_context,
             } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Second argument to `super()` has abstract/structural type `{}`",
-                        owner_type.display(context.db())
-                    ));
-                    if let Some(error_context) = error_context {
-                        Self::add_context(context.db(), &mut diagnostic, *error_context);
+                    if let Some(typevar_context) = typevar_context {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`{owner}` is a type variable with an abstract/structural type as \
+                            its bounds or constraints, in `super({pivot_class}, {owner})` call",
+                            pivot_class = pivot_class.display(context.db()),
+                            owner = owner_type.display(context.db()),
+                        ));
+                        Self::describe_typevar(context.db(), &mut diagnostic, *typevar_context);
+                    } else {
+                        builder.into_diagnostic(format_args!(
+                            "`{owner}` is an abstract/structural type in \
+                            `super({pivot_class}, {owner})` call",
+                            pivot_class = pivot_class.display(context.db()),
+                            owner = owner_type.display(context.db()),
+                        ));
                     }
                 }
             }
@@ -11287,17 +11309,24 @@ impl<'db> BoundSuperError<'db> {
             BoundSuperError::FailingConditionCheck {
                 pivot_class,
                 owner,
-                error_context,
+                typevar_context,
             } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "`{owner}` is not an instance or subclass of \
-                         `{pivot_class}` in `super({pivot_class}, {owner})` call",
+                        `{pivot_class}` in `super({pivot_class}, {owner})` call",
                         pivot_class = pivot_class.display(context.db()),
                         owner = owner.display(context.db()),
                     ));
-                    if let Some(error_context) = error_context {
-                        Self::add_context(context.db(), &mut diagnostic, *error_context);
+                    if let Some(typevar_context) = typevar_context {
+                        let bound_or_constraints_union =
+                            Self::describe_typevar(context.db(), &mut diagnostic, *typevar_context);
+                        diagnostic.info(format_args!(
+                            "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
+                            bounds_or_constraints =
+                                bound_or_constraints_union.display(context.db()),
+                            pivot_class = pivot_class.display(context.db()),
+                        ));
                     }
                 }
             }
@@ -11313,14 +11342,22 @@ impl<'db> BoundSuperError<'db> {
         }
     }
 
-    fn add_context(db: &'db dyn Db, diagnostic: &mut Diagnostic, type_var: TypeVarInstance<'db>) {
+    /// Add an `info`-level diagnostic describing the bounds or constraints,
+    /// and return the type variable's upper bound or the union of its constraints.
+    fn describe_typevar(
+        db: &'db dyn Db,
+        diagnostic: &mut Diagnostic,
+        type_var: TypeVarInstance<'db>,
+    ) -> Type<'db> {
         match type_var.bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => diagnostic.info(format_args!(
-                "Type variable `{}` has upper bound `{}`, \
-                which is not an instance or subclass",
-                type_var.name(db),
-                bound.display(db)
-            )),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                diagnostic.info(format_args!(
+                    "Type variable `{}` has upper bound `{}`",
+                    type_var.name(db),
+                    bound.display(db)
+                ));
+                bound
+            }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 diagnostic.info(format_args!(
                     "Type variable `{}` has constraints `{}`",
@@ -11331,17 +11368,15 @@ impl<'db> BoundSuperError<'db> {
                         .map(|c| c.display(db))
                         .join(", ")
                 ));
-                // TODO: it would be great if we could list the constraints that are problematic here
-                diagnostic.info(
-                    "All constraints must be instances or subclasses \
-                    for this `super()` call to be valid",
-                );
+                Type::Union(constraints)
             }
-            None => diagnostic.info(format_args!(
-                "Type variable `{}` has `object` as its implicit upper bound, \
-                    which is not an instance or subclass",
-                type_var.name(db)
-            )),
+            None => {
+                diagnostic.info(format_args!(
+                    "Type variable `{}` has `object` as its implicit upper bound",
+                    type_var.name(db)
+                ));
+                Type::object()
+            }
         }
     }
 }
@@ -11437,19 +11472,21 @@ impl<'db> BoundSuperType<'db> {
                 delegate_to(type_to_delegate_to).map_err(|err| match err {
                     BoundSuperError::AbstractOwnerType {
                         owner_type: _,
-                        error_context: _,
+                        pivot_class: _,
+                        typevar_context: _,
                     } => BoundSuperError::AbstractOwnerType {
                         owner_type,
-                        error_context,
+                        pivot_class: pivot_class_type,
+                        typevar_context: error_context,
                     },
                     BoundSuperError::FailingConditionCheck {
                         pivot_class,
                         owner: _,
-                        error_context: _,
+                        typevar_context: _,
                     } => BoundSuperError::FailingConditionCheck {
                         pivot_class,
                         owner: owner_type,
-                        error_context,
+                        typevar_context: error_context,
                     },
                     BoundSuperError::InvalidPivotClassType { pivot_class } => {
                         BoundSuperError::InvalidPivotClassType { pivot_class }
@@ -11476,21 +11513,20 @@ impl<'db> BoundSuperType<'db> {
                 } else {
                     return Err(BoundSuperError::AbstractOwnerType {
                         owner_type,
-                        error_context: None,
+                        pivot_class: pivot_class_type,
+                        typevar_context: None,
                     });
                 }
             }
 
             Type::Union(union) => {
-                return Ok(UnionType::from_elements(
-                    db,
-                    union
-                        .elements(db)
-                        .iter()
-                        .copied()
-                        .map(delegate_to)
-                        .collect::<Result<Vec<_>, _>>()?,
-                ));
+                return Ok(union
+                    .elements(db)
+                    .iter()
+                    .try_fold(UnionBuilder::new(db), |builder, element| {
+                        delegate_to(*element).map(|ty| builder.add(ty))
+                    })?
+                    .build());
             }
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
@@ -11504,7 +11540,8 @@ impl<'db> BoundSuperType<'db> {
                 if !one_good_element_found {
                     return Err(BoundSuperError::AbstractOwnerType {
                         owner_type,
-                        error_context: None,
+                        pivot_class: pivot_class_type,
+                        typevar_context: None,
                     });
                 }
                 for negative in intersection.negative(db) {
@@ -11587,7 +11624,8 @@ impl<'db> BoundSuperType<'db> {
             | Type::DataclassTransformer(_) => {
                 return Err(BoundSuperError::AbstractOwnerType {
                     owner_type,
-                    error_context: None,
+                    pivot_class: pivot_class_type,
+                    typevar_context: None,
                 });
             }
         };
@@ -11631,7 +11669,7 @@ impl<'db> BoundSuperType<'db> {
                 return Err(BoundSuperError::FailingConditionCheck {
                     pivot_class: pivot_class_type,
                     owner: owner_type,
-                    error_context: None,
+                    typevar_context: None,
                 });
             }
         }
