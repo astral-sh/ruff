@@ -7,10 +7,10 @@ python-version = "3.14"
 
 ## Introduction
 
-Some common callable objects (functions, lambdas) are also bound-method descriptors. That is, they
-have a `__get__` method which returns a bound-method object that binds the receiver instance to the
-first argument. The bound-method object therefore has a different signature, lacking the first
-argument:
+Some common callable objects (all functions, including lambdas) are also bound-method descriptors.
+That is, they have a `__get__` method which returns a bound-method object that binds the receiver
+instance to the first argument. The bound-method object therefore has a different signature, lacking
+the first argument:
 
 ```py
 from ty_extensions import CallableTypeOf
