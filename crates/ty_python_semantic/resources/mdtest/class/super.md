@@ -127,7 +127,7 @@ def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
 reveal_type(super(list[int], []))
 ```
 
-`super(pivot_class, owner)` can be done from inside methods, just like single-argument `super()`:
+`super(pivot_class, owner)` can be called from inside methods, just like single-argument `super()`:
 
 ```py
 class Super:
