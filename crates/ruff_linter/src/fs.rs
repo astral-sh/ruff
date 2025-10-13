@@ -11,8 +11,7 @@ use crate::settings::types::CompiledPerFileIgnoreList;
 pub fn get_cwd() -> &'static Path {
     #[cfg(target_arch = "wasm32")]
     {
-        static CWD: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| PathBuf::from("."));
-        &CWD
+        Path::new(".")
     }
     #[cfg(not(target_arch = "wasm32"))]
     path_absolutize::path_dedot::CWD.as_path()
