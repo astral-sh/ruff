@@ -697,6 +697,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                // F407
                 if self.is_rule_enabled(Rule::FutureFeatureNotDefined) {
                     self.report_diagnostic(
                         pyflakes::rules::FutureFeatureNotDefined { name },
@@ -705,6 +706,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::BreakOutsideLoop => {
+                // F701
                 if self.is_rule_enabled(Rule::BreakOutsideLoop) {
                     self.report_diagnostic(pyflakes::rules::BreakOutsideLoop, error.range);
                 }
