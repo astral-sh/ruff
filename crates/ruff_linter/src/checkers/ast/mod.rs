@@ -697,11 +697,18 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                // F407
                 if self.is_rule_enabled(Rule::FutureFeatureNotDefined) {
                     self.report_diagnostic(
                         pyflakes::rules::FutureFeatureNotDefined { name },
                         error.range,
                     );
+                }
+            }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => {
+                // F701
+                if self.is_rule_enabled(Rule::BreakOutsideLoop) {
+                    self.report_diagnostic(pyflakes::rules::BreakOutsideLoop, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -811,18 +818,39 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
         )
     }
+
+    fn in_loop_context(&self) -> bool {
+        let mut child = self.semantic.current_statement();
+
+        for parent in self.semantic.current_statements().skip(1) {
+            match parent {
+                Stmt::For(ast::StmtFor { orelse, .. })
+                | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+                    if !orelse.contains(child) {
+                        return true;
+                    }
+                }
+                Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+                    break;
+                }
+                _ => {}
+            }
+            child = parent;
+        }
+        false
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        // Step 0: Pre-processing
+        self.semantic.push_node(stmt);
+
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
         if !stmt.is_function_def_stmt() {
             self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         }
-
-        // Step 0: Pre-processing
-        self.semantic.push_node(stmt);
 
         // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
         // we encounter a cell boundary.

@@ -1010,7 +1010,6 @@ python-version = "3.10"
 
 ```py
 from dataclasses import dataclass, field, KW_ONLY
-from typing_extensions import reveal_type
 
 @dataclass
 class C:
@@ -1205,9 +1204,9 @@ python-version = "3.12"
 from dataclasses import dataclass
 from typing import Callable
 from types import FunctionType
-from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
 
-@dataclass
+@dataclass(order=True)
 class C:
     x: int
 
@@ -1234,8 +1233,20 @@ static_assert(not is_assignable_to(EquivalentPureCallableType, DunderInitType))
 static_assert(is_subtype_of(DunderInitType, EquivalentFunctionLikeCallableType))
 static_assert(is_assignable_to(DunderInitType, EquivalentFunctionLikeCallableType))
 
-static_assert(not is_subtype_of(EquivalentFunctionLikeCallableType, DunderInitType))
-static_assert(not is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitType))
+static_assert(is_subtype_of(EquivalentFunctionLikeCallableType, DunderInitType))
+static_assert(is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitType))
+
+static_assert(is_equivalent_to(EquivalentFunctionLikeCallableType, DunderInitType))
 
 static_assert(is_subtype_of(DunderInitType, FunctionType))
+```
+
+It should be possible to mock out synthesized methods:
+
+```py
+from unittest.mock import Mock
+
+def test_c():
+    c = C(1)
+    c.__lt__ = Mock()
 ```

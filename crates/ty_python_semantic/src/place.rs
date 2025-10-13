@@ -232,54 +232,6 @@ pub(crate) fn place<'db>(
     )
 }
 
-/// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
-/// `scope`.
-pub(crate) fn class_symbol<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> PlaceAndQualifiers<'db> {
-    place_table(db, scope)
-        .symbol_id(name)
-        .map(|symbol_id| {
-            let place_and_quals = place_by_id(
-                db,
-                scope,
-                symbol_id.into(),
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::EndOfScope,
-            );
-
-            if !place_and_quals.place.is_unbound() && !place_and_quals.is_init_var() {
-                // Trust the declared type if we see a class-level declaration
-                return place_and_quals;
-            }
-
-            if let PlaceAndQualifiers {
-                place: Place::Type(ty, _),
-                qualifiers,
-            } = place_and_quals
-            {
-                // Otherwise, we need to check if the symbol has bindings
-                let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
-
-                // TODO: we should not need to calculate inferred type second time. This is a temporary
-                // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                match inferred {
-                    Place::Unbound => Place::Unbound.with_qualifiers(qualifiers),
-                    Place::Type(_, boundness) => {
-                        Place::Type(ty, boundness).with_qualifiers(qualifiers)
-                    }
-                }
-            } else {
-                Place::Unbound.into()
-            }
-        })
-        .unwrap_or_default()
-}
-
 /// Infers the public type of an explicit module-global symbol as seen from within the same file.
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
@@ -704,7 +656,7 @@ fn place_cycle_initial<'db>(
 }
 
 #[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-fn place_by_id<'db>(
+pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     place_id: ScopedPlaceId,

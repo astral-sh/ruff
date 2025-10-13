@@ -963,6 +963,40 @@ c: Callable[[Any], str] = f
 c: Callable[[Any], str] = g
 ```
 
+A function with no explicit return type should be assignable to a callable with a return type of
+`Any`.
+
+```py
+def h():
+    return
+
+c: Callable[[], Any] = h
+```
+
+And, similarly for parameters with no annotations:
+
+```py
+def i(a, b, /) -> None:
+    return
+
+c: Callable[[Any, Any], None] = i
+```
+
+Additionally, a function definition that includes both `*args` and `**kwargs` parameters that are
+annotated as `Any` or kept unannotated should be assignable to a callable with `...` as the
+parameter type.
+
+```py
+def variadic_without_annotation(*args, **kwargs):
+    return
+
+def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
+    return
+
+c: Callable[..., Any] = variadic_without_annotation
+c: Callable[..., Any] = variadic_with_annotation
+```
+
 ### Method types
 
 ```py

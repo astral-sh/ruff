@@ -464,7 +464,7 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import Unknown, CallableTypeOf, TypeOf, is_equivalent_to, static_assert
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -476,14 +476,17 @@ static_assert(not is_equivalent_to(Callable[[int, str], None], Callable[[int, st
 static_assert(not is_equivalent_to(Callable[..., None], Callable[[], None]))
 ```
 
-A function with no explicit return type should be gradual equivalent to a callable with a return
-type of `Any`.
+A function with no explicit return type should be gradually equivalent to a function-like callable
+with a return type of `Any`.
 
 ```py
 def f1():
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f1], Callable[[], Any]))
+def f1_equivalent() -> Any:
+    return
+
+static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f1_equivalent]))
 ```
 
 And, similarly for parameters with no annotations.
@@ -492,12 +495,15 @@ And, similarly for parameters with no annotations.
 def f2(a, b, /) -> None:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f2], Callable[[Any, Any], None]))
+def f2_equivalent(a: Any, b: Any, /) -> None:
+    return
+
+static_assert(is_equivalent_to(CallableTypeOf[f2], CallableTypeOf[f2_equivalent]))
 ```
 
-Additionally, as per the spec, a function definition that includes both `*args` and `**kwargs`
-parameter that are annotated as `Any` or kept unannotated should be gradual equivalent to a callable
-with `...` as the parameter type.
+A function definition that includes both `*args` and `**kwargs` parameter that are annotated as
+`Any` or kept unannotated should be gradual equivalent to a callable with `...` as the parameter
+type.
 
 ```py
 def variadic_without_annotation(*args, **kwargs):
@@ -506,12 +512,27 @@ def variadic_without_annotation(*args, **kwargs):
 def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[variadic_without_annotation], Callable[..., Any]))
-static_assert(is_equivalent_to(CallableTypeOf[variadic_with_annotation], Callable[..., Any]))
+def _(
+    signature_variadic_without_annotation: CallableTypeOf[variadic_without_annotation],
+    signature_variadic_with_annotation: CallableTypeOf[variadic_with_annotation],
+) -> None:
+    # revealed: (...) -> Unknown
+    reveal_type(signature_variadic_without_annotation)
+    # revealed: (...) -> Any
+    reveal_type(signature_variadic_with_annotation)
 ```
 
-But, a function with either `*args` or `**kwargs` (and not both) is not gradual equivalent to a
-callable with `...` as the parameter type.
+Note that `variadic_without_annotation` and `variadic_with_annotation` are *not* considered
+gradually equivalent to `Callable[..., Any]`, because the latter is not a function-like callable
+type:
+
+```py
+static_assert(not is_equivalent_to(CallableTypeOf[variadic_without_annotation], Callable[..., Any]))
+static_assert(not is_equivalent_to(CallableTypeOf[variadic_with_annotation], Callable[..., Any]))
+```
+
+A function with either `*args` or `**kwargs` (and not both) is is not equivalent to a callable with
+`...` as the parameter type.
 
 ```py
 def variadic_args(*args):
@@ -519,6 +540,15 @@ def variadic_args(*args):
 
 def variadic_kwargs(**kwargs):
     return
+
+def _(
+    signature_variadic_args: CallableTypeOf[variadic_args],
+    signature_variadic_kwargs: CallableTypeOf[variadic_kwargs],
+) -> None:
+    # revealed: (*args) -> Unknown
+    reveal_type(signature_variadic_args)
+    # revealed: (**kwargs) -> Unknown
+    reveal_type(signature_variadic_kwargs)
 
 static_assert(not is_equivalent_to(CallableTypeOf[variadic_args], Callable[..., Any]))
 static_assert(not is_equivalent_to(CallableTypeOf[variadic_kwargs], Callable[..., Any]))
