@@ -16,9 +16,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 2 | 
 3 | class C[T]:
 4 |     class Ok1[S]: ...
-5 |     # error: [invalid-generic-class] "Generic class `Bad1` must not reference type variables bound in an enclosing scope"
+5 |     # error: [invalid-generic-class]
 6 |     class Bad1[T]: ...
-7 |     # error: [invalid-generic-class] "Generic class `Bad2` must not reference type variables bound in an enclosing scope"
+7 |     # error: [invalid-generic-class]
 8 |     class Bad2(Iterable[T]): ...
 ```
 
@@ -26,18 +26,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-generic-class]: Generic class `Bad1` must not reference type variables bound in an enclosing scope
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:3:7
   |
-1 |   from typing import Iterable
+1 | from typing import Iterable
 2 |
-3 | / class C[T]:
-4 | |     class Ok1[S]: ...
-5 | |     # error: [invalid-generic-class] "Generic class `Bad1` must not reference type variables bound in an enclosing scope"
-6 | |     class Bad1[T]: ...
-  | |           ^^^^
-7 | |     # error: [invalid-generic-class] "Generic class `Bad2` must not reference type variables bound in an enclosing scope"
-8 | |     class Bad2(Iterable[T]): ...
-  | |________________________________^ Type variable `T` is bound in this enclosing scope
+3 | class C[T]:
+  |       - Type variable `T` is bound in this enclosing scope
+4 |     class Ok1[S]: ...
+5 |     # error: [invalid-generic-class]
+6 |     class Bad1[T]: ...
+  |           ^^^^ `T` referenced in class definition here
+7 |     # error: [invalid-generic-class]
+8 |     class Bad2(Iterable[T]): ...
   |
 info: rule `invalid-generic-class` is enabled by default
 
@@ -45,17 +45,18 @@ info: rule `invalid-generic-class` is enabled by default
 
 ```
 error[invalid-generic-class]: Generic class `Bad2` must not reference type variables bound in an enclosing scope
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:3:7
   |
-1 |   from typing import Iterable
+1 | from typing import Iterable
 2 |
-3 | / class C[T]:
-4 | |     class Ok1[S]: ...
-5 | |     # error: [invalid-generic-class] "Generic class `Bad1` must not reference type variables bound in an enclosing scope"
-6 | |     class Bad1[T]: ...
-7 | |     # error: [invalid-generic-class] "Generic class `Bad2` must not reference type variables bound in an enclosing scope"
-8 | |     class Bad2(Iterable[T]): ...
-  | |___________^^^^_________________^ Type variable `T` is bound in this enclosing scope
+3 | class C[T]:
+  |       - Type variable `T` is bound in this enclosing scope
+4 |     class Ok1[S]: ...
+5 |     # error: [invalid-generic-class]
+6 |     class Bad1[T]: ...
+7 |     # error: [invalid-generic-class]
+8 |     class Bad2(Iterable[T]): ...
+  |           ^^^^^^^^^^^^^^^^^ `T` referenced in class definition here
   |
 info: rule `invalid-generic-class` is enabled by default
 

@@ -8184,11 +8184,15 @@ impl<'db> From<Definition<'db>> for BindingContext<'db> {
 }
 
 impl<'db> BindingContext<'db> {
-    fn name(self, db: &'db dyn Db) -> Option<String> {
+    pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
-            BindingContext::Definition(definition) => definition.name(db),
+            BindingContext::Definition(definition) => Some(definition),
             BindingContext::Synthetic => None,
         }
+    }
+
+    fn name(self, db: &'db dyn Db) -> Option<String> {
+        self.definition().and_then(|definition| definition.name(db))
     }
 }
 

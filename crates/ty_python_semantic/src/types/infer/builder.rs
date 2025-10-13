@@ -91,11 +91,11 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BindingContext, CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType,
-    DataclassParams, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
-    ParameterForm, Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
     TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
@@ -866,29 +866,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             if let Some(builder) = self
                                 .context
-                                .report_lint(&INVALID_GENERIC_CLASS, &class_node.name)
+                                .report_lint(&INVALID_GENERIC_CLASS, class.header_range(self.db()))
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
                                     "Generic class `{}` must not reference type variables \
                                     bound in an enclosing scope",
                                     class_node.name,
                                 ));
-                                if let BindingContext::Definition(other_definition) =
-                                    other_typevar.binding_context(self.db())
+                                diagnostic.set_primary_message(format_args!(
+                                    "`{self_typevar_name}` referenced in class definition here"
+                                ));
+                                if let Some(other_definition) =
+                                    other_typevar.binding_context(self.db()).definition()
                                 {
-                                    diagnostic.annotate(
-                                        Annotation::primary(
-                                            other_definition
-                                                .full_range(self.db(), self.module())
-                                                .into(),
-                                        )
-                                        .message(
+                                    let span = match binding_type(self.db(), other_definition) {
+                                        Type::ClassLiteral(class) => {
+                                            Some(class.header_span(self.db()))
+                                        }
+                                        Type::FunctionLiteral(function) => {
+                                            function.spans(self.db()).map(|spans| spans.signature)
+                                        }
+                                        _ => None,
+                                    };
+                                    if let Some(span) = span {
+                                        diagnostic.annotate(Annotation::secondary(span).message(
                                             format_args!(
                                                 "Type variable `{self_typevar_name}` is bound \
                                                 in this enclosing scope",
                                             ),
-                                        ),
-                                    );
+                                        ));
+                                    }
                                 }
                             }
                         }
