@@ -276,10 +276,9 @@ fn extract_options(source: &str) -> Option<ParseOptions> {
 #[ignore]
 #[expect(clippy::print_stdout)]
 fn parser_quick_test() {
-    let source = "\
-f'{ab'
-''
-";
+    let source = r#"
+f"hello
+"#;
 
     let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
 

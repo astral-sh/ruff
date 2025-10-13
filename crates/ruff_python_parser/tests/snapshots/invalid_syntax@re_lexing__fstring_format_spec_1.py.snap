@@ -122,6 +122,33 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
+                    range: 203..205,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 203..205,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 203..205,
+                                        node_index: NodeIndex(None),
+                                        value: "}",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 207..228,
                     value: FString(
                         ExprFString {
@@ -172,7 +199,15 @@ Module(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 226..228,
                                                                 node_index: NodeIndex(None),
-                                                                elements: [],
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 226..228,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "\\",
+                                                                        },
+                                                                    ),
+                                                                ],
                                                             },
                                                         ),
                                                     },
@@ -182,7 +217,7 @@ Module(
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,
-                                                unclosed: false,
+                                                unclosed: true,
                                             },
                                         },
                                     ),
@@ -328,6 +363,33 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 296..298,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 296..298,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 296..298,
+                                        node_index: NodeIndex(None),
+                                        value: "}",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -367,16 +429,6 @@ Module(
   |                     ^^ Syntax Error: missing closing quote in string literal
 7 |
 8 | f'middle {'string':\\
-  |
-
-
-  |
-5 | f'middle {'string':\
-6 |         'format spec'}
-  |                       ^ Syntax Error: Expected a statement
-7 |
-8 | f'middle {'string':\\
-9 |         'format spec'}
   |
 
 
@@ -462,11 +514,4 @@ Module(
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |                     ^^ Syntax Error: Got unexpected string
-   |
-
-
-   |
-11 | f'middle {'string':\\\
-12 |         'format spec'}
-   |                       ^ Syntax Error: Expected a statement
    |
