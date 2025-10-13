@@ -855,7 +855,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let scope = class.body_scope(self.db()).scope(self.db());
-            if let Some(parent) = scope.parent() {
+            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
+                && let Some(parent) = scope.parent()
+            {
                 for self_typevar in class.typevars_referenced_in_definition(self.db()) {
                     let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
                     for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {

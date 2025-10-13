@@ -100,6 +100,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
+        LintDiagnosticGuardBuilder::severity_and_source(self, lint).is_some()
+    }
+
     /// Optionally return a builder for a lint diagnostic guard.
     ///
     /// If the current context believes a diagnostic should be reported for
@@ -396,11 +400,10 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
 }
 
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
-    fn new(
+    fn severity_and_source(
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: &'static LintMetadata,
-        range: TextRange,
-    ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
+    ) -> Option<(Severity, LintSource)> {
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
         // has been refactored, but this still kind of looked
@@ -429,14 +432,25 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         if ctx.is_in_multi_inference() {
             return None;
         }
-        let id = DiagnosticId::Lint(lint.name());
+
+        Some((severity, source))
+    }
+
+    fn new(
+        ctx: &'ctx InferContext<'db, 'ctx>,
+        lint: &'static LintMetadata,
+        range: TextRange,
+    ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
+        let (severity, source) = Self::severity_and_source(ctx, lint)?;
 
         let suppressions = suppressions(ctx.db(), ctx.file());
+        let lint_id = LintId::of(lint);
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
             return None;
         }
 
+        let id = DiagnosticId::Lint(lint.name());
         let primary_span = Span::from(ctx.file()).with_range(range);
         Some(LintDiagnosticGuardBuilder {
             ctx,
