@@ -1475,9 +1475,9 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn typevars_referenced_in_definition(
         self,
         db: &'db dyn Db,
-    ) -> FxOrderSet<BoundTypeVarInstance<'db>> {
+    ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
         struct CollectTypeVars<'db> {
-            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
             seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
         }
 
@@ -1509,7 +1509,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         let visitor = CollectTypeVars {
-            typevars: RefCell::new(FxOrderSet::default()),
+            typevars: RefCell::new(FxIndexSet::default()),
             seen_types: RefCell::new(FxIndexSet::default()),
         };
         if let Some(generic_context) = self.generic_context(db) {
