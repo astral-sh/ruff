@@ -841,12 +841,11 @@ impl SemanticSyntaxContext for Checker<'_> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        // For functions, defer semantic syntax error checks until the body of the function is
-        // visited
-
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
+        // For functions, defer semantic syntax error checks until the body of the function is
+        // visited
         if !stmt.is_function_def_stmt() {
             self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         }
