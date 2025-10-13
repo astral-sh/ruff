@@ -579,7 +579,15 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        let mut parameters = Parameters::new(self.parameters().iter().skip(1).cloned());
+        let mut parameters = self.parameters.iter().cloned().peekable();
+
+        // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
+        // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
+        if parameters.peek().is_some_and(Parameter::is_positional) {
+            parameters.next();
+        }
+
+        let mut parameters = Parameters::new(parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
             parameters = parameters.apply_type_mapping_impl(
