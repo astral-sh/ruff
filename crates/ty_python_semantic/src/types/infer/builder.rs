@@ -2176,10 +2176,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => {
-                    let is_input_function_like = inferred_ty.is_function_literal()
-                        || inferred_ty
-                            .unwrap_as_callable_type()
-                            .is_some_and(|callable| callable.is_function_like(self.db()));
+                    let is_input_function_like = inferred_ty
+                        .into_callable(self.db())
+                        .and_then(super::super::Type::unwrap_as_callable_type)
+                        .is_some_and(|callable| callable.is_function_like(self.db()));
                     if is_input_function_like
                         && let Some(callable_type) = return_ty.unwrap_as_callable_type()
                     {
