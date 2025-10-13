@@ -1403,7 +1403,6 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
                 InterpolatedStringElement::Interpolation(f_string) => {
                     f_string.debug_text.is_some()
-                        || !matches!(f_string.conversion, ast::ConversionFlag::None)
                         || inner(&f_string.expression)
                 }
             })
