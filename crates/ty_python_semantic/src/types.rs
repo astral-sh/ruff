@@ -9945,9 +9945,6 @@ impl<'db> CallableType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        if other.is_function_like(db) && !self.is_function_like(db) {
-            return ConstraintSet::from(false);
-        }
         self.signatures(db).has_relation_to_impl(
             db,
             other.signatures(db),
@@ -9970,10 +9967,8 @@ impl<'db> CallableType<'db> {
             return ConstraintSet::from(true);
         }
 
-        ConstraintSet::from(self.is_function_like(db) == other.is_function_like(db)).and(db, || {
-            self.signatures(db)
-                .is_equivalent_to_impl(db, other.signatures(db), visitor)
-        })
+        self.signatures(db)
+            .is_equivalent_to_impl(db, other.signatures(db), visitor)
     }
 }
 
