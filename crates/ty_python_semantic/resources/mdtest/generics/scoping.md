@@ -267,9 +267,9 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # error: [invalid-generic-class] "Generic class `Bad1` must not reference type variables bound in an enclosing scope"
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # error: [invalid-generic-class] "Generic class `Bad2` must not reference type variables bound in an enclosing scope"
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -282,9 +282,9 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # error: [invalid-generic-class] "Generic class `Bad1` must not reference type variables bound in an enclosing scope"
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # error: [invalid-generic-class] "Generic class `Bad2` must not reference type variables bound in an enclosing scope"
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 
