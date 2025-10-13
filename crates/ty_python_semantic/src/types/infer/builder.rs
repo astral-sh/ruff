@@ -2178,7 +2178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Ok(return_ty) => {
                     let is_input_function_like = inferred_ty
                         .into_callable(self.db())
-                        .and_then(super::super::Type::unwrap_as_callable_type)
+                        .and_then(Type::unwrap_as_callable_type)
                         .is_some_and(|callable| callable.is_function_like(self.db()));
                     if is_input_function_like
                         && let Some(callable_type) = return_ty.unwrap_as_callable_type()
