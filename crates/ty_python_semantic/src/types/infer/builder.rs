@@ -53,26 +53,24 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, report_bad_dunder_set_call,
-    report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_namedtuple_field_without_default_after_field_with_default,
-    report_possibly_missing_attribute,
-};
-use crate::types::diagnostic::{
-    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, SUBCLASS_OF_FINAL_CLASS,
+    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PROTOCOL,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
+    report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
+    report_instance_layout_conflict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_or_unsupported_base, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type,
+    report_invalid_type_checking_constant,
+    report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
+    report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_rebound_typevar, report_slice_step_size_zero,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -864,40 +862,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(other_typevar) =
                             enclosing.binds_named_typevar(self.db(), self_typevar_name)
                         {
-                            if let Some(builder) = self
-                                .context
-                                .report_lint(&INVALID_GENERIC_CLASS, class.header_range(self.db()))
-                            {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Generic class `{}` must not reference type variables \
-                                    bound in an enclosing scope",
-                                    class_node.name,
-                                ));
-                                diagnostic.set_primary_message(format_args!(
-                                    "`{self_typevar_name}` referenced in class definition here"
-                                ));
-                                if let Some(other_definition) =
-                                    other_typevar.binding_context(self.db()).definition()
-                                {
-                                    let span = match binding_type(self.db(), other_definition) {
-                                        Type::ClassLiteral(class) => {
-                                            Some(class.header_span(self.db()))
-                                        }
-                                        Type::FunctionLiteral(function) => {
-                                            function.spans(self.db()).map(|spans| spans.signature)
-                                        }
-                                        _ => None,
-                                    };
-                                    if let Some(span) = span {
-                                        diagnostic.annotate(Annotation::secondary(span).message(
-                                            format_args!(
-                                                "Type variable `{self_typevar_name}` is bound \
-                                                in this enclosing scope",
-                                            ),
-                                        ));
-                                    }
-                                }
-                            }
+                            report_rebound_typevar(
+                                &self.context,
+                                self_typevar_name,
+                                class,
+                                class_node,
+                                other_typevar,
+                            );
                         }
                     }
                 }

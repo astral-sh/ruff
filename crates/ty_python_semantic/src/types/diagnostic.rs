@@ -18,10 +18,10 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{
-    ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
-    TypeContext, binding_type, infer_isolated_expression,
+    BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
+    infer_isolated_expression, protocol_class::ProtocolClass,
 };
-use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
 use crate::{
     Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
@@ -3052,6 +3052,37 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
         builder.into_diagnostic(format_args!(
             "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
+    }
+}
+
+pub(crate) fn report_rebound_typevar<'db>(
+    context: &InferContext<'db, '_>,
+    typevar_name: &ast::name::Name,
+    class: ClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    other_typevar: BoundTypeVarInstance<'db>,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Generic class `{}` must not reference type variables bound in an enclosing scope",
+            class_node.name,
+        ));
+        diagnostic.set_primary_message(format_args!(
+            "`{typevar_name}` referenced in class definition here"
+        ));
+        if let Some(other_definition) = other_typevar.binding_context(db).definition() {
+            let span = match binding_type(db, other_definition) {
+                Type::ClassLiteral(class) => Some(class.header_span(db)),
+                Type::FunctionLiteral(function) => function.spans(db).map(|spans| spans.signature),
+                _ => None,
+            };
+            if let Some(span) = span {
+                diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+                    "Type variable `{typevar_name}` is bound in this enclosing scope",
+                )));
+            }
+        }
     }
 }
 
