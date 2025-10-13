@@ -818,13 +818,13 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_loop_context(&self) -> bool {
-        let mut cur_stmt = self.semantic.current_statement();
+        let mut child = self.semantic.current_statement();
 
         for parent in self.semantic.current_statements().skip(1) {
             match parent {
                 Stmt::For(ast::StmtFor { orelse, .. })
                 | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                    if !orelse.contains(cur_stmt) {
+                    if !orelse.contains(child) {
                         return true;
                     }
                 }
@@ -833,7 +833,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
                 _ => {}
             }
-            cur_stmt = parent;
+            child = parent;
         }
         false
     }
