@@ -673,7 +673,6 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
-
             Stmt::FunctionDef(_) => {
                 self.seen_futures_boundary = true;
             }
@@ -681,6 +680,7 @@ impl SemanticSyntaxChecker {
                 self.seen_futures_boundary = true;
             }
         }
+
         self.seen_module_docstring_boundary = true;
     }
 

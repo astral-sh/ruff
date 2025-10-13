@@ -50,7 +50,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
             }
         }
-
         Stmt::Continue(_) => {
             if checker.is_rule_enabled(Rule::ContinueOutsideLoop) {
                 pyflakes::rules::continue_outside_loop(
