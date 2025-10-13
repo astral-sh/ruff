@@ -1401,7 +1401,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Callable(_) => Some(self),
 
-            Type::Dynamic(_) => Some(CallableType::single(db, Signature::dynamic(self))),
+            Type::Dynamic(_) => Some(CallableType::function_like(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
@@ -9770,7 +9770,7 @@ impl<'db> BoundMethodType<'db> {
                     .iter()
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
-            false,
+            true,
         )
     }
 
