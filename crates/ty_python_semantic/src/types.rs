@@ -3,6 +3,7 @@ use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 
 use std::borrow::Cow;
+use std::time::Duration;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
@@ -11,11 +12,13 @@ use diagnostic::{
     INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
+use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
+
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -106,8 +109,9 @@ mod property_tests;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
-
     tracing::debug!("Checking file '{path}'", path = file.path(db));
+
+    let start = Instant::now();
 
     let index = semantic_index(db, file);
     let mut diagnostics = TypeCheckDiagnostics::default();
@@ -128,6 +132,14 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     );
 
     check_suppressions(db, file, &mut diagnostics);
+
+    let elapsed = start.elapsed();
+    if elapsed >= Duration::from_millis(100) {
+        tracing::info!(
+            "Checking file `{path}` took more than 100ms ({elapsed:?})",
+            path = file.path(db)
+        );
+    }
 
     diagnostics.into_diagnostics()
 }
