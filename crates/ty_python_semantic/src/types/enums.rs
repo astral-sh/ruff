@@ -194,12 +194,19 @@ pub(crate) fn enum_metadata<'db>(
             // we don't know if it's a duplicate or not.
             if matches!(
                 value_ty,
-                Type::IntLiteral(_) | Type::StringLiteral(_) | Type::BytesLiteral(_)
+                Type::BooleanLiteral(_)
+                    | Type::IntLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::BytesLiteral(_)
             ) {
-                if let Some(previous) = enum_values.insert(value_ty, name.clone()) {
-                    aliases.insert(name.clone(), previous);
+                if let Some(canonical) = enum_values.get(&value_ty) {
+                    // This is a duplicate value, create an alias to the canonical (first) member
+                    aliases.insert(name.clone(), canonical.clone());
                     return None;
                 }
+
+                // This is the first occurrence of this value, track it as the canonical member
+                enum_values.insert(value_ty, name.clone());
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);

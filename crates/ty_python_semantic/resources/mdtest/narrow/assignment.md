@@ -34,7 +34,7 @@ class _:
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
-    reveal_type(a.x)  # revealed: Unknown | int | None
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     # TODO: Should be `Unknown | None`
     reveal_type(a.z)  # revealed: Unknown
@@ -78,7 +78,7 @@ class _:
 
     if cond():
         a = A()
-    reveal_type(a.x)  # revealed: int | None | Unknown
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     # TODO: Should be `Unknown | None`
     reveal_type(a.z)  # revealed: Unknown
@@ -300,10 +300,10 @@ class C:
 
 def _():
     # error: [possibly-missing-attribute]
-    reveal_type(b.a.x[0])  # revealed: Unknown | int | None
+    reveal_type(b.a.x[0])  # revealed: int | None
     # error: [possibly-missing-attribute]
-    reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
-    reveal_type(b.a)  # revealed: Unknown | A | None
+    reveal_type(b.a.x)  # revealed: list[int | None]
+    reveal_type(b.a)  # revealed: A | None
 ```
 
 ## Invalid assignments are not used for narrowing

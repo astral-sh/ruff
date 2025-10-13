@@ -62,7 +62,7 @@
       "type": "object",
       "properties": {
         "extra-paths": {
-          "description": "List of user-provided paths that should take first priority in the module resolution. Examples in other type checkers are mypy's `MYPYPATH` environment variable, or pyright's `stubPath` configuration setting.",
+          "description": "User-provided paths that should take first priority in module resolution.\n\nThis is an advanced option that should usually only be used for first-party or third-party modules that are not installed into your Python environment in a conventional way. Use the `python` option to specify the location of your Python environment.\n\nThis option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath` configuration setting.",
           "type": [
             "array",
             "null"
@@ -72,7 +72,7 @@
           }
         },
         "python": {
-          "description": "Path to the Python installation from which ty resolves type information and third-party dependencies.\n\nty will search in the path's `site-packages` directories for type information and third-party imports.\n\nThis option is commonly used to specify the path to a virtual environment.",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment to resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment variable to point to your project's virtual environment. ty can also infer the location of your environment from an activated Conda environment, and will look for a `.venv` directory in the project root if none of the above apply.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable (such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
           "type": [
             "string",
             "null"
@@ -1009,6 +1009,16 @@
           "title": "detects unused `type: ignore` comments",
           "description": "## What it does\nChecks for `type: ignore` or `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `type: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "useless-overload-body": {
+          "title": "detects `@overload`-decorated functions with non-stub bodies",
+          "description": "## What it does\nChecks for various `@overload`-decorated functions that have non-stub bodies.\n\n## Why is this bad?\nFunctions decorated with `@overload` are ignored at runtime; they are overridden\nby the implementation function that follows the series of overloads. While it is\nnot illegal to provide a body for an `@overload`-decorated function, it may indicate\na misunderstanding of how the `@overload` decorator works.\n\n## Example\n\n```py\nfrom typing import overload\n\n@overload\ndef foo(x: int) -> int:\n    return x + 1  # will never be executed\n\n@overload\ndef foo(x: str) -> str:\n    return \"Oh no, got a string\"  # will never be executed\n\ndef foo(x: int | str) -> int | str:\n    raise Exception(\"unexpected type encountered\")\n```\n\nUse instead:\n\n```py\nfrom typing import assert_never, overload\n\n@overload\ndef foo(x: int) -> int: ...\n\n@overload\ndef foo(x: str) -> str: ...\n\ndef foo(x: int | str) -> int | str:\n    if isinstance(x, int):\n        return x + 1\n    elif isinstance(x, str):\n        return \"Oh no, got a string\"\n    else:\n        assert_never(x)\n```\n\n## References\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

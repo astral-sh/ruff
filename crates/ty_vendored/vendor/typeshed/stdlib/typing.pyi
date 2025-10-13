@@ -61,6 +61,7 @@ __all__ = [
     "AsyncIterator",
     "Awaitable",
     "BinaryIO",
+    "ByteString",
     "Callable",
     "ChainMap",
     "ClassVar",
@@ -128,9 +129,6 @@ __all__ = [
     "overload",
     "runtime_checkable",
 ]
-
-if sys.version_info < (3, 14):
-    __all__ += ["ByteString"]
 
 if sys.version_info >= (3, 14):
     __all__ += ["evaluate_forward_ref"]
@@ -949,7 +947,7 @@ class Awaitable(Protocol[_T_co]):
     @abstractmethod
     def __await__(self) -> Generator[Any, Any, _T_co]: ...
 
-# Non-default variations to accommodate couroutines, and `AwaitableGenerator` having a 4th type parameter.
+# Non-default variations to accommodate coroutines, and `AwaitableGenerator` having a 4th type parameter.
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
 _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
@@ -1457,8 +1455,7 @@ class TextIO(IO[str]):
     @abstractmethod
     def __enter__(self) -> TextIO: ...
 
-if sys.version_info < (3, 14):
-    ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
+ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
 
 # Functions
 

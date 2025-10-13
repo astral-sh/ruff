@@ -10,6 +10,7 @@ from typing_extensions import assert_type
 def _(x: int):
     assert_type(x, int)  # fine
     assert_type(x, str)  # error: [type-assertion-failure]
+    assert_type(assert_type(x, int), int)
 ```
 
 ## Narrowing

@@ -8,11 +8,10 @@ use ruff_python_ast::{
     StmtAssign,
 };
 use ruff_python_stdlib::typing::{
-    as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
-    is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
-    is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
-    is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
-    is_typed_dict, is_typed_dict_member,
+    as_pep_585_generic, is_immutable_generic_type, is_immutable_non_generic_type,
+    is_immutable_return_type, is_literal_member, is_mutable_return_type, is_pep_593_generic_member,
+    is_pep_593_generic_type, is_standard_library_generic, is_standard_library_generic_member,
+    is_standard_library_literal, is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
 use smallvec::{SmallVec, smallvec};
@@ -148,14 +147,46 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
-pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
+pub fn is_pep585_generic(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    include_preview_generics: bool,
+) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            let [module, name] = qualified_name.segments() else {
-                return false;
-            };
-            has_pep_585_generic(module, name)
+        .is_some_and(|qualified_name| match qualified_name.segments() {
+            ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
+            | ["collections", "deque" | "defaultdict"] => true,
+            ["asyncio", "Future" | "Task"]
+            | ["collections", "ChainMap" | "Counter" | "OrderedDict"]
+            | [
+                "contextlib",
+                "AbstractAsyncContextManager" | "AbstractContextManager",
+            ]
+            | ["dataclasses", "Field"]
+            | ["functools", "cached_property" | "partialmethod"]
+            | ["os", "PathLike"]
+            | [
+                "queue",
+                "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue",
+            ]
+            | ["re", "Match" | "Pattern"]
+            | ["shelve", "BsdDbShelf" | "DbfilenameShelf" | "Shelf"]
+            | ["types", "MappingProxyType"]
+            | [
+                "weakref",
+                "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary",
+            ]
+            | [
+                "collections",
+                "abc",
+                "AsyncGenerator" | "AsyncIterable" | "AsyncIterator" | "Awaitable" | "ByteString"
+                | "Callable" | "Collection" | "Container" | "Coroutine" | "Generator" | "ItemsView"
+                | "Iterable" | "Iterator" | "KeysView" | "Mapping" | "MappingView"
+                | "MutableMapping" | "MutableSequence" | "MutableSet" | "Reversible" | "Sequence"
+                | "Set" | "ValuesView",
+            ] => include_preview_generics,
+            _ => false,
         })
 }
 

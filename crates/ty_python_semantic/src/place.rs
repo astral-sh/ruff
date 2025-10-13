@@ -232,54 +232,6 @@ pub(crate) fn place<'db>(
     )
 }
 
-/// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
-/// `scope`.
-pub(crate) fn class_symbol<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> PlaceAndQualifiers<'db> {
-    place_table(db, scope)
-        .symbol_id(name)
-        .map(|symbol_id| {
-            let place_and_quals = place_by_id(
-                db,
-                scope,
-                symbol_id.into(),
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::EndOfScope,
-            );
-
-            if !place_and_quals.place.is_unbound() && !place_and_quals.is_init_var() {
-                // Trust the declared type if we see a class-level declaration
-                return place_and_quals;
-            }
-
-            if let PlaceAndQualifiers {
-                place: Place::Type(ty, _),
-                qualifiers,
-            } = place_and_quals
-            {
-                // Otherwise, we need to check if the symbol has bindings
-                let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
-
-                // TODO: we should not need to calculate inferred type second time. This is a temporary
-                // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                match inferred {
-                    Place::Unbound => Place::Unbound.with_qualifiers(qualifiers),
-                    Place::Type(_, boundness) => {
-                        Place::Type(ty, boundness).with_qualifiers(qualifiers)
-                    }
-                }
-            } else {
-                Place::Unbound.into()
-            }
-        })
-        .unwrap_or_default()
-}
-
 /// Infers the public type of an explicit module-global symbol as seen from within the same file.
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
@@ -704,7 +656,7 @@ fn place_cycle_initial<'db>(
 }
 
 #[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-fn place_by_id<'db>(
+pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     place_id: ScopedPlaceId,
@@ -810,7 +762,7 @@ fn place_by_id<'db>(
             // modified externally, but those changes do not take effect. We therefore issue
             // a diagnostic if we see it being modified externally. In type inference, we
             // can assign a "narrow" type to it even if it is not *declared*. This means, we
-            // do not have to call [`widen_type_for_undeclared_public_symbol`].
+            // do not have to union with `Unknown`.
             //
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
@@ -822,18 +774,37 @@ fn place_by_id<'db>(
                 )
             });
 
-            if scope.file(db).is_stub(db) || scope.scope(db).visibility().is_private() {
-                // We generally trust module-level undeclared places in stubs and do not union
-                // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
-                // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
-                // leads to all sorts of downstream problems. Similarly, type variables are often
-                // defined as `_T = TypeVar("_T")`, without being declared.
-                // Also, if the scope is private, such as a function scope,
-                // meaning that the place cannot be rewritten from elsewhere, we do not union with `Unknown`.
+            // Module-level globals can be mutated externally. A `MY_CONSTANT = 1` global might
+            // be changed to `"some string"` from code outside of the module that we're looking
+            // at, and so from a gradual-guarantee perspective, it makes sense to infer a type
+            // of `Literal[1] | Unknown` for global symbols. This allows the code that does the
+            // mutation to type check correctly, and for code that uses the global, it accurately
+            // reflects the lack of knowledge about the type.
+            //
+            // However, external modifications (or modifications through `global` statements) that
+            // would require a wider type are relatively rare. From a practical perspective, we can
+            // therefore achieve a better user experience by trusting the inferred type. Users who
+            // need the external mutation to work can always annotate the global with the wider
+            // type. And everyone else benefits from more precise type inference.
+            let is_module_global = scope.node(db).scope_kind().is_module();
 
+            // If the visibility of the scope is private (like for a function scope), we also do
+            // not union with `Unknown`, because the symbol cannot be modified externally.
+            let scope_has_private_visibility = scope.scope(db).visibility().is_private();
+
+            // We generally trust undeclared places in stubs and do not union with `Unknown`.
+            let in_stub_file = scope.file(db).is_stub(db);
+
+            if is_considered_non_modifiable
+                || is_module_global
+                || scope_has_private_visibility
+                || in_stub_file
+            {
                 inferred.into()
             } else {
-                widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
+                // Widen the inferred type of undeclared public symbols by unioning with `Unknown`
+                inferred
+                    .map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
                     .into()
             }
         }
@@ -1583,29 +1554,6 @@ pub(crate) enum BoundnessAnalysis {
     ///     x = 1
     /// ```
     BasedOnUnboundVisibility,
-}
-
-/// Computes a possibly-widened type `Unknown | T_inferred` from the inferred type `T_inferred`
-/// of a symbol, unless the type is a known-instance type (e.g. `typing.Any`) or the symbol is
-/// considered non-modifiable (e.g. when the symbol is `@Final`). We need this for public uses
-/// of symbols that have no declared type.
-fn widen_type_for_undeclared_public_symbol<'db>(
-    db: &'db dyn Db,
-    inferred: Place<'db>,
-    is_considered_non_modifiable: bool,
-) -> Place<'db> {
-    // We special-case known-instance types here since symbols like `typing.Any` are typically
-    // not declared in the stubs (e.g. `Any = object()`), but we still want to treat them as
-    // such.
-    let is_known_instance = inferred
-        .ignore_possibly_unbound()
-        .is_some_and(|ty| matches!(ty, Type::SpecialForm(_) | Type::KnownInstance(_)));
-
-    if is_considered_non_modifiable || is_known_instance {
-        inferred
-    } else {
-        inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
-    }
 }
 
 #[cfg(test)]
