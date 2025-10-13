@@ -476,7 +476,7 @@ static_assert(not is_equivalent_to(Callable[[int, str], None], Callable[[int, st
 static_assert(not is_equivalent_to(Callable[..., None], Callable[[], None]))
 ```
 
-A function with no explicit return type should be gradual equivalent to a function-like callable
+A function with no explicit return type should be gradually equivalent to a function-like callable
 with a return type of `Any`.
 
 ```py

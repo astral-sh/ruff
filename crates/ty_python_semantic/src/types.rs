@@ -1402,10 +1402,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Callable(_) => Some(self),
 
-            Type::Dynamic(_) => Some(CallableType::single_function_like(
-                db,
-                Signature::dynamic(self),
-            )),
+            Type::Dynamic(_) => Some(CallableType::function_like(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
@@ -9869,16 +9866,6 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             false,
-        ))
-    }
-
-    /// Create a callable type with a single non-overloaded signature. Mark the callable
-    /// as function-like.
-    pub(crate) fn single_function_like(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
-        Type::Callable(CallableType::new(
-            db,
-            CallableSignature::single(signature),
-            true,
         ))
     }
 
