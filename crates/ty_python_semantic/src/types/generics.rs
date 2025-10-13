@@ -14,11 +14,11 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, binding_type, declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType,
+    binding_type, declaration_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -317,30 +317,16 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
-        definition: impl FnOnce() -> Definition<'db>,
+        definition: Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            base.find_legacy_typevars(db, None, &mut variables);
+            base.find_legacy_typevars(db, Some(definition), &mut variables);
         }
-
-        // If there are no legacy typevars mentioned in the base class list, we can return early.
         if variables.is_empty() {
             return None;
         }
-
-        // If there are legacy typevars, filter out the ones that are not bound by this class. (We
-        // do this as a post-processing step, instead of by passing in a parameter to
-        // `find_legacy_typevars`, since there are very many classes that do not reference legacy
-        // typevars at all, and this avoids adding a salsa dependency on the class `Definition` in
-        // those cases.)
-        let binding_context = BindingContext::Definition(definition());
-        variables.retain(|bound_typevar| bound_typevar.binding_context(db) == binding_context);
-        if variables.is_empty() {
-            return None;
-        }
-
         Some(Self::from_typevar_instances(db, variables))
     }
 
