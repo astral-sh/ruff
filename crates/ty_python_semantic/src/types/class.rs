@@ -20,7 +20,9 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{
+    GenericContext, Specialization, walk_generic_context, walk_specialization,
+};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -1520,9 +1522,7 @@ impl<'db> ClassLiteral<'db> {
 
         let visitor = CollectTypeVars::default();
         if let Some(generic_context) = self.generic_context(db) {
-            for bound_typevar in generic_context.variables(db) {
-                visitor.visit_bound_type_var_type(db, bound_typevar);
-            }
+            walk_generic_context(db, generic_context, &visitor);
         }
         for base in self.explicit_bases(db) {
             visitor.visit_type(db, *base);
