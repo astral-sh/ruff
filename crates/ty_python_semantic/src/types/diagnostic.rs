@@ -3063,26 +3063,28 @@ pub(crate) fn report_rebound_typevar<'db>(
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) {
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Generic class `{}` must not reference type variables bound in an enclosing scope",
-            class_node.name,
-        ));
-        diagnostic.set_primary_message(format_args!(
-            "`{typevar_name}` referenced in class definition here"
-        ));
-        if let Some(other_definition) = other_typevar.binding_context(db).definition() {
-            let span = match binding_type(db, other_definition) {
-                Type::ClassLiteral(class) => Some(class.header_span(db)),
-                Type::FunctionLiteral(function) => function.spans(db).map(|spans| spans.signature),
-                _ => None,
-            };
-            if let Some(span) = span {
-                diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-                    "Type variable `{typevar_name}` is bound in this enclosing scope",
-                )));
-            }
-        }
+    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Generic class `{}` must not reference type variables bound in an enclosing scope",
+        class_node.name,
+    ));
+    diagnostic.set_primary_message(format_args!(
+        "`{typevar_name}` referenced in class definition here"
+    ));
+    let Some(other_definition) = other_typevar.binding_context(db).definition() else {
+        return;
+    };
+    let span = match binding_type(db, other_definition) {
+        Type::ClassLiteral(class) => Some(class.header_span(db)),
+        Type::FunctionLiteral(function) => function.spans(db).map(|spans| spans.signature),
+        _ => return,
+    };
+    if let Some(span) = span {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "Type variable `{typevar_name}` is bound in this enclosing scope",
+        )));
     }
 }
 
