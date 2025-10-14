@@ -1071,7 +1071,7 @@ mod tests {
         
         def f(a):
             class Inner:
-                global a
+                global a   # ok
         ",
         PythonVersion::PY310,
         "GlobalParameter"

@@ -851,7 +851,7 @@ impl SemanticSyntaxContext for Checker<'_> {
         for scope in self.semantic.current_scopes() {
             match scope.kind {
                 ScopeKind::Class(_) => {
-                    continue;
+                    return false;
                 }
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => {
                     if let Some(mut binding_id) = scope.get(name) {

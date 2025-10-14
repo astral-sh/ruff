@@ -54,12 +54,3 @@ invalid-syntax: name `a` is parameter and global
 27 |
 28 | def f(a):
    |
-
-invalid-syntax: name `a` is parameter and global
-  --> <filename>:30:16
-   |
-28 | def f(a):
-29 |     class Inner:
-30 |         global a
-   |                ^
-   |
