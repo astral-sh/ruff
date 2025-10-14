@@ -24,7 +24,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
-    DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionType,
+    KnownFunction, OverloadLiteral,
 };
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
@@ -32,9 +33,9 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
+    BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType,
+    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -871,42 +872,44 @@ impl<'db> Bindings<'db> {
                                 weakref_slot,
                             ] = overload.parameter_types()
                             {
-                                let mut params = DataclassParams::empty();
+                                let mut flags = DataclassFlags::empty();
 
                                 if to_bool(init, true) {
-                                    params |= DataclassParams::INIT;
+                                    flags |= DataclassFlags::INIT;
                                 }
                                 if to_bool(repr, true) {
-                                    params |= DataclassParams::REPR;
+                                    flags |= DataclassFlags::REPR;
                                 }
                                 if to_bool(eq, true) {
-                                    params |= DataclassParams::EQ;
+                                    flags |= DataclassFlags::EQ;
                                 }
                                 if to_bool(order, false) {
-                                    params |= DataclassParams::ORDER;
+                                    flags |= DataclassFlags::ORDER;
                                 }
                                 if to_bool(unsafe_hash, false) {
-                                    params |= DataclassParams::UNSAFE_HASH;
+                                    flags |= DataclassFlags::UNSAFE_HASH;
                                 }
                                 if to_bool(frozen, false) {
-                                    params |= DataclassParams::FROZEN;
+                                    flags |= DataclassFlags::FROZEN;
                                 }
                                 if to_bool(match_args, true) {
-                                    params |= DataclassParams::MATCH_ARGS;
+                                    flags |= DataclassFlags::MATCH_ARGS;
                                 }
                                 if to_bool(kw_only, false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                        params |= DataclassParams::KW_ONLY;
+                                        flags |= DataclassFlags::KW_ONLY;
                                     } else {
                                         // TODO: emit diagnostic
                                     }
                                 }
                                 if to_bool(slots, false) {
-                                    params |= DataclassParams::SLOTS;
+                                    flags |= DataclassFlags::SLOTS;
                                 }
                                 if to_bool(weakref_slot, false) {
-                                    params |= DataclassParams::WEAKREF_SLOT;
+                                    flags |= DataclassFlags::WEAKREF_SLOT;
                                 }
+
+                                let params = DataclassParams::from_flags(db, flags);
 
                                 overload.set_return_type(Type::DataclassDecorator(params));
                             }
@@ -915,7 +918,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(Type::ClassLiteral(class_literal))] =
                                 overload.parameter_types()
                             {
-                                let params = DataclassParams::default();
+                                let params = DataclassParams::default_params(db);
                                 overload.set_return_type(Type::from(ClassLiteral::new(
                                     db,
                                     class_literal.name(db),
@@ -938,30 +941,26 @@ impl<'db> Bindings<'db> {
                                 _kwargs,
                             ] = overload.parameter_types()
                             {
-                                let mut params = DataclassTransformerParams::empty();
+                                let mut flags = DataclassTransformerFlags::empty();
 
                                 if to_bool(eq_default, true) {
-                                    params |= DataclassTransformerParams::EQ_DEFAULT;
+                                    flags |= DataclassTransformerFlags::EQ_DEFAULT;
                                 }
                                 if to_bool(order_default, false) {
-                                    params |= DataclassTransformerParams::ORDER_DEFAULT;
+                                    flags |= DataclassTransformerFlags::ORDER_DEFAULT;
                                 }
                                 if to_bool(kw_only_default, false) {
-                                    params |= DataclassTransformerParams::KW_ONLY_DEFAULT;
+                                    flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
                                 }
                                 if to_bool(frozen_default, false) {
-                                    params |= DataclassTransformerParams::FROZEN_DEFAULT;
+                                    flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
                                 }
 
-                                if let Some(field_specifiers_type) = field_specifiers {
-                                    // For now, we'll do a simple check: if field_specifiers is not
-                                    // None/empty, we assume it might contain dataclasses.field
-                                    // TODO: Implement proper parsing to check for
-                                    //   dataclasses.field/Field specifically
-                                    if !field_specifiers_type.is_none(db) {
-                                        params |= DataclassTransformerParams::FIELD_SPECIFIERS;
-                                    }
-                                }
+                                let params = DataclassTransformerParams::new(
+                                    db,
+                                    flags,
+                                    field_specifiers.unwrap_or(Type::none(db)),
+                                );
 
                                 overload.set_return_type(Type::DataclassTransformer(params));
                             }
@@ -1030,36 +1029,41 @@ impl<'db> Bindings<'db> {
                                             // the argument type and overwrite the corresponding flag in `dataclass_params` after
                                             // constructing them from the `dataclass_transformer`-parameter defaults.
 
-                                            let mut dataclass_params =
-                                                DataclassParams::from(params);
+                                            let dataclass_params =
+                                                DataclassParams::from_transformer_params(
+                                                    db, params,
+                                                );
+                                            let mut flags = dataclass_params.flags(db);
 
                                             if let Ok(Some(Type::BooleanLiteral(order))) =
                                                 overload.parameter_type_by_name("order")
                                             {
-                                                dataclass_params.set(DataclassParams::ORDER, order);
+                                                flags.set(DataclassFlags::ORDER, order);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(eq))) =
                                                 overload.parameter_type_by_name("eq")
                                             {
-                                                dataclass_params.set(DataclassParams::EQ, eq);
+                                                flags.set(DataclassFlags::EQ, eq);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(kw_only))) =
                                                 overload.parameter_type_by_name("kw_only")
                                             {
-                                                dataclass_params
-                                                    .set(DataclassParams::KW_ONLY, kw_only);
+                                                flags.set(DataclassFlags::KW_ONLY, kw_only);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(frozen))) =
                                                 overload.parameter_type_by_name("frozen")
                                             {
-                                                dataclass_params
-                                                    .set(DataclassParams::FROZEN, frozen);
+                                                flags.set(DataclassFlags::FROZEN, frozen);
                                             }
 
-                                            Type::DataclassDecorator(dataclass_params)
+                                            Type::DataclassDecorator(DataclassParams::new(
+                                                db,
+                                                flags,
+                                                dataclass_params.field_specifiers(db),
+                                            ))
                                         },
                                     )
                                 })

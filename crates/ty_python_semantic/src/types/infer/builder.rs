@@ -2573,7 +2573,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
-                dataclass_params = Some(DataclassParams::default());
+                dataclass_params = Some(DataclassParams::default_params(self.db()));
                 continue;
             }
 
@@ -2594,11 +2594,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // overload, or an overload and the implementation both. Nevertheless, this is not
                 // allowed. We do not try to treat the offenders intelligently -- just use the
                 // params of the last seen usage of `@dataclass_transform`
-                let params = f
+                let transformer_params = f
                     .iter_overloads_and_implementation(self.db())
                     .find_map(|overload| overload.dataclass_transformer_params(self.db()));
-                if let Some(params) = params {
-                    dataclass_params = Some(params.into());
+                if let Some(transformer_params) = transformer_params {
+                    dataclass_params = Some(DataclassParams::from_transformer_params(
+                        self.db(),
+                        transformer_params,
+                    ));
                     continue;
                 }
             }

@@ -32,12 +32,12 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
-    determine_upper_bound, infer_definition_types,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
+    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
+    declaration_type, determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -163,7 +163,7 @@ fn try_metaclass_cycle_recover<'db>(
     _count: u32,
     _self: ClassLiteral<'db>,
 ) -> salsa::CycleRecoveryAction<
-    Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
+    Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>>,
 > {
     salsa::CycleRecoveryAction::Iterate
 }
@@ -172,7 +172,7 @@ fn try_metaclass_cycle_recover<'db>(
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self_: ClassLiteral<'db>,
-) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
+) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
@@ -180,17 +180,17 @@ fn try_metaclass_cycle_initial<'db>(
 
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum CodeGeneratorKind {
+pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
-    DataclassLike(Option<DataclassTransformerParams>),
+    DataclassLike(Option<DataclassTransformerParams<'db>>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
     /// Classes inheriting from `typing.TypedDict`
     TypedDict,
 }
 
-impl CodeGeneratorKind {
-    pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
+impl<'db> CodeGeneratorKind<'db> {
+    pub(crate) fn from_class(db: &'db dyn Db, class: ClassLiteral<'db>) -> Option<Self> {
         #[salsa::tracked(
             cycle_fn=code_generator_of_class_recover,
             cycle_initial=code_generator_of_class_initial,
@@ -199,7 +199,7 @@ impl CodeGeneratorKind {
         fn code_generator_of_class<'db>(
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
-        ) -> Option<CodeGeneratorKind> {
+        ) -> Option<CodeGeneratorKind<'db>> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
             } else if let Ok((_, Some(transformer_params))) = class.try_metaclass(db) {
@@ -216,27 +216,27 @@ impl CodeGeneratorKind {
             }
         }
 
-        fn code_generator_of_class_initial(
-            _db: &dyn Db,
-            _class: ClassLiteral<'_>,
-        ) -> Option<CodeGeneratorKind> {
+        fn code_generator_of_class_initial<'db>(
+            _db: &'db dyn Db,
+            _class: ClassLiteral<'db>,
+        ) -> Option<CodeGeneratorKind<'db>> {
             None
         }
 
-        #[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-        fn code_generator_of_class_recover(
-            _db: &dyn Db,
-            _value: &Option<CodeGeneratorKind>,
+        #[expect(clippy::ref_option)]
+        fn code_generator_of_class_recover<'db>(
+            _db: &'db dyn Db,
+            _value: &Option<CodeGeneratorKind<'db>>,
             _count: u32,
-            _class: ClassLiteral<'_>,
-        ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind>> {
+            _class: ClassLiteral<'db>,
+        ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind<'db>>> {
             salsa::CycleRecoveryAction::Iterate
         }
 
         code_generator_of_class(db, class)
     }
 
-    pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    pub(super) fn matches(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
         matches!(
             (CodeGeneratorKind::from_class(db, class), self),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
@@ -1387,8 +1387,8 @@ pub struct ClassLiteral<'db> {
     /// If this class is deprecated, this holds the deprecation message.
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
-    pub(crate) dataclass_params: Option<DataclassParams>,
-    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
+    pub(crate) dataclass_params: Option<DataclassParams<'db>>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1909,7 +1909,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn try_metaclass(
         self,
         db: &'db dyn Db,
-    ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
+    ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
         tracing::trace!("ClassLiteral::try_metaclass: {}", self.name(db));
 
         // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -2271,14 +2271,17 @@ impl<'db> ClassLiteral<'db> {
 
         let transformer_params =
             if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
-                Some(DataclassParams::from(transformer_params))
+                Some(DataclassParams::from_transformer_params(
+                    db,
+                    transformer_params,
+                ))
             } else {
                 None
             };
 
         let has_dataclass_param = |param| {
-            dataclass_params.is_some_and(|params| params.contains(param))
-                || transformer_params.is_some_and(|params| params.contains(param))
+            dataclass_params.is_some_and(|params| params.flags(db).contains(param))
+                || transformer_params.is_some_and(|params| params.flags(db).contains(param))
         };
 
         let instance_ty =
@@ -2357,7 +2360,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let is_kw_only = name == "__replace__"
-                    || kw_only.unwrap_or(has_dataclass_param(DataclassParams::KW_ONLY));
+                    || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
 
                 let mut parameter = if is_kw_only {
                     Parameter::keyword_only(field_name)
@@ -2395,7 +2398,7 @@ impl<'db> ClassLiteral<'db> {
 
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
-                if !has_dataclass_param(DataclassParams::INIT) {
+                if !has_dataclass_param(DataclassFlags::INIT) {
                     return None;
                 }
 
@@ -2410,7 +2413,7 @@ impl<'db> ClassLiteral<'db> {
                 signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
             }
             (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
-                if !has_dataclass_param(DataclassParams::ORDER) {
+                if !has_dataclass_param(DataclassFlags::ORDER) {
                     return None;
                 }
 
@@ -2461,7 +2464,7 @@ impl<'db> ClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], Some(instance_ty))
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if has_dataclass_param(DataclassParams::FROZEN) {
+                if has_dataclass_param(DataclassFlags::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new([
                             Parameter::positional_or_keyword(Name::new_static("self"))
@@ -2477,7 +2480,7 @@ impl<'db> ClassLiteral<'db> {
                 None
             }
             (CodeGeneratorKind::DataclassLike(_), "__slots__") => {
-                has_dataclass_param(DataclassParams::SLOTS).then(|| {
+                has_dataclass_param(DataclassFlags::SLOTS).then(|| {
                     let fields = self.fields(db, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
                     Type::heterogeneous_tuple(db, slots)
@@ -2901,7 +2904,7 @@ impl<'db> ClassLiteral<'db> {
                     default_ty = field.default_type(db);
                     if self
                         .dataclass_params(db)
-                        .map(|params| params.contains(DataclassParams::NO_FIELD_SPECIFIERS))
+                        .map(|params| params.field_specifiers(db).is_none(db))
                         .unwrap_or(false)
                     {
                         // This happens when constructing a `dataclass` with a `dataclass_transform`
@@ -3635,7 +3638,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             let is_frozen_dataclass = Program::get(db).python_version(db) <= PythonVersion::PY312
                 && self
                     .dataclass_params(db)
-                    .is_some_and(|params| params.contains(DataclassParams::FROZEN));
+                    .is_some_and(|params| params.flags(db).contains(DataclassFlags::FROZEN));
             if is_namedtuple || is_frozen_dataclass {
                 TypeVarVariance::Covariant
             } else {

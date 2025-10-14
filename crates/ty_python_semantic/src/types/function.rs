@@ -152,23 +152,31 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-    pub struct DataclassTransformerParams: u8 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
-        const FIELD_SPECIFIERS= 1 << 4;
     }
 }
 
-impl get_size2::GetSize for DataclassTransformerParams {}
+impl get_size2::GetSize for DataclassTransformerFlags {}
 
-impl Default for DataclassTransformerParams {
+impl Default for DataclassTransformerFlags {
     fn default() -> Self {
         Self::EQ_DEFAULT
     }
 }
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DataclassTransformerParams<'db> {
+    pub flags: DataclassTransformerFlags,
+    pub field_specifiers: Type<'db>,
+}
+
+impl get_size2::GetSize for DataclassTransformerParams<'_> {}
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
@@ -201,7 +209,7 @@ pub struct OverloadLiteral<'db> {
 
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
-    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -212,7 +220,7 @@ impl<'db> OverloadLiteral<'db> {
     fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -740,7 +748,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.

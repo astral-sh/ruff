@@ -32,7 +32,7 @@ pub(crate) use self::signatures::{CallableSignature, Parameter, Parameters, Sign
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
-use crate::place::{Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol};
+use crate::place::{Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
@@ -50,7 +50,8 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionSpans, FunctionType,
+    KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, PartialSpecialization, Specialization, bind_typevar,
@@ -622,8 +623,8 @@ bitflags! {
     /// that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/dataclasses.html
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct DataclassParams: u16 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct DataclassFlags: u16 {
         const INIT = 0b0000_0000_0001;
         const REPR = 0b0000_0000_0010;
         const EQ = 0b0000_0000_0100;
@@ -634,48 +635,71 @@ bitflags! {
         const KW_ONLY = 0b0000_1000_0000;
         const SLOTS = 0b0001_0000_0000;
         const WEAKREF_SLOT = 0b0010_0000_0000;
-        // This is not an actual argument from `dataclass(...)` but a flag signaling that no
-        // `field_specifiers` was specified for the `dataclass_transform`, see [1].
-        // [1]: https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-transform-parameters
-        const NO_FIELD_SPECIFIERS = 0b0100_0000_0000;
     }
 }
 
-impl get_size2::GetSize for DataclassParams {}
+impl get_size2::GetSize for DataclassFlags {}
 
-impl Default for DataclassParams {
+impl Default for DataclassFlags {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
     }
 }
 
-impl From<DataclassTransformerParams> for DataclassParams {
-    fn from(params: DataclassTransformerParams) -> Self {
+impl From<DataclassTransformerFlags> for DataclassFlags {
+    fn from(params: DataclassTransformerFlags) -> Self {
         let mut result = Self::default();
 
         result.set(
             Self::EQ,
-            params.contains(DataclassTransformerParams::EQ_DEFAULT),
+            params.contains(DataclassTransformerFlags::EQ_DEFAULT),
         );
         result.set(
             Self::ORDER,
-            params.contains(DataclassTransformerParams::ORDER_DEFAULT),
+            params.contains(DataclassTransformerFlags::ORDER_DEFAULT),
         );
         result.set(
             Self::KW_ONLY,
-            params.contains(DataclassTransformerParams::KW_ONLY_DEFAULT),
+            params.contains(DataclassTransformerFlags::KW_ONLY_DEFAULT),
         );
         result.set(
             Self::FROZEN,
-            params.contains(DataclassTransformerParams::FROZEN_DEFAULT),
-        );
-
-        result.set(
-            Self::NO_FIELD_SPECIFIERS,
-            !params.contains(DataclassTransformerParams::FIELD_SPECIFIERS),
+            params.contains(DataclassTransformerFlags::FROZEN_DEFAULT),
         );
 
         result
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DataclassParams<'db> {
+    flags: DataclassFlags,
+    field_specifiers: Type<'db>,
+}
+
+impl get_size2::GetSize for DataclassParams<'_> {}
+
+impl<'db> DataclassParams<'db> {
+    fn default_params(db: &'db dyn Db) -> Self {
+        Self::from_flags(db, DataclassFlags::default())
+    }
+
+    fn from_flags(db: &'db dyn Db, flags: DataclassFlags) -> Self {
+        let dataclasses_field = known_module_symbol(db, KnownModule::Dataclasses, "field")
+            .place
+            .ignore_possibly_unbound()
+            .unwrap_or_else(|| Type::none(db));
+
+        Self::new(db, flags, dataclasses_field)
+    }
+
+    fn from_transformer_params(db: &'db dyn Db, params: DataclassTransformerParams<'db>) -> Self {
+        Self::new(
+            db,
+            DataclassFlags::from(params.flags(db)),
+            params.field_specifiers(db),
+        )
     }
 }
 
@@ -719,9 +743,9 @@ pub enum Type<'db> {
     /// A special callable that is returned by a `dataclass(…)` call. It is usually
     /// used as a decorator. Note that this is only used as a return type for actual
     /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
-    DataclassDecorator(DataclassParams),
+    DataclassDecorator(DataclassParams<'db>),
     /// A special callable that is returned by a `dataclass_transform(…)` call.
-    DataclassTransformer(DataclassTransformerParams),
+    DataclassTransformer(DataclassTransformerParams<'db>),
     /// The type of an arbitrary callable object with a certain specified signature.
     Callable(CallableType<'db>),
     /// A specific module object
