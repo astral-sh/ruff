@@ -30,7 +30,7 @@ To that end we define the following extension:
 > If an `__init__.pyi` for `mypackage` contains a `from...import` targetting a submodule, then that
 > submodule should be available as an attribute of `mypackage`.
 
-## Relative From Import of Direct Submodule in Init
+## Relative `from` Import of Direct Submodule in `__init__`
 
 The `from . import submodule` idiom in an `__init__.pyi` is fairly explicit and we should definitely
 support it.
@@ -63,7 +63,7 @@ reveal_type(mypackage.imported.X)  # revealed: int
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## Relative From Import of Direct Submodule in Init (Non-Stub Check)
+## Relative `from` Import of Direct Submodule in `__init__` (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -93,7 +93,7 @@ reveal_type(mypackage.imported.X)  # revealed: int
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## Absolute From Import of Direct Submodule in Init
+## Absolute `from` Import of Direct Submodule in `__init__`
 
 If an absolute `from...import` happens to import a submodule, it works just as well as a relative
 one.
@@ -126,7 +126,7 @@ reveal_type(mypackage.imported.X)  # revealed: int
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## Absolute From Import of Direct Submodule in Init (Non-Stub Check)
+## Absolute `from` Import of Direct Submodule in `__init__` (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -156,7 +156,7 @@ reveal_type(mypackage.imported.X)  # revealed: int
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## Import of Direct Submodule in Init
+## Import of Direct Submodule in `__init__`
 
 An `import` that happens to import a submodule does not expose the submodule as an attribute. (This
 is an arbitrary decision and can be changed easily!)
@@ -182,7 +182,7 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## Import of Direct Submodule in (Non-Stub Check)
+## Import of Direct Submodule in `__init__` (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -205,7 +205,7 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## Relative From Import of Direct Submodule in Init, Mismatched Alias
+## Relative `from` Import of Direct Submodule in `__init__`, Mismatched Alias
 
 Renaming the submodule to something else disables the `__init__.pyi` idiom.
 
@@ -232,7 +232,7 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 ```
 
-## Relative From Import of Direct Submodule in Init, Mismatched Alias (Non-Stub Check)
+## Relative `from` Import of Direct Submodule in `__init__`, Mismatched Alias (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -256,7 +256,7 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 reveal_type(mypackage.imported_m.X)  # revealed: int
 ```
 
-## Relative From Import of Direct Submodule in Init, Matched Alias
+## Relative `from` Import of Direct Submodule in `__init__`, Matched Alias
 
 The `__init__.pyi` idiom should definitely always work if the submodule is renamed to itself, as
 this is the re-export idiom.
@@ -281,7 +281,7 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
-## Relative From Import of Direct Submodule in Init, Matched Alias (Non-Stub Check)
+## Relative `from` Import of Direct Submodule in `__init__`, Matched Alias (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -356,7 +356,7 @@ reveal_type(imported.X)  # revealed: int
 reveal_type(Z)  # revealed: int
 ```
 
-## From Import of Non-Submodule
+## `from` Import of Non-Submodule
 
 A from import that terminates in a non-submodule should not expose the intermediate submodules as
 attributes.
@@ -382,7 +382,7 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## From Import of Non-Submodule (Non-Stub Check)
+## `from` Import of Non-Submodule (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -405,10 +405,10 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## From Import of Other Package's Submodule
+## `from` Import of Other Package's Submodule
 
 `from mypackage import submodule` from outside the package is not modeled as a side-effect on
-`mypackage`, even in the importing file.
+`mypackage`, even in the importing file (this could be changed!).
 
 `mypackage/__init__.pyi`:
 
@@ -432,7 +432,7 @@ reveal_type(imported.X)  # revealed: int
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## From Import of Other Package's Submodule (Non-Stub Check)
+## `from` Import of Other Package's Submodule (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
@@ -456,7 +456,7 @@ reveal_type(imported.X)  # revealed: int
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## From Import of Sibling Module
+## `from` Import of Sibling Module
 
 `from . import submodule` from a sibling module is not modeled as a side-effect on `mypackage` or a
 re-export from `submodule`.
@@ -492,7 +492,7 @@ reveal_type(imported.fails.Y)  # revealed: Unknown
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## From Import of Sibling Module (Non-Stub Check)
+## `from` Import of Sibling Module (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
