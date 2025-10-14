@@ -1255,7 +1255,7 @@ mod tests {
 
         let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap();
 
         let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)

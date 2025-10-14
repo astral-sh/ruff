@@ -15,7 +15,7 @@ use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Sig
 use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{Boundness, Place};
+use crate::place::{Definedness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -833,7 +833,7 @@ impl<'db> Bindings<'db> {
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
-                                    Place::Type(ty, Boundness::Bound) => {
+                                    Place::Defined(ty, _, Definedness::AlwaysDefined) => {
                                         if ty.is_dynamic() {
                                             // Here, we attempt to model the fact that an attribute lookup on
                                             // a dynamic type could fail
@@ -843,10 +843,10 @@ impl<'db> Bindings<'db> {
                                             ty
                                         }
                                     }
-                                    Place::Type(ty, Boundness::PossiblyUnbound) => {
+                                    Place::Defined(ty, _, Definedness::PossiblyUndefined) => {
                                         union_with_default(ty)
                                     }
-                                    Place::Unbound => default,
+                                    Place::Undefined => default,
                                 },
                             );
                         }
@@ -2378,7 +2378,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 )
                 .place
             }) {
-                Some(Place::Type(keys_method, Boundness::Bound)) => keys_method
+                Some(Place::Defined(keys_method, _, Definedness::AlwaysDefined)) => keys_method
                     .try_call(db, &CallArguments::positional([Type::unknown()]))
                     .ok()
                     .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
@@ -2696,7 +2696,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 )
                 .place
             {
-                Place::Type(keys_method, Boundness::Bound) => keys_method
+                Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
                     .try_call(self.db, &CallArguments::none())
                     .ok()
                     .and_then(|bindings| {
@@ -2734,7 +2734,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 )
                 .place
             {
-                Place::Type(keys_method, Boundness::Bound) => keys_method
+                Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
                     .try_call(self.db, &CallArguments::positional([Type::unknown()]))
                     .ok()
                     .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),

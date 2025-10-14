@@ -1713,7 +1713,7 @@ mod tests {
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap()
             .to_instance(&db)
             .unwrap()
