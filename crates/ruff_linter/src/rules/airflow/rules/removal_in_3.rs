@@ -481,7 +481,9 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "create_datasets" => Replacement::AttrRenamed("create_assets"),
             "notify_dataset_created" => Replacement::AttrRenamed("notify_asset_created"),
             "notify_dataset_changed" => Replacement::AttrRenamed("notify_asset_changed"),
-            "notify_dataset_alias_created" => Replacement::AttrRenamed("notify_asset_alias_created"),
+            "notify_dataset_alias_created" => {
+                Replacement::AttrRenamed("notify_asset_alias_created")
+            }
             _ => return,
         },
         ["airflow", "lineage", "hook", "HookLineageCollector"] => match attr.as_str() {
@@ -695,10 +697,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.notifications
-        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => Replacement::SymbolRenamed {
-            module: "airflow.sdk.bases.notifier",
-            name: "BaseNotifier",
-        },
+        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
+            Replacement::SymbolRenamed {
+                module: "airflow.sdk.bases.notifier",
+                name: "BaseNotifier",
+            }
+        }
 
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
@@ -715,10 +719,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: "SecretCache",
         },
-        ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::SymbolRenamed {
-            module: "airflow.secrets.local_filesystem",
-            name: "load_connections_dict",
-        },
+        ["airflow", "secrets", "local_filesystem", "load_connections"] => {
+            Replacement::SymbolRenamed {
+                module: "airflow.secrets.local_filesystem",
+                name: "load_connections_dict",
+            }
+        }
 
         // airflow.security
         ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Replacement::SymbolRenamed {

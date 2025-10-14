@@ -136,18 +136,22 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "hooks", "package_index", "PackageIndexHook"] => ProviderReplacement::SymbolRenamed {
-            module: "airflow.providers.standard.hooks.package_index",
-            name: "PackageIndexHook",
-            provider: "standard",
-            version: "0.0.1",
-        },
-        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::SymbolRenamed {
-            module: "airflow.providers.standard.hooks.subprocess",
-            name: "SubprocessHook",
-            provider: "standard",
-            version: "0.0.3",
-        },
+        ["airflow", "hooks", "package_index", "PackageIndexHook"] => {
+            ProviderReplacement::SymbolRenamed {
+                module: "airflow.providers.standard.hooks.package_index",
+                name: "PackageIndexHook",
+                provider: "standard",
+                version: "0.0.1",
+            }
+        }
+        ["airflow", "hooks", "subprocess", "SubprocessHook"] => {
+            ProviderReplacement::SymbolRenamed {
+                module: "airflow.providers.standard.hooks.subprocess",
+                name: "SubprocessHook",
+                provider: "standard",
+                version: "0.0.3",
+            }
+        }
         ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.operators.bash",
             name: "BashOperator",
@@ -271,12 +275,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::SymbolRenamed {
-            module: "airflow.providers.standard.sensors.weekday",
-            name: "DayOfWeekSensor",
-            provider: "standard",
-            version: "0.0.1",
-        },
+        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => {
+            ProviderReplacement::SymbolRenamed {
+                module: "airflow.providers.standard.sensors.weekday",
+                name: "DayOfWeekSensor",
+                provider: "standard",
+                version: "0.0.1",
+            }
+        }
         [
             "airflow",
             "triggers",
@@ -310,9 +316,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
     let (module, name) = match &replacement {
         ProviderReplacement::SymbolRenamed { module, name, .. } => (module, *name),
-        ProviderReplacement::SymbolsMovedToProvider { module, name, .. } => {
-            (module, name.as_str())
-        }
+        ProviderReplacement::SymbolsMovedToProvider { module, name, .. } => (module, name.as_str()),
     };
 
     if is_guarded_by_try_except(expr, module, name, checker.semantic()) {

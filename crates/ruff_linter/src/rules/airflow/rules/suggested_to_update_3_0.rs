@@ -255,12 +255,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.models
-        ["airflow", "models", rest @ ("Connection" | "Variable")] => {
-            Replacement::SymbolsMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            }
-        }
+        ["airflow", "models", rest @ ("Connection" | "Variable")] => Replacement::SymbolsMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
         ["airflow", "models", "Param"] => Replacement::SymbolRenamed {
             module: "airflow.sdk.definitions.param",
             name: "Param",
@@ -276,10 +274,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::SymbolRenamed {
-            module: "airflow.sdk",
-            name: "BaseOperatorLink",
-        },
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
+            Replacement::SymbolRenamed {
+                module: "airflow.sdk",
+                name: "BaseOperatorLink",
+            }
+        }
 
         // airflow.model..DAG
         ["airflow", "models", .., "DAG"] => Replacement::SymbolsMoved {
@@ -299,10 +299,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.timetables
-        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::SymbolRenamed {
-            module: "airflow.timetables.assets",
-            name: "AssetOrTimeSchedule",
-        },
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
+            Replacement::SymbolRenamed {
+                module: "airflow.timetables.assets",
+                name: "AssetOrTimeSchedule",
+            }
+        }
 
         // airflow.utils
         [
