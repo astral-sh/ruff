@@ -207,7 +207,7 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 
 ## Relative From Import of Direct Submodule in Init, Mismatched Alias
 
-If you do the `__init__.pyi` idiom and rename the alias we don't currently use that. We should.
+Renaming the submodule to something else disables the `__init__.pyi` idiom.
 
 `mypackage/__init__.pyi`:
 
@@ -226,7 +226,8 @@ X: int = 42
 ```py
 import mypackage
 
-reveal_type(mypackage.imported.X)  # revealed: int
+# error: "has no attribute `imported`"
+reveal_type(mypackage.imported.X)  # revealed: Unknown
 # error: "has no attribute `imported_m`"
 reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 ```
