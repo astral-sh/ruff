@@ -524,3 +524,84 @@ reveal_type(imported.fails.Y)  # revealed: int
 # error: "has no attribute `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
+
+## Fractal Re-export Nameclash Problems
+
+This precise configuration of:
+
+- a subpackage that defines a submodule with its own name
+- that in turn defines a function/class with its own name
+- and re-exporting that name through every layer using `from` imports and `__all__`
+
+Causes the typechecker to eventually get "confused" and think imports of the name from the top-level
+package are referring to the subpackage and not the function/class. This is an issue that as of this
+writing effects the `lobpcg` function in `scipy.sparse.linalg`.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import funcmod
+
+__all__ = ["funcmod"]
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+from .funcmod import funcmod
+
+__all__ = ["funcmod"]
+```
+
+`mypackage/funcmod/funcmod.pyi`:
+
+```pyi
+__all__ = ["funcmod"]
+
+def funcmod(x: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+# TODO: this isn't a desirable result
+# error: "Object of type `<module 'mypackage.funcmod'>` is not callable"
+x = funcmod(1)
+```
+
+## Fractal Re-export Nameclash Problems (Not-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import funcmod
+
+__all__ = ["funcmod"]
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+from .funcmod import funcmod
+
+__all__ = ["funcmod"]
+```
+
+`mypackage/funcmod/funcmod.py`:
+
+```py
+__all__ = ["funcmod"]
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
