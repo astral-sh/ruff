@@ -2032,7 +2032,7 @@ impl<'db> ClassLiteral<'db> {
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
+        if (name.starts_with("__") && name.ends_with("__")) || member.is_class_var() {
             member = member.map_type(|ty| into_function_like_callable(db, ty));
         }
 
