@@ -192,7 +192,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
                     .map(|node| binding_type(self.db, index.expect_single_definition(node)))
-                    .filter_map(Type::into_function_literal);
+                    .filter_map(Type::as_function_literal);
 
                 // Iterate over all functions and test if any is decorated with `@no_type_check`.
                 function_scope_tys.any(|function_ty| {

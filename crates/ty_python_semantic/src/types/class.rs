@@ -1726,7 +1726,7 @@ impl<'db> ClassLiteral<'db> {
     /// Determine if this is an abstract class.
     pub(super) fn is_abstract(self, db: &'db dyn Db) -> bool {
         self.metaclass(db)
-            .into_class_literal()
+            .as_class_literal()
             .is_some_and(|metaclass| metaclass.is_known(db, KnownClass::ABCMeta))
     }
 
@@ -1760,7 +1760,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> impl Iterator<Item = KnownFunction> + 'db {
         self.decorators(db)
             .iter()
-            .filter_map(|deco| deco.into_function_literal())
+            .filter_map(|deco| deco.as_function_literal())
             .filter_map(|decorator| decorator.known(db))
     }
 
@@ -2016,7 +2016,29 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        self.class_member_inner(db, None, name, policy)
+        fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty) => {
+                    Type::Callable(CallableType::new(db, callable_ty.signatures(db), true))
+                }
+                Type::Union(union) => {
+                    union.map(db, |element| into_function_like_callable(db, *element))
+                }
+                Type::Intersection(intersection) => intersection
+                    .map_positive(db, |element| into_function_like_callable(db, *element)),
+                _ => ty,
+            }
+        }
+
+        let mut member = self.class_member_inner(db, None, name, policy);
+
+        // We generally treat dunder attributes with `Callable` types as function-like callables.
+        // See `callables_as_descriptors.md` for more details.
+        if name.starts_with("__") && name.ends_with("__") {
+            member = member.map_type(|ty| into_function_like_callable(db, ty));
+        }
+
+        member
     }
 
     fn class_member_inner(
@@ -2400,7 +2422,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
-                    .into_class_literal()?
+                    .as_class_literal()?
                     .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_unbound()
                     .map(|ty| {
@@ -5252,7 +5274,7 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.into_string_literal()),
+                    DeprecatedInstance::new(db, message.as_string_literal()),
                 )));
             }
 
@@ -5272,7 +5294,7 @@ impl KnownClass {
                     return;
                 };
 
-                let Some(name) = name.into_string_literal() else {
+                let Some(name) = name.as_string_literal() else {
                     if let Some(builder) =
                         context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
                     {

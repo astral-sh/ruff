@@ -5,7 +5,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::AnyNodeRef;
 
 use crate::{
-    Db,
+    Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
         ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass, MemberLookupPolicy,
@@ -75,10 +75,16 @@ impl<'db> BoundSuperError<'db> {
             }
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
-                    builder.into_diagnostic(format_args!(
-                        "`{pivot_class}` is not a valid class",
-                        pivot_class = pivot_class.display(context.db()),
-                    ));
+                    match pivot_class {
+                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                            "`types.GenericAlias` instance `{}` is not a valid class",
+                            alias.display_with(context.db(), DisplaySettings::default()),
+                        )),
+                        _ => builder.into_diagnostic(format_args!(
+                            "`{pivot_class}` is not a valid class",
+                            pivot_class = pivot_class.display(context.db()),
+                        )),
+                    };
                 }
             }
             BoundSuperError::FailingConditionCheck {
@@ -102,6 +108,14 @@ impl<'db> BoundSuperError<'db> {
                                 bound_or_constraints_union.display(context.db()),
                             pivot_class = pivot_class.display(context.db()),
                         ));
+                        if typevar_context.bound_or_constraints(context.db()).is_none()
+                            && !typevar_context.kind(context.db()).is_self()
+                        {
+                            diagnostic.help(format_args!(
+                                "Consider adding an upper bound to type variable `{}`",
+                                typevar_context.name(context.db())
+                            ));
+                        }
                     }
                 }
             }
@@ -412,15 +426,10 @@ impl<'db> BoundSuperType<'db> {
         //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
         let pivot_class = match pivot_class_type {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
-            Type::GenericAlias(class) => ClassBase::Class(ClassType::Generic(class)),
-            Type::SubclassOf(subclass_of) if subclass_of.subclass_of().is_dynamic() => {
-                ClassBase::Dynamic(
-                    subclass_of
-                        .subclass_of()
-                        .into_dynamic()
-                        .expect("Checked in branch arm"),
-                )
-            }
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => ClassBase::Class(class),
+                SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
+            },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
             Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
