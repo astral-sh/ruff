@@ -142,7 +142,7 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- 'python/py_fuzzer/**' \
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- 'python/py-fuzzer/**' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
