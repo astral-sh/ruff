@@ -158,7 +158,8 @@ reveal_type(mypackage.fails.Y)  # revealed: Unknown
 
 ## Import of Direct Submodule in Init
 
-An `import` that happens to import a submodule does not expose the submodule as an attribute.
+An `import` that happens to import a submodule does not expose the submodule as an attribute. (This
+is an arbitrary decision and can be changed easily!)
 
 `mypackage/__init__.pyi`:
 
@@ -204,9 +205,107 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
+## Relative From Import of Direct Submodule in Init, Mismatched Alias
+
+If you do the `__init__.pyi` idiom and rename the alias we don't currently use that. We should.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from . import imported as imported_m
+```
+
+`mypackage/imported.pyi`:
+
+```pyi
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+reveal_type(mypackage.imported.X)  # revealed: int
+# error: "has no attribute `imported_m`"
+reveal_type(mypackage.imported_m.X)  # revealed: Unknown
+```
+
+## Relative From Import of Direct Submodule in Init, Mismatched Alias (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from . import imported as imported_m
+```
+
+`mypackage/imported.py`:
+
+```py
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no attribute `imported`"
+reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported_m.X)  # revealed: int
+```
+
+## Relative From Import of Direct Submodule in Init, Matched Alias
+
+The `__init__.pyi` idiom should definitely always work if the submodule is renamed to itself, as
+this is the re-export idiom.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from . import imported as imported
+```
+
+`mypackage/imported.pyi`:
+
+```pyi
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+reveal_type(mypackage.imported.X)  # revealed: int
+```
+
+## Relative From Import of Direct Submodule in Init, Matched Alias (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from . import imported as imported
+```
+
+`mypackage/imported.py`:
+
+```py
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+reveal_type(mypackage.imported.X)  # revealed: int
+```
+
 ## Star Import Unaffected
 
-Even if the `__init__` idiom is in effect, star imports do not pick it up.
+Even if the `__init__` idiom is in effect, star imports do not pick it up. (This is an arbitrary
+decision that mostly fell out of the implementation details and can be changed!)
 
 `mypackage/__init__.pyi`:
 
