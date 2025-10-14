@@ -5596,10 +5596,10 @@ impl<'db> Type<'db> {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
                         let mut elements_iter = elements.iter();
-                        let first_element_spec = non_async_special_case(db, *elements_iter.next()?)?;
+                        let first_element_spec = elements_iter.next()?.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
                         for element in elements_iter {
-                            builder = builder.union(db, non_async_special_case(db, *element).as_deref()?);
+                            builder = builder.union(db, &*element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?);
                         }
                         Some(Cow::Owned(builder.build()))
                     } else {
