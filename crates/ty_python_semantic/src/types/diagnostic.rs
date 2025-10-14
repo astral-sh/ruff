@@ -1814,6 +1814,7 @@ declare_lint! {
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// x: int
     ///
@@ -1826,6 +1827,7 @@ declare_lint! {
     /// ```
     ///
     /// Or:
+    ///
     /// ```python
     /// x: int | None = None
     ///
