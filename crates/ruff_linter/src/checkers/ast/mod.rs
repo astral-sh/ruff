@@ -878,7 +878,6 @@ impl SemanticSyntaxContext for Checker<'_> {
 
         false
     }
-
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {

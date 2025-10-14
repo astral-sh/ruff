@@ -2019,6 +2019,8 @@ pub trait SemanticSyntaxContext {
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 
+    fn in_loop_context(&self) -> bool;
+
     fn is_bound_parameter(&self, name: &str) -> bool;
 }
 
