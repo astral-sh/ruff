@@ -476,15 +476,6 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).len()
     }
 
-    pub(crate) fn contains(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        self.variables_inner(db)
-            .contains_key(&bound_typevar.identity(db))
-    }
-
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
             self.variables(db)

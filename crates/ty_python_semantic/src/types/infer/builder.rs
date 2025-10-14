@@ -5439,8 +5439,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let parameter_type =
                     overload.signature.parameters()[*parameter_index].annotated_type()?;
 
-                // TODO: For now, skip any parameter annotations that mention any of the overload's
-                // typevars. There are two issues:
+                // TODO: For now, skip any parameter annotations that mention any typevars. There
+                // are two issues:
                 //
                 // First, if we include those typevars in the type context that we use to infer the
                 // corresponding argument type, the typevars might end up appearing in the inferred
@@ -5461,20 +5461,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 //
                 // Regardless, for now, the expedient "solution" is to not perform bidi type
                 // checking for these kinds of parameters.
-                if let Some(generic_context) = overload.signature.generic_context {
-                    let mentions_overload_typevars = any_over_type(
-                        db,
-                        parameter_type,
-                        &|ty| {
-                            ty.as_typevar().is_some_and(|bound_typevar| {
-                                generic_context.contains(db, bound_typevar)
-                            })
-                        },
-                        true,
-                    );
-                    if mentions_overload_typevars {
-                        return None;
-                    }
+                if parameter_type.has_typevar(db) {
+                    return None;
                 }
 
                 Some(parameter_type)
