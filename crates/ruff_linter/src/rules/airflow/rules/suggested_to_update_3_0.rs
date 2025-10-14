@@ -53,10 +53,10 @@ impl Violation for Airflow3SuggestedUpdate {
         } = self;
         match replacement {
             Replacement::None
-            | Replacement::AttrName(_)
+            | Replacement::AttrRenamed(_)
             | Replacement::Message(_)
-            | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
+            | Replacement::SymbolRenamed { module: _, name: _ }
+            | Replacement::SymbolsMoved { module: _, name: _ } => {
                 format!(
                     "`{deprecated}` is removed in Airflow 3.0; \
                     It still works in Airflow 3.0 but is expected to be removed in a future version."
@@ -69,12 +69,12 @@ impl Violation for Airflow3SuggestedUpdate {
         let Airflow3SuggestedUpdate { replacement, .. } = self;
         match replacement {
             Replacement::None => None,
-            Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
+            Replacement::AttrRenamed(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
-            Replacement::Rename { module, name } => {
+            Replacement::SymbolRenamed { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
-            Replacement::SourceModuleMoved { module, name } => {
+            Replacement::SymbolsMoved { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
         }
@@ -129,7 +129,7 @@ fn diagnostic_for_argument(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
             replacement: match replacement {
-                Some(name) => Replacement::AttrName(name),
+                Some(name) => Replacement::AttrRenamed(name),
                 None => Replacement::None,
             },
         },
@@ -191,30 +191,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
-        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::Rename {
+        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::SymbolRenamed {
             module: "airflow.sdk",
             name: "Metadata",
         },
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::Rename {
+        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::SymbolRenamed {
             module: "airflow.sdk",
             name: "Asset",
         },
         ["airflow", "datasets", rest] => match *rest {
             "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::Rename {
+            "DatasetAlias" => Replacement::SymbolRenamed {
                 module: "airflow.sdk",
                 name: "AssetAlias",
             },
-            "DatasetAll" => Replacement::Rename {
+            "DatasetAll" => Replacement::SymbolRenamed {
                 module: "airflow.sdk",
                 name: "AssetAll",
             },
-            "DatasetAny" => Replacement::Rename {
+            "DatasetAny" => Replacement::SymbolRenamed {
                 module: "airflow.sdk",
                 name: "AssetAny",
             },
-            "expand_alias_to_datasets" => Replacement::Rename {
+            "expand_alias_to_datasets" => Replacement::SymbolRenamed {
                 module: "airflow.models.asset",
                 name: "expand_alias_to_assets",
             },
@@ -226,7 +226,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "decorators",
             rest @ ("dag" | "task" | "task_group" | "setup" | "teardown"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SymbolsMoved {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
@@ -239,29 +239,29 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             | "TaskDecorator"
             | "get_unique_task_id"
             | "task_decorator_factory"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SymbolsMoved {
             module: "airflow.sdk.bases.decorator",
             name: (*rest).to_string(),
         },
 
         // airflow.io
-        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SymbolsMoved {
             module: "airflow.sdk",
             name: "ObjectStoragePath".to_string(),
         },
-        ["airflow", "io", "store", "attach"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "store", "attach"] => Replacement::SymbolsMoved {
             module: "airflow.sdk.io",
             name: "attach".to_string(),
         },
 
         // airflow.models
         ["airflow", "models", rest @ ("Connection" | "Variable")] => {
-            Replacement::SourceModuleMoved {
+            Replacement::SymbolsMoved {
                 module: "airflow.sdk",
                 name: (*rest).to_string(),
             }
         }
-        ["airflow", "models", "Param"] => Replacement::Rename {
+        ["airflow", "models", "Param"] => Replacement::SymbolRenamed {
             module: "airflow.sdk.definitions.param",
             name: "Param",
         },
@@ -272,17 +272,17 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "models",
             "baseoperator",
             rest @ ("chain" | "chain_linear" | "cross_downstream"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SymbolsMoved {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::Rename {
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::SymbolRenamed {
             module: "airflow.sdk",
             name: "BaseOperatorLink",
         },
 
         // airflow.model..DAG
-        ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
+        ["airflow", "models", .., "DAG"] => Replacement::SymbolsMoved {
             module: "airflow.sdk",
             name: "DAG".to_string(),
         },
@@ -293,13 +293,13 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "sensors",
             "base",
             rest @ ("BaseSensorOperator" | "PokeReturnValue" | "poke_mode_only"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SymbolsMoved {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
 
         // airflow.timetables
-        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::Rename {
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::SymbolRenamed {
             module: "airflow.timetables.assets",
             name: "AssetOrTimeSchedule",
         },
@@ -310,7 +310,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "utils",
             "dag_parsing_context",
             "get_parsing_context",
-        ] => Replacement::Rename {
+        ] => Replacement::SymbolRenamed {
             module: "airflow.sdk",
             name: "get_parsing_context",
         },
@@ -319,8 +319,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     };
 
     let (module, name) = match &replacement {
-        Replacement::Rename { module, name } => (module, *name),
-        Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        Replacement::SymbolRenamed { module, name } => (module, *name),
+        Replacement::SymbolsMoved { module, name } => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow3SuggestedUpdate {

@@ -65,13 +65,13 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
             replacement,
         } = self;
         match replacement {
-            ProviderReplacement::Rename {
+            ProviderReplacement::SymbolRenamed {
                 name: _,
                 module: _,
                 provider,
                 version: _,
             }
-            | ProviderReplacement::SourceModuleMovedToProvider {
+            | ProviderReplacement::SymbolsMovedToProvider {
                 name: _,
                 module: _,
                 provider,
@@ -88,7 +88,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedToMoveToProvider { replacement, .. } = self;
         match replacement {
-            ProviderReplacement::Rename {
+            ProviderReplacement::SymbolRenamed {
                 module,
                 name,
                 provider,
@@ -96,7 +96,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
             } => Some(format!(
                 "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
             )),
-            ProviderReplacement::SourceModuleMovedToProvider {
+            ProviderReplacement::SymbolsMovedToProvider {
                 module,
                 name,
                 provider,
@@ -130,32 +130,32 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
     let replacement = match qualified_name.segments() {
         // apache-airflow-providers-standard
-        ["airflow", "hooks", "filesystem", "FSHook"] => ProviderReplacement::Rename {
+        ["airflow", "hooks", "filesystem", "FSHook"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.hooks.filesystem",
             name: "FSHook",
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "hooks", "package_index", "PackageIndexHook"] => ProviderReplacement::Rename {
+        ["airflow", "hooks", "package_index", "PackageIndexHook"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.hooks.package_index",
             name: "PackageIndexHook",
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::Rename {
+        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.hooks.subprocess",
             name: "SubprocessHook",
             provider: "standard",
             version: "0.0.3",
         },
-        ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::Rename {
+        ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.operators.bash",
             name: "BashOperator",
             provider: "standard",
             version: "0.0.1",
         },
         ["airflow", "operators", "datetime", "BranchDateTimeOperator"] => {
-            ProviderReplacement::Rename {
+            ProviderReplacement::SymbolRenamed {
                 module: "airflow.providers.standard.operators.datetime",
                 name: "BranchDateTimeOperator",
                 provider: "standard",
@@ -167,20 +167,20 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "operators",
             "trigger_dagrun",
             "TriggerDagRunOperator",
-        ] => ProviderReplacement::Rename {
+        ] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.operators.trigger_dagrun",
             name: "TriggerDagRunOperator",
             provider: "standard",
             version: "0.0.2",
         },
-        ["airflow", "operators", "empty", "EmptyOperator"] => ProviderReplacement::Rename {
+        ["airflow", "operators", "empty", "EmptyOperator"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.operators.empty",
             name: "EmptyOperator",
             provider: "standard",
             version: "0.0.2",
         },
         ["airflow", "operators", "latest_only", "LatestOnlyOperator"] => {
-            ProviderReplacement::Rename {
+            ProviderReplacement::SymbolRenamed {
                 module: "airflow.providers.standard.operators.latest_only",
                 name: "LatestOnlyOperator",
                 provider: "standard",
@@ -195,21 +195,21 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             | "PythonOperator"
             | "PythonVirtualenvOperator"
             | "ShortCircuitOperator"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.operators.python",
             provider: "standard",
             version: "0.0.1",
         },
         ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => {
-            ProviderReplacement::Rename {
+            ProviderReplacement::SymbolRenamed {
                 module: "airflow.providers.standard.operators.weekday",
                 name: "BranchDayOfWeekOperator",
                 provider: "standard",
                 version: "0.0.1",
             }
         }
-        ["airflow", "sensors", "bash", "BashSensor"] => ProviderReplacement::Rename {
+        ["airflow", "sensors", "bash", "BashSensor"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.sensor.bash",
             name: "BashSensor",
             provider: "standard",
@@ -220,7 +220,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "sensors",
             "date_time",
             rest @ ("DateTimeSensor" | "DateTimeSensorAsync"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.date_time",
             provider: "standard",
@@ -231,19 +231,19 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "sensors",
             "external_task",
             rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.external_task",
             provider: "standard",
             version: "0.0.3",
         },
-        ["airflow", "sensors", "filesystem", "FileSensor"] => ProviderReplacement::Rename {
+        ["airflow", "sensors", "filesystem", "FileSensor"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.sensors.filesystem",
             name: "FileSensor",
             provider: "standard",
             version: "0.0.2",
         },
-        ["airflow", "sensors", "python", "PythonSensor"] => ProviderReplacement::Rename {
+        ["airflow", "sensors", "python", "PythonSensor"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.sensors.python",
             name: "PythonSensor",
             provider: "standard",
@@ -254,7 +254,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "sensors",
             "time_sensor",
             rest @ ("TimeSensor" | "TimeSensorAsync"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.time",
             provider: "standard",
@@ -265,13 +265,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "sensors",
             "time_delta",
             rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.time_delta",
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::Rename {
+        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.sensors.weekday",
             name: "DayOfWeekSensor",
             provider: "standard",
@@ -282,13 +282,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "triggers",
             "external_task",
             rest @ ("DagStateTrigger" | "WorkflowTrigger"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.triggers.external_task",
             provider: "standard",
             version: "0.0.3",
         },
-        ["airflow", "triggers", "file", "FileTrigger"] => ProviderReplacement::Rename {
+        ["airflow", "triggers", "file", "FileTrigger"] => ProviderReplacement::SymbolRenamed {
             module: "airflow.providers.standard.triggers.file",
             name: "FileTrigger",
             provider: "standard",
@@ -299,7 +299,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "triggers",
             "temporal",
             rest @ ("DateTimeTrigger" | "TimeDeltaTrigger"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
+        ] => ProviderReplacement::SymbolsMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.triggers.temporal",
             provider: "standard",
@@ -309,8 +309,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     };
 
     let (module, name) = match &replacement {
-        ProviderReplacement::Rename { module, name, .. } => (module, *name),
-        ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
+        ProviderReplacement::SymbolRenamed { module, name, .. } => (module, *name),
+        ProviderReplacement::SymbolsMovedToProvider { module, name, .. } => {
             (module, name.as_str())
         }
     };

@@ -17,33 +17,42 @@ use ruff_text_size::TextRange;
 pub(crate) enum Replacement {
     // There's no replacement or suggestion other than removal
     None,
-    // Additional information. Used when there's no direct maaping replacement.
+    // Additional information.
+    // Used when there's no direct maaping replacement.
     Message(&'static str),
-    // The attribute name of a class has been changed.
-    AttrName(&'static str),
-    // Symbols updated in Airflow 3 with replacement
-    // e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`
-    Rename {
+    // Symbols updated in Airflow 3 with replacement.
+    // Used when we want to match only one symbol
+    // e.g.,
+    // * `airflow.datasets.Dataset` to `airflow.sdk.Asset`
+    // * `airflow.decorators.dag` to `airflow.sdk.dag`
+    SymbolRenamed {
         module: &'static str,
         name: &'static str,
     },
-    // Symbols updated in Airflow 3 with only module changed. Used when we want to match multiple names.
+    // Symbols updated in Airflow 3 with only source module changed.
+    // Used when we want to match multiple symbols.
     // e.g., `airflow.configuration.as_dict | get` to `airflow.configuration.conf.as_dict | get`
-    SourceModuleMoved {
+    SymbolsMoved {
         module: &'static str,
         name: String,
     },
+    // The attribute name of a class has been changed.
+    AttrRenamed(&'static str),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
-    Rename {
+    // Symbols moved to an airflow provider.
+    // Used when we want to match only one symbol
+    SymbolRenamed {
         module: &'static str,
         name: &'static str,
         provider: &'static str,
         version: &'static str,
     },
-    SourceModuleMovedToProvider {
+    // Symbols moved to an airflow provider.
+    // Used when we want to match multiple symbols.
+    SymbolsMovedToProvider {
         module: &'static str,
         name: String,
         provider: &'static str,
@@ -186,8 +195,7 @@ pub(crate) fn match_head(value: &Expr) -> Option<&ExprName> {
     }
 }
 
-/// Return the [`Fix`] that
-/// imports the new name and updates where the import is referenced.
+/// Return the [`Fix`] that imports the new name and updates where the import is referenced.
 /// This is used for cases that member name has changed.
 /// (e.g., `airflow.datasts.Dataset` to `airflow.sdk.Asset`)
 pub(crate) fn generate_import_edit(
@@ -209,8 +217,7 @@ pub(crate) fn generate_import_edit(
     Some(Fix::safe_edits(import_edit, [replacement_edit]))
 }
 
-/// Return the [`Fix`] that
-/// removes the original import and imports the same name with new path.
+/// Return the [`Fix`] that removes the original import and imports the same name with new path.
 /// This is used for cases that member name has not changed.
 /// (e.g., `airflow.operators.pig_operator.PigOperator` to
 ///  `airflow.providers.apache.pig.operators.pig.PigOperator`)
