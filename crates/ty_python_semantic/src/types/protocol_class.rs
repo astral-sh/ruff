@@ -22,6 +22,7 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
+        generics::InferableTypeVars,
         signatures::{Parameter, Parameters},
         todo_type,
     },
@@ -235,6 +236,7 @@ impl<'db> ProtocolInterface<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -276,6 +278,7 @@ impl<'db> ProtocolInterface<'db> {
                         our_type.has_relation_to_impl(
                             db,
                             Type::Callable(other_type.bind_self(db)),
+                            inferable,
                             relation,
                             relation_visitor,
                             disjointness_visitor,
@@ -288,6 +291,7 @@ impl<'db> ProtocolInterface<'db> {
                     ) => our_method.bind_self(db).has_relation_to_impl(
                         db,
                         other_method.bind_self(db),
+                        inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
@@ -300,6 +304,7 @@ impl<'db> ProtocolInterface<'db> {
                         .has_relation_to_impl(
                             db,
                             other_type,
+                            inferable,
                             relation,
                             relation_visitor,
                             disjointness_visitor,
@@ -308,6 +313,7 @@ impl<'db> ProtocolInterface<'db> {
                             other_type.has_relation_to_impl(
                                 db,
                                 our_type,
+                                inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
@@ -605,6 +611,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -613,9 +620,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => {
                 ConstraintSet::from(false)
             }
-            ProtocolMemberKind::Other(ty) => {
-                ty.is_disjoint_from_impl(db, other, disjointness_visitor, relation_visitor)
-            }
+            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(
+                db,
+                other,
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            ),
         }
     }
 
@@ -625,6 +636,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -664,6 +676,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 attribute_type.has_relation_to_impl(
                     db,
                     Type::Callable(method.bind_self(db)),
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -684,6 +697,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     .has_relation_to_impl(
                         db,
                         attribute_type,
+                        inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
@@ -692,6 +706,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         attribute_type.has_relation_to_impl(
                             db,
                             *member_type,
+                            inferable,
                             relation,
                             relation_visitor,
                             disjointness_visitor,

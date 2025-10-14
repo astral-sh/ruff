@@ -23,7 +23,9 @@ use super::{
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
-use crate::types::generics::{GenericContext, typing_self, walk_generic_context};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, typing_self, walk_generic_context,
+};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
@@ -174,41 +176,27 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Check whether this callable type is a subtype of another callable type.
-    ///
-    /// See [`Type::is_subtype_of`] for more details.
-    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other).is_always_satisfied()
-    }
-
-    fn is_subtype_of_impl(&self, db: &'db dyn Db, other: &Self) -> ConstraintSet<'db> {
+    fn is_subtype_of_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
+            inferable,
             TypeRelation::Subtyping,
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
         )
     }
 
-    /// Check whether this callable type is assignable to another callable type.
-    ///
-    /// See [`Type::is_assignable_to`] for more details.
-    pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.has_relation_to_impl(
-            db,
-            other,
-            TypeRelation::Assignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
-        )
-        .is_always_satisfied()
-    }
-
     pub(crate) fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -217,6 +205,7 @@ impl<'db> CallableSignature<'db> {
             db,
             &self.overloads,
             &other.overloads,
+            inferable,
             relation,
             relation_visitor,
             disjointness_visitor,
@@ -229,6 +218,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -239,6 +229,7 @@ impl<'db> CallableSignature<'db> {
                 self_signature.has_relation_to_impl(
                     db,
                     other_signature,
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -251,6 +242,7 @@ impl<'db> CallableSignature<'db> {
                     db,
                     std::slice::from_ref(self_signature),
                     other_signatures,
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -263,6 +255,7 @@ impl<'db> CallableSignature<'db> {
                     db,
                     self_signatures,
                     std::slice::from_ref(other_signature),
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -275,6 +268,7 @@ impl<'db> CallableSignature<'db> {
                     db,
                     self_signatures,
                     std::slice::from_ref(other_signature),
+                    inferable,
                     relation,
                     relation_visitor,
                     disjointness_visitor,
@@ -290,20 +284,21 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.overloads.as_slice(), other.overloads.as_slice()) {
             ([self_signature], [other_signature]) => {
                 // Common case: both callable types contain a single signature, use the custom
                 // equivalence check instead of delegating it to the subtype check.
-                self_signature.is_equivalent_to_impl(db, other_signature, visitor)
+                self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
             }
             (_, _) => {
                 if self == other {
                     return ConstraintSet::from(true);
                 }
-                self.is_subtype_of_impl(db, other)
-                    .and(db, || other.is_subtype_of_impl(db, self))
+                self.is_subtype_of_impl(db, other, inferable)
+                    .and(db, || other.is_subtype_of_impl(db, self, inferable))
             }
         }
     }
@@ -619,6 +614,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::from(true);
@@ -626,7 +622,10 @@ impl<'db> Signature<'db> {
             let self_type = self_type.unwrap_or(Type::unknown());
             let other_type = other_type.unwrap_or(Type::unknown());
             !result
-                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
+                .intersect(
+                    db,
+                    self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
+                )
                 .is_never_satisfied()
         };
 
@@ -702,6 +701,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -777,6 +777,7 @@ impl<'db> Signature<'db> {
                     type1.has_relation_to_impl(
                         db,
                         type2,
+                        inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
