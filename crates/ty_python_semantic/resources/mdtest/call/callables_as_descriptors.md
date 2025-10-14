@@ -204,3 +204,37 @@ class Calculator:
 
 reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
 ```
+
+## Use case: Treating dunder methods as bound-method descriptors
+
+pytorch defines a `__pow__` dunder attribute on [`TensorBase`] in a similar way to the following
+example. We generally treat dunder attributes as bound-method descriptors since they all take a
+`self` argument. This allows us to type-check the following code correctly:
+
+```py
+from typing import Callable
+
+def pow_impl(tensor: Tensor, exponent: int) -> Tensor:
+    raise NotImplementedError
+
+class Tensor:
+    __pow__: Callable[[Tensor, int], Tensor] = pow_impl
+
+Tensor() ** 2
+```
+
+The following example is also taken from a real world project. Here, the `__lt__` dunder attribute
+is not declared. The attribute type is therefore inferred as `Unknown | Callable[…]`, but we still
+treat it as a bound-method descriptor:
+
+```py
+def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
+    raise NotImplementedError
+
+class Matrix:
+    __lt__ = make_comparison_operator("lt")
+
+Matrix() < Matrix()
+```
+
+[`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

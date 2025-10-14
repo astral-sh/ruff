@@ -11116,6 +11116,23 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
+    /// Map a type transformation over all positive elements of the intersection. Leave the
+    /// negative elements unchanged.
+    pub(crate) fn map_positive(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db);
+        for ty in self.positive(db) {
+            builder = builder.add_positive(transform_fn(ty));
+        }
+        for ty in self.negative(db) {
+            builder = builder.add_negative(*ty);
+        }
+        builder.build()
+    }
+
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
