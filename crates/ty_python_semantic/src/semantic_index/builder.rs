@@ -1561,7 +1561,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (&alias.name.id, false)
                     };
 
-                    {
+                    // If there's no alias or a redundant alias, record this as a potential import of a submodule
+                    if alias.asname.is_none() || is_reexported {
                         let from_module = node.module.as_ref().map(ToString::to_string);
 
                         self.maybe_imported_modules.insert((
