@@ -93,10 +93,33 @@ fn generate_markdown() -> String {
             })
             .join("\n");
 
+        // Format the status information
+        let status_text = match lint.status() {
+            ty_python_semantic::lint::LintStatus::Stable { since } => {
+                format!("Added in [{since}](https://github.com/astral-sh/ty/releases/tag/{since})")
+            }
+            ty_python_semantic::lint::LintStatus::Preview { since } => {
+                format!(
+                    "Preview (since [{since}](https://github.com/astral-sh/ty/releases/tag/{since}))"
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
+                format!(
+                    "Deprecated (since [{since}](https://github.com/astral-sh/ty/releases/tag/{since}))"
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Removed { since, .. } => {
+                format!(
+                    "Removed (since [{since}](https://github.com/astral-sh/ty/releases/tag/{since}))"
+                )
+            }
+        };
+
         let _ = writeln!(
             &mut output,
             r#"<small>
 Default level: [`{level}`](../rules.md#rule-levels "This lint has a default level of '{level}'.") ·
+{status_text} ·
 [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/{file}#L{line})
 </small>
@@ -104,6 +127,7 @@ Default level: [`{level}`](../rules.md#rule-levels "This lint has a default leve
 {documentation}
 "#,
             level = lint.default_level(),
+            status_text = status_text,
             encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
                 .collect::<String>(),
             file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())

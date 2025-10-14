@@ -32,7 +32,7 @@ declare_lint! {
     /// ```
     pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
     }
 }
@@ -57,7 +57,7 @@ declare_lint! {
     /// ```
     pub(crate) static UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
     }
 }
@@ -81,7 +81,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_IGNORE_COMMENT = {
         summary: "detects ignore comments that use invalid syntax",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
     }
 }
