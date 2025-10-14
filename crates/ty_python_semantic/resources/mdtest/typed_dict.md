@@ -907,7 +907,7 @@ grandchild: Node = {"name": "grandchild", "parent": child}
 
 nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", "parent": None}}}
 
-# TODO: this should be an error (invalid type for `name` in innermost node)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
 ```
 

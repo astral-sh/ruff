@@ -5890,6 +5890,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
+        // TODO: Use the list of inferable typevars from the generic context of tuple.
+        let inferable = InferableTypeVars::None;
+
+        // Remove any union elements of that are unrelated to the tuple type.
+        let tcx = tcx.map(|annotation| {
+            annotation.filter_disjoint_elements(
+                self.db(),
+                KnownClass::Tuple.to_instance(self.db()),
+                inferable,
+            )
+        });
+
         let annotated_tuple = tcx
             .known_specialization(self.db(), KnownClass::Tuple)
             .and_then(|specialization| {
@@ -5955,7 +5967,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dict;
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(typed_dict) = tcx.annotation.and_then(Type::as_typed_dict)
+        if let Some(tcx) = tcx.annotation
+            && let Some(typed_dict) = tcx
+                .filter_union(self.db(), Type::is_typed_dict)
+                .as_typed_dict()
             && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict)
         {
             return ty;
@@ -6038,9 +6053,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: Use the list of inferable typevars from the generic context of the collection
         // class.
         let inferable = InferableTypeVars::None;
-        let tcx = tcx.map_annotation(|annotation| {
-            // Remove any union elements of `annotation` that are not related to `collection_ty`.
-            // e.g. `annotation: list[int] | None => list[int]` if `collection_ty: list`
+
+        // Remove any union elements of that are unrelated to the collection type.
+        //
+        // For example, we only want the `list[int]` from `annotation: list[int] | None` if
+        // `collection_ty` is `list`.
+        let tcx = tcx.map(|annotation| {
             let collection_ty = collection_class.to_instance(self.db());
             annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
