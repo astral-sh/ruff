@@ -1447,7 +1447,7 @@ mod implicit_globals {
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
             .to_class_literal(db)
-            .into_class_literal()
+            .as_class_literal()
         else {
             // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
             // without a `types.pyi` stub in the `stdlib/` directory

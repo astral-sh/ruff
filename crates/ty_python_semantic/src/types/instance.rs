@@ -165,7 +165,7 @@ impl<'db> Type<'db> {
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
             // `Q`'s members in a Liskov-incompatible way.
             let type_to_test = self
-                .into_protocol_instance()
+                .as_protocol_instance()
                 .and_then(ProtocolInstanceType::as_nominal_type)
                 .map(Type::NominalInstance)
                 .unwrap_or(self);
