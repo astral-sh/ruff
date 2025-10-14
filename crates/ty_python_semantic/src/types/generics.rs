@@ -35,7 +35,7 @@ pub(crate) fn enclosing_generic_contexts<'db>(
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class);
                 binding_type(db, definition)
-                    .into_class_literal()?
+                    .as_class_literal()?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
@@ -43,15 +43,15 @@ pub(crate) fn enclosing_generic_contexts<'db>(
                 infer_definition_types(db, definition)
                     .undecorated_type()
                     .expect("function should have undecorated type")
-                    .into_function_literal()?
+                    .as_function_literal()?
                     .last_definition_signature(db)
                     .generic_context
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
                 let definition = index.expect_single_definition(type_alias);
                 binding_type(db, definition)
-                    .into_type_alias()?
-                    .into_pep_695_type_alias()?
+                    .as_type_alias()?
+                    .as_pep_695_type_alias()?
                     .generic_context(db)
             }
             _ => None,
@@ -1284,7 +1284,7 @@ impl<'db> SpecializationBuilder<'db> {
                 let types_have_typevars = formal_union
                     .elements(self.db)
                     .iter()
-                    .filter(|ty| ty.has_type_var(self.db));
+                    .filter(|ty| ty.has_typevar(self.db));
                 let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
                 else {
                     return Ok(());
@@ -1305,7 +1305,7 @@ impl<'db> SpecializationBuilder<'db> {
                 // type. (Note that we've already handled above the case where the actual is
                 // assignable to any _non-typevar_ union element.)
                 let bound_typevars =
-                    (formal.elements(self.db).iter()).filter_map(|ty| ty.into_type_var());
+                    (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
                 if let Ok(bound_typevar) = bound_typevars.exactly_one() {
                     self.add_type_mapping(bound_typevar, actual);
                 }

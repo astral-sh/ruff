@@ -1145,7 +1145,7 @@ fn is_instance_truthiness<'db>(
 fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) -> bool {
     // Return true for any mode that doesn't match typeshed's
     // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
-    mode.into_string_literal().is_none_or(|mode| {
+    mode.as_string_literal().is_none_or(|mode| {
         !matches!(
             mode.value(db),
             "r+" | "+r"
@@ -1557,7 +1557,7 @@ impl KnownFunction {
                         return;
                     }
                     let mut diagnostic = if let Some(message) = message
-                        .and_then(Type::into_string_literal)
+                        .and_then(Type::as_string_literal)
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))

@@ -1724,7 +1724,7 @@ impl<'db> ClassLiteral<'db> {
     /// Determine if this is an abstract class.
     pub(super) fn is_abstract(self, db: &'db dyn Db) -> bool {
         self.metaclass(db)
-            .into_class_literal()
+            .as_class_literal()
             .is_some_and(|metaclass| metaclass.is_known(db, KnownClass::ABCMeta))
     }
 
@@ -1758,7 +1758,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> impl Iterator<Item = KnownFunction> + 'db {
         self.decorators(db)
             .iter()
-            .filter_map(|deco| deco.into_function_literal())
+            .filter_map(|deco| deco.as_function_literal())
             .filter_map(|decorator| decorator.known(db))
     }
 
@@ -2398,7 +2398,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
-                    .into_class_literal()?
+                    .as_class_literal()?
                     .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_unbound()
                     .map(|ty| {
@@ -5250,7 +5250,7 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.into_string_literal()),
+                    DeprecatedInstance::new(db, message.as_string_literal()),
                 )));
             }
 
@@ -5270,7 +5270,7 @@ impl KnownClass {
                     return;
                 };
 
-                let Some(name) = name.into_string_literal() else {
+                let Some(name) = name.as_string_literal() else {
                     if let Some(builder) =
                         context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
                     {

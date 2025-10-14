@@ -55,7 +55,7 @@ fn infer_method_information<'db>(
     let method = infer_definition_types(db, definition)
         .declaration_type(definition)
         .inner_type()
-        .into_function_literal()?;
+        .as_function_literal()?;
 
     let class_def = index.expect_single_definition(class_node);
     let (class_literal, class_is_generic) = match infer_definition_types(db, class_def)
