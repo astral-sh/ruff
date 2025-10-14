@@ -198,40 +198,27 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 73..82,
+                    range: 73..81,
                     value: TString(
                         ExprTString {
                             node_index: NodeIndex(None),
-                            range: 73..82,
+                            range: 73..81,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
-                                        range: 73..82,
+                                        range: 73..81,
                                         node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
-                                                    range: 77..82,
+                                                    range: 77..78,
                                                     node_index: NodeIndex(None),
-                                                    expression: StringLiteral(
-                                                        ExprStringLiteral {
+                                                    expression: Name(
+                                                        ExprName {
                                                             node_index: NodeIndex(None),
-                                                            range: 78..82,
-                                                            value: StringLiteralValue {
-                                                                inner: Single(
-                                                                    StringLiteral {
-                                                                        range: 78..82,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "\n",
-                                                                        flags: StringLiteralFlags {
-                                                                            quote_style: Double,
-                                                                            prefix: Empty,
-                                                                            triple_quoted: true,
-                                                                            unclosed: true,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                            },
+                                                            range: 78..78,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
                                                         },
                                                     ),
                                                     debug_text: None,
@@ -244,7 +231,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: true,
-                                            unclosed: true,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -301,12 +288,5 @@ Module(
 4 | t"{foo="
 5 | t"{"
 6 | t"""{"""
-  |      ^^^ Syntax Error: missing closing quote in string literal
-  |
-
-
-  |
-5 | t"{"
-6 | t"""{"""
-  |         ^ Syntax Error: t-string: unterminated string
+  |      ^^^ Syntax Error: Expected an expression
   |

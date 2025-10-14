@@ -513,5 +513,5 @@ Module(
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
-   |                     ^^ Syntax Error: Got unexpected string
+   |                     ^^ Syntax Error: missing closing quote in string literal
    |

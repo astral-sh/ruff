@@ -1721,6 +1721,13 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
+        // Before newline is incorrect too for multiline strings. We need to
+        // check if the quotes on the first line are only followed by whitespace
+
+        // TODO: What about multiline? Should we move the assertion that it's before a newline here?
+        // The check in `re_lex_string_token_in_interpolation_element` whether it's positioned
+        // at a newline is also incorrect if the string is multiline as it doesn't check
+        // the end of the first line.
         self.tokens
             .re_lex_string_token_in_interpolation_element(string_kind);
 

@@ -995,7 +995,7 @@ impl<'src> Lexer<'src> {
                     self.current_flags |= TokenFlags::UNCLOSED_STRING;
 
                     self.push_error(LexicalError::new(
-                        LexicalErrorType::StringError,
+                        LexicalErrorType::UnclosedStringError,
                         self.token_range(),
                     ));
 
@@ -1508,39 +1508,32 @@ impl<'src> Lexer<'src> {
             return;
         };
 
-        if interpolated_string.is_triple_quoted() {
-            return;
-        }
+        let current_string_flags = self.current_flags().as_any_string_flags();
 
-        // Only unclosed strings, that have the same quote character and aren't triple-quoted
+        // Only unclosed strings, that have the same quote character
         if !matches!(self.current_kind, TokenKind::String)
             || !self.current_flags.is_unclosed()
-            || self.current_flags.prefix() != AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
-            || self.current_flags.quote_style().as_char() != interpolated_string.quote_char()
-            || self.current_flags.is_triple_quoted()
+            || current_string_flags.prefix() != AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
+            || current_string_flags.quote_style().as_char() != interpolated_string.quote_char()
+            || current_string_flags.is_triple_quoted() != interpolated_string.is_triple_quoted()
         {
             return;
         }
 
-        let TokenValue::String(value) = &self.current_value else {
-            return;
-        };
+        // Only if the string's first line only contains whitespace,
+        // or ends in a comment (not `f"{"abc`)
+        let first_line = &self.source
+            [(self.current_range.start() + current_string_flags.quote_len()).to_usize()..];
 
-        for c in value.chars() {
-            if is_python_whitespace(c) {
-                continue;
-            }
-
-            if c == '#' {
+        for c in first_line.chars() {
+            if matches!(dbg!(c), '\n' | '\r' | '#') {
                 break;
             }
 
             // `f'{'ab`, we want to parse `ab` as a normal string and not the closing element of the f-string
-            return;
-        }
-
-        if !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR) {
-            return;
+            if !is_python_whitespace(c) {
+                return;
+            }
         }
 
         if self.errors.last().is_some_and(|error| {
@@ -1550,13 +1543,17 @@ impl<'src> Lexer<'src> {
             self.errors.pop();
         }
 
-        self.current_range = TextRange::at(self.current_range.start(), TextSize::new(1));
+        self.current_range =
+            TextRange::at(self.current_range.start(), self.current_flags.quote_len());
         self.current_kind = kind.end_token();
         self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
 
         self.nesting = interpolated_string.nesting();
         self.interpolated_strings.pop();
+
+        self.cursor = Cursor::new(self.source);
+        self.cursor.skip_bytes(self.current_range.end().to_usize());
     }
 
     /// Re-lex `r"` in a format specifier position.
@@ -2958,7 +2955,7 @@ t"{(lambda x:{x})}"
         ```
         [
             LexicalError {
-                error: StringError,
+                error: UnclosedStringError,
                 location: 3..4,
             },
             LexicalError {
@@ -3020,7 +3017,7 @@ t"{(lambda x:{x})}"
         ```
         [
             LexicalError {
-                error: StringError,
+                error: UnclosedStringError,
                 location: 7..9,
             },
             LexicalError {
