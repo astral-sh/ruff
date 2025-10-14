@@ -1586,6 +1586,13 @@ impl<'src> Parser<'src> {
         // f"""{f"""{x}"""}"""                # mark the whole triple quote
         // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
 
+        // test_err nested_quote_in_format_spec_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f"{1:""}"  # this is a ParseError on all versions
+
+        // test_ok non_nested_quote_in_format_spec_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"{1:''}"  # but this is okay on all versions
         let range = self.node_range(start);
 
         if !self.options.target_version.supports_pep_701()
