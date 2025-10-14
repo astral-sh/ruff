@@ -1526,7 +1526,7 @@ impl<'src> Lexer<'src> {
             [(self.current_range.start() + current_string_flags.quote_len()).to_usize()..];
 
         for c in first_line.chars() {
-            if matches!(dbg!(c), '\n' | '\r' | '#') {
+            if matches!(c, '\n' | '\r' | '#') {
                 break;
             }
 
@@ -2874,7 +2874,7 @@ t"{(lambda x:{x})}"
     }
 
     #[test]
-    fn lex_fstring_unclsoed() {
+    fn lex_fstring_unclosed() {
         let source = r#"f"hello"#;
 
         assert_snapshot!(lex_invalid(source, Mode::Module), @r#"

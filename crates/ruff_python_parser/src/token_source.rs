@@ -94,7 +94,7 @@ impl<'src> TokenSource<'src> {
         kind: InterpolatedStringKind,
     ) {
         self.lexer
-            .re_lex_string_token_in_interpolation_element(kind)
+            .re_lex_string_token_in_interpolation_element(kind);
     }
 
     pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
