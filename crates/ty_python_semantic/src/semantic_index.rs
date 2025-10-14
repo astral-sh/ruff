@@ -27,7 +27,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-use crate::{Db, Module};
+use crate::{Db, Module, resolve_module};
 
 pub mod ast_ids;
 mod builder;
@@ -89,7 +89,7 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
     semantic_index(db, file).imported_modules.clone()
 }
 
-/// Returns the set of things that *look like* relative submodules that are imported anywhere in
+/// Returns the set of relative submodules that are explicitly imported anywhere in
 /// `importing_module`.
 ///
 /// This set only considers `from...import` statements (but it could also include `import`).
@@ -106,12 +106,8 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// In particular, many packages have their `__init__` include lines like
 /// `from . import subpackage`, with the intent that `mypackage.subpackage` should be
 /// available for anyone who only does `import mypackage`.
-///
-/// As discussed in [`imported_modules`], `from` imports are syntactically ambiguous as to
-/// whether they're importing a module. We do our best here to filter out things that obviously
-/// aren't, but this function expects the caller to be fine with false positives.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn maybe_imported_relative_submodules_of_stub_package<'db>(
+pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
     db: &'db dyn Db,
     importing_module: Module<'db>,
 ) -> Vec<ModuleName> {
@@ -128,6 +124,9 @@ pub(crate) fn maybe_imported_relative_submodules_of_stub_package<'db>(
             let mut submodule =
                 ModuleName::from_identifier_parts(db, file, module.as_deref(), *level).ok()?;
             submodule.extend(&ModuleName::new(submodule_name)?);
+            // Throw out the result if this doesn't resolve to an actual module
+            resolve_module(db, &submodule)?;
+            // Return only the relative part
             submodule.relative_to(importing_module.name(db))
         })
         .collect()
