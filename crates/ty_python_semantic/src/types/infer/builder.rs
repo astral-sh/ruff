@@ -2211,6 +2211,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ))),
                             Type::Union(union) => union
                                 .try_map(db, |element| into_function_like_callable(db, *element)),
+                            // Intersections are currently not handled here because that would require
+                            // the decorator to be explicitly annotated as returning an intersection.
                             _ => None,
                         }
                     }
