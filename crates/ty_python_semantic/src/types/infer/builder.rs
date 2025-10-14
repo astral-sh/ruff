@@ -2199,19 +2199,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => {
+                    fn into_function_like_callable<'d>(
+                        db: &'d dyn Db,
+                        ty: Type<'d>,
+                    ) -> Option<Type<'d>> {
+                        match ty {
+                            Type::Callable(callable) => Some(Type::Callable(CallableType::new(
+                                db,
+                                callable.signatures(db),
+                                true,
+                            ))),
+                            Type::Union(union) => union
+                                .try_map(db, |element| into_function_like_callable(db, *element)),
+                            _ => None,
+                        }
+                    }
+
                     let is_input_function_like = inferred_ty
                         .try_upcast_to_callable(self.db())
                         .and_then(Type::as_callable)
                         .is_some_and(|callable| callable.is_function_like(self.db()));
-                    if is_input_function_like && let Some(callable_type) = return_ty.as_callable() {
+
+                    if is_input_function_like
+                        && let Some(return_ty_function_like) =
+                            into_function_like_callable(self.db(), return_ty)
+                    {
                         // When a method on a class is decorated with a function that returns a `Callable`, assume that
                         // the returned callable is also function-like. See "Decorating a method with a `Callable`-typed
                         // decorator" in `callables_as_descriptors.md` for the extended explanation.
-                        Type::Callable(CallableType::new(
-                            self.db(),
-                            callable_type.signatures(self.db()),
-                            true,
-                        ))
+                        return_ty_function_like
                     } else {
                         return_ty
                     }
