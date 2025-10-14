@@ -53,31 +53,29 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, report_bad_dunder_set_call,
-    report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_namedtuple_field_without_default_after_field_with_default,
-    report_possibly_missing_attribute,
-};
-use crate::types::diagnostic::{
-    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, SUBCLASS_OF_FINAL_CLASS,
+    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PROTOCOL,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
+    report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
+    report_instance_layout_conflict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_or_unsupported_base, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type,
+    report_invalid_type_checking_constant,
+    report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
+    report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_rebound_typevar, report_slice_step_size_zero,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{GenericContext, bind_typevar, enclosing_generic_contexts};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
@@ -96,8 +94,9 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -532,7 +531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Filter out class literals that result from imports
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                 ty.inner_type()
-                    .into_class_literal()
+                    .as_class_literal()
                     .map(|class_literal| (class_literal, class.node(self.module())))
             } else {
                 None
@@ -838,6 +837,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // (6) If the class is generic, verify that its generic context does not violate any of
+            // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
                 class.inherited_legacy_generic_context(self.db()),
@@ -854,7 +855,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check that a dataclass does not have more than one `KW_ONLY`.
+            let scope = class.body_scope(self.db()).scope(self.db());
+            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
+                && let Some(parent) = scope.parent()
+            {
+                for self_typevar in class.typevars_referenced_in_definition(self.db()) {
+                    let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                    for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                        if let Some(other_typevar) =
+                            enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                        {
+                            report_rebound_typevar(
+                                &self.context,
+                                self_typevar_name,
+                                class,
+                                class_node,
+                                other_typevar,
+                            );
+                        }
+                    }
+                }
+            }
+
+            // (7) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
@@ -916,7 +939,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !matches!(definition.kind(self.db()), DefinitionKind::Function(_)) {
                     return None;
                 }
-                let function = ty.inner_type().into_function_literal()?;
+                let function = ty.inner_type().as_function_literal()?;
                 if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
                     Some(definition.place(self.db()))
                 } else {
@@ -2175,7 +2198,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .try_call(self.db(), &CallArguments::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
-                Ok(return_ty) => return_ty,
+                Ok(return_ty) => {
+                    fn into_function_like_callable<'d>(
+                        db: &'d dyn Db,
+                        ty: Type<'d>,
+                    ) -> Option<Type<'d>> {
+                        match ty {
+                            Type::Callable(callable) => Some(Type::Callable(CallableType::new(
+                                db,
+                                callable.signatures(db),
+                                true,
+                            ))),
+                            Type::Union(union) => union
+                                .try_map(db, |element| into_function_like_callable(db, *element)),
+                            // Intersections are currently not handled here because that would require
+                            // the decorator to be explicitly annotated as returning an intersection.
+                            _ => None,
+                        }
+                    }
+
+                    let is_input_function_like = inferred_ty
+                        .try_upcast_to_callable(self.db())
+                        .and_then(Type::as_callable)
+                        .is_some_and(|callable| callable.is_function_like(self.db()));
+
+                    if is_input_function_like
+                        && let Some(return_ty_function_like) =
+                            into_function_like_callable(self.db(), return_ty)
+                    {
+                        // When a method on a class is decorated with a function that returns a `Callable`, assume that
+                        // the returned callable is also function-like. See "Decorating a method with a `Callable`-typed
+                        // decorator" in `callables_as_descriptors.md` for the extended explanation.
+                        return_ty_function_like
+                    } else {
+                        return_ty
+                    }
+                }
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, (*decorator_node).into());
                     bindings.return_type(self.db())
@@ -2466,7 +2524,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let func_type = infer_definition_types(self.db(), method_definition)
             .declaration_type(method_definition)
             .inner_type()
-            .into_function_literal()?;
+            .as_function_literal()?;
 
         let module = parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
         if func_def
@@ -2550,7 +2608,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
             if decorator_ty
-                .into_function_literal()
+                .as_function_literal()
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
                 dataclass_params = Some(DataclassParams::default());
@@ -3006,15 +3064,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
+        let identity =
+            TypeVarIdentity::new(self.db(), &name.id, Some(definition), TypeVarKind::Pep695);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
-            &name.id,
-            Some(definition),
+            identity,
             bound_or_constraint,
-            None,
+            None, // explicit_variance
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
-            TypeVarKind::Pep695,
-            None,
         )));
         self.add_declaration_with_binding(
             node.into(),
@@ -3347,8 +3404,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let assigned_d = assigned_ty.display(db);
                             let value_d = value_ty.display(db);
 
-                            if let Some(typed_dict) = value_ty.into_typed_dict() {
-                                if let Some(key) = slice_ty.into_string_literal() {
+                            if let Some(typed_dict) = value_ty.as_typed_dict() {
+                                if let Some(key) = slice_ty.as_string_literal() {
                                     let key = key.value(self.db());
                                     validate_typed_dict_key_assignment(
                                         &self.context,
@@ -4061,7 +4118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
 
                     let typevar_class = callable_type
-                        .into_class_literal()
+                        .as_class_literal()
                         .and_then(|cls| cls.known(self.db()))
                         .filter(|cls| {
                             matches!(cls, KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
@@ -4283,10 +4340,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty
-            .into_string_literal()
-            .map(|name| name.value(db))
-        else {
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
                 &self.context,
                 "The first argument to `TypeVar` must be a string literal.",
@@ -4345,15 +4399,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.insert(definition);
         }
 
+        let identity = TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::Legacy);
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
-            target_name,
-            Some(definition),
+            identity,
             bound_or_constraints,
             Some(variance),
             default,
-            TypeVarKind::Legacy,
-            None,
         )))
     }
 
@@ -5043,7 +5095,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid looking up attributes on a module if a module imports from itself
         // (e.g. `from parent import submodule` inside the `parent` module).
         let import_is_self_referential = module_ty
-            .into_module_literal()
+            .as_module_literal()
             .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()));
 
         // First try loading the requested attribute from the module.
@@ -5878,7 +5930,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = dict;
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(typed_dict) = tcx.annotation.and_then(Type::into_typed_dict)
+        if let Some(typed_dict) = tcx.annotation.and_then(Type::as_typed_dict)
             && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict)
         {
             return ty;
@@ -6602,10 +6654,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_all_argument_types(arguments, &mut call_arguments, &bindings);
 
         // Validate `TypedDict` constructor calls after argument type inference
-        if let Some(class_literal) = callable_type.into_class_literal() {
+        if let Some(class_literal) = callable_type.as_class_literal() {
             if class_literal.is_typed_dict(self.db()) {
                 let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
-                if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
+                if let Some(typed_dict) = typed_dict_type.as_typed_dict() {
                     validate_typed_dict_constructor(
                         &self.context,
                         typed_dict,
@@ -9466,7 +9518,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                     CallErrorKind::BindingError => {
-                        if let Some(typed_dict) = value_ty.into_typed_dict() {
+                        if let Some(typed_dict) = value_ty.as_typed_dict() {
                             let slice_node = subscript.slice.as_ref();
 
                             report_invalid_key_on_typed_dict(
@@ -9573,7 +9625,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // TODO: properly handle old-style generics; get rid of this temporary hack
             if !value_ty
-                .into_class_literal()
+                .as_class_literal()
                 .is_some_and(|class| class.iter_mro(db, None).contains(&ClassBase::Generic))
             {
                 report_non_subscriptable(context, value_node.into(), value_ty, "__class_getitem__");

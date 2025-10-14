@@ -378,7 +378,7 @@ impl<'db> Bindings<'db> {
                                 ..,
                             ] if property.getter(db).is_some_and(|getter| {
                                 getter
-                                    .into_function_literal()
+                                    .as_function_literal()
                                     .is_some_and(|f| f.name(db) == "__name__")
                             }) =>
                             {
@@ -392,7 +392,7 @@ impl<'db> Bindings<'db> {
                             ] => {
                                 match property
                                     .getter(db)
-                                    .and_then(Type::into_function_literal)
+                                    .and_then(Type::as_function_literal)
                                     .map(|f| f.name(db).as_str())
                                 {
                                     Some("__name__") => {
@@ -785,7 +785,7 @@ impl<'db> Bindings<'db> {
                                 // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
                                 // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
                                 overload.set_return_type(Type::BooleanLiteral(
-                                    ty.into_class_literal()
+                                    ty.as_class_literal()
                                         .is_some_and(|class| class.is_protocol(db)),
                                 ));
                             }
@@ -817,7 +817,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let Some(attr_name) = attr_name.into_string_literal() else {
+                            let Some(attr_name) = attr_name.as_string_literal() else {
                                 continue;
                             };
 

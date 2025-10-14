@@ -634,7 +634,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // Add the narrowed values from the RHS first, to keep literals before broader types.
             builder = builder.add(rhs_values);
 
-            if let Some(lhs_union) = lhs_ty.into_union() {
+            if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     // Keep only the non-single-valued portion of the original type.
                     if !element.is_single_valued(self.db)
@@ -671,7 +671,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let mut single_builder = UnionBuilder::new(self.db);
             let mut rest_builder = UnionBuilder::new(self.db);
 
-            if let Some(lhs_union) = lhs_ty.into_union() {
+            if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
                         || element.is_literal_string()
@@ -840,7 +840,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     let callable_type = inference.expression_type(&**callable);
 
                     if callable_type
-                        .into_class_literal()
+                        .as_class_literal()
                         .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
                         let place = self.expect_place(&target);
@@ -903,7 +903,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if function == KnownFunction::HasAttr {
                     let attr = inference
                         .expression_type(second_arg)
-                        .into_string_literal()?
+                        .as_string_literal()?
                         .value(self.db);
 
                     if !is_identifier(attr) {

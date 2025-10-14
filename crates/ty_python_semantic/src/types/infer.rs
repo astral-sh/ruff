@@ -490,7 +490,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
             infer_definition_types(db, definition)
                 .declaration_type(definition)
                 .inner_type()
-                .into_class_literal()
+                .as_class_literal()
         })
 }
 
@@ -514,7 +514,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
             inference
                 .undecorated_type()
                 .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
-                .into_function_literal()
+                .as_function_literal()
         })
 }
 

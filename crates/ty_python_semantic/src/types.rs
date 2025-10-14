@@ -981,44 +981,50 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypeVar(_))
     }
 
-    pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
+    pub(crate) const fn as_typevar(self) -> Option<BoundTypeVarInstance<'db>> {
         match self {
             Type::TypeVar(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
     }
 
-    pub(crate) fn has_type_var(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
     }
 
-    pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
+    pub(crate) const fn as_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
         }
     }
 
-    pub(crate) const fn into_type_alias(self) -> Option<TypeAliasType<'db>> {
+    pub(crate) const fn as_type_alias(self) -> Option<TypeAliasType<'db>> {
         match self {
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => Some(type_alias),
             _ => None,
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
+    pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
             _ => None,
         }
     }
 
-    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
-        self.into_dynamic()
-            .expect("Expected a Type::Dynamic variant")
+    pub(crate) const fn as_callable(self) -> Option<CallableType<'db>> {
+        match self {
+            Type::Callable(callable_type) => Some(callable_type),
+            _ => None,
+        }
     }
 
-    pub(crate) const fn into_protocol_instance(self) -> Option<ProtocolInstanceType<'db>> {
+    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
+        self.as_dynamic().expect("Expected a Type::Dynamic variant")
+    }
+
+    pub(crate) const fn as_protocol_instance(self) -> Option<ProtocolInstanceType<'db>> {
         match self {
             Type::ProtocolInstance(instance) => Some(instance),
             _ => None,
@@ -1027,7 +1033,7 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub(crate) fn expect_class_literal(self) -> ClassLiteral<'db> {
-        self.into_class_literal()
+        self.as_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
     }
 
@@ -1040,7 +1046,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) fn into_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::EnumLiteral(enum_literal) => Some(enum_literal),
             _ => None,
@@ -1050,7 +1056,7 @@ impl<'db> Type<'db> {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_enum_literal(self) -> EnumLiteralType<'db> {
-        self.into_enum_literal()
+        self.as_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
     }
 
@@ -1058,7 +1064,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
-    pub(crate) fn into_typed_dict(self) -> Option<TypedDictType<'db>> {
+    pub(crate) fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
             _ => None,
@@ -1092,14 +1098,14 @@ impl<'db> Type<'db> {
         ))
     }
 
-    pub(crate) const fn into_module_literal(self) -> Option<ModuleLiteralType<'db>> {
+    pub(crate) const fn as_module_literal(self) -> Option<ModuleLiteralType<'db>> {
         match self {
             Type::ModuleLiteral(module) => Some(module),
             _ => None,
         }
     }
 
-    pub(crate) const fn into_union(self) -> Option<UnionType<'db>> {
+    pub(crate) const fn as_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),
             _ => None,
@@ -1109,10 +1115,10 @@ impl<'db> Type<'db> {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_union(self) -> UnionType<'db> {
-        self.into_union().expect("Expected a Type::Union variant")
+        self.as_union().expect("Expected a Type::Union variant")
     }
 
-    pub(crate) const fn into_function_literal(self) -> Option<FunctionType<'db>> {
+    pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => Some(function_type),
             _ => None,
@@ -1122,7 +1128,7 @@ impl<'db> Type<'db> {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_function_literal(self) -> FunctionType<'db> {
-        self.into_function_literal()
+        self.as_function_literal()
             .expect("Expected a Type::FunctionLiteral variant")
     }
 
@@ -1131,7 +1137,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.into_union().is_some_and(|union| {
+        self.as_union().is_some_and(|union| {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
@@ -1144,7 +1150,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.into_union().is_some_and(|union| {
+        self.as_union().is_some_and(|union| {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
@@ -1156,7 +1162,7 @@ impl<'db> Type<'db> {
             || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
-    pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
+    pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
         match self {
             Type::StringLiteral(string_literal) => Some(string_literal),
             _ => None,
@@ -1396,11 +1402,11 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Callable(_) => Some(self),
 
-            Type::Dynamic(_) => Some(CallableType::single(db, Signature::dynamic(self))),
+            Type::Dynamic(_) => Some(CallableType::function_like(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
@@ -1419,7 +1425,7 @@ impl<'db> Type<'db> {
                     .place;
 
                 if let Place::Type(ty, Boundness::Bound) = call_symbol {
-                    ty.into_callable(db)
+                    ty.try_upcast_to_callable(db)
                 } else {
                     None
                 }
@@ -1439,13 +1445,13 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
+            Type::Union(union) => union.try_map(db, |element| element.try_upcast_to_callable(db)),
 
-            Type::EnumLiteral(enum_literal) => {
-                enum_literal.enum_class_instance(db).into_callable(db)
-            }
+            Type::EnumLiteral(enum_literal) => enum_literal
+                .enum_class_instance(db)
+                .try_upcast_to_callable(db),
 
-            Type::TypeAlias(alias) => alias.value_type(db).into_callable(db),
+            Type::TypeAlias(alias) => alias.value_type(db).try_upcast_to_callable(db),
 
             Type::KnownBoundMethod(method) => Some(Type::Callable(CallableType::new(
                 db,
@@ -1666,7 +1672,7 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(lhs_bound_typevar),
                 Type::NonInferableTypeVar(rhs_bound_typevar),
-            ) if lhs_bound_typevar.is_identical_to(db, rhs_bound_typevar) => {
+            ) if lhs_bound_typevar.identity(db) == rhs_bound_typevar.identity(db) => {
                 ConstraintSet::from(true)
             }
 
@@ -1935,7 +1941,7 @@ impl<'db> Type<'db> {
                 }),
 
             (_, Type::Callable(_)) => relation_visitor.visit((self, target, relation), || {
-                self.into_callable(db).when_some_and(|callable| {
+                self.try_upcast_to_callable(db).when_some_and(|callable| {
                     callable.has_relation_to_impl(
                         db,
                         target,
@@ -2435,7 +2441,9 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(self_bound_typevar),
                 Type::NonInferableTypeVar(other_bound_typevar),
-            ) if self_bound_typevar == other_bound_typevar => ConstraintSet::from(false),
+            ) if self_bound_typevar.identity(db) == other_bound_typevar.identity(db) => {
+                ConstraintSet::from(false)
+            }
 
             (tvar @ Type::NonInferableTypeVar(_), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::NonInferableTypeVar(_))
@@ -7772,7 +7780,38 @@ pub enum TypeVarKind {
     TypingSelf,
 }
 
-/// A type variable that has not been bound to a generic context yet.
+impl TypeVarKind {
+    const fn is_self(self) -> bool {
+        matches!(self, Self::TypingSelf)
+    }
+}
+
+/// The identity of a type variable.
+///
+/// This represents the core identity of a typevar, independent of its bounds or constraints. Two
+/// typevars have the same identity if they represent the same logical typevar, even if their
+/// bounds have been materialized differently.
+///
+/// # Ordering
+/// Ordering is based on the identity's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the identity was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypeVarIdentity<'db> {
+    /// The name of this TypeVar (e.g. `T`)
+    #[returns(ref)]
+    pub(crate) name: ast::name::Name,
+
+    /// The type var's definition (None if synthesized)
+    pub(crate) definition: Option<Definition<'db>>,
+
+    /// The kind of typevar (PEP 695, Legacy, or TypingSelf)
+    pub(crate) kind: TypeVarKind,
+}
+
+impl get_size2::GetSize for TypeVarIdentity<'_> {}
+
+/// A specific instance of a type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
 /// context, which might be specialized to a concrete type, you want [`BoundTypeVarInstance`]. This
@@ -7811,12 +7850,8 @@ pub enum TypeVarKind {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TypeVarInstance<'db> {
-    /// The name of this TypeVar (e.g. `T`)
-    #[returns(ref)]
-    name: ast::name::Name,
-
-    /// The type var's definition (None if synthesized)
-    pub definition: Option<Definition<'db>>,
+    /// The identity of this typevar
+    pub(crate) identity: TypeVarIdentity<'db>,
 
     /// The upper bound or constraint on the type of this TypeVar, if any. Don't use this field
     /// directly; use the `bound_or_constraints` (or `upper_bound` and `constraints`) methods
@@ -7829,14 +7864,6 @@ pub struct TypeVarInstance<'db> {
     /// The default type for this TypeVar, if any. Don't use this field directly, use the
     /// `default_type` method instead (to evaluate any lazy default).
     _default: Option<TypeVarDefaultEvaluation<'db>>,
-
-    pub kind: TypeVarKind,
-
-    /// If this typevar was transformed from another typevar via `mark_typevars_inferable`, this
-    /// records the identity of the "original" typevar, so we can recognize them as the same
-    /// typevar in `bind_typevar`. TODO: this (and the `is_identical_to` methods) should be
-    /// removable once we remove `mark_typevars_inferable`.
-    pub(crate) original: Option<TypeVarInstance<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -7882,6 +7909,18 @@ impl<'db> TypeVarInstance<'db> {
         BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context))
     }
 
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
+        self.identity(db).name(db)
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        self.identity(db).definition(db)
+    }
+
+    pub(crate) fn kind(self, db: &'db dyn Db) -> TypeVarKind {
+        self.identity(db).kind(db)
+    }
+
     pub(crate) fn is_self(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::TypingSelf)
     }
@@ -7925,8 +7964,7 @@ impl<'db> TypeVarInstance<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
-            self.name(db),
-            self.definition(db),
+            self.identity(db),
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
@@ -7946,8 +7984,6 @@ impl<'db> TypeVarInstance<'db> {
                     .lazy_default(db)
                     .map(|ty| ty.normalized_impl(db, visitor).into()),
             }),
-            self.kind(db),
-            self.original(db),
         )
     }
 
@@ -7959,8 +7995,7 @@ impl<'db> TypeVarInstance<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db),
-            self.definition(db),
+            self.identity(db),
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
@@ -7992,8 +8027,6 @@ impl<'db> TypeVarInstance<'db> {
                     .lazy_default(db)
                     .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
             }),
-            self.kind(db),
-            self.original(db),
         )
     }
 
@@ -8030,31 +8063,13 @@ impl<'db> TypeVarInstance<'db> {
             }),
         });
 
-        // Ensure that we only modify the `original` field if we are going to modify one or both of
-        // `_bound_or_constraints` and `_default`; don't trigger creation of a new
-        // `TypeVarInstance` unnecessarily.
-        let new_original = if new_bound_or_constraints == self._bound_or_constraints(db)
-            && new_default == self._default(db)
-        {
-            self.original(db)
-        } else {
-            Some(self)
-        };
-
         Self::new(
             db,
-            self.name(db),
-            self.definition(db),
+            self.identity(db),
             new_bound_or_constraints,
             self.explicit_variance(db),
             new_default,
-            self.kind(db),
-            new_original,
         )
-    }
-
-    fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self == other || (self.original(db) == Some(other) || other.original(db) == Some(self))
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
@@ -8063,18 +8078,21 @@ impl<'db> TypeVarInstance<'db> {
                 TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?.into_union()?)
+                TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?.as_union()?)
             }
         };
-        Some(Self::new(
+        let identity = TypeVarIdentity::new(
             db,
             Name::new(format!("{}'instance", self.name(db))),
-            None,
+            None, // definition
+            self.kind(db),
+        );
+        Some(Self::new(
+            db,
+            identity,
             Some(bound_or_constraints.into()),
             self.explicit_variance(db),
-            None,
-            self.kind(db),
-            self.original(db),
+            None, // _default
         ))
     }
 
@@ -8108,7 +8126,7 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
                 definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
-                    .into_union()?
+                    .as_union()?
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
@@ -8193,12 +8211,28 @@ impl<'db> From<Definition<'db>> for BindingContext<'db> {
 }
 
 impl<'db> BindingContext<'db> {
-    fn name(self, db: &'db dyn Db) -> Option<String> {
+    pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
-            BindingContext::Definition(definition) => definition.name(db),
+            BindingContext::Definition(definition) => Some(definition),
             BindingContext::Synthetic => None,
         }
     }
+
+    fn name(self, db: &'db dyn Db) -> Option<String> {
+        self.definition().and_then(|definition| definition.name(db))
+    }
+}
+
+/// The identity of a bound type variable.
+///
+/// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
+/// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
+/// if they represent the same logical typevar bound in the same context, even if their bounds
+/// have been materialized differently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub struct BoundTypeVarIdentity<'db> {
+    pub(crate) identity: TypeVarIdentity<'db>,
+    pub(crate) binding_context: BindingContext<'db>,
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
@@ -8214,6 +8248,17 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Get the identity of this bound typevar.
+    ///
+    /// This is used for comparing whether two bound typevars represent the same logical typevar,
+    /// regardless of e.g. differences in their bounds or constraints due to materialization.
+    pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
+        BoundTypeVarIdentity {
+            identity: self.typevar(db).identity(db),
+            binding_context: self.binding_context(db),
+        }
+    }
+
     /// Create a new PEP 695 type variable that can be used in signatures
     /// of synthetic generic functions.
     pub(crate) fn synthetic(
@@ -8221,20 +8266,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         name: &'static str,
         variance: TypeVarVariance,
     ) -> Self {
-        Self::new(
+        let identity = TypeVarIdentity::new(
             db,
-            TypeVarInstance::new(
-                db,
-                Name::new_static(name),
-                None, // definition
-                None, // _bound_or_constraints
-                Some(variance),
-                None, // _default
-                TypeVarKind::Pep695,
-                None,
-            ),
-            BindingContext::Synthetic,
-        )
+            Name::new_static(name),
+            None, // definition
+            TypeVarKind::Pep695,
+        );
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            None, // _bound_or_constraints
+            Some(variance),
+            None, // _default
+        );
+        Self::new(db, typevar, BindingContext::Synthetic)
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -8243,32 +8288,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         upper_bound: Type<'db>,
         binding_context: BindingContext<'db>,
     ) -> Self {
-        Self::new(
+        let identity = TypeVarIdentity::new(
             db,
-            TypeVarInstance::new(
-                db,
-                Name::new_static("Self"),
-                None,
-                Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
-                Some(TypeVarVariance::Invariant),
-                None,
-                TypeVarKind::TypingSelf,
-                None,
-            ),
-            binding_context,
-        )
-    }
-
-    pub(crate) fn is_identical_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if self == other {
-            return true;
-        }
-
-        if self.binding_context(db) != other.binding_context(db) {
-            return false;
-        }
-
-        self.typevar(db).is_identical_to(db, other.typevar(db))
+            Name::new_static("Self"),
+            None, // definition
+            TypeVarKind::TypingSelf,
+        );
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
+            Some(TypeVarVariance::Invariant),
+            None, // _default
+        );
+        Self::new(db, typevar, binding_context)
     }
 
     pub(crate) fn variance_with_polarity(
@@ -9760,7 +9793,7 @@ impl<'db> BoundMethodType<'db> {
                     .iter()
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
-            false,
+            true,
         )
     }
 
@@ -10675,7 +10708,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn into_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
+    pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
             TypeAliasType::ManualPEP695(_) => None,
@@ -11077,6 +11110,23 @@ impl<'db> IntersectionType<'db> {
         } else {
             Either::Right(self.positive(db).iter().copied())
         }
+    }
+
+    /// Map a type transformation over all positive elements of the intersection. Leave the
+    /// negative elements unchanged.
+    pub(crate) fn map_positive(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db);
+        for ty in self.positive(db) {
+            builder = builder.add_positive(transform_fn(ty));
+        }
+        for ty in self.negative(db) {
+            builder = builder.add_negative(*ty);
+        }
+        builder.build()
     }
 
     pub(crate) fn map_with_boundness(

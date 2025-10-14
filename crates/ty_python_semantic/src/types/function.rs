@@ -943,7 +943,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signature(db), false)
+        CallableType::new(db, self.signature(db), true)
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].
@@ -1145,7 +1145,7 @@ fn is_instance_truthiness<'db>(
 fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) -> bool {
     // Return true for any mode that doesn't match typeshed's
     // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
-    mode.into_string_literal().is_none_or(|mode| {
+    mode.as_string_literal().is_none_or(|mode| {
         !matches!(
             mode.value(db),
             "r+" | "+r"
@@ -1557,7 +1557,7 @@ impl KnownFunction {
                         return;
                     }
                     let mut diagnostic = if let Some(message) = message
-                        .and_then(Type::into_string_literal)
+                        .and_then(Type::as_string_literal)
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
@@ -1730,7 +1730,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1747,7 +1747,8 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
+                let constraints =
+                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
@@ -20,12 +21,15 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{
+    GenericContext, Specialization, walk_generic_context, walk_specialization,
+};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
+use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
@@ -35,7 +39,7 @@ use crate::types::{
     determine_upper_bound, infer_definition_types, todo_type,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet, Program,
+    Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, known_module_symbol,
@@ -1379,7 +1383,7 @@ impl get_size2::GetSize for ClassLiteral<'_> {}
 
 #[expect(clippy::ref_option)]
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn pep695_generic_context_cycle_recover<'db>(
+fn generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
     _count: u32,
@@ -1388,7 +1392,7 @@ fn pep695_generic_context_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn pep695_generic_context_cycle_initial<'db>(
+fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
@@ -1428,7 +1432,11 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_fn=generic_context_cycle_recover,
+        cycle_initial=generic_context_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let file = scope.file(db);
@@ -1451,17 +1459,74 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
+    #[salsa::tracked(
+        cycle_fn=generic_context_cycle_recover,
+        cycle_initial=generic_context_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn inherited_legacy_generic_context(
         self,
         db: &'db dyn Db,
     ) -> Option<GenericContext<'db>> {
         GenericContext::from_base_classes(
             db,
+            self.definition(db),
             self.explicit_bases(db)
                 .iter()
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
         )
+    }
+
+    /// Returns all of the typevars that are referenced in this class's definition. This includes
+    /// any typevars bound in its generic context, as well as any typevars mentioned in its base
+    /// class list. (This is used to ensure that classes do not bind or reference typevars from
+    /// enclosing generic contexts.)
+    pub(crate) fn typevars_referenced_in_definition(
+        self,
+        db: &'db dyn Db,
+    ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
+        #[derive(Default)]
+        struct CollectTypeVars<'db> {
+            typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
+            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars.borrow_mut().insert(bound_typevar);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
+                            // If we have already seen this type, we can skip it.
+                            return;
+                        }
+                        walk_non_atomic_type(db, non_atomic_type, self);
+                    }
+                }
+            }
+        }
+
+        let visitor = CollectTypeVars::default();
+        if let Some(generic_context) = self.generic_context(db) {
+            walk_generic_context(db, generic_context, &visitor);
+        }
+        for base in self.explicit_bases(db) {
+            visitor.visit_type(db, *base);
+        }
+        visitor.typevars.into_inner()
     }
 
     /// Returns the generic context that should be inherited by any constructor methods of this
@@ -1656,7 +1721,7 @@ impl<'db> ClassLiteral<'db> {
     /// Determine if this is an abstract class.
     pub(super) fn is_abstract(self, db: &'db dyn Db) -> bool {
         self.metaclass(db)
-            .into_class_literal()
+            .as_class_literal()
             .is_some_and(|metaclass| metaclass.is_known(db, KnownClass::ABCMeta))
     }
 
@@ -1690,7 +1755,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> impl Iterator<Item = KnownFunction> + 'db {
         self.decorators(db)
             .iter()
-            .filter_map(|deco| deco.into_function_literal())
+            .filter_map(|deco| deco.as_function_literal())
             .filter_map(|decorator| decorator.known(db))
     }
 
@@ -1946,7 +2011,29 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        self.class_member_inner(db, None, name, policy)
+        fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty) => {
+                    Type::Callable(CallableType::new(db, callable_ty.signatures(db), true))
+                }
+                Type::Union(union) => {
+                    union.map(db, |element| into_function_like_callable(db, *element))
+                }
+                Type::Intersection(intersection) => intersection
+                    .map_positive(db, |element| into_function_like_callable(db, *element)),
+                _ => ty,
+            }
+        }
+
+        let mut member = self.class_member_inner(db, None, name, policy);
+
+        // We generally treat dunder attributes with `Callable` types as function-like callables.
+        // See `callables_as_descriptors.md` for more details.
+        if name.starts_with("__") && name.ends_with("__") {
+            member = member.map_type(|ty| into_function_like_callable(db, ty));
+        }
+
+        member
     }
 
     fn class_member_inner(
@@ -2330,7 +2417,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
-                    .into_class_literal()?
+                    .as_class_literal()?
                     .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_unbound()
                     .map(|ty| {
@@ -5067,7 +5154,7 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.into_string_literal()),
+                    DeprecatedInstance::new(db, message.as_string_literal()),
                 )));
             }
 
@@ -5087,7 +5174,7 @@ impl KnownClass {
                     return;
                 };
 
-                let Some(name) = name.into_string_literal() else {
+                let Some(name) = name.as_string_literal() else {
                     if let Some(builder) =
                         context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
                     {

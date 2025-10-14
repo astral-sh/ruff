@@ -963,6 +963,40 @@ c: Callable[[Any], str] = f
 c: Callable[[Any], str] = g
 ```
 
+A function with no explicit return type should be assignable to a callable with a return type of
+`Any`.
+
+```py
+def h():
+    return
+
+c: Callable[[], Any] = h
+```
+
+And, similarly for parameters with no annotations:
+
+```py
+def i(a, b, /) -> None:
+    return
+
+c: Callable[[Any, Any], None] = i
+```
+
+Additionally, a function definition that includes both `*args` and `**kwargs` parameters that are
+annotated as `Any` or kept unannotated should be assignable to a callable with `...` as the
+parameter type.
+
+```py
+def variadic_without_annotation(*args, **kwargs):
+    return
+
+def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
+    return
+
+c: Callable[..., Any] = variadic_without_annotation
+c: Callable[..., Any] = variadic_with_annotation
+```
+
 ### Method types
 
 ```py
@@ -1147,18 +1181,17 @@ static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [s
 An instance type is assignable to a compatible callable type if the instance type's class has a
 callable `__call__` attribute.
 
-TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
-change for better compatibility with mypy/pyright.
-
 ```py
+from __future__ import annotations
+
 from typing import Callable
 from ty_extensions import static_assert, is_assignable_to
 
-def call_impl(a: int) -> str:
+def call_impl(a: A, x: int) -> str:
     return ""
 
 class A:
-    __call__: Callable[[int], str] = call_impl
+    __call__: Callable[[A, int], str] = call_impl
 
 static_assert(is_assignable_to(A, Callable[[int], str]))
 static_assert(not is_assignable_to(A, Callable[[int], int]))
