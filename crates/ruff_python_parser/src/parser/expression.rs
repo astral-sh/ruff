@@ -1594,22 +1594,29 @@ impl<'src> Parser<'src> {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.interpolations() {
-                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
-                {
+                // We need to check the whole expression range, including any leading or trailing
+                // debug text, but exclude the format spec, where escapes and escaped, reused quotes
+                // are allowed.
+                let range = expr
+                    .format_spec
+                    .as_ref()
+                    .map(|format_spec| TextRange::new(expr.start(), format_spec.start()))
+                    .unwrap_or(expr.range);
+                for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
                     let slash_position = TextSize::try_from(slash_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
+                        TextRange::at(range.start() + slash_position, '\\'.text_len()),
                     );
                 }
 
                 if let Some(quote_position) =
-                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
+                    memchr::memmem::find(self.source[range].as_bytes(), quote_bytes)
                 {
                     let quote_position = TextSize::try_from(quote_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(expr.range.start() + quote_position, quote_len),
+                        TextRange::at(range.start() + quote_position, quote_len),
                     );
                 }
             }
