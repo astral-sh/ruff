@@ -7790,6 +7790,12 @@ pub enum TypeVarKind {
     TypingSelf,
 }
 
+impl TypeVarKind {
+    const fn is_self(self) -> bool {
+        matches!(self, Self::TypingSelf)
+    }
+}
+
 /// The identity of a type variable.
 ///
 /// This represents the core identity of a typevar, independent of its bounds or constraints. Two

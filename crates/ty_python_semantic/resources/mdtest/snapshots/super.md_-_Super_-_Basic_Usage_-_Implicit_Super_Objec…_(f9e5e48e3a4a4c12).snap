@@ -162,6 +162,7 @@ error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<c
    |
 info: Type variable `S` has `object` as its implicit upper bound
 info: `object` is not an instance or subclass of `<class 'Foo'>`
+help: Consider adding an upper bound to type variable `S`
 info: rule `invalid-super-argument` is enabled by default
 
 ```

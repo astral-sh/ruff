@@ -25,6 +25,8 @@ python-version = "3.12"
 ```
 
 ```py
+from __future__ import annotations
+
 class A:
     def a(self): ...
     aa: int = 1
@@ -116,6 +118,26 @@ def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
 
     # revealed: <super: <class 'object'>, dict[Literal["x", "y"], int | bytes]>
     reveal_type(super(object, y))
+
+# The first argument to `super()` must be an actual class object;
+# instances of `GenericAlias` are not accepted at runtime:
+#
+# error: [invalid-super-argument]
+# revealed: Unknown
+reveal_type(super(list[int], []))
+```
+
+`super(pivot_class, owner)` can be called from inside methods, just like single-argument `super()`:
+
+```py
+class Super:
+    def method(self) -> int:
+        return 42
+
+class Sub(Super):
+    def method(self: Sub) -> int:
+        # revealed: <super: <class 'Sub'>, Sub>
+        return reveal_type(super(self.__class__, self)).method()
 ```
 
 ### Implicit Super Object
