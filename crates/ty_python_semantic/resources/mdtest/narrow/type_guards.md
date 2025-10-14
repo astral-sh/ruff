@@ -281,7 +281,7 @@ def _(x: Foo | Bar, flag: bool) -> None:
 The `TypeIs` type remains effective across generic boundaries:
 
 ```py
-from typing_extensions import TypeVar, reveal_type
+from typing_extensions import TypeVar
 
 T = TypeVar("T")
 

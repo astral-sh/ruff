@@ -108,8 +108,6 @@ reveal_type(x)
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class NotIterable:
         if flag:
@@ -271,8 +269,6 @@ def g(
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -292,8 +288,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -370,8 +364,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -390,8 +382,6 @@ for x in Iterable():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Bad:
     def __iter__(self) -> int:
         return 42
@@ -424,8 +414,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator1:
     def __next__(self, extra_arg) -> int:
         return 42
@@ -455,8 +443,6 @@ for y in Iterable2():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator:
         def __next__(self) -> int:
@@ -509,8 +495,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -534,8 +518,6 @@ def _(flag1: bool, flag2: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Bad:
     __getitem__: None = None
 
@@ -549,8 +531,6 @@ for x in Bad():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class CustomCallable:
         if flag:
@@ -585,8 +565,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterable:
     # invalid because it will implicitly be passed an `int`
     # by the interpreter
@@ -626,8 +604,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -663,8 +639,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator1:
         if flag:
@@ -704,8 +678,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterable1:
         if flag:
@@ -737,8 +709,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> bytes:
         return b"foo"

@@ -260,27 +260,31 @@ class C[T]:
 
 ### Generic class within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 
 ### Generic class within generic class
+
+<!-- snapshot-diagnostics -->
 
 ```py
 from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 

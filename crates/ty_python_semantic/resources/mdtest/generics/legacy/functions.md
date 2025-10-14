@@ -181,7 +181,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ```py
 from typing import TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T", bound=int)
 
@@ -200,7 +199,6 @@ reveal_type(f("string"))  # revealed: Unknown
 
 ```py
 from typing import TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T", int, None)
 

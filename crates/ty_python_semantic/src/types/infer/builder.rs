@@ -53,31 +53,29 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NAMED_TUPLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, report_bad_dunder_set_call,
-    report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_namedtuple_field_without_default_after_field_with_default,
-    report_possibly_missing_attribute,
-};
-use crate::types::diagnostic::{
-    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, SUBCLASS_OF_FINAL_CLASS,
+    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PROTOCOL,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
+    report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
+    report_instance_layout_conflict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_or_unsupported_base, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type,
+    report_invalid_type_checking_constant,
+    report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
+    report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_rebound_typevar, report_slice_step_size_zero,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{GenericContext, bind_typevar, enclosing_generic_contexts};
 use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
@@ -839,6 +837,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // (6) If the class is generic, verify that its generic context does not violate any of
+            // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
                 class.inherited_legacy_generic_context(self.db()),
@@ -855,7 +855,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check that a dataclass does not have more than one `KW_ONLY`.
+            let scope = class.body_scope(self.db()).scope(self.db());
+            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
+                && let Some(parent) = scope.parent()
+            {
+                for self_typevar in class.typevars_referenced_in_definition(self.db()) {
+                    let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                    for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                        if let Some(other_typevar) =
+                            enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                        {
+                            report_rebound_typevar(
+                                &self.context,
+                                self_typevar_name,
+                                class,
+                                class_node,
+                                other_typevar,
+                            );
+                        }
+                    }
+                }
+            }
+
+            // (7) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
@@ -2176,7 +2198,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .try_call(self.db(), &CallArguments::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
-                Ok(return_ty) => return_ty,
+                Ok(return_ty) => {
+                    let is_input_function_like = inferred_ty
+                        .into_callable(self.db())
+                        .and_then(Type::unwrap_as_callable_type)
+                        .is_some_and(|callable| callable.is_function_like(self.db()));
+                    if is_input_function_like
+                        && let Some(callable_type) = return_ty.unwrap_as_callable_type()
+                    {
+                        // When a method on a class is decorated with a function that returns a `Callable`, assume that
+                        // the returned callable is also function-like. See "Decorating a method with a `Callable`-typed
+                        // decorator" in `callables_as_descriptors.md` for the extended explanation.
+                        Type::Callable(CallableType::new(
+                            self.db(),
+                            callable_type.signatures(self.db()),
+                            true,
+                        ))
+                    } else {
+                        return_ty
+                    }
+                }
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, (*decorator_node).into());
                     bindings.return_type(self.db())

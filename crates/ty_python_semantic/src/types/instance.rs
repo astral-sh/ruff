@@ -159,32 +159,28 @@ impl<'db> Type<'db> {
         // This matches the behaviour of other type checkers, and is required for us to
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
-            if let Protocol::FromClass(class) = protocol.inner {
-                // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
-                // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
-                // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
-                // `Q`'s members in a Liskov-incompatible way.
-                let type_to_test = if let Type::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::FromClass(class),
-                    ..
-                }) = self
-                {
-                    Type::non_tuple_instance(db, class)
-                } else {
-                    self
-                };
+            let Some(nominal_instance) = protocol.as_nominal_type() else {
+                return ConstraintSet::from(false);
+            };
 
-                type_to_test.has_relation_to_impl(
-                    db,
-                    Type::non_tuple_instance(db, class),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            } else {
-                ConstraintSet::from(false)
-            }
+            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+            // `Q`'s members in a Liskov-incompatible way.
+            let type_to_test = self
+                .into_protocol_instance()
+                .and_then(ProtocolInstanceType::as_nominal_type)
+                .map(Type::NominalInstance)
+                .unwrap_or(self);
+
+            type_to_test.has_relation_to_impl(
+                db,
+                Type::NominalInstance(nominal_instance),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
         })
     }
 }
@@ -612,6 +608,20 @@ impl<'db> ProtocolInstanceType<'db> {
         Self {
             inner: Protocol::Synthesized(synthesized),
             _phantom: PhantomData,
+        }
+    }
+
+    /// If this is a class-based protocol, convert the protocol-instance into a nominal instance.
+    ///
+    /// If this is a synthesized protocol that does not correspond to a class definition
+    /// in source code, return `None`. These are "pure" abstract types, that cannot be
+    /// treated in a nominal way.
+    pub(super) fn as_nominal_type(self) -> Option<NominalInstanceType<'db>> {
+        match self.inner {
+            Protocol::FromClass(class) => {
+                Some(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+            }
+            Protocol::Synthesized(_) => None,
         }
     }
 

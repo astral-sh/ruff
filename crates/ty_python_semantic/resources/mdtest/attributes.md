@@ -901,24 +901,21 @@ reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
 reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
 
-# TODO: Both of these should be `str`
 reveal_type(Derived.overwritten_in_subclass_method)  # revealed: str
-reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str | Unknown | None
+reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
 
 reveal_type(Derived().pure_attribute)  # revealed: str | None
 
 # TODO: This should be `str`
 reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: Unknown | None | str
 
-# TODO: This should be `str`
-reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: Unknown | None
+reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 
 # TODO: Both of these should be `Unknown | Literal["intermediate", "base"]`
 reveal_type(Derived.undeclared)  # revealed: Unknown | Literal["intermediate"]
 reveal_type(Derived().undeclared)  # revealed: Unknown | Literal["intermediate"]
 
-# TODO: This should be `Unknown | Literal["intermediate", "base"]`
-reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate"]
+reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate", "base"]
 ```
 
 ## Accessing attributes on class objects
