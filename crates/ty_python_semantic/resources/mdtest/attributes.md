@@ -405,38 +405,41 @@ class C:
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
+        def f():
+            [... for self.h in IntIterable()]
+
+        def g():
+            [... for self.i in IntIterable()]
+        g()
+
 class D:
     g: int
 
 c_instance = C()
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.a)  # revealed: Unknown
+reveal_type(c_instance.a)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.b)  # revealed: Unknown
+reveal_type(c_instance.b)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | str
-# error: [unresolved-attribute]
-reveal_type(c_instance.c)  # revealed: Unknown
+reveal_type(c_instance.c)  # revealed: Unknown | str
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.d)  # revealed: Unknown
+reveal_type(c_instance.d)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.e)  # revealed: Unknown
+reveal_type(c_instance.e)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.f)  # revealed: Unknown
+reveal_type(c_instance.f)  # revealed: Unknown | int
 
 # This one is correctly not resolved as an attribute:
 # error: [unresolved-attribute]
 reveal_type(c_instance.g)  # revealed: Unknown
+
+# This attribute is in the function f and is not reachable
+# error: [unresolved-attribute]
+reveal_type(c_instance.h)  # revealed: Unknown
+
+# TODO: Even though g method is called and is reachable we do not record this attribute assignment
+# error: [unresolved-attribute]
+reveal_type(c_instance.i)  # revealed: Unknown
 ```
 
 #### Conditionally declared / bound attributes
