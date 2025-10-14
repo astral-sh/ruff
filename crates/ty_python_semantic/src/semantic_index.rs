@@ -1,4 +1,4 @@
-use std::iter::FusedIterator;
+use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
@@ -208,29 +208,56 @@ pub(crate) fn attribute_declarations<'db, 's>(
 ///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
 /// introduces a direct dependency on that file's AST.
-pub(crate) fn attribute_scopes<'db, 's>(
+pub(crate) fn attribute_scopes<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
+) -> impl Iterator<Item = FileScopeId> + 'db {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
+    ChildrenIter::new(&index.scopes, class_scope_id)
+        .filter_map(move |(child_scope_id, scope)| {
+            let (function_scope_id, function_scope) =
+                if scope.node().scope_kind() == ScopeKind::TypeParams {
+                    // This could be a generic method with a type-params scope.
+                    // Go one level deeper to find the function scope. The first
+                    // descendant is the (potential) function scope.
+                    let function_scope_id = scope.descendants().start;
+                    (function_scope_id, index.scope(function_scope_id))
+                } else {
+                    (child_scope_id, scope)
+                };
+            function_scope.node().as_function()?;
+            Some(function_scope_id)
+        })
+        .flat_map(move |func_id| {
+            // Add any descendent scope that is eager and have eager scopes between the scope
+            // and the method scope. Since attributes can be defined in this scope.
+            let nested = index.descendent_scopes(func_id).filter_map(move |(id, s)| {
+                let is_eager = s.kind().is_eager();
+                let parents_are_eager = {
+                    let mut all_parents_eager = true;
+                    let mut current = Some(id);
 
-    ChildrenIter::new(&index.scopes, class_scope_id).filter_map(move |(child_scope_id, scope)| {
-        let (function_scope_id, function_scope) =
-            if scope.node().scope_kind() == ScopeKind::TypeParams {
-                // This could be a generic method with a type-params scope.
-                // Go one level deeper to find the function scope. The first
-                // descendant is the (potential) function scope.
-                let function_scope_id = scope.descendants().start;
-                (function_scope_id, index.scope(function_scope_id))
-            } else {
-                (child_scope_id, scope)
-            };
+                    while let Some(scope_id) = current {
+                        if scope_id == func_id {
+                            break;
+                        }
+                        let scope = index.scope(scope_id);
+                        if !scope.is_eager() {
+                            all_parents_eager = false;
+                            break;
+                        }
+                        current = scope.parent();
+                    }
 
-        function_scope.node().as_function()?;
-        Some(function_scope_id)
-    })
+                    all_parents_eager
+                };
+
+                (parents_are_eager && is_eager).then_some(id)
+            });
+            once(func_id).chain(nested)
+        })
 }
 
 /// Returns the module global scope of `file`.
@@ -818,7 +845,10 @@ mod tests {
     use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind};
     use crate::semantic_index::symbol::ScopedSymbolId;
     use crate::semantic_index::use_def::UseDefMap;
-    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+    use crate::semantic_index::{
+        attribute_declarations, attribute_scopes, global_scope, place_table, semantic_index,
+        use_def_map,
+    };
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
@@ -1193,6 +1223,125 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 DefinitionKind::Comprehension(_)
             ));
         }
+    }
+
+    /// Test case to validate that comprehensions inside a method are correctly marked as attribute
+    /// scopes
+    #[test]
+    fn comprehension_in_method_instance_attribute() {
+        let TestCase { db, file } = test_case(
+            "
+class C:
+    def __init__(self):
+        self.x = 1
+        [None for self.z in range(1)]
+",
+        );
+
+        let index = semantic_index(&db, file);
+
+        let [(class_scope_id, class_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope (the class)")
+        };
+
+        assert_eq!(class_scope.kind(), ScopeKind::Class);
+        let class_scope = class_scope_id.to_scope_id(&db, file);
+
+        let method_scopes: Vec<_> = index.child_scopes(class_scope_id).collect();
+        assert_eq!(method_scopes.len(), 1, "expected __init__");
+        let (method_scope_id, method_scope) = method_scopes[0];
+        assert_eq!(method_scope.kind(), ScopeKind::Function);
+
+        let comp_scopes: Vec<_> = index.child_scopes(method_scope_id).collect();
+        assert_eq!(comp_scopes.len(), 1, "expected one comprehension scope");
+        let (comprehension_scope_id, comprehension_scope) = comp_scopes[0];
+        assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
+
+        let attr_scopes: Vec<_> = attribute_scopes(&db, class_scope).collect();
+        assert!(
+            attr_scopes.contains(&method_scope_id),
+            "attribute_scopes should include the method scope"
+        );
+        assert!(
+            attr_scopes.contains(&comprehension_scope_id),
+            "attribute_scopes should include the comprehension scope"
+        );
+
+        let comprehension_place_table = index.place_table(comprehension_scope_id);
+        let members: Vec<_> = comprehension_place_table.members().collect();
+
+        let has_z_instance_attr = members
+            .iter()
+            .any(|member| member.as_instance_attribute() == Some("z"));
+        assert!(
+            has_z_instance_attr,
+            "self.z should be marked as an instance attribute in the comprehension scope found members: {members:?}"
+        );
+
+        let z_declarations: Vec<_> = attribute_declarations(&db, class_scope, "z")
+            .map(|(decls, scope_id)| {
+                let decl_vec: Vec<_> = decls.collect();
+                (decl_vec, scope_id)
+            })
+            .collect();
+        assert!(
+            !z_declarations.is_empty(),
+            "attribute_declarations should find declarations for z"
+        );
+
+        // Verify that at least one declaration of z is in the comprehension scope
+        let has_comp_declaration = z_declarations
+            .iter()
+            .any(|(_, scope_id)| *scope_id == comprehension_scope_id);
+        assert!(
+            has_comp_declaration,
+            "attribute_declarations should include a declaration from the comprehension scope"
+        );
+    }
+
+    /// Test case to validate that when first method argument is shadowed by a comprehension variable,
+    /// attributes accessed on the shadowed argument should NOT be tracked as instance attributes
+    /// of the containing class.
+    #[test]
+    fn comprehension_shadowing_self() {
+        let TestCase { db, file } = test_case(
+            "
+class D:
+    g: int
+
+class C:
+    def __init__(self):
+        [[None for self.g in range(1)] for self in [D()]]
+",
+        );
+
+        let index = semantic_index(&db, file);
+
+        let all_scopes: Vec<_> = index.child_scopes(FileScopeId::global()).collect();
+
+        let (class_c_scope_id, class_c_scope) = all_scopes[1];
+        assert_eq!(class_c_scope.kind(), ScopeKind::Class);
+        let class_c_scope = class_c_scope_id.to_scope_id(&db, file);
+
+        let attr_scopes: Vec<_> = attribute_scopes(&db, class_c_scope).collect();
+        let mut has_g_attribute = false;
+        for scope_id in &attr_scopes {
+            let place_table = index.place_table(*scope_id);
+            if place_table
+                .member_id_by_instance_attribute_name("g")
+                .is_some()
+            {
+                has_g_attribute = true;
+                break;
+            }
+        }
+        assert!(
+            !has_g_attribute,
+            "self.g should NOT be tracked as an attribute of C because 'self' is shadowed by the outer comprehension variable"
+        );
     }
 
     /// Test case to validate that the `x` variable used in the comprehension is referencing the
