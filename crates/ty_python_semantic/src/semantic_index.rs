@@ -6,6 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_ast::NodeIndex;
+use ruff_python_ast::name::Name;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
@@ -101,7 +102,8 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 ///
 /// While we endeavour to accurately model import side-effects for `.py` files, we intentionally
 /// limit them for `.pyi` files to encourage more intentional API design. The standard escape
-/// hatch for this is the `import x as x` idiom, but in practice some other idioms are popular.
+/// hatches for this are the `import x as x` idiom or listing them in `__all__`, but in practice
+/// some other idioms are popular.
 ///
 /// In particular, many packages have their `__init__` include lines like
 /// `from . import subpackage`, with the intent that `mypackage.subpackage` should be
@@ -110,20 +112,25 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
     db: &'db dyn Db,
     importing_module: Module<'db>,
-) -> Vec<ModuleName> {
+) -> Box<[ModuleName]> {
     let Some(file) = importing_module.file(db) else {
-        return Vec::new();
+        return Box::default();
     };
     if !file.is_package_stub(db) {
-        return Vec::new();
+        return Box::default();
     }
     semantic_index(db, file)
         .maybe_imported_modules
         .iter()
-        .filter_map(|(level, module, submodule_name)| {
-            let mut submodule =
-                ModuleName::from_identifier_parts(db, file, module.as_deref(), *level).ok()?;
-            submodule.extend(&ModuleName::new(submodule_name)?);
+        .filter_map(|import| {
+            let mut submodule = ModuleName::from_identifier_parts(
+                db,
+                file,
+                import.from_module.as_deref(),
+                import.level,
+            )
+            .ok()?;
+            submodule.extend(&ModuleName::new(import.submodule.as_str())?);
             // Throw out the result if this doesn't resolve to an actual module
             resolve_module(db, &submodule)?;
             // Return only the relative part
@@ -274,7 +281,7 @@ pub(crate) struct SemanticIndex<'db> {
     imported_modules: Arc<FxHashSet<ModuleName>>,
 
     /// The set of modules that are imported anywhere within this file.
-    maybe_imported_modules: Arc<FxHashSet<(u32, Option<String>, String)>>,
+    maybe_imported_modules: Arc<FxHashSet<MaybeModuleImport>>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -287,6 +294,16 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
+}
+
+/// A `from...import` that may be an import of a module
+///
+/// Later analysis will determine if it is.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
+pub(crate) struct MaybeModuleImport {
+    level: u32,
+    from_module: Option<Name>,
+    submodule: Name,
 }
 
 impl<'db> SemanticIndex<'db> {

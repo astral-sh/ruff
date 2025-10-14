@@ -47,7 +47,9 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
+use crate::semantic_index::{
+    ExpressionsScopeMap, MaybeModuleImport, SemanticIndex, VisibleAncestorsIter,
+};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -111,7 +113,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    maybe_imported_modules: FxHashSet<(u32, Option<String>, String)>,
+    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -1563,13 +1565,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     // If there's no alias or a redundant alias, record this as a potential import of a submodule
                     if alias.asname.is_none() || is_reexported {
-                        let from_module = node.module.as_ref().map(ToString::to_string);
-
-                        self.maybe_imported_modules.insert((
-                            node.level,
-                            from_module,
-                            alias.name.to_string(),
-                        ));
+                        self.maybe_imported_modules.insert(MaybeModuleImport {
+                            level: node.level,
+                            from_module: node.module.clone().map(Into::into),
+                            submodule: alias.name.clone().into(),
+                        });
                     }
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
