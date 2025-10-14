@@ -145,22 +145,38 @@ class C2:
 C2().method_decorated(1)
 ```
 
+And with unions of `Callable` types:
+
+```py
+from typing import Callable
+
+def expand(f: Callable[[C3, int], int]) -> Callable[[C3, int], int] | Callable[[C3, int], str]:
+    raise NotImplementedError
+
+class C3:
+    @expand
+    def method_decorated(self, x: int) -> int:
+        return x
+
+reveal_type(C3().method_decorated(1))  # revealed: int | str
+```
+
 Note that we currently only apply this heuristic when calling a function such as `memoize` via the
 decorator syntax. This is inconsistent, because the above *should* be equivalent to the following,
 but here we emit errors:
 
 ```py
-def memoize3(f: Callable[[C3, int], str]) -> Callable[[C3, int], str]:
+def memoize3(f: Callable[[C4, int], str]) -> Callable[[C4, int], str]:
     raise NotImplementedError
 
-class C3:
+class C4:
     def method(self, x: int) -> str:
         return str(x)
     method_decorated = memoize3(method)
 
 # error: [missing-argument]
 # error: [invalid-argument-type]
-C3().method_decorated(1)
+C4().method_decorated(1)
 ```
 
 The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
