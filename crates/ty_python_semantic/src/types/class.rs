@@ -4556,7 +4556,7 @@ impl KnownClass {
     /// the class. If this class is generic, this will use the default specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub fn to_instance(self, db: &dyn Db) -> Type<'_> {
+    pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
