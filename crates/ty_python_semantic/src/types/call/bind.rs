@@ -136,6 +136,7 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: &TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
         for element in &mut self.elements {
             if let Some(mut updated_argument_forms) =
@@ -148,7 +149,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db);
+        self.evaluate_known_cases(db, dataclass_field_specifiers);
 
         // In order of precedence:
         //
@@ -270,7 +271,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db, dataclass_field_specifiers: &[Type<'db>]) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -595,6 +596,52 @@ impl<'db> Bindings<'db> {
                                 KnownClass::Iterator.to_specialized_instance(db, [enum_instance]),
                             );
                         }
+                    }
+
+                    function @ Type::FunctionLiteral(function_type)
+                        if dataclass_field_specifiers.contains(&function)
+                            || function_type.is_known(db, KnownFunction::Field) =>
+                    {
+                        let default = overload.parameter_type_by_name("default").unwrap_or(None);
+                        let default_factory = overload
+                            .parameter_type_by_name("default_factory")
+                            .unwrap_or(None);
+                        let init = overload.parameter_type_by_name("init").unwrap_or(None);
+                        let kw_only = overload.parameter_type_by_name("kw_only").unwrap_or(None);
+
+                        // `dataclasses.field` and field-specifier functions of commonly used
+                        // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
+                        // the default type for the field (or `Any`) instead of an actual `Field`
+                        // instance, even if this is not what happens at runtime (see also below).
+                        // We still make use of this fact and pretend that all field specifiers
+                        // return the type of the default value:
+                        let default_ty = if default.is_some() || default_factory.is_some() {
+                            Some(overload.return_ty)
+                        } else {
+                            None
+                        };
+
+                        let init = init
+                            .map(|init| !init.bool(db).is_always_false())
+                            .unwrap_or(true);
+
+                        let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
+                        {
+                            kw_only.map(|kw_only| !kw_only.bool(db).is_always_false())
+                        } else {
+                            None
+                        };
+
+                        // `typeshed` pretends that `dataclasses.field()` returns the type of the
+                        // default value directly. At runtime, however, this function returns an
+                        // instance of `dataclasses.Field`. We also model it this way and return
+                        // a known-instance type with information about the field. The drawback
+                        // of this approach is that we need to pretend that instances of `Field`
+                        // are assignable to `T` if the default type of the field is assignable
+                        // to `T`. Otherwise, we would error on `name: str = field(default="")`.
+                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
+                            FieldInstance::new(db, default_ty, init, kw_only),
+                        )));
                     }
 
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
@@ -956,61 +1003,22 @@ impl<'db> Bindings<'db> {
                                     flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
                                 }
 
-                                let params = DataclassTransformerParams::new(
-                                    db,
-                                    flags,
-                                    field_specifiers.unwrap_or(Type::none(db)),
-                                );
+                                let field_specifiers: Box<[Type<'db>]> = field_specifiers
+                                    .map(|tuple_type| {
+                                        tuple_type
+                                            .exact_tuple_instance_spec(db)
+                                            .iter()
+                                            .flat_map(|tuple_spec| tuple_spec.fixed_elements())
+                                            .copied()
+                                            .collect()
+                                    })
+                                    .unwrap_or_default();
+
+                                let params =
+                                    DataclassTransformerParams::new(db, flags, field_specifiers);
 
                                 overload.set_return_type(Type::DataclassTransformer(params));
                             }
-                        }
-
-                        Some(KnownFunction::Field) => {
-                            let default =
-                                overload.parameter_type_by_name("default").unwrap_or(None);
-                            let default_factory = overload
-                                .parameter_type_by_name("default_factory")
-                                .unwrap_or(None);
-                            let init = overload.parameter_type_by_name("init").unwrap_or(None);
-                            let kw_only =
-                                overload.parameter_type_by_name("kw_only").unwrap_or(None);
-
-                            // `dataclasses.field` and field-specifier functions of commonly used
-                            // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
-                            // the default type for the field (or `Any`) instead of an actual `Field`
-                            // instance, even if this is not what happens at runtime (see also below).
-                            // We still make use of this fact and pretend that all field specifiers
-                            // return the type of the default value:
-                            let default_ty = if default.is_some() || default_factory.is_some() {
-                                Some(overload.return_ty)
-                            } else {
-                                None
-                            };
-
-                            let init = init
-                                .map(|init| !init.bool(db).is_always_false())
-                                .unwrap_or(true);
-
-                            let kw_only =
-                                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                    kw_only.map(|kw_only| !kw_only.bool(db).is_always_false())
-                                } else {
-                                    None
-                                };
-
-                            // `typeshed` pretends that `dataclasses.field()` returns the type of the
-                            // default value directly. At runtime, however, this function returns an
-                            // instance of `dataclasses.Field`. We also model it this way and return
-                            // a known-instance type with information about the field. The drawback
-                            // of this approach is that we need to pretend that instances of `Field`
-                            // are assignable to `T` if the default type of the field is assignable
-                            // to `T`. Otherwise, we would error on `name: str = field(default="")`.
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::Field(FieldInstance::new(
-                                    db, default_ty, init, kw_only,
-                                )),
-                            ));
                         }
 
                         _ => {

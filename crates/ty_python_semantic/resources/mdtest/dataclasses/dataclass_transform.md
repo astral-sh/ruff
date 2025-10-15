@@ -461,7 +461,7 @@ The [`typing.dataclass_transform`] specification also allows classes (such as `d
 to be listed in `field_specifiers`, but it is currently unclear how this should work, and other type
 checkers do not seem to support this either.
 
-### Basic example
+### For function-based transformers
 
 ```py
 from typing_extensions import dataclass_transform, Any
@@ -478,16 +478,95 @@ class Person:
     name: str = fancy_field()
     age: int | None = fancy_field(kw_only=True)
 
-# TODO: Should be `(self: Person, name: str, *, age: int | None) -> None`
-reveal_type(Person.__init__)  # revealed: (self: Person, id: int = Any, name: str = Any, age: int | None = Any) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 
-# TODO: No error here
-# error: [invalid-argument-type]
 alice = Person("Alice", age=30)
 
 reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
+```
+
+### For metaclass-based transformers
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+class FancyMeta(type):
+    def __new__(cls, name, bases, namespace):
+        ...
+        return super().__new__(cls, name, bases, namespace)
+
+class FancyBase(metaclass=FancyMeta): ...
+
+class Person(FancyBase):
+    id: int = fancy_field(init=False)
+    name: str = fancy_field()
+    age: int | None = fancy_field(kw_only=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
+
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
+
+### For base-class-based transformers
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+class FancyBase:
+    def __init_subclass__(cls):
+        ...
+        super().__init_subclass__()
+
+class Person(FancyBase):
+    id: int = fancy_field(init=False)
+    name: str = fancy_field()
+    age: int | None = fancy_field(kw_only=True)
+
+# TODO: should be (self: Person, name: str = Unknown, *, age: int | None = Unknown) -> None
+reveal_type(Person.__init__)  # revealed: def __init__(self) -> None
+
+# TODO: shouldn't be an error
+# error: [too-many-positional-arguments]
+# error: [unknown-argument]
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
+
+### With overloaded field specifiers
+
+```py
+from typing_extensions import dataclass_transform, overload, Any
+
+@overload
+def fancy_field(*, init: bool = True) -> Any: ...
+@overload
+def fancy_field(*, kw_only: bool = False) -> Any: ...
+def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field(init=False)
+    name: str = fancy_field()
+    age: int | None = fancy_field(kw_only=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
 ## Overloaded dataclass-like decorators

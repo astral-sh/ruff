@@ -32,7 +32,9 @@ pub(crate) use self::signatures::{CallableSignature, Parameter, Parameters, Sign
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
-use crate::place::{Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol};
+use crate::place::{
+    Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol,
+};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
@@ -619,8 +621,8 @@ impl<'db> PropertyInstanceType<'db> {
 }
 
 bitflags! {
-    /// Used for the return type of `dataclass(…)` calls. Keeps track of the arguments
-    /// that were passed in. For the precise meaning of the fields, see [1].
+    /// Used to store metadata about a dataclass or dataclass-like class.
+    /// For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/dataclasses.html
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -671,11 +673,16 @@ impl From<DataclassTransformerFlags> for DataclassFlags {
     }
 }
 
+/// Metadata for a dataclass. Stored inside a `Type::DataclassDecorator(…)`
+/// instance that we use as the return type of a `dataclasses.dataclass` and
+/// dataclass-transformer decorator calls.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DataclassParams<'db> {
     flags: DataclassFlags,
-    field_specifiers: Type<'db>,
+
+    #[returns(deref)]
+    field_specifiers: Box<[Type<'db>]>,
 }
 
 impl get_size2::GetSize for DataclassParams<'_> {}
@@ -688,10 +695,10 @@ impl<'db> DataclassParams<'db> {
     fn from_flags(db: &'db dyn Db, flags: DataclassFlags) -> Self {
         let dataclasses_field = known_module_symbol(db, KnownModule::Dataclasses, "field")
             .place
-            .ignore_possibly_unbound()
-            .unwrap_or_else(|| Type::none(db));
+            .ignore_possibly_undefined()
+            .unwrap_or_else(Type::unknown);
 
-        Self::new(db, flags, dataclasses_field)
+        Self::new(db, flags, vec![dataclasses_field].into_boxed_slice())
     }
 
     fn from_transformer_params(db: &'db dyn Db, params: DataclassTransformerParams<'db>) -> Self {
@@ -5472,7 +5479,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
             .match_parameters(db, argument_types)
-            .check_types(db, argument_types, &TypeContext::default())
+            .check_types(db, argument_types, &TypeContext::default(), &[])
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -5524,7 +5531,7 @@ impl<'db> Type<'db> {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, argument_types, &tcx)?;
+                    .check_types(db, argument_types, &tcx, &[])?;
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
