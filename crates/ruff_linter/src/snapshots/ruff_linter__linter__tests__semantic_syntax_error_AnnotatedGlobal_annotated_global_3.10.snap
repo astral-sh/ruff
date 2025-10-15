@@ -30,4 +30,17 @@ invalid-syntax: annotated name `c` can't be global
 15 |     global c
 16 |     c: list[str] = []
    |     ^
+17 |
+18 | d: int = 1
+   |
+
+invalid-syntax: annotated name `d` can't be global
+  --> <filename>:21:5
+   |
+19 | def f3():
+20 |     global d
+21 |     d: str
+   |     ^
+22 |
+23 | e: int = 1
    |
