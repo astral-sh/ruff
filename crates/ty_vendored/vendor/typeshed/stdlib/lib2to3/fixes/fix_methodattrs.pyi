@@ -1,3 +1,5 @@
+"""Fix bound method attributes (method.im_? -> method.__?__).
+"""
 from typing import ClassVar, Final, Literal
 
 from .. import fixer_base

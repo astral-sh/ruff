@@ -1,10 +1,17 @@
+"""distutils.command.bdist
+
+Implements the Distutils 'bdist' command (create a built [binary]
+distribution).
+"""
 from _typeshed import Incomplete, Unused
 from collections.abc import Callable
 from typing import ClassVar
 
 from ..cmd import Command
 
-def show_formats() -> None: ...
+def show_formats() -> None:
+    """Print list of available formats (arguments to "--format" option).
+    """
 
 class bdist(Command):
     description: str
