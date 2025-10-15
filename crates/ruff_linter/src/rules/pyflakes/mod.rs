@@ -528,6 +528,26 @@ mod tests {
         import a",
         "f401_use_in_between_imports"
     )]
+    #[test_case(
+        r"
+        if cond:
+            import a
+            import a.b
+            a.foo()
+        ",
+        "f401_same_branch"
+    )]
+    #[test_case(
+        r"
+        try:
+            import a.b.c
+        except ImportError:
+            import argparse
+            import a
+            a.b = argparse.Namespace()
+        ",
+        "f401_different_branch"
+    )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
             &SourceKind::Python(dedent(contents).to_string()),
