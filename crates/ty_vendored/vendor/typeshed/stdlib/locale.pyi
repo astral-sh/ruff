@@ -1,3 +1,14 @@
+"""Locale support module.
+
+The module provides low-level access to the C lib's locale APIs and adds high
+level number formatting APIs as well as a locale aliasing engine to complement
+these.
+
+The aliasing engine includes support for many commonly used locale names and
+maps them to values suitable for passing to the C lib's setlocale() function. It
+also includes default encodings for all supported locale names.
+
+"""
 import sys
 from _locale import (
     CHAR_MAX as CHAR_MAX,
@@ -131,31 +142,122 @@ class Error(Exception): ...
 
 def getdefaultlocale(
     envvars: tuple[_str, ...] = ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE")
-) -> tuple[_str | None, _str | None]: ...
-def getlocale(category: int = ...) -> tuple[_str | None, _str | None]: ...
-def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None) -> _str: ...
-def getpreferredencoding(do_setlocale: bool = True) -> _str: ...
-def normalize(localename: _str) -> _str: ...
+) -> tuple[_str | None, _str | None]:
+    """Tries to determine the default locale settings and returns
+them as tuple (language code, encoding).
+
+According to POSIX, a program which has not called
+setlocale(LC_ALL, "") runs using the portable 'C' locale.
+Calling setlocale(LC_ALL, "") lets it use the default locale as
+defined by the LANG variable. Since we don't want to interfere
+with the current locale setting we thus emulate the behavior
+in the way described above.
+
+To maintain compatibility with other platforms, not only the
+LANG variable is tested, but a list of variables given as
+envvars parameter. The first found to be defined will be
+used. envvars defaults to the search path used in GNU gettext;
+it must always contain the variable name 'LANG'.
+
+Except for the code 'C', the language code corresponds to RFC
+1766.  code and encoding can be None in case the values cannot
+be determined.
+
+"""
+def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
+    """Returns the current setting for the given locale category as
+tuple (language code, encoding).
+
+category may be one of the LC_* value except LC_ALL. It
+defaults to LC_CTYPE.
+
+Except for the code 'C', the language code corresponds to RFC
+1766.  code and encoding can be None in case the values cannot
+be determined.
+
+"""
+def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None) -> _str:
+    """Set the locale for the given category.  The locale can be
+a string, an iterable of two strings (language code and encoding),
+or None.
+
+Iterables are converted to strings using the locale aliasing
+engine.  Locale strings are passed directly to the C lib.
+
+category may be given as one of the LC_* values.
+
+"""
+def getpreferredencoding(do_setlocale: bool = True) -> _str:
+    """Return the charset that the user is likely using,
+according to the system configuration.
+"""
+def normalize(localename: _str) -> _str:
+    """Returns a normalized locale code for the given locale
+name.
+
+The returned locale code is formatted for use with
+setlocale().
+
+If normalization fails, the original name is returned
+unchanged.
+
+If the given encoding is not known, the function defaults to
+the default encoding for the locale code just like setlocale()
+does.
+
+"""
 
 if sys.version_info < (3, 13):
     if sys.version_info >= (3, 11):
         @deprecated("Deprecated since Python 3.11; removed in Python 3.13. Use `locale.setlocale(locale.LC_ALL, '')` instead.")
-        def resetlocale(category: int = ...) -> None: ...
+        def resetlocale(category: int = ...) -> None:
+            """ Sets the locale for category to the default setting.
+
+        The default setting is determined by calling
+        getdefaultlocale(). category defaults to LC_ALL.
+
+    """
     else:
-        def resetlocale(category: int = ...) -> None: ...
+        def resetlocale(category: int = ...) -> None:
+            """ Sets the locale for category to the default setting.
+
+        The default setting is determined by calling
+        getdefaultlocale(). category defaults to LC_ALL.
+
+    """
 
 if sys.version_info < (3, 12):
     @deprecated("Deprecated since Python 3.7; removed in Python 3.12. Use `locale.format_string()` instead.")
     def format(
         percent: _str, value: float | Decimal, grouping: bool = False, monetary: bool = False, *additional: Any
-    ) -> _str: ...
+    ) -> _str:
+        """Deprecated, use format_string instead.
+"""
 
-def format_string(f: _str, val: Any, grouping: bool = False, monetary: bool = False) -> _str: ...
-def currency(val: float | Decimal, symbol: bool = True, grouping: bool = False, international: bool = False) -> _str: ...
-def delocalize(string: _str) -> _str: ...
-def atof(string: _str, func: Callable[[_str], float] = ...) -> float: ...
-def atoi(string: _str) -> int: ...
-def str(val: float) -> _str: ...
+def format_string(f: _str, val: Any, grouping: bool = False, monetary: bool = False) -> _str:
+    """Formats a string in the same way that the % formatting would use,
+but takes the current locale into account.
+
+Grouping is applied if the third parameter is true.
+Conversion uses monetary thousands separator and grouping strings if
+forth parameter monetary is true.
+"""
+def currency(val: float | Decimal, symbol: bool = True, grouping: bool = False, international: bool = False) -> _str:
+    """Formats val according to the currency settings
+in the current locale.
+"""
+def delocalize(string: _str) -> _str:
+    """Parses a string as a normalized number according to the locale settings.
+"""
+def atof(string: _str, func: Callable[[_str], float] = ...) -> float:
+    """Parses a string as a float according to the locale settings.
+"""
+def atoi(string: _str) -> int:
+    """Converts a string to an integer according to the locale settings.
+"""
+def str(val: float) -> _str:
+    """Convert float to string, taking the locale into account.
+"""
 
 locale_alias: dict[_str, _str]  # undocumented
 locale_encoding_alias: dict[_str, _str]  # undocumented
