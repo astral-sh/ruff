@@ -4,6 +4,7 @@ Implements the Distutils 'build_clib' command, to build a C/C++ library
 that is included in the module distribution and needed by an extension
 module.
 """
+
 from _typeshed import Incomplete, Unused
 from collections.abc import Callable
 from typing import ClassVar
@@ -39,6 +40,7 @@ class build_clib(Command):
         Raise DistutilsSetupError if the structure is invalid anywhere;
         just returns otherwise.
         """
+
     def get_library_names(self): ...
     def get_source_files(self): ...
     def build_libraries(self, libraries) -> None: ...
