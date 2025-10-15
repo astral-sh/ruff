@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for uses of `typing.Text`.
+/// Checks for uses of `typing.Text`. In preview mode, also checks for `typing_extensions.Text`.
 ///
 /// ## Why is this bad?
 /// `typing.Text` is an alias for `str`, and only exists for Python 2
@@ -18,6 +18,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Example
 /// ```python
 /// from typing import Text
+/// from typing_extensions import Text  # Preview mode only
 ///
 /// foo: Text = "bar"
 /// ```
@@ -30,14 +31,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Text`](https://docs.python.org/3/library/typing.html#typing.Text)
 #[derive(ViolationMetadata)]
-pub(crate) struct TypingTextStrAlias;
+pub(crate) struct TypingTextStrAlias {
+    module: String,
+}
 
 impl Violation for TypingTextStrAlias {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`typing.Text` is deprecated, use `str`".to_string()
+        format!("`{}.Text` is deprecated, use `str`", self.module)
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -54,28 +57,50 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["typing" | "typing_extensions", "Text"]
-            )
-        })
-    {
-        let mut diagnostic = checker.report_diagnostic(TypingTextStrAlias, expr.range());
-        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
-                "str",
-                expr.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::safe_edits(
-                Edit::range_replacement(binding, expr.range()),
-                import_edit,
-            ))
-        });
+    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
+        let segments = qualified_name.segments();
+        if matches!(segments, ["typing", "Text"]) {
+            // Always detect typing.Text (stable behavior)
+            let mut diagnostic = checker.report_diagnostic(
+                TypingTextStrAlias {
+                    module: "typing".to_string(),
+                },
+                expr.range(),
+            );
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                    "str",
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                Ok(Fix::safe_edits(
+                    Edit::range_replacement(binding, expr.range()),
+                    import_edit,
+                ))
+            });
+        } else if matches!(segments, ["typing_extensions", "Text"]) {
+            // Only detect typing_extensions.Text in preview mode
+            if checker.settings().preview.is_enabled() {
+                let mut diagnostic = checker.report_diagnostic(
+                    TypingTextStrAlias {
+                        module: "typing_extensions".to_string(),
+                    },
+                    expr.range(),
+                );
+                diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                        "str",
+                        expr.start(),
+                        checker.semantic(),
+                    )?;
+                    Ok(Fix::safe_edits(
+                        Edit::range_replacement(binding, expr.range()),
+                        import_edit,
+                    ))
+                });
+            }
+        }
     }
 }
