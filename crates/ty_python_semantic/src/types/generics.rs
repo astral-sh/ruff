@@ -1488,10 +1488,18 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty
-                            .when_assignable_to(self.db, bound, self.inferable)
-                            .satisfies_all_typevars(self.db, self.inferable)
-                        {
+                        let when = ty.when_assignable_to(self.db, bound, self.inferable);
+                        eprintln!("==> infer");
+                        eprintln!("    formal    {}", formal.display(self.db));
+                        eprintln!("    actual    {}", actual.display(self.db));
+                        eprintln!(
+                            "    typevar   {}",
+                            bound_typevar.identity(self.db).display(self.db)
+                        );
+                        eprintln!("    bound     {}", bound.display(self.db));
+                        eprintln!("    inferable {}", self.inferable.display(self.db));
+                        eprintln!("    when      {}", when.display(self.db));
+                        if !when.is_always_satisfied() {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,

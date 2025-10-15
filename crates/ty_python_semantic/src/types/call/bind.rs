@@ -623,6 +623,12 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
                                     ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
+                                eprintln!(
+                                    "==> assignable {} {} {}",
+                                    ty_a.display(db),
+                                    ty_b.display(db),
+                                    constraints.display(db)
+                                );
                                 let result = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(result),
