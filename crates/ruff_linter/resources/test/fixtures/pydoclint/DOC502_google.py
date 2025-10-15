@@ -94,3 +94,20 @@ def foo():
         The ``init_kwargs`` argument.
     """
     raise ValueError
+
+
+# DOC502 regression for following section with colons
+def example_with_following_section():
+    """Summary.
+    
+    Returns:
+        str: The resulting expression.
+    
+    Raises:
+        ValueError: If the unit is not valid.
+    
+    Relation to `time_range_lookup`:
+        - Handles the "start of" modifier.
+        - Example: "start of month" → `DATETRUNC()`.
+    """
+    raise ValueError

@@ -493,6 +493,12 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName<'_>> {
                     }
                 }
             }
+        } else {
+            // If we can't strip the expected indentation, check if this is a dedented line
+            // (not blank) - if so, break early as we've reached the end of this section
+            if !potential.trim().is_empty() {
+                break;
+            }
         }
     }
     entries
