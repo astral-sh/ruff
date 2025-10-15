@@ -252,3 +252,10 @@ from some_module import PotentialTypeVar
 class Generic5(list[PotentialTypeVar]):
     def __new__(cls: type[Generic5]) -> Generic5: ...
     def __enter__(self: Generic5) -> Generic5: ...
+
+
+# Test case based on issue #20781 - metaclass with complex __new__ signature
+class MetaclassInWhichSelfCannotBeUsed5(type):
+    def __new__(
+        cls, name: str, bases: tuple[type[Any], ...], attrs: dict[str, Any], **kwargs: Any
+    ) -> MetaclassInWhichSelfCannotBeUsed5: ...
