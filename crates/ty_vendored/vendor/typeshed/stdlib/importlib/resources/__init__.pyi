@@ -14,7 +14,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from types import ModuleType
 from typing import Any, BinaryIO, Literal, TextIO
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 if sys.version_info >= (3, 11):
     from importlib.resources.abc import Traversable
@@ -98,14 +98,23 @@ else:
 
         Directories are *not* resources.
         """
+    if sys.version_info >= (3, 11):
+        @deprecated("Deprecated since Python 3.11. Use `files(anchor).iterdir()`.")
+        def contents(package: Package) -> Iterator[str]:
+            """Return an iterable of entries in `package`.
 
-    def contents(package: Package) -> Iterator[str]:
-        """Return an iterable of entries in `package`.
+            Note that not all entries are resources.  Specifically, directories are
+            not considered resources.  Use `is_resource()` on each entry returned here
+            to check if it is a resource or not.
+            """
+    else:
+        def contents(package: Package) -> Iterator[str]:
+            """Return an iterable of entries in 'package'.
 
-        Note that not all entries are resources.  Specifically, directories are
-        not considered resources.  Use `is_resource()` on each entry returned here
-        to check if it is a resource or not.
-        """
+            Note that not all entries are resources.  Specifically, directories are
+            not considered resources.  Use `is_resource()` on each entry returned here
+            to check if it is a resource or not.
+            """
 
 if sys.version_info >= (3, 11):
     from importlib.resources._common import as_file as as_file
