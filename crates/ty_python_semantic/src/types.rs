@@ -1495,7 +1495,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is a subtype of type `target`.
+    /// Return true if this type is a subtype of type `target`, when no typevars mentioned in
+    /// either type are inferable.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
@@ -1508,8 +1509,7 @@ impl<'db> Type<'db> {
             .is_always_satisfied()
     }
 
-    /// Return the constraints under which this type is a [subtype of] type `target`. (See
-    /// [`is_subtype_of`][Self::is_subtype_of] for more details on how we calculate subtyping.)
+    /// Return the constraints under which this type is a subtype of type `target`.
     ///
     /// If neither type contains any bound typevars (inferable or not), the result will either be
     /// [always][ConstraintSet::is_always_satisfied] or [never][ConstraintSet::is_never_satisfied].
@@ -1520,7 +1520,7 @@ impl<'db> Type<'db> {
     /// leave that up to the caller to check, so that you can use this method to obtain "partial"
     /// results and build up a more complete constraint set over several subtyping checks.
     ///
-    /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    /// See [`TypeRelation::Subtyping`] for more details.
     fn when_subtype_of(
         self,
         db: &'db dyn Db,
@@ -1530,7 +1530,8 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
     }
 
-    /// Return true if this type is assignable to type `target`.
+    /// Return true if this type is assignable to type `target`, when no typevars mentioned in
+    /// either type are inferable.
     ///
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
