@@ -9,7 +9,6 @@ use ruff_python_ast::name::Name;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::types::KnownClass;
 use ty_python_semantic::{
     Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
     types::{CycleDetector, Type},
@@ -280,7 +279,7 @@ fn add_keyword_value_completions<'db>(
     completions: &mut Vec<Completion<'db>>,
 ) {
     let keywords = [
-        ("None", KnownClass::NoneType.to_instance(db)),
+        ("None", Type::none(db)),
         ("True", Type::BooleanLiteral(true)),
         ("False", Type::BooleanLiteral(false)),
     ];
@@ -809,24 +808,20 @@ fn find_typed_text(
     // This one's weird, but if the cursor is beyond
     // what is in the closest `Name` token, then it's
     // likely we can't infer anything about what has
-    // been typed. This likely means there is whtiespace
+    // been typed. This likely means there is whitespace
     // or something that isn't represented in the token
     // stream. So just give up.
-    if last.range().end() < offset {
+    if last.end() < offset {
         return None;
     }
-    Some(source.as_str()[last.range()].to_string())
+    Some(source[last.range()].to_string())
 }
 
 /// Whether the given offset within the parsed module is within
 /// a comment or not.
 fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
     let tokens = tokens_start_before(parsed.tokens(), offset);
-    tokens
-        .iter()
-        .rev()
-        .take_while(|t| matches!(t.kind(), TokenKind::Comment | TokenKind::NonLogicalNewline))
-        .any(|t| matches!(t.kind(), TokenKind::Comment))
+    tokens.last().is_some_and(|t| t.kind().is_comment())
 }
 
 /// Returns true when the cursor at `offset` is positioned within
@@ -2869,11 +2864,6 @@ f = Foo()
 "#,
         );
 
-        // TODO: This should not have any completions suggested for it.
-        // We do correctly avoid giving `object.attr` completions here,
-        // but we instead fall back to scope based completions. Since
-        // we're inside a string, we should avoid giving completions at
-        // all.
         assert_snapshot!(test.completions_without_builtins(), @r"<No completions found>");
     }
 

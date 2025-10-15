@@ -6253,7 +6253,7 @@ impl<'db> Type<'db> {
     }
 
     /// The type `NoneType` / `None`
-    pub(crate) fn none(db: &'db dyn Db) -> Type<'db> {
+    pub fn none(db: &'db dyn Db) -> Type<'db> {
         KnownClass::NoneType.to_instance(db)
     }
 
