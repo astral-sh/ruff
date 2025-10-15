@@ -316,6 +316,42 @@ To enable logging in an mdtest, set `log = true` at the top level of the TOML bl
 See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs)
 for the full list of supported configuration options.
 
+### Testing with external dependencies
+
+Tests can specify external Python dependencies using a `[project]` section in the TOML configuration.
+This allows testing code that uses third-party libraries like `pydantic`, `numpy`, etc.
+
+It is recommended to specify exact versions of packages to ensure reproducibility. The specified
+Python version can also be important during package resolution.
+
+````markdown
+```toml
+[environment]
+python-version = "3.13"
+
+[project]
+dependencies = ["pydantic==2.12.2"]
+```
+
+```py
+import pydantic
+
+# use pydantic in the test
+```
+````
+
+When a test has dependencies:
+
+1. The test framework creates a `pyproject.toml` in a temporary directory.
+1. Runs `uv sync` to install the dependencies.
+1. Copies the installed packages from the virtual environment's `site-packages` directory into the test's
+    in-memory filesystem.
+1. Configures the type checker to use these packages.
+
+**Note**: This feature requires `uv` to be installed and available in your `PATH`. The dependencies
+are installed fresh for each test that specifies them, so tests with many dependencies may be slower
+to run.
+
 ### Specifying a custom typeshed
 
 Some tests will need to override the default typeshed with custom files. The `[environment]`
