@@ -29,7 +29,7 @@ on:
     - cron: "0 0 1,15 * *"
 
 env:
-  FORCE_COLOR: 1
+  CARGO_TERM_COLOR: always
   GH_TOKEN: ${{ github.token }}
 
   # The name of the upstream branch that the first worker creates,
@@ -88,6 +88,8 @@ jobs:
           git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)" --allow-empty
       - name: Sync Linux docstrings
         if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
         run: |
           cd ruff
           ./scripts/codemod_docstrings.sh
@@ -127,6 +129,8 @@ jobs:
       - name: Sync Windows docstrings
         id: docstrings
         shell: bash
+        env:
+          FORCE_COLOR: 1
         run: ./scripts/codemod_docstrings.sh
       - name: Commit the changes
         if: ${{ steps.docstrings.outcome == 'success' }}
@@ -164,11 +168,15 @@ jobs:
           git config --global user.email '<>'
       - name: Sync macOS docstrings
         if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
         run: |
           ./scripts/codemod_docstrings.sh
           git commit -am "Sync macOS docstrings" --allow-empty
       - name: Format the changes
         if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
         run: |
           # Here we just reformat the codemodded stubs so that they are
           # consistent with the other typeshed stubs around them.
@@ -203,8 +211,10 @@ jobs:
           # but if there were also other mdtest failures (for example), it will return a nonzero exit code.
           # We don't care about other tests failing here, we just want snapshots updated where possible,
           # so we use `|| true` here to ignore the exit code.
-          cargo insta test --accept || true
-          git commit -am "Update snapshots" || echo "No snapshot changes to commit"
+          cargo insta test --accept --color=always || true
+      - name: Commit snapshot changes
+        if: ${{ success() }}
+        run: git commit -am "Update snapshots" || echo "No snapshot changes to commit"
       - name: Push changes upstream and create a PR
         if: ${{ success() }}
         run: |
