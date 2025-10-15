@@ -1439,7 +1439,7 @@ impl<'db> CallableBinding<'db> {
                         .unwrap_or(Type::unknown());
                     if argument_type
                         .when_assignable_to(db, parameter_type, overload.inferable_typevars)
-                        .is_always_satisfied()
+                        .satisfies_all_typevars(db, overload.inferable_typevars)
                     {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
@@ -1672,7 +1672,7 @@ impl<'db> CallableBinding<'db> {
                                 current_parameter_type,
                                 overload.inferable_typevars,
                             )
-                            .is_always_satisfied()
+                            .satisfies_all_typevars(db, overload.inferable_typevars)
                         {
                             participating_parameter_indexes.insert(parameter_index);
                         }
@@ -1795,7 +1795,7 @@ impl<'db> CallableBinding<'db> {
                             first_overload_return_type,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied()
+                        .satisfies_all_typevars(db, overload.inferable_typevars)
                 })
             } else {
                 // No matching overload
@@ -2628,15 +2628,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_type = argument_type.apply_specialization(self.db, specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, specialization);
             }
-            // This is one of the few places where we want to check if there's _any_ specialization
-            // where assignability holds; normally we want to check that assignability holds for
-            // _all_ specializations.
             // TODO: Soon we will go further, and build the actual specializations from the
             // constraint set that we get from this assignability check, instead of inferring and
             // building them in an earlier separate step.
-            if argument_type
+            if !argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-                .is_never_satisfied()
+                .satisfies_all_typevars(self.db, self.inferable_typevars)
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
@@ -2770,7 +2767,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     KnownClass::Str.to_instance(self.db),
                     self.inferable_typevars,
                 )
-                .is_always_satisfied()
+                .satisfies_all_typevars(self.db, self.inferable_typevars)
             {
                 self.errors.push(BindingError::InvalidKeyType {
                     argument_index: adjusted_argument_index,

@@ -63,10 +63,11 @@ use std::fmt::Display;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
+use crate::types::generics::InferableTypeVars;
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
-    UnionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -223,6 +224,52 @@ impl<'db> ConstraintSet<'db> {
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self) -> bool {
         self.node.is_always_satisfied()
+    }
+
+    /// Returns whether this constraint set satisfies all of the typevars that it mentions.
+    ///
+    /// Each typevar is either _inferable_ or _non-inferable_. (You provide a list of the
+    /// `inferable` typevars; all others are considered non-inferable.) In either case, we
+    /// restrict the constraint set to only consider that typevar. For an inferable typevar, then
+    /// there must be _some_ type that the typevar can specialize to, and which satisfies the
+    /// bounds or constraints of the typevar. For a non-inferable typevar, then the restricted
+    /// constraint set must be satisfied for _all_ types that satisfy the bounds or constraints.
+    ///
+    /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
+    /// even if the constraint set was created to describe a type that contains other typevars,
+    /// since any other typevar cannot affect whether the constraint set is satisfied or not.
+    pub(crate) fn satisfies_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        match self.node {
+            Node::AlwaysTrue => return true,
+            Node::AlwaysFalse => return false,
+            Node::Interior(_) => {}
+        }
+
+        let mut typevars = FxHashSet::default();
+        self.node.for_each_constraint(db, &mut |constraint| {
+            typevars.insert(constraint.typevar(db));
+        });
+
+        for typevar in typevars {
+            let valid_specializations = typevar.valid_specializations(db);
+            let restricted = (self.node)
+                .project_typevar(db, typevar.identity(db))
+                .and(db, valid_specializations.node);
+            let satisfied = if inferable.is_inferable(db, typevar) {
+                !restricted.is_never_satisfied()
+            } else {
+                restricted == valid_specializations.node
+            };
+            if !satisfied {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -607,6 +654,16 @@ impl<'db> Node<'db> {
             .or(db, self.negate(db).and(db, else_node))
     }
 
+    /// Returns a new BDD that only considers inputs that constrain a particular typevar. All other
+    /// inputs are allowed to take on any. value.
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.project_typevar(db, typevar),
+        }
+    }
+
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
     /// particular values. (Those variables will not be checked when evaluating the result, and
     /// will not be present in the result.)
@@ -935,6 +992,18 @@ impl<'db> InteriorNode<'db> {
                 Node::Interior(self).iff(db, other.if_true(db)),
                 Node::Interior(self).iff(db, other.if_false(db)),
             ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        if self_constraint.typevar(db).identity(db) == typevar {
+            let if_true = self.if_true(db).project_typevar(db, typevar);
+            let if_false = self.if_false(db).project_typevar(db, typevar);
+            Node::new(db, self_constraint, if_true, if_false)
+        } else {
+            self.if_true(db).or(db, self.if_false(db))
         }
     }
 

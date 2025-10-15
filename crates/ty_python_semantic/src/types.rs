@@ -1207,7 +1207,7 @@ impl<'db> Type<'db> {
             union.filter(db, |elem| {
                 !elem
                     .when_disjoint_from(db, target, inferable)
-                    .is_always_satisfied()
+                    .satisfies_all_typevars(db, inferable)
             })
         } else {
             self
@@ -1500,13 +1500,8 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        let valid_specializations =
-            (self.valid_specializations(db)).and(db, || target.valid_specializations(db));
-        valid_specializations
-            .implies(db, || {
-                self.when_subtype_of(db, target, InferableTypeVars::None)
-            })
-            .is_always_satisfied()
+        self.when_subtype_of(db, target, InferableTypeVars::None)
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     /// Return the constraints under which this type is a subtype of type `target`.
@@ -1535,13 +1530,8 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        let valid_specializations =
-            (self.valid_specializations(db)).and(db, || target.valid_specializations(db));
-        valid_specializations
-            .implies(db, || {
-                self.when_assignable_to(db, target, InferableTypeVars::None)
-            })
-            .is_always_satisfied()
+        self.when_assignable_to(db, target, InferableTypeVars::None)
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     /// Returns the constraints under which this type is [assignable to] type `target`.
@@ -1571,7 +1561,7 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Redundancy`] for more details.
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     fn has_relation_to(
@@ -2360,7 +2350,7 @@ impl<'db> Type<'db> {
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_equivalent_to(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     fn when_equivalent_to(
@@ -2483,7 +2473,7 @@ impl<'db> Type<'db> {
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_disjoint_from(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     fn when_disjoint_from(

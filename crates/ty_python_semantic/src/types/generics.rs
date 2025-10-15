@@ -1406,7 +1406,7 @@ impl<'db> SpecializationBuilder<'db> {
             && !actual.is_never()
             && actual
                 .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied()
+                .satisfies_all_typevars(self.db, self.inferable)
         {
             return Ok(());
         }
@@ -1490,7 +1490,7 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty
                             .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied()
+                            .satisfies_all_typevars(self.db, self.inferable)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -1510,7 +1510,7 @@ impl<'db> SpecializationBuilder<'db> {
                         for constraint in constraints.elements(self.db) {
                             let when_assignable: ConstraintSet =
                                 ty.when_assignable_to(self.db, *constraint, self.inferable);
-                            if when_assignable.is_always_satisfied() {
+                            if when_assignable.satisfies_all_typevars(self.db, self.inferable) {
                                 // If the type is assignable to this constraint individually. We
                                 // only track the smallest such constraint.
                                 if let Some(existing) = smallest_assignable.replace(*constraint) {
@@ -1522,7 +1522,7 @@ impl<'db> SpecializationBuilder<'db> {
                             when_all_assignable.intersect(self.db, when_assignable);
                         }
 
-                        if when_all_assignable.is_always_satisfied() {
+                        if when_all_assignable.satisfies_all_typevars(self.db, self.inferable) {
                             self.add_type_mapping(bound_typevar, ty);
                         } else if let Some(smallest_assignable) = smallest_assignable {
                             self.add_type_mapping(bound_typevar, smallest_assignable);
