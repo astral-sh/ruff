@@ -980,26 +980,11 @@ where
         let is_regular_package = package_path.is_regular_package(resolver_state);
 
         if is_regular_package {
-            in_namespace_package = false;
-
-            if !module_search_path.is_standard_library() {
-                // Check if this is a legacy namespace package `__init__`
-                // which acts less like a namespace package and more like a partial stub
-                // (because it can have actual non-submodule contents, as it has an `__init__`).
-                // So if we do find one, say it's a partial stub?
-                package_path.push("__init__");
-                let maybe_init = resolve_file_module(&package_path, resolver_state);
-                package_path.pop();
-                if let Some(regular_package) = maybe_init {
-                    let parsed = ruff_db::parsed::parsed_module(resolver_state.db, regular_package);
-                    let mut visitor = LegacyNamespacePackageVisitor::default();
-                    visitor.visit_body(parsed.load(resolver_state.db).suite());
-
-                    if visitor.is_legacy_namespace_package {
-                        in_namespace_package = true;
-                    }
-                }
-            }
+            // This is the only place where we need to consider the existence of legacy namespace
+            // packages, as we are explicitly searching for the *parent* package of the module
+            // we actually want. Here, such a package should be treated as a namespace package.
+            // In all other contexts it acts like a normal package and needs no special handling.
+            in_namespace_package = is_legacy_namespace_package(&package_path, resolver_state);
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
             && resolve_file_module(&package_path, resolver_state).is_none()
@@ -1034,6 +1019,57 @@ where
         path: package_path,
         typed,
     })
+}
+
+/// Determines whether a package is a legacy namespace package.
+///
+/// Before PEP 420 introduce proper namespace packages, the ecosystem developed
+/// its own form of namespace packages. These legacy namespace packages continue to persist
+/// in modern codebases because they work with ancient pythons and if it ain't broke don't fix it.
+///
+/// A legacy namespace package is distinguished by having an `__init__.py` that contains an
+/// expression to the effect of:
+///
+/// ```python
+/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
+/// ```
+///
+/// The resulting package simultaneously has properties of both regular packages and namespace ones:
+///
+/// * Like regular packages, `__init__.py` is defined and can contain items other than submodules
+/// * Like namespace packages, multiple copies of the package may exist with different submodules
+///
+/// Now, you may rightly wonder: "What if the `__init__.py` files have different contents?"
+/// The apparent official answer is: "Don't do that!"
+/// And the reality is: "Of course people do that!"
+///
+/// In practice we think it's fine to, just like with regular packages, use the first one
+/// we find on the search paths. To the extent that the different copies "need" to have the same
+/// contents, they all "need" to have the legacy namespace idiom (we do nothing to enforce that,
+/// we will just get confused if you mess it up).
+fn is_legacy_namespace_package(
+    package_path: &ModulePath,
+    resolver_state: &ResolverContext,
+) -> bool {
+    // Just an optimization, the stdlib and typeshed are never legacy namespace packages
+    if package_path.search_path().is_standard_library() {
+        return false;
+    }
+
+    let mut package_path = package_path.clone();
+    package_path.push("__init__");
+    let Some(init) = resolve_file_module(&package_path, resolver_state) else {
+        return false;
+    };
+
+    // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
+    // The benefit of being syntax-only is speed and avoid circular dependencies
+    // between module resolution and semantic analysis.
+    let parsed = ruff_db::parsed::parsed_module(resolver_state.db, init);
+    let mut visitor = LegacyNamespacePackageVisitor::default();
+    visitor.visit_body(parsed.load(resolver_state.db).suite());
+
+    visitor.is_legacy_namespace_package
 }
 
 #[derive(Debug)]
