@@ -978,6 +978,24 @@ where
 
         if is_regular_package {
             in_namespace_package = false;
+            // Check if this is a legacy namespace package `__init__`
+            // which acts less like a namespace package and more like a partial stub
+            // (because it can have actual non-submodule contents, as it has an `__init__`).
+            // So if we do find one, say it's a partial stub?
+            package_path.push("__init__");
+            let maybe_init = resolve_file_module(&package_path, resolver_state);
+            package_path.pop();
+            if let Some(regular_package) = maybe_init {
+                let text = ruff_db::source::source_text(resolver_state.db, regular_package);
+                let patterns = [
+                    r#"__path__ = pkgutil.extend_path(__path__, __name__)"#,
+                    r#"__path__ = __import__("pkgutil").extend_path(__path__, __name__)"#,
+                ];
+
+                if patterns.iter().any(|pattern| text.contains(pattern)) {
+                    in_namespace_package = true;
+                }
+            }
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
             && resolve_file_module(&package_path, resolver_state).is_none()

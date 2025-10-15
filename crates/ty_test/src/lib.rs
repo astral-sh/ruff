@@ -449,22 +449,21 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    // FIXME
-    // for from_list in list_modules(db) {
-    //     errs.push(match resolve_module(db, from_list.name(db)) {
-    //         None => ModuleInconsistency {
-    //             db,
-    //             from_list,
-    //             from_resolve: None,
-    //         },
-    //         Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
-    //             db,
-    //             from_list,
-    //             from_resolve: Some(from_resolve),
-    //         },
-    //         _ => continue,
-    //     });
-    // }
+    for from_list in list_modules(db) {
+        errs.push(match resolve_module(db, from_list.name(db)) {
+            None => ModuleInconsistency {
+                db,
+                from_list,
+                from_resolve: None,
+            },
+            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                db,
+                from_list,
+                from_resolve: Some(from_resolve),
+            },
+            _ => continue,
+        });
+    }
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }
 
