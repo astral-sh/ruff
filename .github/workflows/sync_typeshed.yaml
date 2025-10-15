@@ -16,8 +16,10 @@ name: Sync typeshed
 # 3. Once the Windows worker is done, a MacOS worker:
 #    a. Checks out the branch created by the Linux worker
 #    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
-#    c. Commits the changes and pushes them to the same upstream branch
-#    d. Creates a PR against the `main` branch using the branch all three workers have pushed to
+#    c. Attempts to update any snapshots that might have changed
+#       (this sub-step is allowed to fail)
+#    d. Commits the changes and pushes them to the same upstream branch
+#    e. Creates a PR against the `main` branch using the branch all three workers have pushed to
 # 4. If any of steps 1-3 failed, an issue is created in the `astral-sh/ruff` repository
 
 on:
@@ -27,7 +29,12 @@ on:
     - cron: "0 0 1,15 * *"
 
 env:
-  FORCE_COLOR: 1
+  # Don't set this flag globally for the workflow: it does strange things
+  # to the snapshots in the `cargo insta test --accept` step in the MacOS job.
+  #
+  # FORCE_COLOR: 1
+
+  CARGO_TERM_COLOR: always
   GH_TOKEN: ${{ github.token }}
 
   # The name of the upstream branch that the first worker creates,
@@ -86,6 +93,8 @@ jobs:
           git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)" --allow-empty
       - name: Sync Linux docstrings
         if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
         run: |
           cd ruff
           ./scripts/codemod_docstrings.sh
@@ -125,6 +134,8 @@ jobs:
       - name: Sync Windows docstrings
         id: docstrings
         shell: bash
+        env:
+          FORCE_COLOR: 1
         run: ./scripts/codemod_docstrings.sh
       - name: Commit the changes
         if: ${{ steps.docstrings.outcome == 'success' }}
@@ -161,26 +172,63 @@ jobs:
           git config --global user.name typeshedbot
           git config --global user.email '<>'
       - name: Sync macOS docstrings
-        run: ./scripts/codemod_docstrings.sh
-      - name: Commit and push the changes
         if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
         run: |
+          ./scripts/codemod_docstrings.sh
           git commit -am "Sync macOS docstrings" --allow-empty
-
+      - name: Format the changes
+        if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
+        run: |
           # Here we just reformat the codemodded stubs so that they are
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
           uvx black "${VENDORED_TYPESHED}/stdlib" --config "${VENDORED_TYPESHED}/pyproject.toml" || true
           git commit -am "Format codemodded docstrings" --allow-empty
-
-          rm "${VENDORED_TYPESHED}/pyproject.toml"
-          git commit -am "Remove pyproject.toml file"
-
-          git push
-      - name: Create a PR
+      - name: Remove typeshed pyproject.toml file
         if: ${{ success() }}
         run: |
+          rm "${VENDORED_TYPESHED}/pyproject.toml"
+          git commit -am "Remove pyproject.toml file"
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - name: "Install Rust toolchain"
+        if: ${{ success() }}
+        run: rustup show
+      - name: "Install mold"
+        if: ${{ success() }}
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+      - name: "Install cargo nextest"
+        if: ${{ success() }}
+        uses: taiki-e/install-action@522492a8c115f1b6d4d318581f09638e9442547b # v2.62.21
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        if: ${{ success() }}
+        uses: taiki-e/install-action@522492a8c115f1b6d4d318581f09638e9442547b # v2.62.21
+        with:
+          tool: cargo-insta
+      - name: Update snapshots
+        if: ${{ success() }}
+        run: |
+          # The `cargo insta` docs indicate that `--unreferenced=delete` might be a good option,
+          # but from local testing it appears to just revert all changes made by `cargo insta test --accept`.
+          #
+          # If there were only snapshot-related failures, `cargo insta test --accept` will have exit code 0,
+          # but if there were also other mdtest failures (for example), it will return a nonzero exit code.
+          # We don't care about other tests failing here, we just want snapshots updated where possible,
+          # so we use `|| true` here to ignore the exit code.
+          cargo insta test --accept --color=always --all-features --test-runner=nextest || true
+      - name: Commit snapshot changes
+        if: ${{ success() }}
+        run: git commit -am "Update snapshots" || echo "No snapshot changes to commit"
+      - name: Push changes upstream and create a PR
+        if: ${{ success() }}
+        run: |
+          git push
           gh pr list --repo "${GITHUB_REPOSITORY}" --head "${UPSTREAM_BRANCH}" --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
           gh pr create --title "[ty] Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "ty"
 
