@@ -270,6 +270,45 @@ mod tests {
         "PD011_pass_node_name"
     )]
     #[test_case(
+        r"
+        import pandas as pd
+        import numpy as np
+        unique = np.unique_inverse([1, 2, 3, 2, 1])
+        result = unique.values
+    ",
+        "PD011_pass_numpy_unique_inverse"
+    )]
+    #[test_case(
+        r"
+        import pandas as pd
+        import numpy as np
+        unique = np.unique_all([1, 2, 3, 2, 1])
+        result = unique.values
+    ",
+        "PD011_pass_numpy_unique_all"
+    )]
+    #[test_case(
+        r"
+        import pandas as pd
+        import numpy as np
+        unique = np.unique_counts([1, 2, 3, 2, 1])
+        result = unique.values
+    ",
+        "PD011_pass_numpy_unique_counts"
+    )]
+    #[test_case(
+        r"
+        import pandas as pd
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from numpy.lib._arraysetops_impl import UniqueInverseResult
+        import numpy as np
+        unique: UniqueInverseResult[np.uint64] = np.unique_inverse([1, 2, 3, 2, 1])
+        result = unique.values
+    ",
+        "PD011_pass_numpy_typed_unique_inverse"
+    )]
+    #[test_case(
         r#"
         import pandas as pd
         x = pd.DataFrame()
