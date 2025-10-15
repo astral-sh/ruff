@@ -42,7 +42,7 @@ pub(crate) fn all_declarations_and_bindings<'db>(
             place_result
                 .ignore_conflicting_declarations()
                 .place
-                .ignore_possibly_unbound()
+                .ignore_possibly_undefined()
                 .map(|ty| {
                     let symbol = table.symbol(symbol_id);
                     let member = Member {
@@ -71,7 +71,7 @@ pub(crate) fn all_declarations_and_bindings<'db>(
                     }
                 }
                 place_from_bindings(db, bindings)
-                    .ignore_possibly_unbound()
+                    .ignore_possibly_undefined()
                     .map(|ty| {
                         let symbol = table.symbol(symbol_id);
                         let member = Member {
@@ -239,7 +239,8 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Type(ty, _) = imported_symbol(db, file, symbol_name, None).place
+                    let Place::Defined(ty, _, _) =
+                        imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
                     };
@@ -327,7 +328,7 @@ impl<'db> AllMembers<'db> {
             let parent_scope = parent.body_scope(db);
             for memberdef in all_declarations_and_bindings(db, parent_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
-                let Some(ty) = result.place.ignore_possibly_unbound() else {
+                let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
                 self.members.insert(Member {
@@ -358,7 +359,7 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
                     let result = ty.member(db, name);
-                    let Some(ty) = result.place.ignore_possibly_unbound() else {
+                    let Some(ty) = result.place.ignore_possibly_undefined() else {
                         continue;
                     };
                     self.members.insert(Member {
@@ -375,7 +376,7 @@ impl<'db> AllMembers<'db> {
             // method, but `instance_of_SomeClass.__delattr__` is.
             for memberdef in all_declarations_and_bindings(db, class_body_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
-                let Some(ty) = result.place.ignore_possibly_unbound() else {
+                let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
                 self.members.insert(Member {

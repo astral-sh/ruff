@@ -751,7 +751,7 @@ impl<'db> DefinitionInference<'db> {
                     None
                 }
             })
-            .or_else(|| self.fallback_type().map(Into::into))
+            .or_else(|| self.fallback_type().map(TypeAndQualifiers::declared))
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",

@@ -22,7 +22,7 @@ use crate::module_resolver::{
 };
 use crate::node_key::NodeKey;
 use crate::place::{
-    Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
+    ConsideredDefinitions, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
     builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
@@ -136,7 +136,11 @@ enum DeclaredAndInferredType<'db> {
 
 impl<'db> DeclaredAndInferredType<'db> {
     fn are_the_same_type(ty: Type<'db>) -> Self {
-        Self::AreTheSame(ty.into())
+        Self::AreTheSame(TypeAndQualifiers::new(
+            ty,
+            TypeOrigin::Inferred,
+            TypeQualifiers::empty(),
+        ))
     }
 }
 
@@ -957,7 +961,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut public_functions = FxHashSet::default();
 
         for place in overloaded_function_places {
-            if let Place::Type(Type::FunctionLiteral(function), Boundness::Bound) =
+            if let Place::Defined(Type::FunctionLiteral(function), _, Definedness::AlwaysDefined) =
                 place_from_bindings(
                     self.db(),
                     use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
@@ -1465,7 +1469,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Fall back to implicit module globals for (possibly) unbound names
-        if !matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
+        if !place_and_quals.place.is_definitely_bound() {
             if let PlaceExprRef::Symbol(symbol) = place {
                 let symbol_id = place_id.expect_symbol();
 
@@ -1486,38 +1490,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let unwrap_declared_ty = || {
             resolved_place
-                .ignore_possibly_unbound()
+                .ignore_possibly_undefined()
                 .unwrap_or(Type::unknown())
         };
 
         // If the place is unbound and its an attribute or subscript place, fall back to normal
         // attribute/subscript inference on the root type.
-        let declared_ty = if resolved_place.is_unbound() && !place_table.place(place_id).is_symbol()
-        {
-            if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-                let value_type =
-                    self.infer_maybe_standalone_expression(value, TypeContext::default());
-                if let Place::Type(ty, Boundness::Bound) = value_type.member(db, attr).place {
-                    // TODO: also consider qualifiers on the attribute
-                    ty
+        let declared_ty =
+            if resolved_place.is_undefined() && !place_table.place(place_id).is_symbol() {
+                if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+                    let value_type =
+                        self.infer_maybe_standalone_expression(value, TypeContext::default());
+                    if let Place::Defined(ty, _, Definedness::AlwaysDefined) =
+                        value_type.member(db, attr).place
+                    {
+                        // TODO: also consider qualifiers on the attribute
+                        ty
+                    } else {
+                        unwrap_declared_ty()
+                    }
+                } else if let AnyNodeRef::ExprSubscript(
+                    subscript @ ast::ExprSubscript {
+                        value, slice, ctx, ..
+                    },
+                ) = node
+                {
+                    let value_ty = self.infer_expression(value, TypeContext::default());
+                    let slice_ty = self.infer_expression(slice, TypeContext::default());
+                    self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
                 } else {
                     unwrap_declared_ty()
                 }
-            } else if let AnyNodeRef::ExprSubscript(
-                subscript @ ast::ExprSubscript {
-                    value, slice, ctx, ..
-                },
-            ) = node
-            {
-                let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
             } else {
                 unwrap_declared_ty()
-            }
-        } else {
-            unwrap_declared_ty()
-        };
+            };
 
         if qualifiers.contains(TypeQualifiers::FINAL) {
             let mut previous_bindings = use_def.bindings_at_definition(binding);
@@ -1585,7 +1591,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if value_ty
                 .class_member(db, attr.id.clone())
                 .place
-                .ignore_possibly_unbound()
+                .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {
                 bound_ty = declared_ty;
@@ -1644,14 +1650,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if scope.is_global() {
                         module_type_implicit_global_symbol(self.db(), symbol.name())
                     } else {
-                        Place::Unbound.into()
+                        Place::Undefined.into()
                     }
                 } else {
-                    Place::Unbound.into()
+                    Place::Undefined.into()
                 }
             })
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
@@ -1663,7 +1669,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_ty.display(self.db())
                 ));
             }
-            TypeAndQualifiers::unknown()
+            TypeAndQualifiers::declared(Type::unknown())
         };
         self.declarations.insert(declaration, ty);
     }
@@ -1702,7 +1708,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
                         .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
-                        .and_then(|place| place.place.ignore_possibly_unbound())
+                        .and_then(|place| place.place.ignore_possibly_undefined())
                     {
                         let declared_type = declared_ty.inner_type();
                         if !declared_type
@@ -2425,7 +2431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
                     DeclaredAndInferredType::MightBeDifferent {
-                        declared_ty: declared_ty.into(),
+                        declared_ty: TypeAndQualifiers::declared(declared_ty),
                         inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
                     }
                 } else if (self.in_stub()
@@ -3619,14 +3625,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                                         ) {
                                         PlaceAndQualifiers {
-                                            place: Place::Type(attr_ty, _),
+                                            place: Place::Defined(attr_ty, _, _),
                                             qualifiers: _,
                                         } => attr_ty.is_callable_type(),
                                         _ => false,
                                     };
 
                                     let member_exists =
-                                        !object_ty.member(db, attribute).place.is_unbound();
+                                        !object_ty.member(db, attribute).place.is_undefined();
 
                                     let msg = if !member_exists {
                                         format!(
@@ -3693,7 +3699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 false
                             }
                             PlaceAndQualifiers {
-                                place: Place::Type(meta_attr_ty, meta_attr_boundness),
+                                place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
                                 qualifiers,
                             } => {
                                 if invalid_assignment_to_final(qualifiers) {
@@ -3701,7 +3707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
 
                                 let assignable_to_meta_attr =
-                                    if let Place::Type(meta_dunder_set, _) =
+                                    if let Place::Defined(meta_dunder_set, _, _) =
                                         meta_attr_ty.class_member(db, "__set__".into()).place
                                     {
                                         let dunder_set_result = meta_dunder_set.try_call(
@@ -3733,11 +3739,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     };
 
                                 let assignable_to_instance_attribute = if meta_attr_boundness
-                                    == Boundness::PossiblyUnbound
+                                    == Definedness::PossiblyUndefined
                                 {
                                     let (assignable, boundness) = if let PlaceAndQualifiers {
                                         place:
-                                            Place::Type(instance_attr_ty, instance_attr_boundness),
+                                            Place::Defined(instance_attr_ty, _, instance_attr_boundness),
                                         qualifiers,
                                     } =
                                         object_ty.instance_member(db, attribute)
@@ -3751,10 +3757,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             instance_attr_boundness,
                                         )
                                     } else {
-                                        (true, Boundness::PossiblyUnbound)
+                                        (true, Definedness::PossiblyUndefined)
                                     };
 
-                                    if boundness == Boundness::PossiblyUnbound {
+                                    if boundness == Definedness::PossiblyUndefined {
                                         report_possibly_missing_attribute(
                                             &self.context,
                                             target,
@@ -3772,11 +3778,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
 
                             PlaceAndQualifiers {
-                                place: Place::Unbound,
+                                place: Place::Undefined,
                                 ..
                             } => {
                                 if let PlaceAndQualifiers {
-                                    place: Place::Type(instance_attr_ty, instance_attr_boundness),
+                                    place:
+                                        Place::Defined(instance_attr_ty, _, instance_attr_boundness),
                                     qualifiers,
                                 } = object_ty.instance_member(db, attribute)
                                 {
@@ -3784,7 +3791,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         return false;
                                     }
 
-                                    if instance_attr_boundness == Boundness::PossiblyUnbound {
+                                    if instance_attr_boundness == Definedness::PossiblyUndefined {
                                         report_possibly_missing_attribute(
                                             &self.context,
                                             target,
@@ -3818,14 +3825,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 match object_ty.class_member(db, attribute.into()) {
                     PlaceAndQualifiers {
-                        place: Place::Type(meta_attr_ty, meta_attr_boundness),
+                        place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
                         qualifiers,
                     } => {
                         if invalid_assignment_to_final(qualifiers) {
                             return false;
                         }
 
-                        let assignable_to_meta_attr = if let Place::Type(meta_dunder_set, _) =
+                        let assignable_to_meta_attr = if let Place::Defined(meta_dunder_set, _, _) =
                             meta_attr_ty.class_member(db, "__set__".into()).place
                         {
                             let dunder_set_result = meta_dunder_set.try_call(
@@ -3851,20 +3858,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
 
                         let assignable_to_class_attr = if meta_attr_boundness
-                            == Boundness::PossiblyUnbound
+                            == Definedness::PossiblyUndefined
                         {
                             let (assignable, boundness) =
-                                if let Place::Type(class_attr_ty, class_attr_boundness) = object_ty
-                                    .find_name_in_mro(db, attribute)
-                                    .expect("called on Type::ClassLiteral or Type::SubclassOf")
-                                    .place
+                                if let Place::Defined(class_attr_ty, _, class_attr_boundness) =
+                                    object_ty
+                                        .find_name_in_mro(db, attribute)
+                                        .expect("called on Type::ClassLiteral or Type::SubclassOf")
+                                        .place
                                 {
                                     (ensure_assignable_to(class_attr_ty), class_attr_boundness)
                                 } else {
-                                    (true, Boundness::PossiblyUnbound)
+                                    (true, Definedness::PossiblyUndefined)
                                 };
 
-                            if boundness == Boundness::PossiblyUnbound {
+                            if boundness == Definedness::PossiblyUndefined {
                                 report_possibly_missing_attribute(
                                     &self.context,
                                     target,
@@ -3881,11 +3889,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         assignable_to_meta_attr && assignable_to_class_attr
                     }
                     PlaceAndQualifiers {
-                        place: Place::Unbound,
+                        place: Place::Undefined,
                         ..
                     } => {
                         if let PlaceAndQualifiers {
-                            place: Place::Type(class_attr_ty, class_attr_boundness),
+                            place: Place::Defined(class_attr_ty, _, class_attr_boundness),
                             qualifiers,
                         } = object_ty
                             .find_name_in_mro(db, attribute)
@@ -3895,7 +3903,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 return false;
                             }
 
-                            if class_attr_boundness == Boundness::PossiblyUnbound {
+                            if class_attr_boundness == Definedness::PossiblyUndefined {
                                 report_possibly_missing_attribute(
                                     &self.context,
                                     target,
@@ -3911,7 +3919,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     !instance
                                         .instance_member(self.db(), attribute)
                                         .place
-                                        .is_unbound()
+                                        .is_undefined()
                                 });
 
                             // Attribute is declared or bound on instance. Forbid access from the class object
@@ -3946,7 +3954,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::ModuleLiteral(module) => {
-                if let Place::Type(attr_ty, _) = module.static_member(db, attribute).place {
+                if let Place::Defined(attr_ty, _, _) = module.static_member(db, attribute).place {
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
                     if assignable {
                         true
@@ -5057,11 +5065,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
             if let PlaceAndQualifiers {
-                place: Place::Type(ty, boundness),
+                place: Place::Defined(ty, _, boundness),
                 qualifiers,
             } = module_ty.member(self.db(), name)
             {
-                if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
+                if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
                     if let Some(builder) = self
@@ -5079,6 +5087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &DeclaredAndInferredType::MightBeDifferent {
                         declared_ty: TypeAndQualifiers {
                             inner: ty,
+                            origin: TypeOrigin::Declared,
                             qualifiers,
                         },
                         inferred_ty: ty,
@@ -5224,7 +5233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             if !module_type_implicit_global_symbol(self.db(), name)
                 .place
-                .is_unbound()
+                .is_undefined()
             {
                 // This name is an implicit global like `__file__` (but not a built-in like `int`).
                 continue;
@@ -6934,7 +6943,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (without infinite recursion if we're already in builtins.)
             .or_fall_back_to(db, || {
                 if Some(self.scope()) == builtins_module_scope(db) {
-                    Place::Unbound.into()
+                    Place::Undefined.into()
                 } else {
                     builtins_symbol(db, symbol_name)
                 }
@@ -6951,7 +6960,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     typing_extensions_symbol(db, symbol_name)
                 } else {
-                    Place::Unbound.into()
+                    Place::Undefined.into()
                 }
             });
 
@@ -6961,11 +6970,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let ty =
             resolved_after_fallback.unwrap_with_diagnostic(|lookup_error| match lookup_error {
-                LookupError::Unbound(qualifiers) => {
+                LookupError::Undefined(qualifiers) => {
                     self.report_unresolved_reference(name_node);
-                    TypeAndQualifiers::new(Type::unknown(), qualifiers)
+                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
                 }
-                LookupError::PossiblyUnbound(type_when_bound) => {
+                LookupError::PossiblyUndefined(type_when_bound) => {
                     if self.is_reachable(name_node) {
                         report_possibly_unresolved_reference(&self.context, name_node);
                     }
@@ -6996,7 +7005,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.deferred_state.in_string_annotation(),
                     "Expected the place table to create a place for every valid PlaceExpr node"
                 );
-                Place::Unbound
+                Place::Undefined
             };
             (place, None)
         } else {
@@ -7004,7 +7013,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_name_expr()
                 .is_some_and(|name| name.is_invalid())
             {
-                return (Place::Unbound, None);
+                return (Place::Undefined, None);
             }
 
             let use_id = expr_ref.scoped_use_id(db, scope);
@@ -7064,7 +7073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // enclosing scopes in this case. The one exception to this rule is the global fallback
             // in class bodies, which we already handled above.
             if symbol_resolves_locally {
-                return Place::Unbound.into();
+                return Place::Undefined.into();
             }
 
             for parent_id in place_table.parents(place_expr) {
@@ -7082,8 +7091,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
-                if let Place::Type(_, _) = parent_place {
-                    return Place::Unbound.into();
+                if let Place::Defined(_, _, _) = parent_place {
+                    return Place::Undefined.into();
                 }
             }
 
@@ -7154,13 +7163,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // Don't fall back to non-eager place resolution.
                         EnclosingSnapshotResult::NotFound => {
                             if has_root_place_been_reassigned() {
-                                return Place::Unbound.into();
+                                return Place::Undefined.into();
                             }
                             continue;
                         }
                         EnclosingSnapshotResult::NoLongerInEagerContext => {
                             if has_root_place_been_reassigned() {
-                                return Place::Unbound.into();
+                                return Place::Undefined.into();
                             }
                         }
                     }
@@ -7209,12 +7218,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &constraint_keys,
                         )
                     });
-                    // We could have Place::Unbound here, despite the checks above, for example if
+                    // We could have `Place::Undefined` here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
-                    if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
+                    if let Place::Defined(type_, _, boundness) = local_place_and_qualifiers.place {
                         nonlocal_union_builder.add_in_place(type_);
                         // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
-                        debug_assert_eq!(boundness, Boundness::Bound);
+                        debug_assert_eq!(boundness, Definedness::AlwaysDefined);
                         found_some_definition = true;
                     }
 
@@ -7223,20 +7232,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
                         // and we won't consider any scopes outside of this one.
                         return if found_some_definition {
-                            Place::Type(nonlocal_union_builder.build(), Boundness::Bound).into()
+                            Place::bound(nonlocal_union_builder.build()).into()
                         } else {
-                            Place::Unbound.into()
+                            Place::Undefined.into()
                         };
                     }
                 }
             }
 
-            PlaceAndQualifiers::from(Place::Unbound)
+            PlaceAndQualifiers::from(Place::Undefined)
                 // No nonlocal binding? Check the module's explicit globals.
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
                     if file_scope_id.is_global() {
-                        return Place::Unbound.into();
+                        return Place::Undefined.into();
                     }
 
                     if !self.is_deferred() {
@@ -7267,14 +7276,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             // There are no visible bindings / constraint here.
                             EnclosingSnapshotResult::NotFound => {
-                                return Place::Unbound.into();
+                                return Place::Undefined.into();
                             }
                             EnclosingSnapshotResult::NoLongerInEagerContext => {}
                         }
                     }
 
                     let Some(symbol) = place_expr.as_symbol() else {
-                        return Place::Unbound.into();
+                        return Place::Undefined.into();
                     };
 
                     explicit_global_symbol(db, self.file(), symbol.name()).map_type(|ty| {
@@ -7287,7 +7296,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
         });
 
-        if let Some(ty) = place.place.ignore_possibly_unbound() {
+        if let Some(ty) = place.place.ignore_possibly_undefined() {
             self.check_deprecated(expr_ref, ty);
         }
 
@@ -7360,11 +7369,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
                 .class_member(self.db(), id.clone())
                 .place
-                .is_unbound(),
+                .is_undefined(),
             Ok(MethodDecorator::None) => !Type::instance(self.db(), class)
                 .member(self.db(), id)
                 .place
-                .is_unbound(),
+                .is_undefined(),
             Ok(MethodDecorator::StaticMethod) | Err(()) => false,
         };
 
@@ -7421,7 +7430,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::ExprRef::Attribute(attribute),
             );
             constraint_keys.extend(keys);
-            if let Place::Type(ty, Boundness::Bound) = resolved.place {
+            if let Place::Defined(ty, _, Definedness::AlwaysDefined) = resolved.place {
                 assigned_type = Some(ty);
             }
         }
@@ -7441,18 +7450,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             fallback_place.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
-                LookupError::Unbound(_) => {
+                LookupError::Undefined(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
 
                     if report_unresolved_attribute {
                         let bound_on_instance = match value_type {
                             Type::ClassLiteral(class) => {
-                                !class.instance_member(db, None, attr).place.is_unbound()
+                                !class.instance_member(db, None, attr).is_undefined()
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                 match subclass_of.subclass_of() {
                                     SubclassOfInner::Class(class) => {
-                                        !class.instance_member(db, attr).place.is_unbound()
+                                        !class.instance_member(db, attr).is_undefined()
                                     }
                                     SubclassOfInner::Dynamic(_) => unreachable!(
                                         "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
@@ -7487,9 +7496,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    Type::unknown().into()
+                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, TypeQualifiers::empty())
                 }
-                LookupError::PossiblyUnbound(type_when_bound) => {
+                LookupError::PossiblyUndefined(type_when_bound) => {
                     report_possibly_missing_attribute(
                         &self.context,
                         attribute,
@@ -8064,7 +8073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let rhs_reflected = right_class.member(self.db(), reflected_dunder).place;
                     // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
                     // Bindings together
-                    if !rhs_reflected.is_unbound()
+                    if !rhs_reflected.is_undefined()
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder).place
                     {
                         return right_ty
@@ -8911,7 +8920,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let contains_dunder = right.class_member(db, "__contains__".into()).place;
         let compare_result_opt = match contains_dunder {
-            Place::Type(contains_dunder, Boundness::Bound) => {
+            Place::Defined(contains_dunder, _, Definedness::AlwaysDefined) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
                     .try_call(db, &CallArguments::positional([right, left]))
@@ -9092,7 +9101,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ast::ExprRef::Subscript(subscript),
                 );
                 constraint_keys.extend(keys);
-                if let Place::Type(ty, Boundness::Bound) = place.place {
+                if let Place::Defined(ty, _, Definedness::AlwaysDefined) = place.place {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
@@ -9548,9 +9557,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let dunder_class_getitem_method = value_ty.member(db, "__class_getitem__").place;
 
             match dunder_class_getitem_method {
-                Place::Unbound => {}
-                Place::Type(ty, boundness) => {
-                    if boundness == Boundness::PossiblyUnbound {
+                Place::Undefined => {}
+                Place::Defined(ty, _, boundness) => {
+                    if boundness == Definedness::PossiblyUndefined {
                         if let Some(builder) =
                             context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
                         {
