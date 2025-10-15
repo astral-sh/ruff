@@ -19,7 +19,10 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::{PySourceType, PythonVersion};
+use ruff_python_ast::{
+    self as ast, PySourceType, PythonVersion,
+    visitor::{Visitor, walk_body},
+};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -978,22 +981,23 @@ where
 
         if is_regular_package {
             in_namespace_package = false;
-            // Check if this is a legacy namespace package `__init__`
-            // which acts less like a namespace package and more like a partial stub
-            // (because it can have actual non-submodule contents, as it has an `__init__`).
-            // So if we do find one, say it's a partial stub?
-            package_path.push("__init__");
-            let maybe_init = resolve_file_module(&package_path, resolver_state);
-            package_path.pop();
-            if let Some(regular_package) = maybe_init {
-                let text = ruff_db::source::source_text(resolver_state.db, regular_package);
-                let patterns = [
-                    r#"__path__ = pkgutil.extend_path(__path__, __name__)"#,
-                    r#"__path__ = __import__("pkgutil").extend_path(__path__, __name__)"#,
-                ];
 
-                if patterns.iter().any(|pattern| text.contains(pattern)) {
-                    in_namespace_package = true;
+            if !module_search_path.is_standard_library() {
+                // Check if this is a legacy namespace package `__init__`
+                // which acts less like a namespace package and more like a partial stub
+                // (because it can have actual non-submodule contents, as it has an `__init__`).
+                // So if we do find one, say it's a partial stub?
+                package_path.push("__init__");
+                let maybe_init = resolve_file_module(&package_path, resolver_state);
+                package_path.pop();
+                if let Some(regular_package) = maybe_init {
+                    let parsed = ruff_db::parsed::parsed_module(resolver_state.db, regular_package);
+                    let mut visitor = LegacyNamespacePackageVisitor::default();
+                    visitor.visit_body(parsed.load(resolver_state.db).suite());
+
+                    if visitor.is_legacy_namespace_package {
+                        in_namespace_package = true;
+                    }
                 }
             }
         } else if package_path.is_directory(resolver_state)
@@ -1138,6 +1142,125 @@ impl RelaxedModuleName {
 impl fmt::Display for RelaxedModuleName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+/// Detects if a module contains a statement of the form:
+/// ```python
+/// __path__ = pkgutil.extend_path(__path__, __name__)
+/// ```
+/// or
+/// ```python
+/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
+/// ```
+#[derive(Default)]
+struct LegacyNamespacePackageVisitor {
+    is_legacy_namespace_package: bool,
+    in_body: bool,
+}
+
+impl Visitor<'_> for LegacyNamespacePackageVisitor {
+    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+        if self.is_legacy_namespace_package {
+            return;
+        }
+
+        if self.in_body {
+            return;
+        }
+
+        self.in_body = true;
+
+        walk_body(self, body);
+    }
+
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        if self.is_legacy_namespace_package {
+            return;
+        }
+
+        let ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) = stmt else {
+            return;
+        };
+
+        let [ast::Expr::Name(maybe_path)] = &**targets else {
+            return;
+        };
+
+        if &*maybe_path.id != "__path__" {
+            return;
+        }
+
+        let ast::Expr::Call(ast::ExprCall {
+            func: extend_func,
+            arguments: extend_arguments,
+            ..
+        }) = &**value
+        else {
+            return;
+        };
+
+        let ast::Expr::Attribute(ast::ExprAttribute {
+            value: maybe_pkg_util,
+            attr: maybe_extend_path,
+            ..
+        }) = &**extend_func
+        else {
+            return;
+        };
+
+        // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
+        match &**maybe_pkg_util {
+            // __import__("pkgutil").extend_path(__path__, __name__)
+            ast::Expr::Call(ruff_python_ast::ExprCall {
+                func: maybe_import,
+                arguments: import_arguments,
+                ..
+            }) => {
+                let ast::Expr::Name(maybe_import) = &**maybe_import else {
+                    return;
+                };
+
+                if maybe_import.id() != "__import__" {
+                    return;
+                }
+
+                let Some(ast::Expr::StringLiteral(name)) =
+                    import_arguments.find_argument_value("name", 0)
+                else {
+                    return;
+                };
+
+                if name.value.to_str() != "pkgutil" {
+                    return;
+                }
+            }
+            // "pkgutil.extend_path(__path__, __name__)"
+            ast::Expr::Name(name) => {
+                if name.id() != "pkgutil" {
+                    return;
+                }
+            }
+            _ => {
+                return;
+            }
+        }
+
+        // Test that this is an `extend_path(__path__, __name__)` call
+
+        if maybe_extend_path != "extend_path" {
+            return;
+        }
+
+        // TODO: Verify if these are positional only arguments
+        let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
+            return;
+        };
+        let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
+            return;
+        };
+
+        self.is_legacy_namespace_package = path.id() == "__path__" && name.id() == "__name__";
     }
 }
 

@@ -5,13 +5,8 @@ use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use ruff_db::files::{File, FileError, FilePath, system_path_to_file, vendored_path_to_file};
-use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
-use ruff_python_ast::{
-    self as ast,
-    visitor::{Visitor, walk_body},
-};
 
 use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
 use crate::Db;
@@ -864,125 +859,6 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
             SystemOrVendoredPathRef::System(system) => system.fmt(f),
             SystemOrVendoredPathRef::Vendored(vendored) => vendored.fmt(f),
         }
-    }
-}
-
-/// Detects if a module contains a statement of the form:
-/// ```python
-/// __path__ = pkgutil.extend_path(__path__, __name__)
-/// ```
-/// or
-/// ```python
-/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
-/// ```
-#[derive(Default)]
-struct LegacyNamespacePackageVisitor {
-    is_legacy_namespace_package: bool,
-    in_body: bool,
-}
-
-impl Visitor<'_> for LegacyNamespacePackageVisitor {
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        if self.is_legacy_namespace_package {
-            return;
-        }
-
-        if self.in_body {
-            return;
-        }
-
-        self.in_body = true;
-
-        walk_body(self, body);
-    }
-
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        if self.is_legacy_namespace_package {
-            return;
-        }
-
-        let ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) = stmt else {
-            return;
-        };
-
-        let [ast::Expr::Name(maybe_path)] = &**targets else {
-            return;
-        };
-
-        if &*maybe_path.id != "__path__" {
-            return;
-        }
-
-        let ast::Expr::Call(ast::ExprCall {
-            func: extend_func,
-            arguments: extend_arguments,
-            ..
-        }) = &**value
-        else {
-            return;
-        };
-
-        let ast::Expr::Attribute(ast::ExprAttribute {
-            value: maybe_pkg_util,
-            attr: maybe_extend_path,
-            ..
-        }) = &**extend_func
-        else {
-            return;
-        };
-
-        // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
-        match &**maybe_pkg_util {
-            // __import__("pkgutil").extend_path(__path__, __name__)
-            ast::Expr::Call(ruff_python_ast::ExprCall {
-                func: maybe_import,
-                arguments: import_arguments,
-                ..
-            }) => {
-                let ast::Expr::Name(maybe_import) = &**maybe_import else {
-                    return;
-                };
-
-                if maybe_import.id() != "__import__" {
-                    return;
-                }
-
-                let Some(ast::Expr::StringLiteral(name)) =
-                    import_arguments.find_argument_value("name", 0)
-                else {
-                    return;
-                };
-
-                if name.value.to_str() != "pkgutil" {
-                    return;
-                }
-            }
-            // "pkgutil.extend_path(__path__, __name__)"
-            ast::Expr::Name(name) => {
-                if name.id() != "pkgutil" {
-                    return;
-                }
-            }
-            _ => {
-                return;
-            }
-        }
-
-        // Test that this is an `extend_path(__path__, __name__)` call
-
-        if maybe_extend_path != "extend_path" {
-            return;
-        }
-
-        // TODO: Verify if these are positional only arguments
-        let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
-            return;
-        };
-        let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
-            return;
-        };
-
-        self.is_legacy_namespace_package = path.id() == "__path__" && name.id() == "__name__";
     }
 }
 
