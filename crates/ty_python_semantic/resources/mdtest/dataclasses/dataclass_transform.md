@@ -478,11 +478,8 @@ class Person:
     name: str = fancy_field()
     age: int | None = fancy_field(kw_only=True)
 
-# TODO: Should be `(self: Person, name: str, *, age: int | None) -> None`
-reveal_type(Person.__init__)  # revealed: (self: Person, id: int = Any, name: str = Any, age: int | None = Any) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str = Unknown, *, age: int | None = Unknown) -> None
 
-# TODO: No error here
-# error: [invalid-argument-type]
 alice = Person("Alice", age=30)
 
 reveal_type(alice.id)  # revealed: int

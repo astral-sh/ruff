@@ -2900,7 +2900,7 @@ impl<'db> ClassLiteral<'db> {
                     default_ty = Some(field.default_type(db));
                     if self
                         .dataclass_params(db)
-                        .map(|params| params.field_specifiers(db).is_none(db))
+                        .map(|params| params.field_specifiers(db).is_empty())
                         .unwrap_or(false)
                     {
                         // This happens when constructing a `dataclass` with a `dataclass_transform`

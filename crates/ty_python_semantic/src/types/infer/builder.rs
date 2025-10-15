@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use super::{
     CycleRecovery, DefinitionInference, DefinitionInferenceExtra, ExpressionInference,
@@ -272,6 +273,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
+
+    /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
+    /// the right hand side of an annotated assignment in a class that is a dataclass).
+    dataclass_field_specifiers: SmallVec<[Type<'db>; 2]>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -307,6 +312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: None,
             cycle_recovery: None,
             all_definitely_bound: true,
+            dataclass_field_specifiers: SmallVec::new(),
         }
     }
 
@@ -4512,10 +4518,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
+            fn field_specifiers<'db>(
+                db: &'db dyn Db,
+                index: &'db SemanticIndex<'db>,
+                scope: ScopeId<'db>,
+            ) -> Option<SmallVec<[Type<'db>; 2]>> {
+                let enclosing_scope = index.scope(scope.file_scope_id(db));
+
+                if enclosing_scope.kind() != ScopeKind::Class {
+                    return None;
+                }
+
+                let class_node = enclosing_scope.node().as_class()?;
+
+                let class_definition = index.expect_single_definition(class_node);
+                infer_definition_types(db, class_definition)
+                    .declaration_type(class_definition)
+                    .inner_type()
+                    .as_class_literal()?
+                    .dataclass_params(db)
+                    .map(|params| SmallVec::from(params.field_specifiers(db)))
+            }
+
+            if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
+                self.dataclass_field_specifiers = specifiers;
+            }
+
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
+
+            self.dataclass_field_specifiers.clear();
+
             let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
@@ -6631,7 +6666,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = match bindings.check_types(self.db(), &call_arguments, &tcx) {
+        let mut bindings = match bindings.check_types(
+            self.db(),
+            &call_arguments,
+            &tcx,
+            &self.dataclass_field_specifiers[..],
+        ) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
@@ -9218,8 +9258,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
             .match_parameters(self.db(), &call_argument_types)
-            .check_types(self.db(), &call_argument_types, &TypeContext::default())
-        {
+            .check_types(
+                self.db(),
+                &call_argument_types,
+                &TypeContext::default(),
+                &self.dataclass_field_specifiers[..],
+            ) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, subscript.into());
@@ -9751,6 +9795,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             all_definitely_bound,
+            dataclass_field_specifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -9817,8 +9862,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
-            all_definitely_bound: _,
             // builder only state
+            dataclass_field_specifiers: _,
+            all_definitely_bound: _,
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,
@@ -9885,12 +9931,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
-            all_definitely_bound: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
 
             // Builder only state
+            dataclass_field_specifiers: _,
+            all_definitely_bound: _,
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,

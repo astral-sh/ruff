@@ -169,11 +169,15 @@ impl Default for DataclassTransformerFlags {
     }
 }
 
+/// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
+/// instance that we use as the return type for `dataclass_transform(…)` calls.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DataclassTransformerParams<'db> {
     pub flags: DataclassTransformerFlags,
-    pub field_specifiers: Type<'db>,
+
+    #[returns(deref)]
+    pub field_specifiers: Box<[Type<'db>]>,
 }
 
 impl get_size2::GetSize for DataclassTransformerParams<'_> {}
