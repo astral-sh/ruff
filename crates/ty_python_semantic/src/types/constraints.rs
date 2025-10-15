@@ -65,8 +65,8 @@ use rustc_hash::FxHashSet;
 
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
+    UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -195,7 +195,7 @@ impl<'db> ConstraintSet<'db> {
     /// Returns a constraint set that constraints a typevar to a particular range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
         relation: TypeRelation,
@@ -276,7 +276,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         let lower = lower.bottom_materialization(db);
@@ -289,7 +289,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negated_range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         Self::range(db, lower, typevar, upper).negate(db)
@@ -311,7 +311,7 @@ impl From<bool> for ConstraintSet<'_> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarIdentity<'db>,
+    typevar: BoundTypeVarInstance<'db>,
     lower: Type<'db>,
     upper: Type<'db>,
 }
@@ -327,7 +327,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
@@ -349,6 +349,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         let upper = upper.normalized(db);
         Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
     }
+
     fn when_true(self) -> ConstraintAssignment<'db> {
         ConstraintAssignment::Positive(self)
     }
@@ -358,7 +359,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 
     fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db) != other.typevar(db) {
+        if self.typevar(db).identity(db) != other.typevar(db).identity(db) {
             return false;
         }
         self.lower(db).is_subtype_of(db, other.lower(db))
@@ -404,7 +405,10 @@ impl<'db> ConstrainedTypeVar<'db> {
                     return write!(
                         f,
                         "({} {} {})",
-                        self.constraint.typevar(self.db).display(self.db),
+                        self.constraint
+                            .typevar(self.db)
+                            .identity(self.db)
+                            .display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
                     );
@@ -417,7 +421,11 @@ impl<'db> ConstrainedTypeVar<'db> {
                 if !lower.is_never() {
                     write!(f, "{} ≤ ", lower.display(self.db))?;
                 }
-                self.constraint.typevar(self.db).display(self.db).fmt(f)?;
+                self.constraint
+                    .typevar(self.db)
+                    .identity(self.db)
+                    .display(self.db)
+                    .fmt(f)?;
                 if !upper.is_object() {
                     write!(f, " ≤ {}", upper.display(self.db))?;
                 }
@@ -996,8 +1004,8 @@ impl<'db> InteriorNode<'db> {
             // If the constraints refer to different typevars, they trivially cannot be compared.
             // TODO: We might need to consider when one constraint's upper or lower bound refers to
             // the other constraint's typevar.
-            let typevar = left_constraint.typevar(db);
-            if typevar != right_constraint.typevar(db) {
+            if left_constraint.typevar(db).identity(db) != right_constraint.typevar(db).identity(db)
+            {
                 continue;
             }
 
@@ -1408,7 +1416,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => ConstraintSet::from(true),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
                 db,
-                self.identity(db),
+                self,
                 Type::Never,
                 bound,
                 TypeRelation::Assignability,
@@ -1417,7 +1425,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 constraints.elements(db).iter().when_any(db, |constraint| {
                     ConstraintSet::constrain_typevar(
                         db,
-                        self.identity(db),
+                        self,
                         *constraint,
                         *constraint,
                         TypeRelation::Assignability,

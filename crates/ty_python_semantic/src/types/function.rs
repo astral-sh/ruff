@@ -1705,7 +1705,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
+                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
                 let result = ValidSpecializationsConstraintSet::new(db, None, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     result,
@@ -1718,8 +1718,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints =
-                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
+                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
                 let result = ValidSpecializationsConstraintSet::new(db, None, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     result,

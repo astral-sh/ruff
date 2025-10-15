@@ -1761,18 +1761,16 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            (_, Type::Union(union)) => {
-                union.elements(db).iter().when_any(db, |&elem_ty| {
-                    self.has_relation_to_impl(
-                        db,
-                        elem_ty,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
-            }
+            (_, Type::Union(union)) => union.elements(db).iter().when_any(db, |&elem_ty| {
+                self.has_relation_to_impl(
+                    db,
+                    elem_ty,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1845,7 +1843,7 @@ impl<'db> Type<'db> {
                 bound_typevar.valid_specializations(db).implies(db, || {
                     ConstraintSet::constrain_typevar(
                         db,
-                        bound_typevar.identity(db),
+                        bound_typevar,
                         Type::Never,
                         target,
                         relation,
@@ -1856,7 +1854,7 @@ impl<'db> Type<'db> {
                 bound_typevar.valid_specializations(db).implies(db, || {
                     ConstraintSet::constrain_typevar(
                         db,
-                        bound_typevar.identity(db),
+                        bound_typevar,
                         self,
                         Type::object(),
                         relation,
