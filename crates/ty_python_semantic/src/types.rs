@@ -52,9 +52,10 @@ use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
+pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, PartialSpecialization, Specialization, bind_typevar,
-    typing_self, walk_generic_context,
+    InferableTypeVars, PartialSpecialization, Specialization, bind_typevar, typing_self,
+    walk_generic_context,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -7294,6 +7295,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
             Type::TypeIs(type_is_type) => type_is_type.variance_of(db, typevar),
+            Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -7308,7 +7310,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
@@ -7524,6 +7525,17 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
             }
+        }
+    }
+}
+
+impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            KnownInstanceType::TypeAliasType(type_alias) => {
+                type_alias.raw_value_type(db).variance_of(db, typevar)
+            }
+            _ => TypeVarVariance::Bivariant,
         }
     }
 }
@@ -10814,12 +10826,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self.rhs_scope(db);
-        let module = parsed_module(db, scope.file(db)).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definition = self.definition(db);
-        let value_type =
-            definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
+        let value_type = self.raw_value_type(db);
 
         if let Some(generic_context) = self.generic_context(db) {
             let specialization = self
@@ -10830,6 +10837,15 @@ impl<'db> PEP695TypeAliasType<'db> {
         } else {
             value_type
         }
+    }
+
+    pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.rhs_scope(db);
+        let module = parsed_module(db, scope.file(db)).load(db);
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let definition = self.definition(db);
+
+        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
     pub(crate) fn apply_specialization(
@@ -11007,6 +11023,13 @@ impl<'db> TypeAliasType<'db> {
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+        }
+    }
+
+    pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
         }
     }
@@ -11842,5 +11865,86 @@ pub(crate) mod tests {
             .add_positive(Type::Never)
             .build();
         assert_eq!(intersection.display(&db).to_string(), "Never");
+    }
+
+    #[test]
+    fn type_alias_variance() {
+        use crate::db::tests::TestDb;
+        use crate::place::global_symbol;
+
+        fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
+            let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+            let ty = global_symbol(db, module, name).place.expect_type();
+            let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+                type_alias,
+            ))) = ty
+            else {
+                panic!("Expected `{name}` to be a type alias");
+            };
+            type_alias
+        }
+        fn get_bound_typevar<'db>(
+            db: &'db TestDb,
+            type_alias: PEP695TypeAliasType<'db>,
+        ) -> BoundTypeVarInstance<'db> {
+            let generic_context = type_alias.generic_context(db).unwrap();
+            generic_context.variables(db).next().unwrap()
+        }
+
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+class Contravariant[T]:
+    def set(self, value: T):
+        pass
+
+class Invariant[T]:
+    def get(self) -> T:
+        raise ValueError
+    def set(self, value: T):
+        pass
+
+class Bivariant[T]:
+    pass
+
+type CovariantAlias[T] = Covariant[T]
+type ContravariantAlias[T] = Contravariant[T]
+type InvariantAlias[T] = Invariant[T]
+type BivariantAlias[T] = Bivariant[T]
+"#,
+        )
+        .unwrap();
+        let covariant = get_type_alias(&db, "CovariantAlias");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant))
+                .variance_of(&db, get_bound_typevar(&db, covariant)),
+            TypeVarVariance::Covariant
+        );
+
+        let contravariant = get_type_alias(&db, "ContravariantAlias");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant))
+                .variance_of(&db, get_bound_typevar(&db, contravariant)),
+            TypeVarVariance::Contravariant
+        );
+
+        let invariant = get_type_alias(&db, "InvariantAlias");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant))
+                .variance_of(&db, get_bound_typevar(&db, invariant)),
+            TypeVarVariance::Invariant
+        );
+
+        let bivariant = get_type_alias(&db, "BivariantAlias");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
+                .variance_of(&db, get_bound_typevar(&db, bivariant)),
+            TypeVarVariance::Bivariant
+        );
     }
 }
