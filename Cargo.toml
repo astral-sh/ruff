@@ -308,7 +308,7 @@ opt-level = 1
 # But compile times with `lto = fat` are completely untenable.
 #
 # This setup does risk that we are measuring something in benchmarks
-# that we are shipping, but in order to make those two the same, we'd
+# that we aren't shipping, but in order to make those two the same, we'd
 # either need to make compile times way worse for development, or take
 # a hit to binary size and a slight hit to runtime performance in our
 # release builds.
