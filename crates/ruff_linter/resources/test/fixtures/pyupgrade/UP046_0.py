@@ -122,7 +122,7 @@ class MixedGenerics[U]:
         return (u, t)
 
 
-# TODO(brent) default requires 3.13
+# default requires 3.13
 V = TypeVar("V", default=Any, bound=str)
 
 
