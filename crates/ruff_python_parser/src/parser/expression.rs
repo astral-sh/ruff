@@ -1526,7 +1526,7 @@ impl<'src> Parser<'src> {
         kind: InterpolatedStringKind,
     ) -> InterpolatedStringData {
         let start = self.node_start();
-        let flags = self.tokens.current_flags().as_any_string_flags();
+        let mut flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(kind.start_token());
         let elements = self.parse_interpolated_string_elements(
@@ -1535,7 +1535,9 @@ impl<'src> Parser<'src> {
             kind,
         );
 
-        self.expect(kind.end_token());
+        if !self.expect(kind.end_token()) {
+            flags = flags.with_unclosed(true);
+        }
 
         // test_ok pep701_f_string_py312
         // # parse_options: {"target-version": "3.12"}
@@ -1719,6 +1721,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
+
         // test_err f_string_empty_expression
         // f"{}"
         // f"{  }"
@@ -1740,6 +1745,7 @@ impl<'src> Parser<'src> {
         // t"{*}"
         // t"{*x and y}"
         // t"{*yield x}"
+
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
@@ -1773,6 +1779,10 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
+            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // in `f{abc!r"` (note the missing `}`).
+            self.tokens.re_lex_raw_string_in_format_spec();
+
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
                 // test_err f_string_conversion_follows_exclamation
@@ -1851,6 +1861,9 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
+
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
 
         // We're using `eat` here instead of `expect` to use the f-string specific error type.
         if !self.eat(TokenKind::Rbrace) {
