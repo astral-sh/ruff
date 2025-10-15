@@ -1,5 +1,3 @@
-"""Support for POSIX locales."""
-
 import sys
 from _typeshed import StrPath
 from typing import Final, Literal, TypedDict, type_check_only
@@ -33,21 +31,14 @@ LC_NUMERIC: Final[int]
 LC_ALL: Final[int]
 CHAR_MAX: Final = 127
 
-def setlocale(category: int, locale: str | None = None, /) -> str:
-    """Activates/queries locale processing."""
-
-def localeconv() -> _LocaleConv:
-    """Returns numeric and monetary locale-specific parameters."""
+def setlocale(category: int, locale: str | None = None, /) -> str: ...
+def localeconv() -> _LocaleConv: ...
 
 if sys.version_info >= (3, 11):
-    def getencoding() -> str:
-        """Get the current locale encoding."""
+    def getencoding() -> str: ...
 
-def strcoll(os1: str, os2: str, /) -> int:
-    """Compares two strings according to the locale."""
-
-def strxfrm(string: str, /) -> str:
-    """Return a string that can be used as a key for locale-aware comparisons."""
+def strcoll(os1: str, os2: str, /) -> int: ...
+def strxfrm(string: str, /) -> str: ...
 
 # native gettext functions
 # https://docs.python.org/3/library/locale.html#access-to-message-catalogs
@@ -117,31 +108,14 @@ if sys.platform != "win32":
     CRNCYSTR: Final[int]
     ALT_DIGITS: Final[int]
 
-    def nl_langinfo(key: int, /) -> str:
-        """Return the value for the locale information associated with key."""
+    def nl_langinfo(key: int, /) -> str: ...
+
     # This is dependent on `libintl.h` which is a part of `gettext`
     # system dependency. These functions might be missing.
     # But, we always say that they are present.
-    def gettext(msg: str, /) -> str:
-        """gettext(msg) -> string
-
-        Return translation of msg.
-        """
-
-    def dgettext(domain: str | None, msg: str, /) -> str:
-        """dgettext(domain, msg) -> string
-
-        Return translation of msg in domain.
-        """
-
-    def dcgettext(domain: str | None, msg: str, category: int, /) -> str:
-        """Return translation of msg in domain and category."""
-
-    def textdomain(domain: str | None, /) -> str:
-        """Set the C library's textdmain to domain, returning the new domain."""
-
-    def bindtextdomain(domain: str, dir: StrPath | None, /) -> str:
-        """Bind the C library's domain to dir."""
-
-    def bind_textdomain_codeset(domain: str, codeset: str | None, /) -> str | None:
-        """Bind the C library's domain to codeset."""
+    def gettext(msg: str, /) -> str: ...
+    def dgettext(domain: str | None, msg: str, /) -> str: ...
+    def dcgettext(domain: str | None, msg: str, category: int, /) -> str: ...
+    def textdomain(domain: str | None, /) -> str: ...
+    def bindtextdomain(domain: str, dir: StrPath | None, /) -> str: ...
+    def bind_textdomain_codeset(domain: str, codeset: str | None, /) -> str | None: ...
