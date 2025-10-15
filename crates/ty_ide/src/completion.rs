@@ -208,10 +208,7 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
-    if is_in_comment(&parsed, offset)
-        || is_in_string(&parsed, offset)
-        || is_in_unclosed_string(&parsed, offset)
-    {
+    if is_in_comment(&parsed, offset) || is_in_string(&parsed, offset) {
         return vec![];
     }
 
@@ -845,82 +842,6 @@ fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
             TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
         )
     })
-}
-
-/// Returns true when the cursor at `offset` is positioned within an
-/// unclosed string token.
-///
-/// Note that this may scan to the beginning of the token stream.
-///
-/// At present, this may not correctly detect all unclosed strings. If
-/// given a choice, this prefers to return `false` incorrectly over
-/// returning `true` incorrectly (i.e., false negatives are preferred
-/// over false positives). That is, we would rather show completions
-/// when we aren't supposed to than *not* show completions when we are
-/// supposed to.
-fn is_in_unclosed_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = tokens_start_before(parsed.tokens(), offset);
-    for (i, t) in tokens.iter().enumerate().rev() {
-        match t.kind() {
-            TokenKind::Unknown => {
-                // It's possible to lex an unknown token with single/double
-                // quotes. If we got here, then we assume it is the opening
-                // of an unclosed string.
-                if t.flags().has_quotes() {
-                    return true;
-                }
-                // Otherwise, we permit any kind of unknown token to be
-                // counted as part of a possible unclosed string.
-                continue;
-            }
-            // We found the start of an f-string without seeing
-            // the end of an f-string before our cursor, so that
-            // should mean we're within an unclosed f-string.
-            // Similarly for t-strings.
-            //
-            // ... unless we're in the middle of interpolation, in
-            // which case, we should not behave as-if we are within
-            // a string.
-            TokenKind::FStringStart | TokenKind::TStringStart => {
-                return !is_within_brackets(&tokens[i..]);
-            }
-            TokenKind::FStringMiddle
-            | TokenKind::FStringEnd
-            | TokenKind::TStringMiddle
-            | TokenKind::TStringEnd => return false,
-            // We have to pretty much allow everything else since
-            // pretty much anything can appear within an f-string or
-            // a t-string.
-            //
-            // This does mean it's not only possible but likely
-            // that we will scan all the way back to the beginning
-            // of a file. But this should only happen once and it
-            // should only reflect a marginal cost (since we've
-            // already parsed the source code in its entirety by
-            // this point). There may be a way to short circuit,
-            // but I think that might there to be some token or
-            // pattern of tokens that our lexer will never generate
-            // within an f/t-string. ---AG
-            _ => continue,
-        }
-    }
-    false
-}
-
-/// Returns true if the position following the end of the given tokens is
-/// within an opened f-string or t-string interpolation.
-///
-/// It is assumed that `tokens[0]` is an `FStringStart` or `TStringStart`
-/// token.
-fn is_within_brackets(tokens: &[Token]) -> bool {
-    for t in tokens.iter().rev() {
-        match t.kind() {
-            TokenKind::Lbrace => return true,
-            TokenKind::Rbrace => return false,
-            _ => continue,
-        }
-    }
-    false
 }
 
 /// Order completions lexicographically, with these exceptions:
