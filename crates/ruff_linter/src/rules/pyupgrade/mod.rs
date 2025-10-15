@@ -126,6 +126,8 @@ mod tests {
     }
 
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
