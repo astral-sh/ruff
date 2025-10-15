@@ -898,6 +898,10 @@ fn best_match<'a, 'b>(
 
 #[inline]
 fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &SemanticModel) -> bool {
+    let Some(binding_node) = semantic.binding(id).source else {
+        return false;
+    };
+
     scope.shadowed_bindings(id).enumerate().all(|(i, shadow)| {
         let shadowed_binding = semantic.binding(shadow);
         // Bail if one of the shadowed bindings is
@@ -910,6 +914,12 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
         // import a.b
         // ```
         if i > 0 && shadowed_binding.is_used() {
+            return false;
+        }
+        if shadowed_binding
+            .source
+            .is_none_or(|node_id| !semantic.same_branch(node_id, binding_node))
+        {
             return false;
         }
         matches!(
