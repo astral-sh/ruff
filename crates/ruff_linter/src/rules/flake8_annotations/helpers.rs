@@ -142,23 +142,25 @@ impl AutoPythonType {
                 });
                 Some((expr, vec![no_return_edit]))
             }
-            AutoPythonType::Atom(python_type) => {
-                let expr = type_expr(python_type)?;
-                Some((expr, vec![]))
-            }
+            AutoPythonType::Atom(python_type) => type_expr(python_type, checker, at),
             AutoPythonType::Union(python_types) => {
                 if target_version >= PythonVersion::PY310 {
                     // Aggregate all the individual types (e.g., `int`, `float`).
+                    let mut all_edits = Vec::new();
                     let names = python_types
                         .iter()
                         .sorted_unstable()
-                        .map(|python_type| type_expr(*python_type))
+                        .map(|python_type| {
+                            let (expr, mut edits) = type_expr(*python_type, checker, at)?;
+                            all_edits.append(&mut edits);
+                            Some(expr)
+                        })
                         .collect::<Option<Vec<_>>>()?;
 
                     // Wrap in a bitwise union (e.g., `int | float`).
                     let expr = pep_604_union(&names);
 
-                    Some((expr, vec![]))
+                    Some((expr, all_edits))
                 } else {
                     let python_types = python_types
                         .into_iter()
@@ -167,7 +169,7 @@ impl AutoPythonType {
 
                     match python_types.as_slice() {
                         [python_type, PythonType::None] | [PythonType::None, python_type] => {
-                            let element = type_expr(*python_type)?;
+                            let (element, mut edits) = type_expr(*python_type, checker, at)?;
 
                             // Ex) `Optional[int]`
                             let (optional_edit, binding) = checker
@@ -175,12 +177,18 @@ impl AutoPythonType {
                                 .import(at)
                                 .ok()?;
                             let expr = typing_optional(element, Name::from(binding));
-                            Some((expr, vec![optional_edit]))
+                            edits.push(optional_edit);
+                            Some((expr, edits))
                         }
                         _ => {
+                            let mut all_edits = Vec::new();
                             let elements = python_types
                                 .into_iter()
-                                .map(type_expr)
+                                .map(|python_type| {
+                                    let (expr, mut edits) = type_expr(python_type, checker, at)?;
+                                    all_edits.append(&mut edits);
+                                    Some(expr)
+                                })
                                 .collect::<Option<Vec<_>>>()?;
 
                             // Ex) `Union[int, str]`
@@ -189,7 +197,8 @@ impl AutoPythonType {
                                 .import(at)
                                 .ok()?;
                             let expr = typing_union(&elements, Name::from(binding));
-                            Some((expr, vec![union_edit]))
+                            all_edits.push(union_edit);
+                            Some((expr, all_edits))
                         }
                     }
                 }
@@ -199,26 +208,44 @@ impl AutoPythonType {
 }
 
 /// Given a [`PythonType`], return an [`Expr`] that resolves to that type.
-fn type_expr(python_type: PythonType) -> Option<Expr> {
-    fn name(name: &str) -> Expr {
-        Expr::Name(ast::ExprName {
-            id: name.into(),
+///
+/// If the [`Expr`] relies on importing any external symbols, those imports will be returned as
+/// additional edits.
+pub(crate) fn type_expr(
+    python_type: PythonType,
+    checker: &Checker,
+    at: TextSize,
+) -> Option<(Expr, Vec<Edit>)> {
+    fn name(name: &str, checker: &Checker, at: TextSize) -> Option<(Expr, Vec<Edit>)> {
+        let (edit, binding) = checker
+            .importer()
+            .get_or_import_builtin_symbol(name, at, checker.semantic())
+            .ok()?;
+        let expr = Expr::Name(ast::ExprName {
+            id: binding.into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
-        })
+        });
+        Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
     }
 
     match python_type {
-        PythonType::String => Some(name("str")),
-        PythonType::Bytes => Some(name("bytes")),
-        PythonType::Number(number) => match number {
-            NumberLike::Integer => Some(name("int")),
-            NumberLike::Float => Some(name("float")),
-            NumberLike::Complex => Some(name("complex")),
-            NumberLike::Bool => Some(name("bool")),
-        },
-        PythonType::None => Some(name("None")),
+        PythonType::String => name("str", checker, at),
+        PythonType::Bytes => name("bytes", checker, at),
+        PythonType::Number(number) => {
+            let symbol = match number {
+                NumberLike::Integer => "int",
+                NumberLike::Float => "float",
+                NumberLike::Complex => "complex",
+                NumberLike::Bool => "bool",
+            };
+            name(symbol, checker, at)
+        }
+        PythonType::None => {
+            let expr = Expr::NoneLiteral(ast::ExprNoneLiteral::default());
+            Some((expr, vec![]))
+        }
         PythonType::Ellipsis => None,
         PythonType::Dict => None,
         PythonType::List => None,

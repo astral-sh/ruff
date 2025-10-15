@@ -13,9 +13,8 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
 use ty_python_semantic::{
-    HasType, SemanticModel,
-    semantic_index::definition::DefinitionKind,
-    types::{Type, definition_kind_for_name},
+    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
+    types::ide_support::definition_kind_for_name,
 };
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
@@ -337,9 +336,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::NonInferableTypeVar(_) | Type::TypeVar(_) => {
-                (SemanticTokenType::TypeParameter, modifiers)
-            }
+            Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
             Type::FunctionLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {

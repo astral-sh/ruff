@@ -525,10 +525,6 @@ from typing import Literal
 reveal_type(list((1, 2, 3)))  # revealed: list[int]
 reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
 
-# TODO: we could bidirectionally infer that the user does not want literals to be promoted here,
-# and avoid this diagnostic
-#
-# error: [invalid-assignment] "`list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
 x: list[Literal[1, 2, 3]] = list((1, 2, 3))
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 ```

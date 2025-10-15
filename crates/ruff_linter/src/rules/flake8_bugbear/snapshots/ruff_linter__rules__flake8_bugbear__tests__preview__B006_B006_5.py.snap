@@ -1,0 +1,314 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_5.py:5:49
+  |
+5 | def import_module_wrong(value: dict[str, str] = {}):
+  |                                                 ^^
+6 |     import os
+  |
+help: Replace with `None`; initialize within function
+2  | # https://github.com/astral-sh/ruff/issues/7616
+3  | 
+4  | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+5  + def import_module_wrong(value: dict[str, str] = None):
+6  |     import os
+7  +     if value is None:
+8  +         value = {}
+9  | 
+10 | 
+11 | def import_module_with_values_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:9:61
+   |
+ 9 | def import_module_with_values_wrong(value: dict[str, str] = {}):
+   |                                                             ^^
+10 |     import os
+   |
+help: Replace with `None`; initialize within function
+6  |     import os
+7  | 
+8  | 
+   - def import_module_with_values_wrong(value: dict[str, str] = {}):
+9  + def import_module_with_values_wrong(value: dict[str, str] = None):
+10 |     import os
+11 | 
+12 +     if value is None:
+13 +         value = {}
+14 |     return 2
+15 | 
+16 | 
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:15:50
+   |
+15 | def import_modules_wrong(value: dict[str, str] = {}):
+   |                                                  ^^
+16 |     import os
+17 |     import sys
+   |
+help: Replace with `None`; initialize within function
+12 |     return 2
+13 | 
+14 | 
+   - def import_modules_wrong(value: dict[str, str] = {}):
+15 + def import_modules_wrong(value: dict[str, str] = None):
+16 |     import os
+17 |     import sys
+18 |     import itertools
+19 +     if value is None:
+20 +         value = {}
+21 | 
+22 | 
+23 | def from_import_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:21:54
+   |
+21 | def from_import_module_wrong(value: dict[str, str] = {}):
+   |                                                      ^^
+22 |     from os import path
+   |
+help: Replace with `None`; initialize within function
+18 |     import itertools
+19 | 
+20 | 
+   - def from_import_module_wrong(value: dict[str, str] = {}):
+21 + def from_import_module_wrong(value: dict[str, str] = None):
+22 |     from os import path
+23 +     if value is None:
+24 +         value = {}
+25 | 
+26 | 
+27 | def from_imports_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:25:55
+   |
+25 | def from_imports_module_wrong(value: dict[str, str] = {}):
+   |                                                       ^^
+26 |     from os import path
+27 |     from sys import version_info
+   |
+help: Replace with `None`; initialize within function
+22 |     from os import path
+23 | 
+24 | 
+   - def from_imports_module_wrong(value: dict[str, str] = {}):
+25 + def from_imports_module_wrong(value: dict[str, str] = None):
+26 |     from os import path
+27 |     from sys import version_info
+28 +     if value is None:
+29 +         value = {}
+30 | 
+31 | 
+32 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:30:66
+   |
+30 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
+   |                                                                  ^^
+31 |     import os
+32 |     from sys import version_info
+   |
+help: Replace with `None`; initialize within function
+27 |     from sys import version_info
+28 | 
+29 | 
+   - def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
+30 + def import_and_from_imports_module_wrong(value: dict[str, str] = None):
+31 |     import os
+32 |     from sys import version_info
+33 +     if value is None:
+34 +         value = {}
+35 | 
+36 | 
+37 | def import_docstring_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:35:59
+   |
+35 | def import_docstring_module_wrong(value: dict[str, str] = {}):
+   |                                                           ^^
+36 |     """Docstring"""
+37 |     import os
+   |
+help: Replace with `None`; initialize within function
+32 |     from sys import version_info
+33 | 
+34 | 
+   - def import_docstring_module_wrong(value: dict[str, str] = {}):
+35 + def import_docstring_module_wrong(value: dict[str, str] = None):
+36 |     """Docstring"""
+37 |     import os
+38 +     if value is None:
+39 +         value = {}
+40 | 
+41 | 
+42 | def import_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:40:49
+   |
+40 | def import_module_wrong(value: dict[str, str] = {}):
+   |                                                 ^^
+41 |     """Docstring"""
+42 |     import os; import sys
+   |
+help: Replace with `None`; initialize within function
+37 |     import os
+38 | 
+39 | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+40 + def import_module_wrong(value: dict[str, str] = None):
+41 |     """Docstring"""
+42 |     import os; import sys
+43 +     if value is None:
+44 +         value = {}
+45 | 
+46 | 
+47 | def import_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:45:49
+   |
+45 | def import_module_wrong(value: dict[str, str] = {}):
+   |                                                 ^^
+46 |     """Docstring"""
+47 |     import os; import sys; x = 1
+   |
+help: Replace with `None`; initialize within function
+42 |     import os; import sys
+43 | 
+44 | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+45 + def import_module_wrong(value: dict[str, str] = None):
+46 |     """Docstring"""
+47 +     if value is None:
+48 +         value = {}
+49 |     import os; import sys; x = 1
+50 | 
+51 | 
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:50:49
+   |
+50 | def import_module_wrong(value: dict[str, str] = {}):
+   |                                                 ^^
+51 |     """Docstring"""
+52 |     import os; import sys
+   |
+help: Replace with `None`; initialize within function
+47 |     import os; import sys; x = 1
+48 | 
+49 | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+50 + def import_module_wrong(value: dict[str, str] = None):
+51 |     """Docstring"""
+52 |     import os; import sys
+53 +     if value is None:
+54 +         value = {}
+55 | 
+56 | 
+57 | def import_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:55:49
+   |
+55 | def import_module_wrong(value: dict[str, str] = {}):
+   |                                                 ^^
+56 |     import os; import sys
+   |
+help: Replace with `None`; initialize within function
+52 |     import os; import sys
+53 | 
+54 | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+55 + def import_module_wrong(value: dict[str, str] = None):
+56 |     import os; import sys
+57 +     if value is None:
+58 +         value = {}
+59 | 
+60 | 
+61 | def import_module_wrong(value: dict[str, str] = {}):
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:59:49
+   |
+59 | def import_module_wrong(value: dict[str, str] = {}):
+   |                                                 ^^
+60 |     import os; import sys; x = 1
+   |
+help: Replace with `None`; initialize within function
+56 |     import os; import sys
+57 | 
+58 | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+59 + def import_module_wrong(value: dict[str, str] = None):
+60 +     if value is None:
+61 +         value = {}
+62 |     import os; import sys; x = 1
+63 | 
+64 | 
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_5.py:63:49
+   |
+63 | def import_module_wrong(value: dict[str, str] = {}):
+   |                                                 ^^
+64 |     import os; import sys
+   |
+help: Replace with `None`; initialize within function
+60 |     import os; import sys; x = 1
+61 | 
+62 | 
+   - def import_module_wrong(value: dict[str, str] = {}):
+63 + def import_module_wrong(value: dict[str, str] = None):
+64 |     import os; import sys
+65 +     if value is None:
+66 +         value = {}
+67 | 
+68 | 
+69 | def import_module_wrong(value: dict[str, str] = {}): import os
+note: This is an unsafe fix and may change runtime behavior
+
+B006 Do not use mutable data structures for argument defaults
+  --> B006_5.py:67:49
+   |
+67 | def import_module_wrong(value: dict[str, str] = {}): import os
+   |                                                 ^^
+   |
+help: Replace with `None`; initialize within function
+
+B006 Do not use mutable data structures for argument defaults
+  --> B006_5.py:70:49
+   |
+70 | def import_module_wrong(value: dict[str, str] = {}): import os; import sys
+   |                                                 ^^
+   |
+help: Replace with `None`; initialize within function
+
+B006 Do not use mutable data structures for argument defaults
+  --> B006_5.py:73:49
+   |
+73 | def import_module_wrong(value: dict[str, str] = {}): \
+   |                                                 ^^
+74 |     import os
+   |
+help: Replace with `None`; initialize within function

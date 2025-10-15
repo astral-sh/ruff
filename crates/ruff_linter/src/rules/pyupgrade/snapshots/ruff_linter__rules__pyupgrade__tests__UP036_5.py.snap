@@ -160,6 +160,66 @@ UP036 Version specifier is invalid
    |
 
 UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:60:4
+   |
+58 |     print()
+59 |
+60 | if sys.version_info <= (3, 13, 0):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+61 |     print()
+   |
+help: Remove outdated version block
+57 | if sys.version_info <= (3, 13, 'final'):
+58 |     print()
+59 | 
+   - if sys.version_info <= (3, 13, 0):
+   -     print()
+60 | 
+61 | if sys.version_info < (3, 13, 37):
+62 |     print()
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:63:4
+   |
+61 |     print()
+62 |
+63 | if sys.version_info < (3, 13, 37):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64 |     print()
+   |
+help: Remove outdated version block
+60 | if sys.version_info <= (3, 13, 0):
+61 |     print()
+62 | 
+   - if sys.version_info < (3, 13, 37):
+   -     print()
+63 | 
+64 | if sys.version_info <= (3, 13, 37):
+65 |     print()
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:66:4
+   |
+64 |     print()
+65 |
+66 | if sys.version_info <= (3, 13, 37):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 |     print()
+   |
+help: Remove outdated version block
+63 | if sys.version_info < (3, 13, 37):
+64 |     print()
+65 | 
+   - if sys.version_info <= (3, 13, 37):
+   -     print()
+66 | 
+67 | if sys.version_info <= (3, 14, 0):
+68 |     print()
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 [*] Version block is outdated for minimum Python version
   --> UP036_5.py:77:4
    |
 75 | # https://github.com/astral-sh/ruff/issues/18165
@@ -277,4 +337,28 @@ help: Remove outdated version block
 98  | 
 99  | # Semantically incorrect, skip fixing
 100 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 [*] Version block is outdated for minimum Python version
+   --> UP036_5.py:109:4
+    |
+107 |     print(2)
+108 |
+109 | if sys.version_info.major > (3, 13):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+110 |     print(3)
+111 | else:
+    |
+help: Remove outdated version block
+106 | else:
+107 |     print(2)
+108 | 
+    - if sys.version_info.major > (3, 13):
+    -     print(3)
+    - else:
+    -     print(2)
+109 + print(3)
+110 | 
+111 | if sys.version_info.major[:2] > (3, 13):
+112 |     print(3)
 note: This is an unsafe fix and may change runtime behavior

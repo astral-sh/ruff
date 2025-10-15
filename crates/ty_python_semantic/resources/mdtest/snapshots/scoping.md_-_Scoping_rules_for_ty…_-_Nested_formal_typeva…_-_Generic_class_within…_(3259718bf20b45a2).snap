@@ -1,0 +1,63 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: scoping.md - Scoping rules for type variables - Nested formal typevars must be distinct - Generic class within generic function
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Iterable
+2 | 
+3 | def f[T](x: T, y: T) -> None:
+4 |     class Ok[S]: ...
+5 |     # error: [invalid-generic-class]
+6 |     class Bad1[T]: ...
+7 |     # error: [invalid-generic-class]
+8 |     class Bad2(Iterable[T]): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-generic-class]: Generic class `Bad1` must not reference type variables bound in an enclosing scope
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Iterable
+2 |
+3 | def f[T](x: T, y: T) -> None:
+  |     ------------------------ Type variable `T` is bound in this enclosing scope
+4 |     class Ok[S]: ...
+5 |     # error: [invalid-generic-class]
+6 |     class Bad1[T]: ...
+  |           ^^^^ `T` referenced in class definition here
+7 |     # error: [invalid-generic-class]
+8 |     class Bad2(Iterable[T]): ...
+  |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Generic class `Bad2` must not reference type variables bound in an enclosing scope
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing import Iterable
+2 |
+3 | def f[T](x: T, y: T) -> None:
+  |     ------------------------ Type variable `T` is bound in this enclosing scope
+4 |     class Ok[S]: ...
+5 |     # error: [invalid-generic-class]
+6 |     class Bad1[T]: ...
+7 |     # error: [invalid-generic-class]
+8 |     class Bad2(Iterable[T]): ...
+  |           ^^^^^^^^^^^^^^^^^ `T` referenced in class definition here
+  |
+info: rule `invalid-generic-class` is enabled by default
+
+```

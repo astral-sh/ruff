@@ -12,7 +12,7 @@ Function definitions are evaluated lazily.
 x = 1
 
 def f():
-    reveal_type(x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(x)  # revealed: Literal[1, 2]
 
 x = 2
 ```
@@ -283,7 +283,7 @@ x = 1
 
 def _():
     class C:
-        # revealed: Unknown | Literal[1]
+        # revealed: Literal[1]
         [reveal_type(x) for _ in [1]]
         x = 2
 ```
@@ -389,7 +389,7 @@ x = int
 class C:
     var: ClassVar[x]
 
-reveal_type(C.var)  # revealed: Unknown | int | str
+reveal_type(C.var)  # revealed: int | str
 
 x = str
 ```

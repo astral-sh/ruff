@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.14
+
+--- Summary ---
+Removed: 1
+Added: 0
+
+--- Removed ---
+RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?
+  --> confusables.py:61:20
+   |
+60 | from typing import Literal
+61 | x: '''"""'Literal["ﮨ"]'"""'''
+   |                    ^
+   |

@@ -77,6 +77,7 @@ Module(
                                                                 quote_style: Single,
                                                                 prefix: Regular,
                                                                 triple_quoted: true,
+                                                                unclosed: false,
                                                             },
                                                         },
                                                     ),

@@ -207,15 +207,16 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
-                .typevar(db)
-                .bound_or_constraints(db)?
-            {
-                TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
-                TypeVarBoundOrConstraints::Constraints(constraints) => {
-                    self.generate_constraint(db, Type::Union(constraints))
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db)? {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        self.generate_constraint(db, bound)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        self.generate_constraint(db, Type::Union(constraints))
+                    }
                 }
-            },
+            }
 
             // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
             // e.g. `isinstance(x, list[int])` fails at runtime.
@@ -251,7 +252,6 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
-            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,
@@ -634,7 +634,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // Add the narrowed values from the RHS first, to keep literals before broader types.
             builder = builder.add(rhs_values);
 
-            if let Some(lhs_union) = lhs_ty.into_union() {
+            if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     // Keep only the non-single-valued portion of the original type.
                     if !element.is_single_valued(self.db)
@@ -671,7 +671,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let mut single_builder = UnionBuilder::new(self.db);
             let mut rest_builder = UnionBuilder::new(self.db);
 
-            if let Some(lhs_union) = lhs_ty.into_union() {
+            if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
                         || element.is_literal_string()
@@ -840,7 +840,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     let callable_type = inference.expression_type(&**callable);
 
                     if callable_type
-                        .into_class_literal()
+                        .as_class_literal()
                         .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
                         let place = self.expect_place(&target);
@@ -903,7 +903,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if function == KnownFunction::HasAttr {
                     let attr = inference
                         .expression_type(second_arg)
-                        .into_string_literal()?
+                        .as_string_literal()?
                         .value(self.db);
 
                     if !is_identifier(attr) {

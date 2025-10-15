@@ -27,14 +27,13 @@ use crate::fix::{FixResult, fix_file};
 use crate::message::create_syntax_error_diagnostic;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
-use crate::preview::is_py314_support_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
 
@@ -442,14 +441,6 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
-        && !is_py314_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
-        );
-    }
-
     let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
@@ -550,14 +541,6 @@ pub fn lint_fix<'a>(
     let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
-
-    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
-        && !is_py314_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
-        );
-    }
 
     // Continuously fix until the source code stabilizes.
     loop {

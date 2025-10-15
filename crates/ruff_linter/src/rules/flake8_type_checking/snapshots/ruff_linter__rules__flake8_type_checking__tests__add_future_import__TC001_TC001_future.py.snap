@@ -12,15 +12,14 @@ TC001 [*] Move application import `.first_party` into a type-checking block
   |
 help: Move into type-checking block
   - def f():
-1 + from __future__ import annotations
-2 + from typing import TYPE_CHECKING
-3 + 
-4 + if TYPE_CHECKING:
-5 |     from . import first_party
-6 + def f():
-7 | 
-8 |     def f(x: first_party.foo): ...
-9 | 
+1 + from typing import TYPE_CHECKING
+2 + 
+3 + if TYPE_CHECKING:
+4 |     from . import first_party
+5 + def f():
+6 | 
+7 |     def f(x: first_party.foo): ...
+8 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC001 [*] Move application import `.foo` into a type-checking block
@@ -33,24 +32,19 @@ TC001 [*] Move application import `.foo` into a type-checking block
 59 |     def f(x: Union[foo.Ty, int]): ...
    |
 help: Move into type-checking block
-1  + from __future__ import annotations
-2  | def f():
-3  |     from . import first_party
-4  | 
---------------------------------------------------------------------------------
+50 | 
 51 | 
-52 | 
-53 | # unions
+52 | # unions
    - from typing import Union
-54 + from typing import Union, TYPE_CHECKING
-55 | 
-56 + if TYPE_CHECKING:
-57 +     from . import foo
-58 + 
-59 | 
-60 | def n():
+53 + from typing import Union, TYPE_CHECKING
+54 + 
+55 + if TYPE_CHECKING:
+56 +     from . import foo
+57 | 
+58 | 
+59 | def n():
    -     from . import foo
-61 | 
-62 |     def f(x: Union[foo.Ty, int]): ...
-63 |     def g(x: foo.Ty | int): ...
+60 | 
+61 |     def f(x: Union[foo.Ty, int]): ...
+62 |     def g(x: foo.Ty | int): ...
 note: This is an unsafe fix and may change runtime behavior

@@ -3,7 +3,6 @@ DateType
 Expression
 PyGithub
 PyWinCtl
-SinbadCogs
 Tanjun
 aiohttp
 aiohttp-devtools
@@ -40,6 +39,7 @@ dd-trace-py
 dedupe
 discord.py
 django-stubs
+django-test-migrations
 downforeveryone
 dragonchain
 dulwich

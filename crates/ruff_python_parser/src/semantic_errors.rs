@@ -224,6 +224,11 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
+            Stmt::Break(ast::StmtBreak { range, .. }) => {
+                if !ctx.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
+                }
+            }
             _ => {}
         }
 
@@ -1125,6 +1130,7 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
         }
     }
 }
@@ -1498,6 +1504,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
+
+    /// Represents the use of a `break` statement outside of a loop.
+    BreakOutsideLoop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1979,6 +1988,8 @@ pub trait SemanticSyntaxContext {
     fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
+
+    fn in_loop_context(&self) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

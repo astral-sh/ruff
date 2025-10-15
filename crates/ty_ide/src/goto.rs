@@ -15,8 +15,10 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::HasDefinition;
 use ty_python_semantic::ImportAliasResolution;
 use ty_python_semantic::ResolvedDefinition;
-use ty_python_semantic::types::definitions_for_keyword_argument;
-use ty_python_semantic::types::{Type, call_signature_details};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::types::ide_support::{
+    call_signature_details, definitions_for_keyword_argument,
+};
 use ty_python_semantic::{
     HasType, SemanticModel, definitions_for_imported_symbol, definitions_for_name,
 };

@@ -31,6 +31,7 @@ extend-ignore-re = [
     "typ",
     # TODO: Remove this once the `TYP` redirects are removed from `rule_redirects.rs`
     "TYP",
+    "ntBre"
 ]
 
 [default.extend-identifiers]

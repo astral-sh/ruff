@@ -25,7 +25,7 @@ from _ctypes import (
     set_errno as set_errno,
     sizeof as sizeof,
 )
-from _typeshed import StrPath
+from _typeshed import StrPath, SupportsBool, SupportsLen
 from ctypes._endian import BigEndianStructure as BigEndianStructure, LittleEndianStructure as LittleEndianStructure
 from types import GenericAlias
 from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, overload, type_check_only
@@ -301,7 +301,7 @@ class py_object(_CanCastTo, _SimpleCData[_T]):
 
 class c_bool(_SimpleCData[bool]):
     _type_: ClassVar[Literal["?"]]
-    def __init__(self, value: bool = ...) -> None: ...
+    def __init__(self, value: SupportsBool | SupportsLen | None = ...) -> None: ...
 
 class c_byte(_SimpleCData[int]):
     _type_: ClassVar[Literal["b"]]

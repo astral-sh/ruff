@@ -21,48 +21,6 @@ F821 Undefined name `C`
 12 | CStr2: TypeAlias = Union["C", str]  # always okay
    |
 
-F821 Undefined name `C`
-  --> F821_26.py:16:12
-   |
-14 | # References to a class from inside the class:
-15 | class C:
-16 |     other: C = ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
-   |            ^
-17 |     other2: "C" = ...  # always okay
-18 |     def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
-   |
-
-F821 Undefined name `C`
-  --> F821_26.py:18:35
-   |
-16 |     other: C = ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
-17 |     other2: "C" = ...  # always okay
-18 |     def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
-   |                                   ^
-19 |     def from_str2(self, s: str) -> "C": ...  # always okay
-   |
-
-F821 Undefined name `B`
-  --> F821_26.py:23:10
-   |
-21 | # Circular references:
-22 | class A:
-23 |     foo: B  # valid in a `.pyi` stub file, not in a `.py` runtime file
-   |          ^
-24 |     foo2: "B"  # always okay
-25 |     bar: dict[str, B]  # valid in a `.pyi` stub file, not in a `.py` runtime file
-   |
-
-F821 Undefined name `B`
-  --> F821_26.py:25:20
-   |
-23 |     foo: B  # valid in a `.pyi` stub file, not in a `.py` runtime file
-24 |     foo2: "B"  # always okay
-25 |     bar: dict[str, B]  # valid in a `.pyi` stub file, not in a `.py` runtime file
-   |                    ^
-26 |     bar2: dict[str, "A"]  # always okay
-   |
-
 F821 Undefined name `Tree`
   --> F821_26.py:33:17
    |

@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.14
+
+--- Summary ---
+Removed: 3
+Added: 0
+
+--- Removed ---
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `single` signature
+   --> FAST003.py:158:19
+    |
+157 | ### Errors
+158 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+159 | async def single(other: Annotated[str, Depends(something_else)]): ...
+160 | @app.get("/things/{thing_id}")
+    |
+help: Add `thing_id` to function signature
+156 | 
+157 | ### Errors
+158 | @app.get("/things/{thing_id}")
+    - async def single(other: Annotated[str, Depends(something_else)]): ...
+159 + async def single(other: Annotated[str, Depends(something_else)], thing_id): ...
+160 | @app.get("/things/{thing_id}")
+161 | async def default(other: str = Depends(something_else)): ...
+162 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_full` signature
+   --> FAST003.py:197:12
+    |
+196 | # Errors
+197 | @app.get("/{id}")
+    |            ^^^^
+198 | async def get_id_pydantic_full(
+199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
+    |
+help: Add `id` to function signature
+196 | # Errors
+197 | @app.get("/{id}")
+198 | async def get_id_pydantic_full(
+    -     params: Annotated[PydanticParams, Depends(PydanticParams)],
+199 +     params: Annotated[PydanticParams, Depends(PydanticParams)], id,
+200 | ): ...
+201 | @app.get("/{id}")
+202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_short` signature
+   --> FAST003.py:201:12
+    |
+199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
+200 | ): ...
+201 | @app.get("/{id}")
+    |            ^^^^
+202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+203 | @app.get("/{id}")
+    |
+help: Add `id` to function signature
+199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
+200 | ): ...
+201 | @app.get("/{id}")
+    - async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+202 + async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()], id): ...
+203 | @app.get("/{id}")
+204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+205 | 
+note: This is an unsafe fix and may change runtime behavior

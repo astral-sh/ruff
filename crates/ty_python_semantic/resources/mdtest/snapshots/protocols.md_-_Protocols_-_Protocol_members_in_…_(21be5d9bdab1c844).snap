@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 
 ```
  1 | import sys
- 2 | from typing_extensions import Protocol, get_protocol_members, reveal_type
+ 2 | from typing_extensions import Protocol, get_protocol_members
  3 | 
  4 | class Foo(Protocol):
  5 |     if sys.version_info >= (3, 10):
@@ -43,7 +43,7 @@ warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the 
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/mdtest_snippet.py:4:7
   |
-2 | from typing_extensions import Protocol, get_protocol_members, reveal_type
+2 | from typing_extensions import Protocol, get_protocol_members
 3 |
 4 | class Foo(Protocol):
   |       ^^^^^^^^^^^^^ `Foo` declared as a protocol here
@@ -52,17 +52,5 @@ info: Assigning to an undeclared variable in a protocol class leads to an ambigu
   |
 info: No declarations found for `e` in the body of `Foo` or any of its superclasses
 info: rule `ambiguous-protocol-member` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:14:13
-   |
-12 |         def f(self) -> None: ...
-13 |
-14 | reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^ `frozenset[Literal["d", "e", "f"]]`
-   |
 
 ```

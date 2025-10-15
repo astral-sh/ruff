@@ -117,11 +117,9 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 continue;
             };
 
-            // Check for use of %s with str() or %r with repr()
+            // Check for use of %s with str()
             if checker.semantic().match_builtin_expr(func.as_ref(), "str")
                 && matches!(format_conversion, FormatConversion::Str)
-                || checker.semantic().match_builtin_expr(func.as_ref(), "repr")
-                    && matches!(format_conversion, FormatConversion::Repr)
             {
                 checker
                     .report_diagnostic(LoggingEagerConversion { format_conversion }, arg.range());

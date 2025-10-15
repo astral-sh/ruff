@@ -98,6 +98,7 @@ Settings: Settings {
         "unsupported-base": Warning (Default),
         "unsupported-bool-conversion": Error (Default),
         "unsupported-operator": Error (Default),
+        "useless-overload-body": Warning (Default),
         "zero-stepsize-in-slice": Error (Default),
     },
     terminal: TerminalSettings {

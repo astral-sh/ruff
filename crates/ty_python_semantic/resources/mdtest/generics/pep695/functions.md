@@ -286,6 +286,9 @@ def union_param[T](x: T | None) -> T:
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
 reveal_type(union_param(None))  # revealed: Unknown
+
+def _(x: int | None):
+    reveal_type(union_param(x))  # revealed: int
 ```
 
 ```py
@@ -441,7 +444,23 @@ def g[T: A](b: B[T]):
     return f(b.x)  # Fine
 ```
 
-## Constrained TypeVar in a union
+## Typevars in a union
+
+```py
+def takes_in_union[T](t: T | None) -> T:
+    raise NotImplementedError
+
+def takes_in_bigger_union[T](t: T | int | None) -> T:
+    raise NotImplementedError
+
+def _(x: str | None) -> None:
+    reveal_type(takes_in_union(x))  # revealed: str
+    reveal_type(takes_in_bigger_union(x))  # revealed: str
+
+def _(x: str | int | None) -> None:
+    reveal_type(takes_in_union(x))  # revealed: str | int
+    reveal_type(takes_in_bigger_union(x))  # revealed: str
+```
 
 This is a regression test for an issue that surfaced in the primer report of an early version of
 <https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
@@ -542,4 +561,15 @@ def _(x: int):
     reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
 
     reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
+```
+
+## `~T` is never assignable to `T`
+
+```py
+from ty_extensions import Not
+
+def f[T](x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
 ```

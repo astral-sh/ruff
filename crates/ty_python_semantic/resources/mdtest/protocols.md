@@ -347,7 +347,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing_extensions import Protocol, reveal_type
+from typing_extensions import Protocol
 
 # error: [call-non-callable]
 reveal_type(Protocol())  # revealed: Unknown
@@ -381,9 +381,7 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    # TODO: add a `reveal_type` call here once it's no longer a `Todo` type
-    # (which doesn't work well with snapshots)
-    x()
+    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
 ```
 
 ## Members of a protocol
@@ -534,7 +532,7 @@ python-version = "3.9"
 
 ```py
 import sys
-from typing_extensions import Protocol, get_protocol_members, reveal_type
+from typing_extensions import Protocol, get_protocol_members
 
 class Foo(Protocol):
     if sys.version_info >= (3, 10):
@@ -617,11 +615,10 @@ static_assert(is_assignable_to(Foo, HasX))
 static_assert(not is_subtype_of(Foo, HasXY))
 static_assert(not is_assignable_to(Foo, HasXY))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasXIntSub, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(HasXIntSub, HasX))  # error: [static-assert-error]
-static_assert(not is_subtype_of(HasX, HasXIntSub))  # error: [static-assert-error]
-static_assert(not is_assignable_to(HasX, HasXIntSub))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasXIntSub, HasX))
+static_assert(not is_assignable_to(HasXIntSub, HasX))
+static_assert(not is_subtype_of(HasX, HasXIntSub))
+static_assert(not is_assignable_to(HasX, HasXIntSub))
 
 class FooSub(Foo): ...
 
@@ -630,7 +627,7 @@ static_assert(is_assignable_to(FooSub, HasX))
 static_assert(not is_subtype_of(FooSub, HasXY))
 static_assert(not is_assignable_to(FooSub, HasXY))
 
-class FooBool(Foo):
+class FooBool:
     x: bool
 
 static_assert(not is_subtype_of(FooBool, HasX))
@@ -964,11 +961,14 @@ class Foo(Protocol):
 
     def __init__(self) -> None:
         self.x = 42  # fine
+
         self.a = 56  # TODO: should emit diagnostic
         self.b: int = 128  # TODO: should emit diagnostic
 
     def non_init_method(self) -> None:
-        self.y = 64  # fine
+        self.x = 64  # fine
+        self.y = "bar"  # fine
+
         self.c = 72  # TODO: should emit diagnostic
 
 # Note: the list of members does not include `a`, `b` or `c`,
@@ -2288,10 +2288,9 @@ class MethodPUnrelated(Protocol):
 
 static_assert(is_subtype_of(MethodPSub, MethodPSuper))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(MethodPUnrelated, MethodPSuper))  # error: [static-assert-error]
-static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))  # error: [static-assert-error]
-static_assert(not is_assignable_to(MethodPSuper, MethodPSub))  # error: [static-assert-error]
+static_assert(not is_assignable_to(MethodPUnrelated, MethodPSuper))
+static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))
+static_assert(not is_assignable_to(MethodPSuper, MethodPSub))
 ```
 
 ## Subtyping between protocols with method members and protocols with non-method members
@@ -2350,8 +2349,7 @@ And for the same reason, they are never assignable to attribute members (which a
 class Attribute(Protocol):
     f: Callable[[], bool]
 
-# TODO: should pass
-static_assert(not is_assignable_to(Method, Attribute))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Method, Attribute))
 ```
 
 Protocols with attribute members, meanwhile, cannot be assigned to protocols with method members,
@@ -2360,9 +2358,8 @@ this is not true for attribute members. The same principle also applies for prot
 members
 
 ```py
-# TODO: this should pass
-static_assert(not is_assignable_to(PropertyBool, Method))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Attribute, Method))  # error: [static-assert-error]
+static_assert(not is_assignable_to(PropertyBool, Method))
+static_assert(not is_assignable_to(Attribute, Method))
 ```
 
 But an exception to this rule is if an attribute member is marked as `ClassVar`, as this guarantees
@@ -2381,9 +2378,8 @@ static_assert(is_assignable_to(ClassVarAttribute, Method))
 class ClassVarAttributeBad(Protocol):
     f: ClassVar[Callable[[], str]]
 
-# TODO: these should pass:
-static_assert(not is_subtype_of(ClassVarAttributeBad, Method))  # error: [static-assert-error]
-static_assert(not is_assignable_to(ClassVarAttributeBad, Method))  # error: [static-assert-error]
+static_assert(not is_subtype_of(ClassVarAttributeBad, Method))
+static_assert(not is_assignable_to(ClassVarAttributeBad, Method))
 ```
 
 ## Narrowing of protocols
@@ -2395,7 +2391,7 @@ By default, a protocol class cannot be used as the second argument to `isinstanc
 type inside these branches (this matches the behavior of other type checkers):
 
 ```py
-from typing_extensions import Protocol, reveal_type
+from typing_extensions import Protocol
 
 class HasX(Protocol):
     x: int
@@ -2704,9 +2700,8 @@ class RecursiveNonFullyStatic(Protocol):
     parent: RecursiveNonFullyStatic
     x: Any
 
-# TODO: these should pass, once we take into account types of members
-static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))  # error: [static-assert-error]
-static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))  # error: [static-assert-error]
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
 static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
@@ -2724,9 +2719,7 @@ class RecursiveOptionalParent(Protocol):
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
 # Due to invariance of mutable attribute members, neither is assignable to the other
-#
-# TODO: should pass
-static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))  # error: [static-assert-error]
+static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 
 class Other(Protocol):

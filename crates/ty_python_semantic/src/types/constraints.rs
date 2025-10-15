@@ -62,8 +62,8 @@ use rustc_hash::FxHashSet;
 
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
-    UnionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -192,13 +192,14 @@ impl<'db> ConstraintSet<'db> {
     /// Returns a constraint set that constraints a typevar to a particular range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
         relation: TypeRelation,
     ) -> Self {
         let (lower, upper) = match relation {
-            TypeRelation::Subtyping => (
+            // TODO: Is this the correct constraint for redundancy?
+            TypeRelation::Subtyping | TypeRelation::Redundancy => (
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),
@@ -272,7 +273,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Self {
         let lower = lower.bottom_materialization(db);
@@ -285,7 +286,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negated_range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Self {
         Self::range(db, lower, typevar, upper).negate(db)
@@ -307,7 +308,7 @@ impl From<bool> for ConstraintSet<'_> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarInstance<'db>,
+    typevar: BoundTypeVarIdentity<'db>,
     lower: Type<'db>,
     upper: Type<'db>,
 }
@@ -323,7 +324,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
@@ -1262,38 +1263,37 @@ impl<'db> SatisfiedClause<'db> {
         false
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
-        struct DisplaySatisfiedClause<'a, 'db> {
-            clause: &'a SatisfiedClause<'db>,
-            db: &'db dyn Db,
-        }
+    fn display(&self, db: &'db dyn Db) -> String {
+        // This is a bit heavy-handed, but we need to output the constraints in a consistent order
+        // even though Salsa IDs are assigned non-deterministically. This Display output is only
+        // used in test cases, so we don't need to over-optimize it.
 
-        impl Display for DisplaySatisfiedClause<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.clause.constraints.len() > 1 {
-                    f.write_str("(")?;
+        let mut constraints: Vec<_> = self
+            .constraints
+            .iter()
+            .map(|constraint| match constraint {
+                ConstraintAssignment::Positive(constraint) => constraint.display(db).to_string(),
+                ConstraintAssignment::Negative(constraint) => {
+                    constraint.display_negated(db).to_string()
                 }
-                for (i, constraint) in self.clause.constraints.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(" ∧ ")?;
-                    }
-                    match constraint {
-                        ConstraintAssignment::Positive(constraint) => {
-                            write!(f, "{}", constraint.display(self.db))?;
-                        }
-                        ConstraintAssignment::Negative(constraint) => {
-                            write!(f, "{}", constraint.display_negated(self.db))?;
-                        }
-                    }
-                }
-                if self.clause.constraints.len() > 1 {
-                    f.write_str(")")?;
-                }
-                Ok(())
+            })
+            .collect();
+        constraints.sort();
+
+        let mut result = String::new();
+        if constraints.len() > 1 {
+            result.push('(');
+        }
+        for (i, constraint) in constraints.iter().enumerate() {
+            if i > 0 {
+                result.push_str(" ∧ ");
             }
+            result.push_str(constraint);
         }
-
-        DisplaySatisfiedClause { clause: self, db }
+        if constraints.len() > 1 {
+            result.push(')');
+        }
+        result
     }
 }
 
@@ -1377,28 +1377,21 @@ impl<'db> SatisfiedClauses<'db> {
         false
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
-        struct DisplaySatisfiedClauses<'a, 'db> {
-            clauses: &'a SatisfiedClauses<'db>,
-            db: &'db dyn Db,
-        }
+    fn display(&self, db: &'db dyn Db) -> String {
+        // This is a bit heavy-handed, but we need to output the clauses in a consistent order
+        // even though Salsa IDs are assigned non-deterministically. This Display output is only
+        // used in test cases, so we don't need to over-optimize it.
 
-        impl Display for DisplaySatisfiedClauses<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.clauses.clauses.is_empty() {
-                    return f.write_str("always");
-                }
-                for (i, clause) in self.clauses.clauses.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(" ∨ ")?;
-                    }
-                    clause.display(self.db).fmt(f)?;
-                }
-                Ok(())
-            }
+        if self.clauses.is_empty() {
+            return String::from("always");
         }
-
-        DisplaySatisfiedClauses { clauses: self, db }
+        let mut clauses: Vec<_> = self
+            .clauses
+            .iter()
+            .map(|clause| clause.display(db))
+            .collect();
+        clauses.sort();
+        clauses.join(" ∨ ")
     }
 }
 
@@ -1409,7 +1402,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => ConstraintSet::from(true),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
                 db,
-                self,
+                self.identity(db),
                 Type::Never,
                 bound,
                 TypeRelation::Assignability,
@@ -1418,7 +1411,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 constraints.elements(db).iter().when_any(db, |constraint| {
                     ConstraintSet::constrain_typevar(
                         db,
-                        self,
+                        self.identity(db),
                         *constraint,
                         *constraint,
                         TypeRelation::Assignability,
@@ -1445,7 +1438,7 @@ impl<'db> Type<'db> {
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 match ty {
-                    Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
+                    Type::TypeVar(bound_typevar) => {
                         let valid_specializations = bound_typevar.valid_specializations(db);
                         self.result
                             .borrow_mut()

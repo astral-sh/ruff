@@ -22,7 +22,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -242,6 +242,32 @@ mod tests {
             },
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn confusables_deferred_annotations_diff() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/confusables.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+        );
         Ok(())
     }
 

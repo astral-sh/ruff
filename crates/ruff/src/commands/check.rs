@@ -9,11 +9,10 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_linter::message::create_panic_diagnostic;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Span, SubDiagnostic, SubDiagnosticSeverity,
-};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
@@ -195,23 +194,7 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = match error.payload.as_str() {
-                Some(summary) => format!("Fatal error while linting: {summary}"),
-                _ => "Fatal error while linting".to_owned(),
-            };
-            let mut diagnostic = Diagnostic::new(
-                DiagnosticId::Panic,
-                ruff_db::diagnostic::Severity::Fatal,
-                message,
-            );
-            let span = Span::from(SourceFileBuilder::new(path.to_string_lossy(), "").finish());
-            let mut annotation = Annotation::primary(span);
-            annotation.set_file_level(true);
-            diagnostic.annotate(annotation);
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!("{error}"),
-            ));
+            let diagnostic = create_panic_diagnostic(&error, Some(path));
             Ok(Diagnostics::new(vec![diagnostic], FxHashMap::default()))
         }
     }

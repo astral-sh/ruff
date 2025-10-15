@@ -63,7 +63,7 @@ pub(crate) struct Environment {
     ///
     /// By default, the Python version is inferred as the lower bound of the project's
     /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
-    /// stable version supported by ty is used, which is currently 3.13.
+    /// stable version supported by ty is used (see `ty check --help` output).
     ///
     /// ty will not infer the Python version from the Python environment at this time.
     pub(crate) python_version: Option<PythonVersion>,

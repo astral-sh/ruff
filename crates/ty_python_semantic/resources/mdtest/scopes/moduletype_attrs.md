@@ -73,10 +73,10 @@ __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is no
 ```py
 import module
 
-reveal_type(module.__file__)  # revealed: Unknown | None
+reveal_type(module.__file__)  # revealed: None
 reveal_type(module.__path__)  # revealed: list[str]
 reveal_type(module.__doc__)  # revealed: Unknown
-reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
+reveal_type(module.__spec__)  # revealed: ModuleSpec | None
 # error: [unresolved-attribute]
 reveal_type(module.__warningregistry__)  # revealed: Unknown
 
@@ -97,7 +97,7 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = EllipsisType) -> None
 
 # For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
 # unset, but we follow typeshed here):

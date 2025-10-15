@@ -28,7 +28,7 @@ declare_lint! {
     /// ```
     pub(crate) static FSTRING_TYPE_ANNOTATION = {
         summary: "detects F-strings in type annotation positions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -53,7 +53,7 @@ declare_lint! {
         /// ```
     pub(crate) static BYTE_STRING_TYPE_ANNOTATION = {
         summary: "detects byte strings in type annotation positions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -78,7 +78,7 @@ declare_lint! {
         /// ```
     pub(crate) static RAW_STRING_TYPE_ANNOTATION = {
         summary: "detects raw strings in type annotation positions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -103,7 +103,7 @@ declare_lint! {
         /// ```
     pub(crate) static IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION = {
         summary: "detects implicit concatenated strings in type annotations",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -112,7 +112,7 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_SYNTAX_IN_FORWARD_ANNOTATION = {
         summary: "detects invalid syntax in forward annotations",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -121,7 +121,7 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION = {
         summary: "detects forward type annotations with escape characters",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }

@@ -108,7 +108,7 @@ def foo():
     global x
     def bar():
         # allowed, refers to `x` in the global scope
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     bar()
     del x  # allowed, deletes `x` in the global scope (though we don't track that)
 ```

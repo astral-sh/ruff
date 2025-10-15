@@ -14,6 +14,6 @@ class Bar:
     ]
 
 
-# OK: Allow named expressions in annotations.
+# This is no longer allowed on Python 3.14+
 x: (y := 1)
 print(y)

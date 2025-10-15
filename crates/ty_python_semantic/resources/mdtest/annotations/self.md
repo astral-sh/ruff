@@ -301,6 +301,30 @@ reveal_type(Container("a"))  # revealed: Container[str]
 reveal_type(Container(b"a"))  # revealed: Container[bytes]
 ```
 
+## Implicit self for classes with a default value for their generic parameter
+
+```py
+from typing import Self, TypeVar, Generic
+
+class Container[T = bytes]:
+    def method(self) -> Self:
+        return self
+
+def _(c: Container[str], d: Container):
+    reveal_type(c.method())  # revealed: Container[str]
+    reveal_type(d.method())  # revealed: Container[bytes]
+
+T = TypeVar("T", default=bytes)
+
+class LegacyContainer(Generic[T]):
+    def method(self) -> Self:
+        return self
+
+def _(c: LegacyContainer[str], d: LegacyContainer):
+    reveal_type(c.method())  # revealed: LegacyContainer[str]
+    reveal_type(d.method())  # revealed: LegacyContainer[bytes]
+```
+
 ## Invalid Usage
 
 `Self` cannot be used in the signature of a function or variable.
@@ -447,6 +471,20 @@ class C:
         reveal_type(generic_context(b))  # revealed: None
 
 reveal_type(generic_context(C.f))  # revealed: None
+```
+
+## Non-positional first parameters
+
+This makes sure that we don't bind `self` if it's not a positional parameter:
+
+```py
+from ty_extensions import CallableTypeOf
+
+class C:
+    def method(*args, **kwargs) -> None: ...
+
+def _(c: CallableTypeOf[C().method]):
+    reveal_type(c)  # revealed: (...) -> None
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

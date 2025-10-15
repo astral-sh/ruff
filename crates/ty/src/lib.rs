@@ -73,11 +73,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let printer = Printer::default().with_verbosity(verbosity);
 
-    tracing::warn!(
-        "ty is pre-release software and not ready for production use. \
-            Expect to encounter bugs, missing features, and fatal errors.",
-    );
-
     tracing::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.

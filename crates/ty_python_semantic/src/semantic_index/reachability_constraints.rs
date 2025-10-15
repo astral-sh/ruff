@@ -854,7 +854,7 @@ impl ReachabilityConstraints {
                 }
 
                 let overloads_iterator =
-                    if let Some(Type::Callable(callable)) = ty.into_callable(db) {
+                    if let Some(Type::Callable(callable)) = ty.try_upcast_to_callable(db) {
                         callable.signatures(db).overloads.iter()
                     } else {
                         return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);

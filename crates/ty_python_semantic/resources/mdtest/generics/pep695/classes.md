@@ -553,13 +553,9 @@ from typing import overload
 
 class WithOverloadedMethod[T]:
     @overload
-    def method(self, x: T) -> T:
-        return x
-
+    def method(self, x: T) -> T: ...
     @overload
-    def method[S](self, x: S) -> S | T:
-        return x
-
+    def method[S](self, x: S) -> S | T: ...
     def method[S](self, x: S | T) -> S | T:
         return x
 

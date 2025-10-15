@@ -1,6 +1,5 @@
 """A parser for HTML and XHTML."""
 
-import sys
 from _markupbase import ParserBase
 from re import Pattern
 from typing import Final
@@ -30,9 +29,8 @@ class HTMLParser(ParserBase):
     """
 
     CDATA_CONTENT_ELEMENTS: Final[tuple[str, ...]]
-    if sys.version_info >= (3, 13):
-        # Added in 3.13.6
-        RCDATA_CONTENT_ELEMENTS: Final[tuple[str, ...]]
+    # Added in Python 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.6
+    RCDATA_CONTENT_ELEMENTS: Final[tuple[str, ...]]
 
     def __init__(self, *, convert_charrefs: bool = True) -> None:
         """Initialize and reset this instance.
@@ -71,11 +69,8 @@ class HTMLParser(ParserBase):
     def parse_html_declaration(self, i: int) -> int: ...  # undocumented
     def parse_pi(self, i: int) -> int: ...  # undocumented
     def parse_starttag(self, i: int) -> int: ...  # undocumented
-    if sys.version_info >= (3, 13):
-        # `escapable` parameter added in 3.13.6
-        def set_cdata_mode(self, elem: str, *, escapable: bool = False) -> None: ...  # undocumented
-    else:
-        def set_cdata_mode(self, elem: str) -> None: ...  # undocumented
+    # `escapable` parameter added in Python 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.6
+    def set_cdata_mode(self, elem: str, *, escapable: bool = False) -> None: ...  # undocumented
     rawdata: str  # undocumented
     cdata_elem: str | None  # undocumented
     convert_charrefs: bool  # undocumented

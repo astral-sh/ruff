@@ -34,9 +34,10 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe for `map` calls that contain
-/// `**kwargs`, as adding a `strict` keyword argument to such a call may lead
-/// to a duplicate keyword argument error.
+/// This rule's fix is marked as unsafe. While adding `strict=False` preserves
+/// the runtime behavior, it can obscure situations where the iterables are of
+/// unequal length. Ruff prefers to alert users so they can choose the intended
+/// behavior themselves.
 ///
 /// ## References
 /// - [Python documentation: `map`](https://docs.python.org/3/library/functions.html#map)
@@ -73,17 +74,7 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
                     checker.comment_ranges(),
                     checker.locator().contents(),
                 ),
-                // If the function call contains `**kwargs`, mark the fix as unsafe.
-                if call
-                    .arguments
-                    .keywords
-                    .iter()
-                    .any(|keyword| keyword.arg.is_none())
-                {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
+                Applicability::Unsafe,
             ));
     }
 }

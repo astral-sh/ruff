@@ -265,6 +265,41 @@ reveal_type(enum_members(Color))
 reveal_type(Color.red)
 ```
 
+Multiple aliases to the same member are also supported. This is a regression test for
+<https://github.com/astral-sh/ty/issues/1293>:
+
+```py
+from ty_extensions import enum_members
+
+class ManyAliases(Enum):
+    real_member = "real_member"
+    alias1 = "real_member"
+    alias2 = "real_member"
+    alias3 = "real_member"
+
+    other_member = "other_real_member"
+
+# revealed: tuple[Literal["real_member"], Literal["other_member"]]
+reveal_type(enum_members(ManyAliases))
+
+reveal_type(ManyAliases.real_member)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias1)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias2)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias3)  # revealed: Literal[ManyAliases.real_member]
+
+reveal_type(ManyAliases.real_member.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.real_member.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias1.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias1.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias2.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias2.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
+```
+
 ### Using `auto()`
 
 ```toml

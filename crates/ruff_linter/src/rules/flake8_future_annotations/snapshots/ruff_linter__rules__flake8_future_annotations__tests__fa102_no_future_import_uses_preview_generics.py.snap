@@ -1,0 +1,36 @@
+---
+source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
+---
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:42:19
+   |
+40 |     future: asyncio.Future[int],
+41 |     task: asyncio.Task[str],
+42 |     deque_object: collections.deque[int],
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+43 |     defaultdict_object: collections.defaultdict[str, int],
+44 |     ordered_dict: collections.OrderedDict[str, int],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior
+
+FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  --> no_future_import_uses_preview_generics.py:43:25
+   |
+41 |     task: asyncio.Task[str],
+42 |     deque_object: collections.deque[int],
+43 |     defaultdict_object: collections.defaultdict[str, int],
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |     ordered_dict: collections.OrderedDict[str, int],
+45 |     counter_obj: collections.Counter[str],
+   |
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | import asyncio
+3 | import collections
+4 | import contextlib
+note: This is an unsafe fix and may change runtime behavior

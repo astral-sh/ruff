@@ -128,3 +128,15 @@ if f"0" in d:                       # f-string
 
 if k in a.d:                        # Attribute dict
     del a.d[k]
+
+if k in d:                          # else statement
+    del d[k]
+else:
+    pass
+
+if k in d:                          # elif and else statements
+    del d[k]
+elif 0 in d:
+    del d[0]
+else:
+    pass

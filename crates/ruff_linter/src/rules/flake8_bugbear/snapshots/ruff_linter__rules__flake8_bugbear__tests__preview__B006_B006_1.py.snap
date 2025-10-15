@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_1.py:3:22
+  |
+1 | # Docstring followed by a newline
+2 |
+3 | def foobar(foor, bar={}):    
+  |                      ^^
+4 |     """
+5 |     """
+  |
+help: Replace with `None`; initialize within function
+1 | # Docstring followed by a newline
+2 | 
+  - def foobar(foor, bar={}):    
+3 + def foobar(foor, bar=None):    
+4 |     """
+5 |     """
+note: This is an unsafe fix and may change runtime behavior

@@ -1014,6 +1014,30 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("future_import.py"))]
+    #[test_case(Path::new("docstring_future_import.py"))]
+    fn required_import_with_future_import(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "required_import_with_future_import_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::Import(
+                        ModuleNameImport::module("this".to_string()),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("from_first.py"))]
     fn from_first(path: &Path) -> Result<()> {
         let snapshot = format!("from_first_{}", path.to_string_lossy());

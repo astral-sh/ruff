@@ -67,7 +67,7 @@ class C:
     name: str
 ```
 
-## Types of decorators
+## Types of dataclass-transformers
 
 The examples from this section are straight from the Python documentation on
 [`typing.dataclass_transform`].
@@ -165,7 +165,7 @@ Normal(1) < Normal(2)  # error: [unsupported-operator]
 class NormalOverwritten:
     inner: int
 
-NormalOverwritten(1) < NormalOverwritten(2)
+reveal_type(NormalOverwritten(1) < NormalOverwritten(2))  # revealed: bool
 
 @order_default_false
 class OrderFalse:
@@ -177,13 +177,13 @@ OrderFalse(1) < OrderFalse(2)  # error: [unsupported-operator]
 class OrderFalseOverwritten:
     inner: int
 
-OrderFalseOverwritten(1) < OrderFalseOverwritten(2)
+reveal_type(OrderFalseOverwritten(1) < OrderFalseOverwritten(2))  # revealed: bool
 
 @order_default_true
 class OrderTrue:
     inner: int
 
-OrderTrue(1) < OrderTrue(2)
+reveal_type(OrderTrue(1) < OrderTrue(2))  # revealed: bool
 
 @order_default_true(order=False)
 class OrderTrueOverwritten:
@@ -191,6 +191,36 @@ class OrderTrueOverwritten:
 
 # error: [unsupported-operator]
 OrderTrueOverwritten(1) < OrderTrueOverwritten(2)
+```
+
+This also works for metaclass-based transformers:
+
+```py
+@dataclass_transform(order_default=True)
+class OrderedModelMeta(type): ...
+
+class OrderedModel(metaclass=OrderedModelMeta): ...
+
+class TestWithMeta(OrderedModel):
+    inner: int
+
+reveal_type(TestWithMeta(1) < TestWithMeta(2))  # revealed: bool
+```
+
+And for base-class-based transformers:
+
+```py
+@dataclass_transform(order_default=True)
+class OrderedModelBase: ...
+
+class TestWithBase(OrderedModelBase):
+    inner: int
+
+# TODO: No errors here, should reveal `bool`
+# error: [too-many-positional-arguments]
+# error: [too-many-positional-arguments]
+# error: [unsupported-operator]
+reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
 ```
 
 ### `kw_only_default`
@@ -202,7 +232,7 @@ from typing import dataclass_transform
 from dataclasses import field
 
 @dataclass_transform(kw_only_default=True)
-def create_model(*, init=True): ...
+def create_model(*, kw_only: bool = True): ...
 @create_model()
 class A:
     name: str
@@ -213,27 +243,252 @@ a = A(name="Harry")
 a = A("Harry")
 ```
 
-TODO: This can be overridden by the call to the decorator function.
+This can be overridden by setting `kw_only=False` when applying the decorator:
 
 ```py
-from typing import dataclass_transform
-
-@dataclass_transform(kw_only_default=True)
-def create_model(*, kw_only: bool = True): ...
 @create_model(kw_only=False)
 class CustomerModel:
     id: int
     name: str
 
-# TODO: Should not emit errors
-# error: [missing-argument]
-# error: [too-many-positional-arguments]
 c = CustomerModel(1, "Harry")
 ```
 
-### `field_specifiers`
+This also works for metaclass-based transformers:
 
-To do
+```py
+@dataclass_transform(kw_only_default=True)
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class TestMeta(ModelBase):
+    name: str
+
+reveal_type(TestMeta.__init__)  # revealed: (self: TestMeta, *, name: str) -> None
+```
+
+And for base-class-based transformers:
+
+```py
+@dataclass_transform(kw_only_default=True)
+class ModelBase: ...
+
+class TestBase(ModelBase):
+    name: str
+
+# TODO: This should be `(self: TestBase, *, name: str) -> None`
+reveal_type(TestBase.__init__)  # revealed: def __init__(self) -> None
+```
+
+### `frozen_default`
+
+When provided, sets the default value for the `frozen` parameter of `field()`.
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def create_model(*, frozen: bool = True): ...
+@create_model()
+class ImmutableModel:
+    name: str
+
+i = ImmutableModel(name="test")
+i.name = "new"  # error: [invalid-assignment]
+```
+
+Again, this can be overridden by setting `frozen=False` when applying the decorator:
+
+```py
+@create_model(frozen=False)
+class MutableModel:
+    name: str
+
+m = MutableModel(name="test")
+m.name = "new"  # No error
+```
+
+This also works for metaclass-based transformers:
+
+```py
+@dataclass_transform(frozen_default=True)
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class TestMeta(ModelBase):
+    name: str
+
+t = TestMeta(name="test")
+t.name = "new"  # error: [invalid-assignment]
+```
+
+And for base-class-based transformers:
+
+```py
+@dataclass_transform(frozen_default=True)
+class ModelBase: ...
+
+class TestMeta(ModelBase):
+    name: str
+
+# TODO: no error here
+# error: [unknown-argument]
+t = TestMeta(name="test")
+
+# TODO: this should be an `invalid-assignment` error
+t.name = "new"
+```
+
+### Combining parameters
+
+Combining several of these parameters also works as expected:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(eq_default=True, order_default=False, kw_only_default=True, frozen_default=True)
+def create_model(*, eq: bool = True, order: bool = False, kw_only: bool = True, frozen: bool = True): ...
+@create_model(eq=False, order=True, kw_only=False, frozen=False)
+class OverridesAllParametersModel:
+    name: str
+    age: int
+
+# Positional arguments are allowed:
+model = OverridesAllParametersModel("test", 25)
+
+# Mutation is allowed:
+model.name = "new"  # No error
+
+# Comparison methods are generated:
+model < model  # No error
+```
+
+### Overwriting of default parameters on the dataclass-like class
+
+#### Using function-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def default_frozen_model(*, frozen: bool = True): ...
+@default_frozen_model()
+class Frozen:
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+@default_frozen_model(frozen=False)
+class Mutable:
+    name: str
+
+m = Mutable(name="test")
+m.name = "new"  # No error
+```
+
+#### Using metaclass-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class DefaultFrozenMeta(type):
+    def __new__(
+        cls,
+        name,
+        bases,
+        namespace,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class DefaultFrozenModel(metaclass=DefaultFrozenMeta): ...
+
+class Frozen(DefaultFrozenModel):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+class Mutable(DefaultFrozenModel, frozen=False):
+    name: str
+
+m = Mutable(name="test")
+# TODO: no error here
+m.name = "new"  # error: [invalid-assignment]
+```
+
+#### Using base-class-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class DefaultFrozenModel:
+    def __init_subclass__(
+        cls,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class Frozen(DefaultFrozenModel):
+    name: str
+
+# TODO: no error here
+# error: [unknown-argument]
+f = Frozen(name="test")
+# TODO: this should be an `invalid-assignment` error
+f.name = "new"
+
+class Mutable(DefaultFrozenModel, frozen=False):
+    name: str
+
+# TODO: no error here
+# error: [unknown-argument]
+m = Mutable(name="test")
+m.name = "new"  # No error
+```
+
+## `field_specifiers`
+
+The `field_specifiers` argument can be used to specify a list of functions that should be treated
+similar to `dataclasses.field` for normal dataclasses.
+
+The [`typing.dataclass_transform`] specification also allows classes (such as `dataclasses.Field`)
+to be listed in `field_specifiers`, but it is currently unclear how this should work, and other type
+checkers do not seem to support this either.
+
+### Basic example
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field(init=False)
+    name: str = fancy_field()
+    age: int | None = fancy_field(kw_only=True)
+
+# TODO: Should be `(self: Person, name: str, *, age: int | None) -> None`
+reveal_type(Person.__init__)  # revealed: (self: Person, id: int = Any, name: str = Any, age: int | None = Any) -> None
+
+# TODO: No error here
+# error: [invalid-argument-type]
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
 
 ## Overloaded dataclass-like decorators
 
@@ -320,6 +575,34 @@ D2("a")
 
 D1(1.2)  # error: [invalid-argument-type]
 D2(1.2)  # error: [invalid-argument-type]
+```
+
+### Use cases
+
+#### Home Assistant
+
+Home Assistant uses a pattern like this, where a `@dataclass`-decorated class inherits from a base
+class that is itself a `dataclass`-like construct via a metaclass-based dataclass transformer. Make
+sure that we recognize all fields in a hierarchy like this:
+
+```py
+from dataclasses import dataclass
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type):
+    pass
+
+class Sensor(metaclass=ModelMeta):
+    key: int
+
+@dataclass(frozen=True, kw_only=True)
+class TemperatureSensor(Sensor):
+    name: str
+
+t = TemperatureSensor(key=1, name="Temperature Sensor")
+reveal_type(t.key)  # revealed: int
+reveal_type(t.name)  # revealed: str
 ```
 
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

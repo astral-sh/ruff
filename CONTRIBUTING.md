@@ -321,9 +321,15 @@ them to [PyPI](https://pypi.org/project/ruff/).
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
 
-### Creating a new release
+### Installing tools
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+1. Install `npm`: `brew install npm` or similar
+
+### Creating a new release
+
+Commit each step of this process separately for easier review.
 
 1. Run `./scripts/release.sh`; this command will:
 
@@ -337,6 +343,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+    - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `pre-commit`
 
     Additionally, for minor releases:
 
@@ -376,13 +383,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 1. Verify the GitHub release:
 
-    1. The Changelog should match the content of `CHANGELOG.md`
-    1. Append the contributors from the `scripts/release.sh` script
+    1. The changelog should match the content of `CHANGELOG.md`
 
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and

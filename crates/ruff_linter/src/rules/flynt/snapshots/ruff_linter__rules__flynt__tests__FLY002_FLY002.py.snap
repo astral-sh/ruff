@@ -153,6 +153,8 @@ FLY002 [*] Consider `f"{url}{filename}"` instead of string join
 24 | def create_file_public_url(url, filename):
 25 |     return''.join([url, filename])
    |           ^^^^^^^^^^^^^^^^^^^^^^^^
+26 |
+27 | # Regression test for: https://github.com/astral-sh/ruff/issues/19837
    |
 help: Replace with `f"{url}{filename}"`
 22 | 
@@ -160,4 +162,47 @@ help: Replace with `f"{url}{filename}"`
 24 | def create_file_public_url(url, filename):
    -     return''.join([url, filename])
 25 +     return f"{url}{filename}"
+26 | 
+27 | # Regression test for: https://github.com/astral-sh/ruff/issues/19837
+28 | nok10 = "".join((foo, '"'))
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `f'{foo}"'` instead of string join
+  --> FLY002.py:28:9
+   |
+27 | # Regression test for: https://github.com/astral-sh/ruff/issues/19837
+28 | nok10 = "".join((foo, '"'))
+   |         ^^^^^^^^^^^^^^^^^^^
+29 | nok11 = ''.join((foo, "'"))
+30 | nok12 = ''.join([foo, "'", '"'])
+   |
+help: Replace with `f'{foo}"'`
+25 |     return''.join([url, filename])
+26 | 
+27 | # Regression test for: https://github.com/astral-sh/ruff/issues/19837
+   - nok10 = "".join((foo, '"'))
+28 + nok10 = f'{foo}"'
+29 | nok11 = ''.join((foo, "'"))
+30 | nok12 = ''.join([foo, "'", '"'])
+31 | nok13 = "".join([foo, "'", '"'])
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `f"{foo}'"` instead of string join
+  --> FLY002.py:29:9
+   |
+27 | # Regression test for: https://github.com/astral-sh/ruff/issues/19837
+28 | nok10 = "".join((foo, '"'))
+29 | nok11 = ''.join((foo, "'"))
+   |         ^^^^^^^^^^^^^^^^^^^
+30 | nok12 = ''.join([foo, "'", '"'])
+31 | nok13 = "".join([foo, "'", '"'])
+   |
+help: Replace with `f"{foo}'"`
+26 | 
+27 | # Regression test for: https://github.com/astral-sh/ruff/issues/19837
+28 | nok10 = "".join((foo, '"'))
+   - nok11 = ''.join((foo, "'"))
+29 + nok11 = f"{foo}'"
+30 | nok12 = ''.join([foo, "'", '"'])
+31 | nok13 = "".join([foo, "'", '"'])
 note: This is an unsafe fix and may change runtime behavior

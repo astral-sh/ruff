@@ -95,7 +95,10 @@ impl FileRoots {
         self.by_path.insert(route.clone(), root).unwrap();
 
         // Insert a path that matches all subdirectories and files
-        route.push_str("/{*filepath}");
+        if !route.ends_with("/") {
+            route.push('/');
+        }
+        route.push_str("{*filepath}");
 
         self.by_path.insert(route, root).unwrap();
         self.roots.push(root);

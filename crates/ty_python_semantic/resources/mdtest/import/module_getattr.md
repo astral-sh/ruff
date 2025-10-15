@@ -40,7 +40,7 @@ def __getattr__(name: str) -> int:
 import mixed_module
 
 # Explicit attribute should take precedence
-reveal_type(mixed_module.explicit_attr)  # revealed: Unknown | Literal["explicit"]
+reveal_type(mixed_module.explicit_attr)  # revealed: Literal["explicit"]
 
 # `__getattr__` should handle unknown attributes
 reveal_type(mixed_module.dynamic_attr)  # revealed: str

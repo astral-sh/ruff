@@ -3769,7 +3769,7 @@ lambda: fu
         def f(a: A) -> A: pass
         class A: pass
         ",
-            &[Rule::UndefinedName, Rule::UndefinedName],
+            &[],
         );
         flakes(
             r"
@@ -3783,7 +3783,7 @@ lambda: fu
         a: A
         class A: pass
         ",
-            &[Rule::UndefinedName],
+            &[],
         );
         flakes(
             r"

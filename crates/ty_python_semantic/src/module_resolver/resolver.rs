@@ -666,11 +666,15 @@ struct ModuleNameIngredient<'db> {
 /// Returns `true` if the module name refers to a standard library module which can't be shadowed
 /// by a first-party module.
 ///
-/// This includes "builtin" modules, which can never be shadowed at runtime either, as well as the
-/// `types` module, which tends to be imported early in Python startup, so can't be consistently
-/// shadowed, and is important to type checking.
+/// This includes "builtin" modules, which can never be shadowed at runtime either, as well as
+/// certain other modules that are involved in an import cycle with `builtins` (`types`,
+/// `typing_extensions`, etc.). This latter set of modules cannot be allowed to be shadowed by
+/// first-party or "extra-path" modules, or we risk panics in unexpected places due to being
+/// unable to resolve builtin symbols. This is similar behaviour to other type checkers such
+/// as mypy: <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
 pub(super) fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
-    module_name == "types" || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
+    matches!(module_name, "types" | "typing_extensions")
+        || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
 }
 
 /// Given a module name and a list of search paths in which to lookup modules,

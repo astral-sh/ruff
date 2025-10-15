@@ -1091,9 +1091,12 @@ fn suspicious_function(
         ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherModeUsage, range),
 
         // Mktemp
-        ["tempfile", "mktemp"] => {
-            checker.report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
-        }
+        ["tempfile", "mktemp"] => checker
+            .report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
+            .map(|mut diagnostic| {
+                diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                diagnostic
+            }),
 
         // Eval
         ["" | "builtins", "eval"] => {

@@ -1,5 +1,6 @@
 """Tools to analyze tasks running in asyncio programs."""
 
+import sys
 from collections.abc import Iterable
 from enum import Enum
 from typing import NamedTuple, SupportsIndex, type_check_only
@@ -48,6 +49,15 @@ def build_async_tree(result: Iterable[_AwaitedInfo], task_emoji: str = "(T)", co
     """
 
 def build_task_table(result: Iterable[_AwaitedInfo]) -> list[list[int | str]]: ...
+
+if sys.version_info >= (3, 14):
+    def exit_with_permission_help_text() -> None:
+        """
+        Prints a message pointing to platform-specific permission help text and exits the program.
+        This function is called when a PermissionError is encountered while trying
+        to attach to a process.
+        """
+
 def display_awaited_by_tasks_table(pid: SupportsIndex) -> None:
     """Build and print a table of all pending tasks under `pid`."""
 

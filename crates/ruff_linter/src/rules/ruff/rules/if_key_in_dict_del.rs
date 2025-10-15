@@ -45,6 +45,10 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 
 /// RUF051
 pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
+    if !stmt.elif_else_clauses.is_empty() {
+        return;
+    }
+
     let [Stmt::Delete(delete)] = &stmt.body[..] else {
         return;
     };

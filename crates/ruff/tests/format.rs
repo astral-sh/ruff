@@ -12,8 +12,8 @@ use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 
-fn tempdir_filter(tempdir: &TempDir) -> String {
-    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 #[test]
@@ -607,6 +607,112 @@ if __name__ == "__main__":
     ");
 
     Ok(())
+}
+
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#;
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "format",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--preview",
+                    "--check",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
+
+    Ok(())
+}
+
+#[test]
+fn output_format_notebook() {
+    let args = ["format", "--no-cache", "--isolated", "--preview", "--check"];
+    let fixtures = Path::new("resources").join("test").join("fixtures");
+    let path = fixtures.join("unformatted.ipynb");
+    insta::with_settings!({filters => vec![
+        // Replace windows paths
+        (r"\\", "/"),
+    ]}, {
+        assert_cmd_snapshot!(
+            Command::new(get_cargo_bin(BIN_NAME)).args(args).arg(path),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        unformatted: File would be reformatted
+          --> resources/test/fixtures/unformatted.ipynb:cell 1:1:1
+         ::: cell 1
+        1 | import numpy
+          - maths = (numpy.arange(100)**2).sum()
+          - stats= numpy.asarray([1,2,3,4]).median()
+        2 + 
+        3 + maths = (numpy.arange(100) ** 2).sum()
+        4 + stats = numpy.asarray([1, 2, 3, 4]).median()
+         ::: cell 3
+        1 | # A cell with IPython escape command
+        2 | def some_function(foo, bar):
+        3 |     pass
+        4 + 
+        5 + 
+        6 | %matplotlib inline
+          ::: cell 4
+        1  | foo = %pwd
+           - def some_function(foo,bar,):
+        2  + 
+        3  + 
+        4  + def some_function(
+        5  +     foo,
+        6  +     bar,
+        7  + ):
+        8  |     # Another cell with IPython escape command
+        9  |     foo = %pwd
+        10 |     print(foo)
+
+        1 file would be reformatted
+
+        ----- stderr -----
+        ");
+    });
 }
 
 #[test]
@@ -2354,4 +2460,22 @@ fn cookiecutter_globbing() -> Result<()> {
     ");
 
     Ok(())
+}
+
+#[test]
+fn stable_output_format_warning() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--output-format=full", "-"])
+            .pass_stdin("1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1
+
+    ----- stderr -----
+    warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
+    ",
+    );
 }

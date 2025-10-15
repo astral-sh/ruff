@@ -359,14 +359,14 @@ from typing import overload
 @overload
 def func(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
+# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
     def method(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
+    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: str) -> str: ...
 ```
 
@@ -446,6 +446,55 @@ class PartialFoo(ABC):
     @abstractmethod
     # error: [invalid-overload]
     def f(self, x: str) -> str: ...
+```
+
+### `@overload`-decorated functions with non-stub bodies
+
+<!-- snapshot-diagnostics -->
+
+If an `@overload`-decorated function has a non-trivial body, it likely indicates a misunderstanding
+on the part of the user. We emit a warning-level diagnostic to alert them of this.
+
+`...`, `pass` and docstrings are all fine:
+
+```py
+from typing import overload
+
+@overload
+def x(y: int) -> int: ...
+@overload
+def x(y: str) -> str:
+    """Docstring"""
+
+@overload
+def x(y: bytes) -> bytes:
+    pass
+
+@overload
+def x(y: memoryview) -> memoryview:
+    """More docs"""
+    pass
+    ...
+
+def x(y):
+    return y
+```
+
+Anything else, however, will trigger the lint:
+
+```py
+@overload
+def foo(x: int) -> int:
+    return x  # error: [useless-overload-body]
+
+@overload
+def foo(x: str) -> None:
+    """Docstring"""
+    pass
+    print("oh no, a string")  # error: [useless-overload-body]
+
+def foo(x):
+    return x
 ```
 
 ### Inconsistent decorators

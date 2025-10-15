@@ -41,6 +41,7 @@ expression: suite
                                         uppercase_r: false,
                                     },
                                     triple_quoted: true,
+                                    unclosed: false,
                                 },
                             },
                         ),

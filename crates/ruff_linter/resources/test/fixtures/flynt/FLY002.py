@@ -23,3 +23,9 @@ nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote
 # Regression test for: https://github.com/astral-sh/ruff/issues/7197
 def create_file_public_url(url, filename):
     return''.join([url, filename])
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/19837
+nok10 = "".join((foo, '"'))
+nok11 = ''.join((foo, "'"))
+nok12 = ''.join([foo, "'", '"'])
+nok13 = "".join([foo, "'", '"'])
