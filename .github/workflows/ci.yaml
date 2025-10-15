@@ -363,7 +363,7 @@ jobs:
 
   cargo-test-macos:
     name: "cargo test (macos)"
-    runs-on: depot-windows-2022-16
+    runs-on: macos-latest
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
