@@ -23,6 +23,9 @@
 //! Note that all lower and upper bounds in a constraint must be fully static. We take the bottom
 //! and top materializations of the types to remove any gradual forms if needed.
 //!
+//! Lower and upper bounds must also be normalized. This lets us identify, for instance,
+//! two constraints with equivalent but differently ordered unions as their bounds.
+//!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
 //! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
@@ -292,6 +295,8 @@ impl<'db> ConstrainedTypeVar<'db> {
             return Node::AlwaysTrue;
         }
 
+        let lower = lower.normalized(db);
+        let upper = upper.normalized(db);
         Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
     }
     fn when_true(self) -> ConstraintAssignment<'db> {
@@ -317,8 +322,9 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
     fn intersect(self, db: &'db dyn Db, other: Self) -> Option<Self> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]);
-        let upper = IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]);
+        let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]).normalized(db);
+        let upper =
+            IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]).normalized(db);
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
