@@ -2313,6 +2313,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
     ) -> Result<(), ()> {
+        // TODO: `Type::iterate` internally handles unions, but in a lossy way.
+        // It might be superior here to manually map over the union and call `try_iterate`
+        // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
+        // It might be a bit of a refactor, though.
+        // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
+        // for more details. --Alex
         let tuple = argument_type.map(|ty| ty.iterate(db));
         let (mut argument_types, length, variable_element) = match tuple.as_ref() {
             Some(tuple) => (

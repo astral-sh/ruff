@@ -724,14 +724,14 @@ def f3(coinflip: bool):
 
 def f4(a=None, b=None, c=None, d=None, e=None): ...
 
-my_args = (("a", "b"), ("c", "d"), ("e", "f"))
+my_args = ((1, 2), (3, 4), (5, 6))
 
 for tup in my_args:
     f4(*tup, e=None)  # fine
 
 my_other_args = (
-    ("a", "b", "c", "d", "e"),
-    ("f", "g", "h", "i", "k"),
+    (1, 2, 3, 4, 5),
+    (6, 7, 8, 9, 10),
 )
 
 for tup in my_other_args:
