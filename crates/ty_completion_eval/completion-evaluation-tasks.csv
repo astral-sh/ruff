@@ -7,7 +7,7 @@ import-deprioritizes-sunder,main.py,0,1
 internal-typeshed-hidden,main.py,0,4
 none-completion,main.py,0,11
 numpy-array,main.py,0,
-numpy-array,main.py,1,1
+numpy-array,main.py,1,
 object-attr-instance-methods,main.py,0,1
 object-attr-instance-methods,main.py,1,1
 raise-uses-base-exception,main.py,0,2

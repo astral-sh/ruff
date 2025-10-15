@@ -7,7 +7,7 @@ To run a full evaluation, run the `ty_completion_eval` crate with the
 `all` command from the root of this repository:
 
 ```console
-cargo run --release --package ty_completion_eval -- all
+cargo run --profile profiling --package ty_completion_eval -- all
 ```
 
 The output should look like this:
@@ -24,7 +24,7 @@ you can ask the evaluation to write CSV data that contains the rank of
 the expected answer in each completion request:
 
 ```console
-cargo r -r -p ty_completion_eval -- all --tasks ./crates/ty_completion_eval/completion-evaluation-tasks.csv
+cargo r --profile profiling -p ty_completion_eval -- all --tasks ./crates/ty_completion_eval/completion-evaluation-tasks.csv
 ```
 
 To debug a _specific_ task and look at the actual results, use the `show-one`
@@ -133,7 +133,7 @@ CI will also fail if the individual task results have changed.
 To make CI pass, you can just re-run the evaluation locally and commit the results:
 
 ```console
-cargo r -r -p ty_completion_eval -- all --tasks ./crates/ty_completion_eval/completion-evaluation-tasks.csv
+cargo r --profile profiling -p ty_completion_eval -- all --tasks ./crates/ty_completion_eval/completion-evaluation-tasks.csv
 ```
 
 CI fails in this case because it would be best to scrutinize the differences here.
