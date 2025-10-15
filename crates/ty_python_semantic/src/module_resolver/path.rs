@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use ruff_db::files::{File, FileError, FilePath, system_path_to_file, vendored_path_to_file};
+use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
@@ -137,8 +138,24 @@ impl ModulePath {
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
 
-                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
-                    || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
+                let init = system_path_to_file(resolver.db, absolute_path.join("__init__.py"))
+                    .or_else(|_| {
+                        system_path_to_file(resolver.db, absolute_path.join("__init__.pyi"))
+                    });
+
+                // Check if this is a legacy `__init__`
+                if let Ok(init) = init {
+                    let text = source_text(resolver.db, init);
+                    let patterns = [
+                        r#"__path__ = pkgutil.extend_path(__path__, __name__)"#,
+                        r#"__path__ = __import__("pkgutil").extend_path(__path__, __name__)"#,
+                    ];
+                    if patterns.iter().any(|pattern| text.contains(pattern)) {
+                        return false;
+                    }
+                }
+
+                init.is_ok()
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
                 let absolute_path = search_path.join(relative_path);
@@ -857,6 +874,12 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
         }
     }
 }
+
+// struct LegacyNamespacePackageVisitor {
+
+// }
+
+// impl S
 
 #[cfg(test)]
 mod tests {
