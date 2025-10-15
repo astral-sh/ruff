@@ -560,15 +560,15 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
      --> test.py:2:1
       |
     2 | match object():
-      | ^^^^^ Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
+      | ^^^^^
     3 |     case int():
     4 |         pass
       |
@@ -583,17 +583,17 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
      --> test.py:2:1
       |
     2 | match object():
-      | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+      | ^^^^^
     3 |     case int():
     4 |         pass
       |
@@ -602,7 +602,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
