@@ -18,6 +18,7 @@ command will be accumulated (using your own 'collect_incoming_data'
 method) up to the terminator, and then control will be returned to
 you - by calling your self.found_terminator() method.
 """
+
 import asyncore
 from abc import abstractmethod
 
@@ -28,7 +29,8 @@ class simple_producer:
 class async_chat(asyncore.dispatcher):
     """This is an abstract class.  You must derive from this class, and add
     the two methods collect_incoming_data() and found_terminator()
-"""
+    """
+
     ac_in_buffer_size: int
     ac_out_buffer_size: int
     @abstractmethod
@@ -40,11 +42,12 @@ class async_chat(asyncore.dispatcher):
 
         Can be a fixed string of any length, an integer, or None.
         """
+
     def get_terminator(self) -> bytes | int | None: ...
     def push(self, data: bytes) -> None: ...
     def push_with_producer(self, producer: simple_producer) -> None: ...
     def close_when_done(self) -> None:
-        """automatically close this channel once the outgoing queue is empty
-"""
+        """automatically close this channel once the outgoing queue is empty"""
+
     def initiate_send(self) -> None: ...
     def discard_buffers(self) -> None: ...

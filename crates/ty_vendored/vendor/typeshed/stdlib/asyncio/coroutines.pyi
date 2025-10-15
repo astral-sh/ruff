@@ -18,14 +18,14 @@ if sys.version_info < (3, 11):
     def coroutine(func: _FunctionT) -> _FunctionT:
         """Decorator to mark coroutines.
 
-    If the coroutine is not yielded from before it is destroyed,
-    an error message is logged.
-    """
+        If the coroutine is not yielded from before it is destroyed,
+        an error message is logged.
+        """
 
 @overload
 def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
-    """Return True if func is a decorated coroutine function.
-"""
+    """Return True if func is a decorated coroutine function."""
+
 @overload
 def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
 @overload
@@ -33,5 +33,4 @@ def iscoroutinefunction(func: Callable[_P, object]) -> TypeGuard[Callable[_P, Co
 @overload
 def iscoroutinefunction(func: object) -> TypeGuard[Callable[..., Coroutine[Any, Any, Any]]]: ...
 def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
-    """Return True if obj is a coroutine object.
-"""
+    """Return True if obj is a coroutine object."""
