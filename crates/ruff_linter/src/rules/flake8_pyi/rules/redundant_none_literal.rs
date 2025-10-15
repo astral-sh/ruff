@@ -5,6 +5,7 @@ use ruff_python_ast::{
     helpers::{pep_604_union, typing_optional},
     name::Name,
     operator_precedence::OperatorPrecedence,
+    parenthesize::parenthesized_range,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
@@ -241,7 +242,12 @@ fn create_fix(
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
 
             // Check if we need parentheses to preserve operator precedence
-            let content = if needs_parentheses_for_precedence(semantic) {
+            let content = if needs_parentheses_for_precedence(
+                semantic,
+                literal_expr,
+                checker.comment_ranges(),
+                checker.source(),
+            ) {
                 format!("({})", checker.generator().expr(&union_expr))
             } else {
                 checker.generator().expr(&union_expr)
@@ -268,7 +274,26 @@ enum UnionKind {
 /// Check if the union expression needs parentheses to preserve operator precedence.
 /// This is needed when the union is part of a larger expression where the `|` operator
 /// has lower precedence than the surrounding operations (like attribute access).
-fn needs_parentheses_for_precedence(semantic: &ruff_python_semantic::SemanticModel) -> bool {
+fn needs_parentheses_for_precedence(
+    semantic: &ruff_python_semantic::SemanticModel,
+    literal_expr: &Expr,
+    comment_ranges: &ruff_python_trivia::CommentRanges,
+    source: &str,
+) -> bool {
+    // Check if the literal expression is already parenthesized
+    if let Some(parent_expr) = semantic.current_expression_parent() {
+        if parenthesized_range(
+            literal_expr.into(),
+            parent_expr.into(),
+            comment_ranges,
+            source,
+        )
+        .is_some()
+        {
+            return false; // Already parenthesized, don't add more
+        }
+    }
+
     // Get the parent expression to check if we're in a context that needs parentheses
     let Some(parent_expr) = semantic.current_expression_parent() else {
         return false;

@@ -536,4 +536,4 @@ help: Replace with `Literal[...] | None`
 86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
 87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
    - print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
-88 + print(((Literal[1] | None)).__dict__)  # Should become ((Literal[1] | None)).__dict__
+88 + print((Literal[1] | None).__dict__)  # Should become ((Literal[1] | None)).__dict__
