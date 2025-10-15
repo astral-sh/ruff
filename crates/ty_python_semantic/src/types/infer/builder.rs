@@ -75,8 +75,10 @@ use crate::types::diagnostic::{
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_typevar, enclosing_generic_contexts};
-use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
+    enclosing_generic_contexts,
+};
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
@@ -5964,11 +5966,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        // TODO: Use the list of inferable typevars from the generic context of the collection
+        // class.
+        let inferable = InferableTypeVars::None;
         let tcx = tcx.map_annotation(|annotation| {
             // Remove any union elements of `annotation` that are not related to `collection_ty`.
             // e.g. `annotation: list[int] | None => list[int]` if `collection_ty: list`
             let collection_ty = collection_class.to_instance(self.db());
-            annotation.filter_disjoint_elements(self.db(), collection_ty)
+            annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
 
         // Extract the annotated type of `T`, if provided.
@@ -5977,7 +5982,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|specialization| specialization.types(self.db()));
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db());
+        let mut builder = SpecializationBuilder::new(self.db(), inferable);
 
         match annotated_elt_tys {
             // The annotated type acts as a constraint for `T`.
