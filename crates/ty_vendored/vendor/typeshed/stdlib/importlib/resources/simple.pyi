@@ -1,6 +1,7 @@
 """
 Interface adapters for low-level readers.
 """
+
 import abc
 import sys
 from collections.abc import Iterator
@@ -13,38 +14,44 @@ if sys.version_info >= (3, 11):
 
     class SimpleReader(abc.ABC):
         """
-The minimum, low-level interface required from a resource
-provider.
-"""
+        The minimum, low-level interface required from a resource
+        provider.
+        """
+
         @property
         @abc.abstractmethod
         def package(self) -> str:
             """
-The name of the package for which this reader loads resources.
-"""
+            The name of the package for which this reader loads resources.
+            """
+
         @abc.abstractmethod
         def children(self) -> list[SimpleReader]:
             """
-Obtain an iterable of SimpleReader for available
-child containers (e.g. directories).
-"""
+            Obtain an iterable of SimpleReader for available
+            child containers (e.g. directories).
+            """
+
         @abc.abstractmethod
         def resources(self) -> list[str]:
             """
-Obtain available named resources for this virtual package.
-"""
+            Obtain available named resources for this virtual package.
+            """
+
         @abc.abstractmethod
         def open_binary(self, resource: str) -> BinaryIO:
             """
-Obtain a File-like for a named resource.
-"""
+            Obtain a File-like for a named resource.
+            """
+
         @property
         def name(self) -> str: ...
 
     class ResourceHandle(Traversable, metaclass=abc.ABCMeta):
         """
-Handle to a named resource in a ResourceReader.
-"""
+        Handle to a named resource in a ResourceReader.
+        """
+
         parent: ResourceContainer
         def __init__(self, parent: ResourceContainer, name: str) -> None: ...
         def is_file(self) -> Literal[True]: ...
@@ -67,8 +74,9 @@ Handle to a named resource in a ResourceReader.
 
     class ResourceContainer(Traversable, metaclass=abc.ABCMeta):
         """
-Traversable container for a package's resources via its reader.
-"""
+        Traversable container for a package's resources via its reader.
+        """
+
         reader: SimpleReader
         def __init__(self, reader: SimpleReader) -> None: ...
         def is_dir(self) -> Literal[True]: ...
@@ -80,8 +88,9 @@ Traversable container for a package's resources via its reader.
 
     class TraversableReader(TraversableResources, SimpleReader, metaclass=abc.ABCMeta):
         """
-A TraversableResources based on SimpleReader. Resource providers
-may derive from this class to provide the TraversableResources
-interface by supplying the SimpleReader interface.
-"""
+        A TraversableResources based on SimpleReader. Resource providers
+        may derive from this class to provide the TraversableResources
+        interface by supplying the SimpleReader interface.
+        """
+
         def files(self) -> ResourceContainer: ...

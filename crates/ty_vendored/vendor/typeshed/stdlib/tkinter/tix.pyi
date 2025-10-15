@@ -44,6 +44,7 @@ class tixCommand:
     This is a mixin class, assumed to be mixed to Tkinter.Tk
     that supports the self.tk.call method.
     """
+
     def tix_addbitmapdir(self, directory: str) -> None:
         """Tix maintains a list of directories under which
         the  tix_getimage  and tix_getbitmap commands will
@@ -54,11 +55,13 @@ class tixCommand:
         also be located using the tix_getimage or tix_getbitmap
         command.
         """
+
     def tix_cget(self, option: str) -> Any:
         """Returns  the  current  value  of the configuration
         option given by option. Option may be  any  of  the
         options described in the CONFIGURATION OPTIONS section.
         """
+
     def tix_configure(self, cnf: dict[str, Any] | None = None, **kw: Any) -> Any:
         """Query or modify the configuration options of the Tix application
         context. If no option is specified, returns a dictionary all of the
@@ -70,6 +73,7 @@ class tixCommand:
         to have the given value(s); in this case the command returns an
         empty string. Option may be any of the configuration options.
         """
+
     def tix_filedialog(self, dlgclass: str | None = None) -> str:
         """Returns the file selection dialog that may be shared among
         different calls from this application.  This command will create a
@@ -79,6 +83,7 @@ class tixCommand:
         of file selection dialog widget is desired. Possible options are
         tix FileSelectDialog or tixExFileSelectDialog.
         """
+
     def tix_getbitmap(self, name: str) -> str:
         """Locates a bitmap file of the name name.xpm or name in one of the
         bitmap directories (see the tix_addbitmapdir command above).  By
@@ -88,6 +93,7 @@ class tixCommand:
         '@'.  The returned value can be used to configure the -bitmap
         option of the TK and Tix widgets.
         """
+
     def tix_getimage(self, name: str) -> str:
         """Locates an image file of the name name.xpm, name.xbm or name.ppm
         in one of the bitmap directories (see the addbitmapdir command
@@ -100,6 +106,7 @@ class tixCommand:
         returns the name of the newly created image, which can be used to
         configure the -image option of the Tk and Tix widgets.
         """
+
     def tix_option_get(self, name: str) -> Any:
         """Gets  the options  maintained  by  the  Tix
         scheme mechanism. Available options include:
@@ -113,7 +120,8 @@ class tixCommand:
             light1_fg       light2_bg      light2_fg
             menu_font       output1_bg     output2_bg
             select_bg       select_fg      selector
-            """
+        """
+
     def tix_resetoptions(self, newScheme: str, newFontSet: str, newScmPrio: str | None = None) -> None:
         """Resets the scheme and fontset of the Tix application to
         newScheme and newFontSet, respectively.  This affects only those
@@ -133,7 +141,8 @@ class tixCommand:
 class Tk(tkinter.Tk, tixCommand):
     """Toplevel widget of Tix which represents mostly the main window
     of an application. It has an associated Tcl interpreter.
-"""
+    """
+
     def __init__(self, screenName: str | None = None, baseName: str | None = None, className: str = "Tix") -> None: ...
 
 class TixWidget(tkinter.Widget):
@@ -149,6 +158,7 @@ class TixWidget(tkinter.Widget):
 
     Both options are for use by subclasses only.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -159,18 +169,19 @@ class TixWidget(tkinter.Widget):
     ) -> None: ...
     def __getattr__(self, name: str): ...
     def set_silent(self, value: str) -> None:
-        """Set a variable without calling its action routine
-"""
+        """Set a variable without calling its action routine"""
+
     def subwidget(self, name: str) -> tkinter.Widget:
         """Return the named subwidget (which must have been created by
         the sub-class).
-"""
+        """
+
     def subwidgets_all(self) -> list[tkinter.Widget]:
-        """Return all subwidgets.
-"""
+        """Return all subwidgets."""
+
     def config_all(self, option: Any, value: Any) -> None:
-        """Set configuration options for all subwidgets (and self).
-"""
+        """Set configuration options for all subwidgets (and self)."""
+
     def image_create(self, imgtype: str, cnf: dict[str, Any] = {}, master: tkinter.Widget | None = None, **kw) -> None: ...
     def image_delete(self, imgname: str) -> None: ...
 
@@ -180,13 +191,15 @@ class TixSubWidget(TixWidget):
     This is used to mirror child widgets automatically created
     by Tix/Tk as part of a mega-widget in Python (which is not informed
     of this)
-"""
+    """
+
     def __init__(self, master: tkinter.Widget, name: str, destroy_physically: int = 1, check_intermediate: int = 1) -> None: ...
 
 class DisplayStyle:
     """DisplayStyle - handle configuration options shared by
     (multiple) Display Items
-"""
+    """
+
     def __init__(self, itemtype: str, cnf: dict[str, Any] = {}, *, master: tkinter.Widget | None = None, **kw) -> None: ...
     def __getitem__(self, key: str): ...
     def __setitem__(self, key: str, value: Any) -> None: ...
@@ -200,22 +213,25 @@ class Balloon(TixWidget):
     ---------       -----
     label           Label
     message         Message
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def bind_widget(self, widget: tkinter.Widget, cnf: dict[str, Any] = {}, **kw) -> None:
         """Bind balloon widget to another.
         One balloon widget may be bound to several widgets at the same time
-"""
+        """
+
     def unbind_widget(self, widget: tkinter.Widget) -> None: ...
 
 class ButtonBox(TixWidget):
     """ButtonBox - A container for pushbuttons.
     Subwidgets are the buttons added with the add method.
     """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add(self, name: str, cnf: dict[str, Any] = {}, **kw) -> tkinter.Widget:
-        """Add a button with given name to box.
-"""
+        """Add a button with given name to box."""
+
     def invoke(self, name: str) -> None: ...
 
 class ComboBox(TixWidget):
@@ -230,7 +246,8 @@ class ComboBox(TixWidget):
     slistbox    ScrolledListBox
     tick        Button
     cross       Button : present if created with the fancy option
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add_history(self, str: str) -> None: ...
     def append_history(self, str: str) -> None: ...
@@ -249,7 +266,8 @@ class Control(TixWidget):
     decr       Button
     entry       Entry
     label       Label
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def decrement(self) -> None: ...
     def increment(self) -> None: ...
@@ -264,7 +282,8 @@ class LabelEntry(TixWidget):
     ----------       -----
     label       Label
     entry       Entry
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
 
 class LabelFrame(TixWidget):
@@ -277,13 +296,15 @@ class LabelFrame(TixWidget):
     ----------       -----
     label       Label
     frame       Frame
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
 
 class Meter(TixWidget):
     """The Meter widget can be used to show the progress of a background
     job which may take a long time to execute.
     """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
 
 class OptionMenu(TixWidget):
@@ -293,7 +314,8 @@ class OptionMenu(TixWidget):
     ---------       -----
     menubutton      Menubutton
     menu            Menu
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add_command(self, name: str, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add_separator(self, name: str, cnf: dict[str, Any] = {}, **kw) -> None: ...
@@ -311,7 +333,8 @@ class PopupMenu(TixWidget):
     ----------       -----
     menubutton       Menubutton
     menu       Menu
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def bind_widget(self, widget: tkinter.Widget) -> None: ...
     def unbind_widget(self, widget: tkinter.Widget) -> None: ...
@@ -322,14 +345,15 @@ class Select(TixWidget):
     radio-box or check-box style of selection options for the user.
 
     Subwidgets are buttons added dynamically using the add method.
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add(self, name: str, cnf: dict[str, Any] = {}, **kw) -> tkinter.Widget: ...
     def invoke(self, name: str) -> None: ...
 
 class StdButtonBox(TixWidget):
-    """StdButtonBox - Standard Button Box (OK, Apply, Cancel and Help) 
-"""
+    """StdButtonBox - Standard Button Box (OK, Apply, Cancel and Help)"""
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def invoke(self, name: str) -> None: ...
 
@@ -343,7 +367,8 @@ class DirList(TixWidget):
     hlist       HList
     hsb              Scrollbar
     vsb              Scrollbar
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def chdir(self, dir: str) -> None: ...
 
@@ -358,7 +383,8 @@ class DirTree(TixWidget):
     hlist           HList
     hsb             Scrollbar
     vsb             Scrollbar
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def chdir(self, dir: str) -> None: ...
 
@@ -370,7 +396,8 @@ class DirSelectDialog(TixWidget):
     Subwidgets       Class
     ----------       -----
     dirbox       DirSelectDialog
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def popup(self) -> None: ...
     def popdown(self) -> None: ...
@@ -388,7 +415,8 @@ class DirSelectBox(TixWidget):
     filter          ComboBox
     dirlist         ScrolledListBox
     filelist        ScrolledListBox
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
 
 class ExFileSelectBox(TixWidget):
@@ -405,7 +433,8 @@ class ExFileSelectBox(TixWidget):
     file       ComboBox
     dirlist       ScrolledListBox
     filelist       ScrolledListBox
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def filter(self) -> None: ...
     def invoke(self) -> None: ...
@@ -423,7 +452,8 @@ class FileSelectBox(TixWidget):
     filter          ComboBox
     dirlist         ScrolledListBox
     filelist        ScrolledListBox
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def apply_filter(self) -> None: ...
     def invoke(self) -> None: ...
@@ -438,7 +468,8 @@ class FileEntry(TixWidget):
     ----------       -----
     button       Button
     entry       Entry
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def invoke(self) -> None: ...
     def file_dialog(self) -> None: ...
@@ -450,7 +481,8 @@ class HList(TixWidget, tkinter.XView, tkinter.YView):
     according to their places in the hierarchy.
 
     Subwidgets - None
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add(self, entry: str, cnf: dict[str, Any] = {}, **kw) -> tkinter.Widget: ...
     def add_child(self, parent: str | None = None, cnf: dict[str, Any] = {}, **kw) -> tkinter.Widget: ...
@@ -512,67 +544,72 @@ class CheckList(TixWidget):
     similarly to the Tk checkbutton or radiobutton widgets, except it is
     capable of handling many more items than checkbuttons or radiobuttons.
     """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def autosetmode(self) -> None:
         """This command calls the setmode method for all the entries in this
-     Tree widget: if an entry has no child entries, its mode is set to
-     none. Otherwise, if the entry has any hidden child entries, its mode is
-     set to open; otherwise its mode is set to close.
-"""
+        Tree widget: if an entry has no child entries, its mode is set to
+        none. Otherwise, if the entry has any hidden child entries, its mode is
+        set to open; otherwise its mode is set to close.
+        """
+
     def close(self, entrypath: str) -> None:
-        """Close the entry given by entryPath if its mode is close.
-"""
+        """Close the entry given by entryPath if its mode is close."""
+
     def getmode(self, entrypath: str) -> str:
-        """Returns the current mode of the entry given by entryPath.
-"""
+        """Returns the current mode of the entry given by entryPath."""
+
     def open(self, entrypath: str) -> None:
-        """Open the entry given by entryPath if its mode is open.
-"""
+        """Open the entry given by entryPath if its mode is open."""
+
     def getselection(self, mode: str = "on") -> tuple[str, ...]:
         """Returns a list of items whose status matches status. If status is
-     not specified, the list of items in the "on" status will be returned.
-     Mode can be on, off, default
-"""
+        not specified, the list of items in the "on" status will be returned.
+        Mode can be on, off, default
+        """
+
     def getstatus(self, entrypath: str) -> str:
-        """Returns the current status of entryPath.
-"""
+        """Returns the current status of entryPath."""
+
     def setstatus(self, entrypath: str, mode: str = "on") -> None:
         """Sets the status of entryPath to be status. A bitmap will be
-     displayed next to the entry its status is on, off or default.
-"""
+        displayed next to the entry its status is on, off or default.
+        """
 
 class Tree(TixWidget):
     """Tree - The tixTree widget can be used to display hierarchical
     data in a tree form. The user can adjust
     the view of the tree by opening or closing parts of the tree.
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def autosetmode(self) -> None:
         """This command calls the setmode method for all the entries in this
-     Tree widget: if an entry has no child entries, its mode is set to
-     none. Otherwise, if the entry has any hidden child entries, its mode is
-     set to open; otherwise its mode is set to close.
-"""
+        Tree widget: if an entry has no child entries, its mode is set to
+        none. Otherwise, if the entry has any hidden child entries, its mode is
+        set to open; otherwise its mode is set to close.
+        """
+
     def close(self, entrypath: str) -> None:
-        """Close the entry given by entryPath if its mode is close.
-"""
+        """Close the entry given by entryPath if its mode is close."""
+
     def getmode(self, entrypath: str) -> str:
-        """Returns the current mode of the entry given by entryPath.
-"""
+        """Returns the current mode of the entry given by entryPath."""
+
     def open(self, entrypath: str) -> None:
-        """Open the entry given by entryPath if its mode is open.
-"""
+        """Open the entry given by entryPath if its mode is open."""
+
     def setmode(self, entrypath: str, mode: str = "none") -> None:
         """This command is used to indicate whether the entry given by
-     entryPath has children entries and whether the children are visible. mode
-     must be one of open, close or none. If mode is set to open, a (+)
-     indicator is drawn next the entry. If mode is set to close, a (-)
-     indicator is drawn next the entry. If mode is set to none, no
-     indicators will be drawn for this entry. The default mode is none. The
-     open mode indicates the entry has hidden children and this entry can be
-     opened by the user. The close mode indicates that all the children of the
-     entry are now visible and the entry can be closed by the user.
-"""
+        entryPath has children entries and whether the children are visible. mode
+        must be one of open, close or none. If mode is set to open, a (+)
+        indicator is drawn next the entry. If mode is set to close, a (-)
+        indicator is drawn next the entry. If mode is set to none, no
+        indicators will be drawn for this entry. The default mode is none. The
+        open mode indicates the entry has hidden children and this entry can be
+        opened by the user. The close mode indicates that all the children of the
+        entry are now visible and the entry can be closed by the user.
+        """
 
 class TList(TixWidget, tkinter.XView, tkinter.YView):
     """TList - Hierarchy display widget which can be
@@ -583,7 +620,8 @@ class TList(TixWidget, tkinter.XView, tkinter.YView):
     multiple colors and fonts for the list entries.
 
     Subwidgets - None
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def active_set(self, index: int) -> None: ...
     def active_clear(self) -> None: ...
@@ -619,7 +657,8 @@ class PanedWindow(TixWidget):
     Subwidgets       Class
     ----------       -----
     <panes>       g/p widgets added dynamically with the add method.
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add(self, name: str, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def delete(self, name: str) -> None: ...
@@ -635,7 +674,8 @@ class ListNoteBook(TixWidget):
     (windows). At one time only one of these pages can be shown.
     The user can navigate through these pages by
     choosing the name of the desired page in the hlist subwidget.
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add(self, name: str, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def page(self, name: str) -> tkinter.Widget: ...
@@ -649,7 +689,8 @@ class NoteBook(TixWidget):
     ----------       -----
     nbframe       NoteBookFrame
     <pages>       page widgets added dynamically with the add method
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def add(self, name: str, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def delete(self, name: str) -> None: ...
@@ -662,7 +703,8 @@ class InputOnly(TixWidget):
     """InputOnly - Invisible widget. Unix only.
 
     Subwidgets - None
-"""
+    """
+
     def __init__(self, master: tkinter.Widget | None = None, cnf: dict[str, Any] = {}, **kw) -> None: ...
 
 class Form:
@@ -670,7 +712,8 @@ class Form:
 
     Widgets can be arranged by specifying attachments to other widgets.
     See Tix documentation for complete details
-"""
+    """
+
     def __setitem__(self, key: str, value: Any) -> None: ...
     def config(self, cnf: dict[str, Any] = {}, **kw) -> None: ...
     def form(self, cnf: dict[str, Any] = {}, **kw) -> None: ...

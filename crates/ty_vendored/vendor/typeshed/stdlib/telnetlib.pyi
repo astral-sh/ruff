@@ -30,6 +30,7 @@ To do:
   option on one of the read calls only
 
 """
+
 import socket
 from collections.abc import Callable, MutableSequence, Sequence
 from re import Match, Pattern
@@ -171,6 +172,7 @@ class Telnet:
         No other action is done afterwards by telnetlib.
 
     """
+
     host: str | None  # undocumented
     sock: socket.socket | None  # undocumented
     def __init__(self, host: str | None = None, port: int = 0, timeout: float = ...) -> None:
@@ -180,6 +182,7 @@ class Telnet:
         With a hostname argument, it connects the instance; port number
         and timeout are optional.
         """
+
     def open(self, host: str, port: int = 0, timeout: float = ...) -> None:
         """Connect to a host.
 
@@ -188,6 +191,7 @@ class Telnet:
 
         Don't try to reopen an already connected instance.
         """
+
     def msg(self, msg: str, *args: Any) -> None:
         """Print a debug message, when the debug level is > 0.
 
@@ -195,21 +199,23 @@ class Telnet:
         message using the standard string formatting operator.
 
         """
+
     def set_debuglevel(self, debuglevel: int) -> None:
         """Set the debug level.
 
         The higher it is, the more debug output you get (on sys.stdout).
 
         """
+
     def close(self) -> None:
-        """Close the connection.
-"""
+        """Close the connection."""
+
     def get_socket(self) -> socket.socket:
-        """Return the socket object used internally.
-"""
+        """Return the socket object used internally."""
+
     def fileno(self) -> int:
-        """Return the fileno() of the socket object used internally.
-"""
+        """Return the fileno() of the socket object used internally."""
+
     def write(self, buffer: bytes) -> None:
         """Write a string to the socket, doubling any IAC characters.
 
@@ -217,6 +223,7 @@ class Telnet:
         OSError if the connection is closed.
 
         """
+
     def read_until(self, match: bytes, timeout: float | None = None) -> bytes:
         """Read until a given string is encountered or until timeout.
 
@@ -225,9 +232,10 @@ class Telnet:
         is closed and no cooked data is available.
 
         """
+
     def read_all(self) -> bytes:
-        """Read all data until EOF; block until connection closed.
-"""
+        """Read all data until EOF; block until connection closed."""
+
     def read_some(self) -> bytes:
         """Read at least one byte of cooked data unless EOF is hit.
 
@@ -235,6 +243,7 @@ class Telnet:
         available.
 
         """
+
     def read_very_eager(self) -> bytes:
         """Read everything that's possible without blocking in I/O (eager).
 
@@ -243,6 +252,7 @@ class Telnet:
         Don't block unless in the midst of an IAC sequence.
 
         """
+
     def read_eager(self) -> bytes:
         """Read readily available data.
 
@@ -251,6 +261,7 @@ class Telnet:
         Don't block unless in the midst of an IAC sequence.
 
         """
+
     def read_lazy(self) -> bytes:
         """Process and return data that's already in the queues (lazy).
 
@@ -259,6 +270,7 @@ class Telnet:
         unless in the midst of an IAC sequence.
 
         """
+
     def read_very_lazy(self) -> bytes:
         """Return any data available in the cooked queue (very lazy).
 
@@ -266,6 +278,7 @@ class Telnet:
         Return b'' if no cooked data available otherwise.  Don't block.
 
         """
+
     def read_sb_data(self) -> bytes:
         """Return any data available in the SB ... SE queue.
 
@@ -274,9 +287,10 @@ class Telnet:
         found, old unread SB data will be discarded. Don't block.
 
         """
+
     def set_option_negotiation_callback(self, callback: Callable[[socket.socket, bytes, bytes], object] | None) -> None:
-        """Provide a callback function called after each receipt of a telnet option.
-"""
+        """Provide a callback function called after each receipt of a telnet option."""
+
     def process_rawq(self) -> None:
         """Transfer from raw queue to cooked queue.
 
@@ -284,6 +298,7 @@ class Telnet:
         the midst of an IAC sequence.
 
         """
+
     def rawq_getchar(self) -> bytes:
         """Get next char from raw queue.
 
@@ -291,6 +306,7 @@ class Telnet:
         when connection is closed.
 
         """
+
     def fill_rawq(self) -> None:
         """Fill raw queue from exactly one recv() system call.
 
@@ -298,18 +314,19 @@ class Telnet:
         connection is closed.
 
         """
+
     def sock_avail(self) -> bool:
-        """Test whether data is available on the socket.
-"""
+        """Test whether data is available on the socket."""
+
     def interact(self) -> None:
-        """Interaction function, emulates a very dumb telnet client.
-"""
+        """Interaction function, emulates a very dumb telnet client."""
+
     def mt_interact(self) -> None:
-        """Multithreaded version of interact().
-"""
+        """Multithreaded version of interact()."""
+
     def listener(self) -> None:
-        """Helper for mt_interact() -- this executes in the other thread.
-"""
+        """Helper for mt_interact() -- this executes in the other thread."""
+
     def expect(
         self, list: MutableSequence[Pattern[bytes] | bytes] | Sequence[Pattern[bytes]], timeout: float | None = None
     ) -> tuple[int, Match[bytes] | None, bytes]:
@@ -334,10 +351,10 @@ class Telnet:
         results are undeterministic, and may depend on the I/O timing.
 
         """
+
     def __enter__(self) -> Self: ...
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None: ...
     def __del__(self) -> None:
-        """Destructor -- close the connection.
-"""
+        """Destructor -- close the connection."""
