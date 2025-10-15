@@ -360,8 +360,8 @@ class Generic5(list[PotentialTypeVar]):
     def __enter__(self: Generic5) -> Generic5: ...
 
 
-# Test case based on issue #20781 - metaclass with complex __new__ signature
-class MetaclassInWhichSelfCannotBeUsed5(type):
+# Test case based on issue #20781 - metaclass that triggers IsMetaclass::Maybe
+class MetaclassInWhichSelfCannotBeUsed5(type(Protocol)):
     def __new__(
         cls, name: str, bases: tuple[type[Any], ...], attrs: dict[str, Any], **kwargs: Any
     ) -> MetaclassInWhichSelfCannotBeUsed5:

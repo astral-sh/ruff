@@ -451,5 +451,5 @@ help: Use `Self` as return type
 254 +     def __enter__(self) -> typing.Self: ...
 255 | 
 256 | 
-257 | # Test case based on issue #20781 - metaclass with complex __new__ signature
+257 | # Test case based on issue #20781 - metaclass that triggers IsMetaclass::Maybe
 note: This is a display-only fix and is likely to be incorrect
