@@ -280,24 +280,22 @@ fn needs_parentheses_for_precedence(
     comment_ranges: &ruff_python_trivia::CommentRanges,
     source: &str,
 ) -> bool {
-    // Check if the literal expression is already parenthesized
-    if let Some(parent_expr) = semantic.current_expression_parent() {
-        if parenthesized_range(
-            literal_expr.into(),
-            parent_expr.into(),
-            comment_ranges,
-            source,
-        )
-        .is_some()
-        {
-            return false; // Already parenthesized, don't add more
-        }
-    }
-
     // Get the parent expression to check if we're in a context that needs parentheses
     let Some(parent_expr) = semantic.current_expression_parent() else {
         return false;
     };
+
+    // Check if the literal expression is already parenthesized
+    if parenthesized_range(
+        literal_expr.into(),
+        parent_expr.into(),
+        comment_ranges,
+        source,
+    )
+    .is_some()
+    {
+        return false; // Already parenthesized, don't add more
+    }
 
     // Check if the parent expression has higher precedence than the `|` operator
     let union_precedence = OperatorPrecedence::BitOr;
