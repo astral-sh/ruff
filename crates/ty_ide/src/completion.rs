@@ -973,8 +973,7 @@ class _PrivateProtocol(Protocol):
         test.assert_completions_include("public_explicit_type_alias");
         test.assert_completions_do_not_include("_private_explicit_type_alias");
         test.assert_completions_include("public_implicit_union_alias");
-        // TODO: This should be excluded
-        // test.assert_completions_do_not_include("_private_implicit_union_alias");
+        test.assert_completions_do_not_include("_private_implicit_union_alias");
         test.assert_completions_include("PublicProtocol");
         test.assert_completions_do_not_include("_PrivateProtocol");
     }

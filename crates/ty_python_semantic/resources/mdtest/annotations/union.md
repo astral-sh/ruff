@@ -84,5 +84,5 @@ python-version = "3.10"
 X = int | str
 
 def f(y: X):
-    reveal_type(y)  # revealed: @Todo(Support for `types.UnionType` instances in type expressions) | int
+    reveal_type(y)  # revealed: @Todo(Support for `types.UnionType` instances in type expressions)
 ```
