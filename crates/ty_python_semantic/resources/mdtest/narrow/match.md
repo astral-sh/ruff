@@ -71,6 +71,33 @@ reveal_type(x)  # revealed: object
 
 ## Value patterns
 
+Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
+one can only give us information where we know how the subject type implements equality.
+
+Consider the following example.
+
+```py
+from typing import Literal
+
+def _(x: Literal["foo"] | int):
+    match x:
+        case "foo":
+            reveal_type(x)  # revealed: Literal["foo"] | int
+
+    match x:
+        case "bar":
+            reveal_type(x)  # revealed: int
+```
+
+In the first `match`'s `case "foo"` all we know is `x == "foo"`. `x` could be an instance of an
+arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow to
+`Literal["foo"]`.
+
+In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
+rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
+
+More examples follow.
+
 ```py
 def get_object() -> object:
     return object()
@@ -139,9 +166,8 @@ match x:
     case True | False:
         reveal_type(x)  # revealed: bool
     case 3.14 | 2.718 | 1.414:
-        reveal_type(
-            x
-        )  # revealed: ~Literal["foo"] & ~Literal[42] & ~None & ~tuple[Unknown, ...] & ~Literal[True] & ~Literal[False]
+        # revealed: ~Literal["foo"] & ~Literal[42] & ~None & ~tuple[Unknown, ...] & ~Literal[True] & ~Literal[False]
+        reveal_type(x)
 
 reveal_type(x)  # revealed: object
 ```
