@@ -62,7 +62,7 @@ use crate::rules::flake8_logging_format::rules::{LoggingCallType, find_logging_c
 #[derive(ViolationMetadata)]
 pub(crate) struct LoggingEagerConversion {
     pub(crate) format_conversion: FormatConversion,
-    pub(crate) function_name: Option<String>,
+    pub(crate) function_name: Option<&'static str>,
 }
 
 impl Violation for LoggingEagerConversion {
@@ -73,12 +73,32 @@ impl Violation for LoggingEagerConversion {
             function_name,
         } = self;
         match (format_conversion, function_name.as_deref()) {
-            (FormatConversion::Str, Some("oct")) => "Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`".to_string(),
-            (FormatConversion::Str, Some("hex")) => "Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`".to_string(),
-            (FormatConversion::Str, _) => "Unnecessary `str()` conversion when formatting with `%s`".to_string(),
-            (FormatConversion::Repr, _) => "Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`".to_string(),
-            (FormatConversion::Ascii, _) => "Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`".to_string(),
-            (FormatConversion::Bytes, _) => "Unnecessary `bytes()` conversion when formatting with `%b`".to_string(),
+            (FormatConversion::Str, Some("oct")) => {
+                "Unnecessary `oct()` conversion when formatting with `%s`. \
+            Use `%#o` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Str, Some("hex")) => {
+                "Unnecessary `hex()` conversion when formatting with `%s`. \
+            Use `%#x` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Str, _) => {
+                "Unnecessary `str()` conversion when formatting with `%s`".to_string()
+            }
+            (FormatConversion::Repr, _) => {
+                "Unnecessary `repr()` conversion when formatting with `%s`. \
+            Use `%r` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Ascii, _) => {
+                "Unnecessary `ascii()` conversion when formatting with `%s`. \
+            Use `%a` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Bytes, _) => {
+                "Unnecessary `bytes()` conversion when formatting with `%b`".to_string()
+            }
         }
     }
 }
@@ -169,7 +189,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                     checker.report_diagnostic(
                         LoggingEagerConversion {
                             format_conversion: FormatConversion::Str,
-                            function_name: Some("oct".to_string()),
+                            function_name: Some("oct"),
                         },
                         arg.range(),
                     );
@@ -181,21 +201,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                     checker.report_diagnostic(
                         LoggingEagerConversion {
                             format_conversion: FormatConversion::Str,
-                            function_name: Some("hex".to_string()),
-                        },
-                        arg.range(),
-                    );
-                }
-                // %b with bytes() - remove bytes() call
-                FormatConversion::Bytes
-                    if checker
-                        .semantic()
-                        .match_builtin_expr(func.as_ref(), "bytes") =>
-                {
-                    checker.report_diagnostic(
-                        LoggingEagerConversion {
-                            format_conversion,
-                            function_name: None,
+                            function_name: Some("hex"),
                         },
                         arg.range(),
                     );

@@ -158,104 +158,62 @@ RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` inste
 56 | logging.info("Hex: %s", hex(42))
 57 | logging.warning("Hex: %s", hex(255))
    |                            ^^^^^^^^
-58 |
-59 | # %b + bytes()
-   |
-
-RUF065 Unnecessary `bytes()` conversion when formatting with `%b`
-  --> RUF065.py:60:27
-   |
-59 | # %b + bytes()
-60 | logging.info("Bytes: %b", bytes("Hello", "utf-8"))
-   |                           ^^^^^^^^^^^^^^^^^^^^^^^
-61 | logging.warning("Bytes: %b", bytes("test", "utf-8"))
-   |
-
-RUF065 Unnecessary `bytes()` conversion when formatting with `%b`
-  --> RUF065.py:61:30
-   |
-59 | # %b + bytes()
-60 | logging.info("Bytes: %b", bytes("Hello", "utf-8"))
-61 | logging.warning("Bytes: %b", bytes("test", "utf-8"))
-   |                              ^^^^^^^^^^^^^^^^^^^^^^
-62 |
-63 | # Test with imported functions
    |
 
 RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+  --> RUF065.py:63:19
+   |
+61 | from logging import info, log
+62 |
+63 | info("ASCII: %s", ascii("Hello\nWorld"))
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+64 | log(logging.INFO, "ASCII: %s", ascii("test"))
+   |
+
+RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+  --> RUF065.py:64:32
+   |
+63 | info("ASCII: %s", ascii("Hello\nWorld"))
+64 | log(logging.INFO, "ASCII: %s", ascii("test"))
+   |                                ^^^^^^^^^^^^^
+65 |
+66 | info("Octal: %s", oct(42))
+   |
+
+RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
   --> RUF065.py:66:19
    |
-64 | from logging import info, log
+64 | log(logging.INFO, "ASCII: %s", ascii("test"))
 65 |
-66 | info("ASCII: %s", ascii("Hello\nWorld"))
-   |                   ^^^^^^^^^^^^^^^^^^^^^
-67 | log(logging.INFO, "ASCII: %s", ascii("test"))
+66 | info("Octal: %s", oct(42))
+   |                   ^^^^^^^
+67 | log(logging.INFO, "Octal: %s", oct(255))
    |
 
-RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
   --> RUF065.py:67:32
    |
-66 | info("ASCII: %s", ascii("Hello\nWorld"))
-67 | log(logging.INFO, "ASCII: %s", ascii("test"))
-   |                                ^^^^^^^^^^^^^
-68 |
-69 | info("Octal: %s", oct(42))
-   |
-
-RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
-  --> RUF065.py:69:19
-   |
-67 | log(logging.INFO, "ASCII: %s", ascii("test"))
-68 |
-69 | info("Octal: %s", oct(42))
-   |                   ^^^^^^^
-70 | log(logging.INFO, "Octal: %s", oct(255))
-   |
-
-RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
-  --> RUF065.py:70:32
-   |
-69 | info("Octal: %s", oct(42))
-70 | log(logging.INFO, "Octal: %s", oct(255))
+66 | info("Octal: %s", oct(42))
+67 | log(logging.INFO, "Octal: %s", oct(255))
    |                                ^^^^^^^^
-71 |
-72 | info("Hex: %s", hex(42))
+68 |
+69 | info("Hex: %s", hex(42))
    |
 
 RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`
-  --> RUF065.py:72:17
+  --> RUF065.py:69:17
    |
-70 | log(logging.INFO, "Octal: %s", oct(255))
-71 |
-72 | info("Hex: %s", hex(42))
+67 | log(logging.INFO, "Octal: %s", oct(255))
+68 |
+69 | info("Hex: %s", hex(42))
    |                 ^^^^^^^
-73 | log(logging.INFO, "Hex: %s", hex(255))
+70 | log(logging.INFO, "Hex: %s", hex(255))
    |
 
 RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`
-  --> RUF065.py:73:30
+  --> RUF065.py:70:30
    |
-72 | info("Hex: %s", hex(42))
-73 | log(logging.INFO, "Hex: %s", hex(255))
+69 | info("Hex: %s", hex(42))
+70 | log(logging.INFO, "Hex: %s", hex(255))
    |                              ^^^^^^^^
-74 |
-75 | info("Bytes: %b", bytes("Hello", "utf-8"))
-   |
-
-RUF065 Unnecessary `bytes()` conversion when formatting with `%b`
-  --> RUF065.py:75:19
-   |
-73 | log(logging.INFO, "Hex: %s", hex(255))
-74 |
-75 | info("Bytes: %b", bytes("Hello", "utf-8"))
-   |                   ^^^^^^^^^^^^^^^^^^^^^^^
-76 | log(logging.INFO, "Bytes: %b", bytes("test", "utf-8"))
-   |
-
-RUF065 Unnecessary `bytes()` conversion when formatting with `%b`
-  --> RUF065.py:76:32
-   |
-75 | info("Bytes: %b", bytes("Hello", "utf-8"))
-76 | log(logging.INFO, "Bytes: %b", bytes("test", "utf-8"))
-   |                                ^^^^^^^^^^^^^^^^^^^^^^
    |

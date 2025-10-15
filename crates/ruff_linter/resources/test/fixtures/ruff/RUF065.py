@@ -56,9 +56,6 @@ logging.warning("Octal: %s", oct(255))
 logging.info("Hex: %s", hex(42))
 logging.warning("Hex: %s", hex(255))
 
-# %b + bytes()
-logging.info("Bytes: %b", bytes("Hello", "utf-8"))
-logging.warning("Bytes: %b", bytes("test", "utf-8"))
 
 # Test with imported functions
 from logging import info, log
@@ -72,5 +69,3 @@ log(logging.INFO, "Octal: %s", oct(255))
 info("Hex: %s", hex(42))
 log(logging.INFO, "Hex: %s", hex(255))
 
-info("Bytes: %b", bytes("Hello", "utf-8"))
-log(logging.INFO, "Bytes: %b", bytes("test", "utf-8"))
