@@ -17,6 +17,7 @@ implementations all work with abstract devices. The interface makes
 available mechanisms for setting the properties which formatter objects
 manage and inserting data into the output.
 """
+
 from collections.abc import Iterable
 from typing import IO, Any
 from typing_extensions import TypeAlias
@@ -35,6 +36,7 @@ class NullFormatter:
     interface but don't need to inherit any implementation.
 
     """
+
     writer: NullWriter | None
     def __init__(self, writer: NullWriter | None = None) -> None: ...
     def end_paragraph(self, blankline: int) -> None: ...
@@ -63,6 +65,7 @@ class AbstractFormatter:
     implement a full-featured World Wide Web browser.
 
     """
+
     writer: NullWriter
     align: str | None
     align_stack: list[str | None]
@@ -106,6 +109,7 @@ class NullWriter:
     which do not need to inherit any implementation methods.
 
     """
+
     def flush(self) -> None: ...
     def new_alignment(self, align: str | None) -> None: ...
     def new_font(self, font: _FontType) -> None: ...
@@ -135,6 +139,7 @@ class DumbWriter(NullWriter):
     of paragraphs.
 
     """
+
     file: IO[str]
     maxcol: int
     def __init__(self, file: IO[str] | None = None, maxcol: int = 72) -> None: ...
