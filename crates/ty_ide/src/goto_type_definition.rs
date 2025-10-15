@@ -199,13 +199,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:911:7
+           --> stdlib/builtins.pyi:913:7
             |
-        910 | @disjoint_base
-        911 | class str(Sequence[str]):
+        912 | @disjoint_base
+        913 | class str(Sequence[str]):
             |       ^^^
-        912 |     """str(object='') -> str
-        913 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        914 |     """str(object='') -> str
+        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:1
@@ -227,13 +227,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:911:7
+           --> stdlib/builtins.pyi:913:7
             |
-        910 | @disjoint_base
-        911 | class str(Sequence[str]):
+        912 | @disjoint_base
+        913 | class str(Sequence[str]):
             |       ^^^
-        912 |     """str(object='') -> str
-        913 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        914 |     """str(object='') -> str
+        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:2:10
@@ -324,13 +324,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:911:7
+           --> stdlib/builtins.pyi:913:7
             |
-        910 | @disjoint_base
-        911 | class str(Sequence[str]):
+        912 | @disjoint_base
+        913 | class str(Sequence[str]):
             |       ^^^
-        912 |     """str(object='') -> str
-        913 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        914 |     """str(object='') -> str
+        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:6
@@ -358,13 +358,13 @@ mod tests {
         //   is an int. Navigating to `str` would match pyright's behavior.
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:344:7
+           --> stdlib/builtins.pyi:346:7
             |
-        343 | @disjoint_base
-        344 | class int:
+        345 | @disjoint_base
+        346 | class int:
             |       ^^^
-        345 |     """int([x]) -> integer
-        346 |     int(x, base=10) -> integer
+        347 |     """int([x]) -> integer
+        348 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:4:6
@@ -391,13 +391,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2916:7
+            --> stdlib/builtins.pyi:2918:7
              |
-        2915 | @disjoint_base
-        2916 | class dict(MutableMapping[_KT, _VT]):
+        2917 | @disjoint_base
+        2918 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        2917 |     """dict() -> new empty dictionary
-        2918 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2919 |     """dict() -> new empty dictionary
+        2920 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5
@@ -421,13 +421,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:911:7
+           --> stdlib/builtins.pyi:913:7
             |
-        910 | @disjoint_base
-        911 | class str(Sequence[str]):
+        912 | @disjoint_base
+        913 | class str(Sequence[str]):
             |       ^^^
-        912 |     """str(object='') -> str
-        913 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        914 |     """str(object='') -> str
+        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:5
@@ -513,13 +513,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:911:7
+           --> stdlib/builtins.pyi:913:7
             |
-        910 | @disjoint_base
-        911 | class str(Sequence[str]):
+        912 | @disjoint_base
+        913 | class str(Sequence[str]):
             |       ^^^
-        912 |     """str(object='') -> str
-        913 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        914 |     """str(object='') -> str
+        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:15
@@ -560,13 +560,13 @@ f(**kwargs<CURSOR>)
           |
 
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:911:7
+           --> stdlib/builtins.pyi:913:7
             |
-        910 | @disjoint_base
-        911 | class str(Sequence[str]):
+        912 | @disjoint_base
+        913 | class str(Sequence[str]):
             |       ^^^
-        912 |     """str(object='') -> str
-        913 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        914 |     """str(object='') -> str
+        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:5

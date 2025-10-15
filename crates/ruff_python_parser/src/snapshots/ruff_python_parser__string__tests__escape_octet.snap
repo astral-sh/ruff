@@ -27,6 +27,7 @@ expression: suite
                                     quote_style: Single,
                                     prefix: Regular,
                                     triple_quoted: false,
+                                    unclosed: false,
                                 },
                             },
                         ),

@@ -268,12 +268,7 @@ large_stack_arrays = "allow"
 
 
 [profile.release]
-# Note that we set these explicitly, and these values
-# were chosen based on a trade-off between compile times
-# and runtime performance[1].
-#
-# [1]: https://github.com/astral-sh/ruff/pull/9031
-lto = "thin"
+lto = "fat"
 codegen-units = 16
 
 # Some crates don't change as much but benefit more from
@@ -282,6 +277,8 @@ codegen-units = 16
 [profile.release.package.ruff_python_parser]
 codegen-units = 1
 [profile.release.package.ruff_python_ast]
+codegen-units = 1
+[profile.release.package.salsa]
 codegen-units = 1
 
 [profile.dev.package.insta]
@@ -298,11 +295,30 @@ opt-level = 3
 [profile.dev.package.ruff_python_parser]
 opt-level = 1
 
+# This profile is meant to mimic the `release` profile as closely as
+# possible, but using settings that are more beneficial for iterative
+# development. That is, the `release` profile is intended for actually
+# building the release, where as `profiling` is meant for building ty/ruff
+# for running benchmarks.
+#
+# The main differences here are to avoid stripping debug information
+# and disabling fat lto. This does result in a mismatch between our release
+# configuration and our benchmarking configuration, which is unfortunate.
+# But compile times with `lto = fat` are completely untenable.
+#
+# This setup does risk that we are measuring something in benchmarks
+# that we aren't shipping, but in order to make those two the same, we'd
+# either need to make compile times way worse for development, or take
+# a hit to binary size and a slight hit to runtime performance in our
+# release builds.
+#
 # Use the `--profile profiling` flag to show symbols in release mode.
 # e.g. `cargo build --profile profiling`
 [profile.profiling]
 inherits = "release"
-debug = 1
+strip = false
+debug = "full"
+lto = false
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]

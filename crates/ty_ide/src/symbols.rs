@@ -44,17 +44,26 @@ impl QueryPattern {
         }
     }
 
-    fn is_match(&self, symbol: &SymbolInfo<'_>) -> bool {
+    /// Create a new query pattern that matches all symbols.
+    pub fn matches_all_symbols() -> QueryPattern {
+        QueryPattern {
+            re: None,
+            original: String::new(),
+        }
+    }
+
+    fn is_match_symbol(&self, symbol: &SymbolInfo<'_>) -> bool {
         self.is_match_symbol_name(&symbol.name)
     }
 
-    fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+    pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
             re.is_match(symbol_name)
         } else {
             // This is a degenerate case. The only way
             // we should get here is if the query string
             // was thousands (or more) characters long.
+            // ... or, if "typed" text could not be found.
             symbol_name.contains(&self.original)
         }
     }
@@ -108,7 +117,8 @@ impl FlatSymbols {
 
     /// Returns a sequence of symbols that matches the given query.
     pub fn search(&self, query: &QueryPattern) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
-        self.iter().filter(|(_, symbol)| query.is_match(symbol))
+        self.iter()
+            .filter(|(_, symbol)| query.is_match_symbol(symbol))
     }
 
     /// Turns this flat sequence of symbols into a hierarchy of symbols.

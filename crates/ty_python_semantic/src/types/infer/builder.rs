@@ -7992,6 +7992,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )))
             }
 
+            // Special-case `X | Y` with `X` and `Y` instances of `type` to produce a `types.UnionType` instance, in order to
+            // overwrite the typeshed return type for `type.__or__`, which would result in `types.UnionType | X`. We currently
+            // do this to avoid false positives when a legacy type alias like `IntOrStr = int | str` is later used in a type
+            // expression, because `types.UnionType` will result in a `@Todo` type, while `types.UnionType | <class 'int'>` does
+            // not.
+            //
+            // TODO: Remove this special case once we add support for legacy type aliases.
+            (
+                Type::ClassLiteral(..) | Type::SubclassOf(..) | Type::GenericAlias(..),
+                Type::ClassLiteral(..) | Type::SubclassOf(..) | Type::GenericAlias(..),
+                ast::Operator::BitOr,
+            ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
+                Some(KnownClass::UnionType.to_instance(self.db()))
+            }
+
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
             (

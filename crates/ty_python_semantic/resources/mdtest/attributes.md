@@ -828,6 +828,10 @@ class Base:
     redeclared_with_narrower_type: str | None
     redeclared_with_wider_type: str | None
 
+    redeclared_in_method_with_same_type: str | None
+    redeclared_in_method_with_narrower_type: str | None
+    redeclared_in_method_with_wider_type: str | None
+
     overwritten_in_subclass_body: str
     overwritten_in_subclass_method: str
 
@@ -873,6 +877,14 @@ class Intermediate(Base):
     undeclared = "intermediate"
 
     def set_attributes(self) -> None:
+        self.redeclared_in_method_with_same_type: str | None = None
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_narrower_type: str = "foo"
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_wider_type: object = object()
+
         # TODO: This should be an `invalid-assignment` error
         self.overwritten_in_subclass_method = None
 
@@ -889,17 +901,32 @@ reveal_type(Derived().attribute)  # revealed: int | None
 reveal_type(Derived.redeclared_with_same_type)  # revealed: str | None
 reveal_type(Derived().redeclared_with_same_type)  # revealed: str | None
 
-# TODO: It would probably be more consistent if these were `str | None`
+# We infer the narrower type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
 reveal_type(Derived.redeclared_with_narrower_type)  # revealed: str
 reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
 
-# TODO: It would probably be more consistent if these were `str | None`
+# We infer the wider type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
 reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 
 # TODO: Both of these should be `str`
 reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
 reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
+
+# TODO: both of these should be `str`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_narrower_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_narrower_type)  # revealed: str | None
+
+# TODO: both of these should be `object`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_wider_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_wider_type)  # revealed: object
 
 reveal_type(Derived.overwritten_in_subclass_method)  # revealed: str
 reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
@@ -2162,7 +2189,7 @@ All attribute access on literal `bytes` types is currently delegated to `builtin
 ```py
 # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = EllipsisType, end: SupportsIndex | None = EllipsisType, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 

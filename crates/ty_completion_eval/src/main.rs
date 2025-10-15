@@ -15,6 +15,9 @@ use regex::bytes::Regex;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::Completion;
+use ty_project::metadata::Options;
+use ty_project::metadata::options::EnvironmentOptions;
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::ModuleName;
 
@@ -117,8 +120,8 @@ impl ShowOneCommand {
             && self
                 .file_name
                 .as_ref()
-                .is_some_and(|name| name == task.cursor_name())
-            && self.index.is_some_and(|index| index == task.cursor.index)
+                .is_none_or(|name| name == task.cursor_name())
+            && self.index.is_none_or(|index| index == task.cursor.index)
     }
 }
 
@@ -278,6 +281,14 @@ impl Task {
 
         let system = OsSystem::new(project_path);
         let mut project_metadata = ProjectMetadata::discover(project_path, &system)?;
+        // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
+        project_metadata.apply_options(Options {
+            environment: Some(EnvironmentOptions {
+                python: Some(RelativePathBuf::cli(".venv")),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
         project_metadata.apply_configuration_files(&system)?;
         let db = ProjectDatabase::new(project_metadata, system)?;
         Ok(Task {

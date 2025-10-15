@@ -729,7 +729,7 @@ impl fmt::Display for TokenKind {
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct TokenFlags: u8 {
+    pub(crate) struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
         const DOUBLE_QUOTES = 1 << 0;
         /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
@@ -748,9 +748,12 @@ bitflags! {
         const RAW_STRING_LOWERCASE = 1 << 6;
         /// The token is a raw string and the prefix character is in uppercase.
         const RAW_STRING_UPPERCASE = 1 << 7;
+        /// String without matching closing quote(s)
+        const UNCLOSED_STRING = 1 << 8;
 
         /// The token is a raw string i.e., prefixed with `r` or `R`
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
+
     }
 }
 
@@ -807,6 +810,10 @@ impl StringFlags for TokenFlags {
         } else {
             AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
         }
+    }
+
+    fn is_unclosed(self) -> bool {
+        self.intersects(TokenFlags::UNCLOSED_STRING)
     }
 }
 
