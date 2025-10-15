@@ -1,3 +1,5 @@
+"""Event loop mixins.
+"""
 import sys
 import threading
 from typing_extensions import Never
