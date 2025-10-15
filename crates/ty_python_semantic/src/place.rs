@@ -564,13 +564,6 @@ impl<'db> PlaceAndQualifiers<'db> {
         }
     }
 
-    pub(crate) fn definitely_declared(ty: impl Into<Type<'db>>) -> Self {
-        PlaceAndQualifiers {
-            place: Place::declared(ty),
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
-
     pub(crate) fn is_undefined(&self) -> bool {
         self.place.is_undefined()
     }

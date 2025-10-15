@@ -2109,7 +2109,9 @@ impl<'db> ClassLiteral<'db> {
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(
                             db,
-                            class.own_class_member(db, self.inherited_generic_context(db), name),
+                            class
+                                .own_class_member(db, self.inherited_generic_context(db), name)
+                                .inner,
                         )
                     });
                 }
@@ -2184,14 +2186,16 @@ impl<'db> ClassLiteral<'db> {
     ) -> Member<'db> {
         if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
             // Make this class look like a subclass of the `DataClassInstance` protocol
-            return Place::declared(KnownClass::Dict.to_specialized_instance(
-                db,
-                [
-                    KnownClass::Str.to_instance(db),
-                    KnownClass::Field.to_specialized_instance(db, [Type::any()]),
-                ],
-            ))
-            .with_qualifiers(TypeQualifiers::CLASS_VAR);
+            return Member {
+                inner: Place::declared(KnownClass::Dict.to_specialized_instance(
+                    db,
+                    [
+                        KnownClass::Str.to_instance(db),
+                        KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                    ],
+                ))
+                .with_qualifiers(TypeQualifiers::CLASS_VAR),
+            };
         }
 
         if CodeGeneratorKind::NamedTuple.matches(db, self) {
@@ -2991,7 +2995,7 @@ impl<'db> ClassLiteral<'db> {
                     if let member @ PlaceAndQualifiers {
                         place: Place::Defined(ty, origin, boundness),
                         qualifiers,
-                    } = class.own_instance_member(db, name)
+                    } = class.own_instance_member(db, name).inner
                     {
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {
@@ -3095,6 +3099,7 @@ impl<'db> ClassLiteral<'db> {
                 let method_name = method_def.node(&module).name.as_str();
                 if let Some(Type::FunctionLiteral(method_type)) =
                     class_member(db, class_body_scope, method_name)
+                        .inner
                         .place
                         .ignore_possibly_undefined()
                 {
@@ -3148,7 +3153,9 @@ impl<'db> ClassLiteral<'db> {
                             index.expression(value),
                             TypeContext::default(),
                         );
-                        return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
+                        return Member {
+                            inner: Place::bound(inferred_ty).with_qualifiers(all_qualifiers),
+                        };
                     }
 
                     // If there is no right-hand side, just record that we saw a `Final` qualifier
@@ -3156,7 +3163,7 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                return annotation;
+                return Member { inner: annotation };
             }
         }
 
@@ -3348,10 +3355,12 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
-        if is_attribute_bound {
-            Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
-        } else {
-            Place::Undefined.with_qualifiers(qualifiers)
+        Member {
+            inner: if is_attribute_bound {
+                Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
+            } else {
+                Place::Undefined.with_qualifiers(qualifiers)
+            },
         }
     }
 
@@ -3389,7 +3398,7 @@ impl<'db> ClassLiteral<'db> {
                         if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                             .is_undefined()
                         {
-                            return Place::Undefined.into();
+                            return Member::unbound();
                         }
                     }
 
@@ -3410,14 +3419,18 @@ impl<'db> ClassLiteral<'db> {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,
                                 // we trust the declared type.
-                                declared.with_qualifiers(qualifiers)
+                                Member {
+                                    inner: declared.with_qualifiers(qualifiers),
+                                }
                             } else {
-                                Place::Defined(
-                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                    TypeOrigin::Declared,
-                                    declaredness,
-                                )
-                                .with_qualifiers(qualifiers)
+                                Member {
+                                    inner: Place::Defined(
+                                        UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                        TypeOrigin::Declared,
+                                        declaredness,
+                                    )
+                                    .with_qualifiers(qualifiers),
+                                }
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -3436,7 +3449,9 @@ impl<'db> ClassLiteral<'db> {
                         // union with the inferred type from attribute assignments.
 
                         if declaredness == Definedness::AlwaysDefined {
-                            declared.with_qualifiers(qualifiers)
+                            Member {
+                                inner: declared.with_qualifiers(qualifiers),
+                            }
                         } else {
                             if let Some(implicit_ty) = Self::implicit_attribute(
                                 db,
@@ -3444,17 +3459,22 @@ impl<'db> ClassLiteral<'db> {
                                 name,
                                 MethodDecorator::None,
                             )
+                            .inner
                             .place
                             .ignore_possibly_undefined()
                             {
-                                Place::Defined(
-                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                    TypeOrigin::Declared,
-                                    declaredness,
-                                )
-                                .with_qualifiers(qualifiers)
+                                Member {
+                                    inner: Place::Defined(
+                                        UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                        TypeOrigin::Declared,
+                                        declaredness,
+                                    )
+                                    .with_qualifiers(qualifiers),
+                                }
                             } else {
-                                declared.with_qualifiers(qualifiers)
+                                Member {
+                                    inner: declared.with_qualifiers(qualifiers),
+                                }
                             }
                         }
                     }
@@ -3659,7 +3679,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 
         let attribute_variances = attribute_names
             .map(|name| {
-                let place_and_quals = self.own_instance_member(db, &name);
+                let place_and_quals = self.own_instance_member(db, &name).inner;
                 (name, place_and_quals)
             })
             .chain(attribute_places_and_qualifiers)
@@ -5427,6 +5447,7 @@ impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
         let Place::Defined(slots_ty, _, bound) = base
             .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
+            .inner
             .place
         else {
             return Self::NotSpecified;
