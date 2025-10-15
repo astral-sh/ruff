@@ -1063,8 +1063,12 @@ fn is_legacy_namespace_package(
     };
 
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
-    // The benefit of being syntax-only is speed and avoid circular dependencies
+    //
+    // The benefit of being syntax-only is speed and avoiding circular dependencies
     // between module resolution and semantic analysis.
+    //
+    // The downside is if you write slightly different syntax we will fail to detect the idiom,
+    // but hey, this is better than nothing!
     let parsed = ruff_db::parsed::parsed_module(resolver_state.db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
     visitor.visit_body(parsed.load(resolver_state.db).suite());
