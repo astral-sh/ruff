@@ -43,7 +43,7 @@ class Foo:
 T = typing.TypeVar(*args)
 x: typing.TypeAlias = list[T]
 
-# `default` should be skipped for now, added in Python 3.13
+# `default` was added in Python 3.13
 T = typing.TypeVar("T", default=Any)
 x: typing.TypeAlias = list[T]
 
@@ -90,9 +90,9 @@ PositiveList = TypeAliasType(
     "PositiveList2", list[Annotated[T, Gt(0)]], type_params=(T,)
 )
 
-# `default` should be skipped for now, added in Python 3.13
+# `default` was added in Python 3.13
 T = typing.TypeVar("T", default=Any)
-AnyList = TypeAliasType("AnyList", list[T], typep_params=(T,))
+AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
 
 # unsafe fix if comments within the fix
 T = TypeVar("T")
