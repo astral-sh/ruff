@@ -4532,12 +4532,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let class_node = enclosing_scope.node().as_class()?;
 
                 let class_definition = index.expect_single_definition(class_node);
-                infer_definition_types(db, class_definition)
+                let class_literal = infer_definition_types(db, class_definition)
                     .declaration_type(class_definition)
                     .inner_type()
-                    .as_class_literal()?
+                    .as_class_literal()?;
+
+                class_literal
                     .dataclass_params(db)
                     .map(|params| SmallVec::from(params.field_specifiers(db)))
+                    .or_else(|| {
+                        class_literal
+                            .try_metaclass(db)
+                            .ok()
+                            .and_then(|(_, params)| params)
+                            .map(|params| SmallVec::from(params.field_specifiers(db)))
+                    })
             }
 
             if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
