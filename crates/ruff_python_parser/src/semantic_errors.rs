@@ -1513,6 +1513,7 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `break` statement outside of a loop.
     BreakOutsideLoop,
+
     /// Represents the use of a `continue` statement outside of a loop.
     ContinueOutsideLoop,
 }
