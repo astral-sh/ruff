@@ -81,15 +81,17 @@ reveal_type(x)  # revealed: object
 
 match x:
     case "foo":
-        reveal_type(x)  # revealed: Literal["foo"]
+        reveal_type(x)  # revealed: object
     case 42:
-        reveal_type(x)  # revealed: Literal[42]
+        reveal_type(x)  # revealed: ~Literal["foo"]
     case 6.0:
-        reveal_type(x)  # revealed: float
+        reveal_type(x)  # revealed: ~Literal["foo"] & ~Literal[42]
     case 1j:
-        reveal_type(x)  # revealed: complex
+        reveal_type(x)  # revealed: ~Literal["foo"] & ~Literal[42]
     case b"foo":
-        reveal_type(x)  # revealed: Literal[b"foo"]
+        reveal_type(x)  # revealed: ~Literal["foo"] & ~Literal[42]
+    case _:
+        reveal_type(x)  # revealed: ~Literal["foo"] & ~Literal[42] & ~Literal[b"foo"]
 
 reveal_type(x)  # revealed: object
 ```
@@ -105,15 +107,15 @@ x = get_object()
 reveal_type(x)  # revealed: object
 
 match x:
-    case "foo" if reveal_type(x):  # revealed: Literal["foo"]
+    case "foo" if reveal_type(x):  # revealed: object
         pass
-    case 42 if reveal_type(x):  # revealed: Literal[42]
+    case 42 if reveal_type(x):  # revealed: object
         pass
-    case 6.0 if reveal_type(x):  # revealed: float
+    case 6.0 if reveal_type(x):  # revealed: object
         pass
-    case 1j if reveal_type(x):  # revealed: complex
+    case 1j if reveal_type(x):  # revealed: object
         pass
-    case b"foo" if reveal_type(x):  # revealed: Literal[b"foo"]
+    case b"foo" if reveal_type(x):  # revealed: object
         pass
 
 reveal_type(x)  # revealed: object
@@ -131,13 +133,15 @@ reveal_type(x)  # revealed: object
 
 match x:
     case "foo" | 42 | None:
-        reveal_type(x)  # revealed: Literal["foo", 42] | None
+        reveal_type(x)  # revealed: object
     case "foo" | tuple():
-        reveal_type(x)  # revealed: tuple[Unknown, ...]
+        reveal_type(x)  # revealed: ~Literal["foo"] & ~Literal[42] & ~None
     case True | False:
         reveal_type(x)  # revealed: bool
     case 3.14 | 2.718 | 1.414:
-        reveal_type(x)  # revealed: float
+        reveal_type(
+            x
+        )  # revealed: ~Literal["foo"] & ~Literal[42] & ~None & ~tuple[Unknown, ...] & ~Literal[True] & ~Literal[False]
 
 reveal_type(x)  # revealed: object
 ```
@@ -153,13 +157,13 @@ x = get_object()
 reveal_type(x)  # revealed: object
 
 match x:
-    case "foo" | 42 | None if reveal_type(x):  # revealed: Literal["foo", 42] | None
+    case "foo" | 42 | None if reveal_type(x):  # revealed: object
         pass
-    case "foo" | tuple() if reveal_type(x):  # revealed: Literal["foo"] | tuple[Unknown, ...]
+    case "foo" | tuple() if reveal_type(x):  # revealed: object
         pass
     case True | False if reveal_type(x):  # revealed: bool
         pass
-    case 3.14 | 2.718 | 1.414 if reveal_type(x):  # revealed: float
+    case 3.14 | 2.718 | 1.414 if reveal_type(x):  # revealed: object
         pass
 
 reveal_type(x)  # revealed: object
@@ -179,7 +183,7 @@ match x:
     case str() | float() if type(x) is str:
         reveal_type(x)  #  revealed: str
     case "foo" | 42 | None if isinstance(x, int):
-        reveal_type(x)  #  revealed: Literal[42]
+        reveal_type(x)  #  revealed: int
     case False if x:
         reveal_type(x)  #  revealed: Never
     case "foo" if x := "bar":
@@ -201,7 +205,7 @@ reveal_type(x)  # revealed: object
 match x:
     case str() | float() if type(x) is str and reveal_type(x):  # revealed: str
         pass
-    case "foo" | 42 | None if isinstance(x, int) and reveal_type(x):  #  revealed: Literal[42]
+    case "foo" | 42 | None if isinstance(x, int) and reveal_type(x):  #  revealed: int
         pass
     case False if x and reveal_type(x):  #  revealed: Never
         pass
