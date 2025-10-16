@@ -594,6 +594,10 @@ impl SearchPath {
         )
     }
 
+    pub(crate) fn is_editable_install(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::Editable(_))
+    }
+
     pub(crate) fn is_first_party(&self) -> bool {
         matches!(&*self.0, SearchPathInner::FirstParty(_))
     }
