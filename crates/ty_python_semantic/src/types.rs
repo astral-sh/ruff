@@ -1675,19 +1675,19 @@ impl<'db> Type<'db> {
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
             (Type::TypeVar(bound_typevar), Type::Union(union))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && intersection.positive(db).contains(&target) =>
             {
                 ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && intersection.negative(db).contains(&target) =>
             {
                 ConstraintSet::from(false)
@@ -1699,7 +1699,7 @@ impl<'db> Type<'db> {
             // Note that this is not handled by the early return at the beginning of this method,
             // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
-                if !inferable.is_inferable(db, lhs_bound_typevar)
+                if !lhs_bound_typevar.is_inferable(db, inferable)
                     && lhs_bound_typevar.identity(db) == rhs_bound_typevar.identity(db) =>
             {
                 ConstraintSet::from(true)
@@ -1709,7 +1709,7 @@ impl<'db> Type<'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -1742,7 +1742,7 @@ impl<'db> Type<'db> {
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && !bound_typevar
                         .typevar(db)
                         .constraints(db)
@@ -1782,7 +1782,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeVar(bound_typevar), _)
-                if inferable.is_inferable(db, bound_typevar) && relation.is_assignability() =>
+                if bound_typevar.is_inferable(db, inferable) && relation.is_assignability() =>
             {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
@@ -1884,12 +1884,12 @@ impl<'db> Type<'db> {
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(db, bound_typevar) => {
+            (_, Type::TypeVar(bound_typevar)) if !bound_typevar.is_inferable(db, inferable) => {
                 ConstraintSet::from(false)
             }
 
             (_, Type::TypeVar(typevar))
-                if inferable.is_inferable(db, typevar)
+                if typevar.is_inferable(db, inferable)
                     && relation.is_assignability()
                     && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
                         !self
@@ -1920,7 +1920,7 @@ impl<'db> Type<'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(bound_typevar), _) | (_, Type::TypeVar(bound_typevar))
-                if inferable.is_inferable(db, bound_typevar) =>
+                if bound_typevar.is_inferable(db, inferable) =>
             {
                 ConstraintSet::from(false)
             }
@@ -2360,7 +2360,7 @@ impl<'db> Type<'db> {
             // never subtypes of any other variants
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
-                assert!(!inferable.is_inferable(db, bound_typevar));
+                assert!(!bound_typevar.is_inferable(db, inferable));
                 ConstraintSet::from(false)
             }
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
@@ -2596,7 +2596,7 @@ impl<'db> Type<'db> {
             // and `Any`!) Different typevars might be disjoint, depending on their bounds and
             // constraints, which are handled below.
             (Type::TypeVar(self_bound_typevar), Type::TypeVar(other_bound_typevar))
-                if !inferable.is_inferable(db, self_bound_typevar)
+                if !self_bound_typevar.is_inferable(db, inferable)
                     && self_bound_typevar.identity(db) == other_bound_typevar.identity(db) =>
             {
                 ConstraintSet::from(false)
@@ -2604,7 +2604,7 @@ impl<'db> Type<'db> {
 
             (tvar @ Type::TypeVar(bound_typevar), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && intersection.negative(db).contains(&tvar) =>
             {
                 ConstraintSet::from(true)
@@ -2615,7 +2615,7 @@ impl<'db> Type<'db> {
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
             (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar) =>
+                if !bound_typevar.is_inferable(db, inferable) =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => ConstraintSet::from(false),

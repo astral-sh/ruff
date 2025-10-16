@@ -153,21 +153,23 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
     ),
 }
 
-impl<'a, 'db> InferableTypeVars<'a, 'db> {
+impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(
         &self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
-        match self {
+        match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::One(typevars) => typevars.contains(&bound_typevar.identity(db)),
+            InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
             InferableTypeVars::Two(left, right) => {
-                left.is_inferable(db, bound_typevar) || right.is_inferable(db, bound_typevar)
+                self.is_inferable(db, *left) || self.is_inferable(db, *right)
             }
         }
     }
+}
 
+impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn merge(&'a self, other: Option<&'a InferableTypeVars<'a, 'db>>) -> Self {
         match other {
             Some(other) => InferableTypeVars::Two(self, other),
@@ -1484,7 +1486,7 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
-                if self.inferable.is_inferable(self.db, bound_typevar) =>
+                if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
