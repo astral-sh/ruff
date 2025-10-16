@@ -194,7 +194,7 @@ match get_object():
         ...
     case I(foo=R):
         ...
-    case P | Q:  # error: [invalid-syntax] "variable `P` is not bound in all patterns"
+    case P | Q:  # error: [invalid-syntax] "alternative patterns bind different names"
         ...
 
 match 56:
@@ -293,7 +293,7 @@ match 42:
     case [D]:
         ...
     # error: [invalid-syntax] "name capture `E` makes remaining patterns unreachable"
-    # error: [invalid-syntax] "variable `E` is not bound in all patterns"
+    # error: [invalid-syntax] "alternative patterns bind different names"
     case E | F:
         ...
     case object(foo=G):
@@ -363,7 +363,7 @@ match 42:
     case [D]:
         ...
     # error: [invalid-syntax] "name capture `E` makes remaining patterns unreachable"
-    # error: [invalid-syntax] "variable `E` is not bound in all patterns"
+    # error: [invalid-syntax] "alternative patterns bind different names"
     case E | F:
         ...
     case object(foo=G):
