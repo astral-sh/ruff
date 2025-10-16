@@ -13,8 +13,7 @@ use crate::semantic_index::{
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{
-    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
-    class::CodeGeneratorKind,
+    ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, class::CodeGeneratorKind,
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
@@ -268,9 +267,10 @@ impl<'db> AllMembers<'db> {
                             }
                             Type::ClassLiteral(class) if class.is_protocol(db) => continue,
                             Type::KnownInstance(
-                                KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
+                                KnownInstanceType::TypeVar(_)
+                                | KnownInstanceType::TypeAliasType(_)
+                                | KnownInstanceType::TypeAlias(_),
                             ) => continue,
-                            Type::Dynamic(DynamicType::TodoTypeAlias) => continue,
                             _ => {}
                         }
                     }

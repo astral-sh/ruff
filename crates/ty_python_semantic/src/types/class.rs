@@ -34,7 +34,7 @@ use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomi
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
+    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAlias, MaterializationKind,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
     TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
     determine_upper_bound, infer_definition_types,
@@ -5328,7 +5328,7 @@ impl KnownClass {
                     return;
                 };
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                    TypeAliasType::ManualPEP695(ManualPEP695TypeAlias::new(
                         db,
                         ast::name::Name::new(name.value(db)),
                         containing_assignment,

@@ -313,8 +313,7 @@ reveal_type(A() + "foo")  # revealed: A
 reveal_type("foo" + A())  # revealed: A
 
 reveal_type(A() + b"foo")  # revealed: A
-# TODO should be `A` since `bytes.__add__` doesn't support `A` instances
-reveal_type(b"foo" + A())  # revealed: bytes
+reveal_type(b"foo" + A())  # revealed: A
 
 reveal_type(A() + ())  # revealed: A
 reveal_type(() + A())  # revealed: A
