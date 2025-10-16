@@ -4790,21 +4790,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let program = Program::get(self.db());
                 let typeshed_versions = program.search_paths(self.db()).typeshed_versions();
 
-                if let Some(version_range) = typeshed_versions.exact(&module_name) {
-                    // We know it is a stdlib module on *some* Python versions...
-                    let python_version = program.python_version(self.db());
-                    if !version_range.contains(python_version) {
-                        // ...But not on *this* Python version.
-                        diagnostic.info(format_args!(
-                            "The stdlib module `{module_name}` is only available on Python {version_range}",
-                            version_range = version_range.diagnostic_display(),
-                        ));
-                        add_inferred_python_version_hint_to_diagnostic(
-                            self.db(),
-                            &mut diagnostic,
-                            "resolving modules",
-                        );
-                        return;
+                // Loop over ancestors in case we have info on the parent module but not submodule
+                for module_name in module_name.ancestors() {
+                    if let Some(version_range) = typeshed_versions.exact(&module_name) {
+                        // We know it is a stdlib module on *some* Python versions...
+                        let python_version = program.python_version(self.db());
+                        if !version_range.contains(python_version) {
+                            // ...But not on *this* Python version.
+                            diagnostic.info(format_args!(
+                                "The stdlib module `{module_name}` is only available on Python {version_range}",
+                                version_range = version_range.diagnostic_display(),
+                            ));
+                            add_inferred_python_version_hint_to_diagnostic(
+                                self.db(),
+                                &mut diagnostic,
+                                "resolving modules",
+                            );
+                            return;
+                        }
+                        // We found the most precise answer we could, stop searching
+                        break;
                     }
                 }
             }
