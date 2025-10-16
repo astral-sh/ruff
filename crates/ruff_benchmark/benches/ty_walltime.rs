@@ -210,7 +210,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    100,
+    320,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(

@@ -26,9 +26,7 @@ class C:
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
-
-# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 # There is no special handling of attributes that are (directly) assigned to a declared parameter,
 # which means we union with `Unknown` here, since the attribute itself is not declared. This is
@@ -177,8 +175,7 @@ c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
 
-# TODO: Should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
@@ -399,9 +396,19 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [... for self.a in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for self.d in IntIterable() for self.e in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
@@ -598,6 +605,8 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
+            # TODO: Should not emit this diagnostic
+            # error: [unresolved-attribute]
             self.e = e
 
 # TODO: this would ideally be `Unknown | Literal[1]`
@@ -685,7 +694,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # TODO: this should be an error
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self@method`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
@@ -885,11 +894,9 @@ class Intermediate(Base):
         # TODO: This should be an error (violates Liskov)
         self.redeclared_in_method_with_wider_type: object = object()
 
-        # TODO: This should be an `invalid-assignment` error
-        self.overwritten_in_subclass_method = None
+        self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
-        # TODO: This should be an `invalid-assignment` error
-        self.pure_overwritten_in_subclass_method = None
+        self.pure_overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
         self.pure_undeclared = "intermediate"
 
@@ -1839,6 +1846,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
+        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]

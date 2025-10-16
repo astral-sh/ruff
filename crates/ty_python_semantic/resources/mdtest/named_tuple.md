@@ -208,8 +208,7 @@ class SuperUser(User):
     def now_called_robert(self):
         self.name = "Robert"  # fine because overridden with a mutable attribute
 
-        # TODO: this should cause us to emit an error as we're assigning to a read-only property
-        # inherited from the `NamedTuple` superclass (requires https://github.com/astral-sh/ty/issues/159)
+        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
         self.nickname = "Bob"
 
 james = SuperUser(0, "James", 42, "Jimmy")
