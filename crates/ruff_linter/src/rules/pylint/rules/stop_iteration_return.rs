@@ -61,8 +61,7 @@ pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRai
     // Check if it's a StopIteration exception (could be with or without a value)
     if let ast::Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments,
         range: _,
         node_index: _,
     }) = exc.as_ref()
