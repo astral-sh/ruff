@@ -8344,7 +8344,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -8388,6 +8388,23 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: TypeVarInstance<'db>,
 ) -> Option<TypeVarBoundOrConstraints<'db>> {
+    None
+}
+
+#[allow(clippy::ref_option)]
+fn lazy_default_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<Type<'db>>,
+    _count: u32,
+    _self: TypeVarInstance<'db>,
+) -> salsa::CycleRecoveryAction<Option<Type<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn lazy_default_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: TypeVarInstance<'db>,
+) -> Option<Type<'db>> {
     None
 }
 
