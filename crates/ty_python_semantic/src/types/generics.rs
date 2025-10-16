@@ -331,6 +331,7 @@ impl<'db> GenericContext<'db> {
     }
 
     fn inferable_typevars_innerer(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
             seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
@@ -366,10 +367,7 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        let visitor = CollectTypeVars {
-            typevars: RefCell::new(FxHashSet::default()),
-            seen_types: RefCell::new(FxIndexSet::default()),
-        };
+        let visitor = CollectTypeVars::default();
         for bound_typevar in self.variables(db) {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }
