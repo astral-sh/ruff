@@ -99,8 +99,6 @@ If the arity check only matches a single overload, it should be evaluated as a r
 call should be reported directly and not as a `no-matching-overload` error.
 
 ```py
-from typing_extensions import reveal_type
-
 from overloaded import f
 
 reveal_type(f())  # revealed: None
@@ -1210,11 +1208,7 @@ from typing_extensions import LiteralString
 
 def f(a: Foo, b: list[str], c: list[LiteralString], e):
     reveal_type(e)  # revealed: Unknown
-
-    # TODO: we should select the second overload here and reveal `str`
-    # (the incorrect result is due to missing logic in protocol subtyping/assignability)
-    reveal_type(a.join(b))  # revealed: LiteralString
-
+    reveal_type(a.join(b))  # revealed: str
     reveal_type(a.join(c))  # revealed: LiteralString
 
     # since both overloads match and they have return types that are not equivalent,

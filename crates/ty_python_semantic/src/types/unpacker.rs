@@ -118,6 +118,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
                 let mut unpacker = TupleUnpacker::new(self.db(), target_len);
 
+                // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
+                // For our purposes here, we get better error messages and more precise inference
+                // if we manually map over the union and call `try_iterate` on each union element.
+                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
+                // for more discussion.
                 let unpack_types = match value_ty {
                     Type::Union(union_ty) => union_ty.elements(self.db()),
                     _ => std::slice::from_ref(&value_ty),

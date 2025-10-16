@@ -108,8 +108,6 @@ reveal_type(x)
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class NotIterable:
         if flag:
@@ -247,8 +245,7 @@ class StrIterator:
 
 def f(x: IntIterator | StrIterator):
     for a in x:
-        # TODO: this should be `int | str` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(a)  # revealed: int
+        reveal_type(a)  # revealed: int | str
 ```
 
 Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods:
@@ -260,14 +257,25 @@ def g(
     c: Literal["foo", b"bar"],
 ):
     for x in a:
-        # TODO: should be `int | str` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int | str
     for y in b:
-        # TODO: should be `str | int` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(y)  # revealed: str
-    for z in c:
-        # TODO: should be `LiteralString | int` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(z)  # revealed: LiteralString
+        reveal_type(y)  # revealed: str | int
+```
+
+## Union type as iterable where some elements in the union have precise tuple specs
+
+If all elements in a union can be iterated over, we "union together" their "tuple specs" and are
+able to infer the iterable element precisely when iterating over the union, in the same way that we
+infer a precise type for the iterable element when iterating over a `Literal` string or bytes type:
+
+```py
+from typing import Literal
+
+def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
+    for item in x:
+        reveal_type(item)  # revealed: Literal["f", "o", 98, 97, 114]
+    for item in y:
+        reveal_type(item)  # revealed: Literal["f", "o"] | int
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method
@@ -275,8 +283,6 @@ def g(
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -296,8 +302,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -374,8 +378,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -394,8 +396,6 @@ for x in Iterable():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Bad:
     def __iter__(self) -> int:
         return 42
@@ -428,8 +428,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator1:
     def __next__(self, extra_arg) -> int:
         return 42
@@ -459,8 +457,6 @@ for y in Iterable2():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator:
         def __next__(self) -> int:
@@ -513,8 +509,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -538,8 +532,6 @@ def _(flag1: bool, flag2: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Bad:
     __getitem__: None = None
 
@@ -553,8 +545,6 @@ for x in Bad():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class CustomCallable:
         if flag:
@@ -589,8 +579,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterable:
     # invalid because it will implicitly be passed an `int`
     # by the interpreter
@@ -630,8 +618,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -667,8 +653,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator1:
         if flag:
@@ -708,8 +692,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterable1:
         if flag:
@@ -741,8 +723,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> bytes:
         return b"foo"

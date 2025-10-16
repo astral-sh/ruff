@@ -19,7 +19,7 @@ env:
 jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -49,13 +49,13 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@279f8a15b0e7f77213bf9096dbc2335a19ef89c5"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@908758da02a73ef3f3308e1dbb2248510029bbe4"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
             analyze \
-            --profile=release \
+            --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 

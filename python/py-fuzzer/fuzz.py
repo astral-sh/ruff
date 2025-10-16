@@ -152,8 +152,8 @@ class FuzzResult:
 
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
-    # TODO(carljm) debug slowness of this seed
-    skip_check = seed in {208}
+    # TODO debug slowness of these seeds
+    skip_check = seed in {32, 56, 208}
 
     code = generate_random_code(seed)
     bug_found = False

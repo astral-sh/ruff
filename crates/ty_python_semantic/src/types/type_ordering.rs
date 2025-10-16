@@ -1,10 +1,9 @@
 use std::cmp::Ordering;
 
-use crate::db::Db;
+use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
-    subclass_of::SubclassOfInner,
+    DynamicType, TodoType, Type, TypeIsType, class_base::ClassBase, subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear

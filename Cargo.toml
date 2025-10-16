@@ -43,6 +43,7 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_combine = { path = "crates/ty_combine" }
+ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
@@ -69,8 +70,9 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-divan = { package = "codspeed-divan-compat", version = "3.0.2" }
-codspeed-criterion-compat = { version = "3.0.2", default-features = false }
+csv = { version = "1.3.1" }
+divan = { package = "codspeed-divan-compat", version = "4.0.4" }
+codspeed-criterion-compat = { version = "4.0.4", default-features = false }
 colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
@@ -144,7 +146,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "29ab321b45d00daa4315fa2a06f7207759a8c87e", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "ef9f9329be6923acd050c8dddd172e3bc93e8051", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -203,7 +205,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom", "ruff_options_metadata", "uuid", "get-size2"]
+ignored = ["getrandom", "ruff_options_metadata", "uuid", "get-size2", "ty_completion_eval"]
 
 
 [workspace.lints.rust]
@@ -266,12 +268,7 @@ large_stack_arrays = "allow"
 
 
 [profile.release]
-# Note that we set these explicitly, and these values
-# were chosen based on a trade-off between compile times
-# and runtime performance[1].
-#
-# [1]: https://github.com/astral-sh/ruff/pull/9031
-lto = "thin"
+lto = "fat"
 codegen-units = 16
 
 # Some crates don't change as much but benefit more from
@@ -280,6 +277,8 @@ codegen-units = 16
 [profile.release.package.ruff_python_parser]
 codegen-units = 1
 [profile.release.package.ruff_python_ast]
+codegen-units = 1
+[profile.release.package.salsa]
 codegen-units = 1
 
 [profile.dev.package.insta]
@@ -296,11 +295,30 @@ opt-level = 3
 [profile.dev.package.ruff_python_parser]
 opt-level = 1
 
+# This profile is meant to mimic the `release` profile as closely as
+# possible, but using settings that are more beneficial for iterative
+# development. That is, the `release` profile is intended for actually
+# building the release, where as `profiling` is meant for building ty/ruff
+# for running benchmarks.
+#
+# The main differences here are to avoid stripping debug information
+# and disabling fat lto. This does result in a mismatch between our release
+# configuration and our benchmarking configuration, which is unfortunate.
+# But compile times with `lto = fat` are completely untenable.
+#
+# This setup does risk that we are measuring something in benchmarks
+# that we aren't shipping, but in order to make those two the same, we'd
+# either need to make compile times way worse for development, or take
+# a hit to binary size and a slight hit to runtime performance in our
+# release builds.
+#
 # Use the `--profile profiling` flag to show symbols in release mode.
 # e.g. `cargo build --profile profiling`
 [profile.profiling]
 inherits = "release"
-debug = 1
+strip = false
+debug = "full"
+lto = false
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]

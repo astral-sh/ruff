@@ -299,8 +299,8 @@ pub struct Options {
     /// code upgrades, like rewriting type annotations. Ruff will not propose
     /// changes using features that are not available in the given version.
     ///
-    /// For example, to represent supporting Python >=3.10 or ==3.10
-    /// specify `target-version = "py310"`.
+    /// For example, to represent supporting Python >=3.11 or ==3.11
+    /// specify `target-version = "py311"`.
     ///
     /// If you're already using a `pyproject.toml` file, we recommend
     /// `project.requires-python` instead, as it's based on Python packaging
@@ -327,8 +327,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py39""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313""#,
+        default = r#""py310""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313" | "py314""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -2168,7 +2168,8 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Note that this setting has no effect when `from __future__ import annotations`
     /// is present, as `__future__` annotations are always treated equivalently
-    /// to quoted annotations.
+    /// to quoted annotations. Similarly, this setting has no effect on Python
+    /// versions after 3.14 because these annotations are also deferred.
     #[option(
         default = "false",
         value_type = "bool",

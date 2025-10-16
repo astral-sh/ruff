@@ -1,11 +1,14 @@
 //! Display implementations for types.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
 use ruff_db::display::FormatterJoinExtension;
+use ruff_db::files::FilePath;
+use ruff_db::source::line_index;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
@@ -21,7 +24,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
     UnionType, WrapperDescriptorKind, visitor,
 };
@@ -34,7 +37,9 @@ pub struct DisplaySettings<'db> {
     pub multiline: bool,
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
-    pub qualified: Rc<FxHashSet<&'db str>>,
+    pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    /// Whether long unions are displayed in full
+    pub preserve_full_unions: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -55,6 +60,22 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
+    pub fn truncate_long_unions(self) -> Self {
+        Self {
+            preserve_full_unions: false,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn preserve_long_unions(self) -> Self {
+        Self {
+            preserve_full_unions: true,
+            ..self
+        }
+    }
+
+    #[must_use]
     pub fn from_possibly_ambiguous_type_pair(
         db: &'db dyn Db,
         type_1: Type<'db>,
@@ -70,10 +91,28 @@ impl<'db> DisplaySettings<'db> {
                     .class_names
                     .borrow()
                     .iter()
-                    .filter_map(|(name, ambiguity)| ambiguity.is_ambiguous().then_some(*name))
+                    .filter_map(|(name, ambiguity)| {
+                        Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
+                    })
                     .collect(),
             ),
             ..Self::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QualificationLevel {
+    ModuleName,
+    FileAndLineNumber,
+}
+
+impl QualificationLevel {
+    const fn from_ambiguity_state(state: &AmbiguityState) -> Option<Self> {
+        match state {
+            AmbiguityState::Unambiguous(_) => None,
+            AmbiguityState::RequiresFullyQualifiedName { .. } => Some(Self::ModuleName),
+            AmbiguityState::RequiresFileAndLineNumber => Some(Self::FileAndLineNumber),
         }
     }
 }
@@ -92,10 +131,32 @@ impl<'db> AmbiguousClassCollector<'db> {
             }
             Entry::Occupied(mut entry) => {
                 let value = entry.get_mut();
-                if let AmbiguityState::Unambiguous(existing) = value
-                    && *existing != class
-                {
-                    *value = AmbiguityState::Ambiguous;
+                match value {
+                    AmbiguityState::Unambiguous(existing) => {
+                        if *existing != class {
+                            let qualified_name_components = class.qualified_name_components(db);
+                            if existing.qualified_name_components(db) == qualified_name_components {
+                                *value = AmbiguityState::RequiresFileAndLineNumber;
+                            } else {
+                                *value = AmbiguityState::RequiresFullyQualifiedName {
+                                    class,
+                                    qualified_name_components,
+                                };
+                            }
+                        }
+                    }
+                    AmbiguityState::RequiresFullyQualifiedName {
+                        class: existing,
+                        qualified_name_components,
+                    } => {
+                        if *existing != class {
+                            let new_components = class.qualified_name_components(db);
+                            if *qualified_name_components == new_components {
+                                *value = AmbiguityState::RequiresFileAndLineNumber;
+                            }
+                        }
+                    }
+                    AmbiguityState::RequiresFileAndLineNumber => {}
                 }
             }
         }
@@ -104,18 +165,18 @@ impl<'db> AmbiguousClassCollector<'db> {
 
 /// Whether or not a class can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum AmbiguityState<'db> {
     /// The class can be displayed unambiguously using its unqualified name
     Unambiguous(ClassLiteral<'db>),
     /// The class must be displayed using its fully qualified name to avoid ambiguity.
-    Ambiguous,
-}
-
-impl AmbiguityState<'_> {
-    const fn is_ambiguous(self) -> bool {
-        matches!(self, AmbiguityState::Ambiguous)
-    }
+    RequiresFullyQualifiedName {
+        class: ClassLiteral<'db>,
+        qualified_name_components: Vec<String>,
+    },
+    /// Even the class's fully qualified name is not sufficient;
+    /// we must also include the file and line number.
+    RequiresFileAndLineNumber,
 }
 
 impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
@@ -214,21 +275,19 @@ impl<'db> ClassLiteral<'db> {
             settings,
         }
     }
-}
 
-struct ClassDisplay<'db> {
-    db: &'db dyn Db,
-    class: ClassLiteral<'db>,
-    settings: DisplaySettings<'db>,
-}
-
-impl ClassDisplay<'_> {
-    fn class_parents(&self) -> Vec<String> {
-        let body_scope = self.class.body_scope(self.db);
-        let file = body_scope.file(self.db);
-        let module_ast = parsed_module(self.db, file).load(self.db);
-        let index = semantic_index(self.db, file);
-        let file_scope_id = body_scope.file_scope_id(self.db);
+    /// Returns the components of the qualified name of this class, excluding this class itself.
+    ///
+    /// For example, calling this method on a class `C` in the module `a.b` would return
+    /// `["a", "b"]`. Calling this method on a class `D` inside the namespace of a method
+    /// `m` inside the namespace of a class `C` in the module `a.b` would return
+    /// `["a", "b", "C", "<locals of function 'm'>"]`.
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
+        let body_scope = self.body_scope(db);
+        let file = body_scope.file(db);
+        let module_ast = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let file_scope_id = body_scope.file_scope_id(db);
 
         let mut name_parts = vec![];
 
@@ -254,8 +313,8 @@ impl ClassDisplay<'_> {
             }
         }
 
-        if let Some(module) = file_to_module(self.db, file) {
-            let module_name = module.name(self.db);
+        if let Some(module) = file_to_module(db, file) {
+            let module_name = module.name(db);
             name_parts.push(module_name.as_str().to_string());
         }
 
@@ -264,19 +323,39 @@ impl ClassDisplay<'_> {
     }
 }
 
+struct ClassDisplay<'db> {
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    settings: DisplaySettings<'db>,
+}
+
 impl Display for ClassDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self
-            .settings
-            .qualified
-            .contains(&**self.class.name(self.db))
-        {
-            for parent in self.class_parents() {
+        let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
+        if qualification_level.is_some() {
+            for parent in self.class.qualified_name_components(self.db) {
                 f.write_str(&parent)?;
                 f.write_char('.')?;
             }
         }
-        f.write_str(self.class.name(self.db))
+        f.write_str(self.class.name(self.db))?;
+        if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
+            let file = self.class.file(self.db);
+            let path = file.path(self.db);
+            let path = match path {
+                FilePath::System(path) => Cow::Owned(FilePath::System(
+                    path.strip_prefix(self.db.system().current_directory())
+                        .unwrap_or(path)
+                        .to_path_buf(),
+                )),
+                FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
+            };
+            let line_index = line_index(self.db, file);
+            let class_offset = self.class.header_range(self.db).start();
+            let line_number = line_index.line_index(class_offset);
+            write!(f, " @ {path}:{line_number}")?;
+        }
+        Ok(())
     }
 }
 
@@ -482,7 +561,7 @@ impl Display for DisplayRepresentation<'_> {
                 literal_name = enum_literal.name(self.db)
             ),
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                bound_typevar.display(self.db).fmt(f)
+                bound_typevar.identity(self.db).display(self.db).fmt(f)
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -492,9 +571,7 @@ impl Display for DisplayRepresentation<'_> {
                     "<super: {pivot}, {owner}>",
                     pivot = Type::from(bound_super.pivot_class(self.db))
                         .display_with(self.db, self.settings.singleline()),
-                    owner = bound_super
-                        .owner(self.db)
-                        .into_type()
+                    owner = Type::from(bound_super.owner(self.db))
                         .display_with(self.db, self.settings.singleline())
                 )
             }
@@ -521,24 +598,24 @@ impl Display for DisplayRepresentation<'_> {
     }
 }
 
-impl<'db> BoundTypeVarInstance<'db> {
+impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        DisplayBoundTypeVarInstance {
-            bound_typevar: self,
+        DisplayBoundTypeVarIdentity {
+            bound_typevar_identity: self,
             db,
         }
     }
 }
 
-struct DisplayBoundTypeVarInstance<'db> {
-    bound_typevar: BoundTypeVarInstance<'db>,
+struct DisplayBoundTypeVarIdentity<'db> {
+    bound_typevar_identity: BoundTypeVarIdentity<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayBoundTypeVarInstance<'_> {
+impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bound_typevar.typevar(self.db).name(self.db))?;
-        if let Some(binding_context) = self.bound_typevar.binding_context(self.db).name(self.db) {
+        f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
+        if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
             write!(f, "@{binding_context}")?;
         }
         Ok(())
@@ -1265,6 +1342,9 @@ struct DisplayUnionType<'db> {
     settings: DisplaySettings<'db>,
 }
 
+const MAX_DISPLAYED_UNION_ITEMS: usize = 5;
+const MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED: usize = 3;
+
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fn is_condensable(ty: Type<'_>) -> bool {
@@ -1286,12 +1366,35 @@ impl Display for DisplayUnionType<'_> {
             .filter(|element| is_condensable(*element))
             .collect::<Vec<_>>();
 
+        let total_entries =
+            usize::from(!condensed_types.is_empty()) + elements.len() - condensed_types.len();
+
+        assert_ne!(total_entries, 0);
+
         let mut join = f.join(" | ");
 
+        let display_limit = if self.settings.preserve_full_unions {
+            total_entries
+        } else {
+            let limit = if total_entries > MAX_DISPLAYED_UNION_ITEMS {
+                MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED
+            } else {
+                MAX_DISPLAYED_UNION_ITEMS
+            };
+            limit.min(total_entries)
+        };
+
         let mut condensed_types = Some(condensed_types);
+        let mut displayed_entries = 0usize;
+
         for element in elements {
+            if displayed_entries >= display_limit {
+                break;
+            }
+
             if is_condensable(*element) {
                 if let Some(condensed_types) = condensed_types.take() {
+                    displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
                         db: self.db,
@@ -1299,10 +1402,20 @@ impl Display for DisplayUnionType<'_> {
                     });
                 }
             } else {
+                displayed_entries += 1;
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
                     settings: self.settings.singleline(),
+                });
+            }
+        }
+
+        if !self.settings.preserve_full_unions {
+            let omitted_entries = total_entries.saturating_sub(displayed_entries);
+            if omitted_entries > 0 {
+                join.entry(&DisplayUnionOmitted {
+                    count: omitted_entries,
                 });
             }
         }
@@ -1316,6 +1429,21 @@ impl Display for DisplayUnionType<'_> {
 impl fmt::Debug for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
+    }
+}
+
+struct DisplayUnionOmitted {
+    count: usize,
+}
+
+impl Display for DisplayUnionOmitted {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let plural = if self.count == 1 {
+            "element"
+        } else {
+            "elements"
+        };
+        write!(f, "... omitted {} union {}", self.count, plural)
     }
 }
 
@@ -1585,7 +1713,7 @@ mod tests {
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap()
             .to_instance(&db)
             .unwrap()

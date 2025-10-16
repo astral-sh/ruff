@@ -50,6 +50,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
+use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers};
@@ -383,11 +384,17 @@ impl<'db> TypeContext<'db> {
     // specialization.
     fn known_specialization(
         &self,
-        known_class: KnownClass,
         db: &'db dyn Db,
+        known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         self.annotation
-            .and_then(|ty| ty.known_specialization(known_class, db))
+            .and_then(|ty| ty.known_specialization(db, known_class))
+    }
+
+    pub(crate) fn map_annotation(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            annotation: self.annotation.map(f),
+        }
     }
 }
 
@@ -483,7 +490,31 @@ pub(crate) fn nearest_enclosing_class<'db>(
             infer_definition_types(db, definition)
                 .declaration_type(definition)
                 .inner_type()
-                .into_class_literal()
+                .as_class_literal()
+        })
+}
+
+/// Returns the type of the nearest enclosing function for the given scope.
+///
+/// This function walks up the ancestor scopes starting from the given scope,
+/// and finds the closest (non-lambda) function definition.
+///
+/// Returns `None` if no enclosing function is found.
+pub(crate) fn nearest_enclosing_function<'db>(
+    db: &'db dyn Db,
+    semantic: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> Option<FunctionType<'db>> {
+    semantic
+        .ancestor_scopes(scope.file_scope_id(db))
+        .find_map(|(_, ancestor_scope)| {
+            let func = ancestor_scope.node().as_function()?;
+            let definition = semantic.expect_single_definition(func);
+            let inference = infer_definition_types(db, definition);
+            inference
+                .undecorated_type()
+                .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
+                .as_function_literal()
         })
 }
 
@@ -631,7 +662,7 @@ struct DefinitionInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
 
-    /// The definitions that are deferred.
+    /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
     /// The diagnostics for this region.
@@ -720,7 +751,7 @@ impl<'db> DefinitionInference<'db> {
                     None
                 }
             })
-            .or_else(|| self.fallback_type().map(Into::into))
+            .or_else(|| self.fallback_type().map(TypeAndQualifiers::declared))
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
