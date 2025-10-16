@@ -734,6 +734,28 @@ impl<'db> Node<'db> {
         interior.if_false(db).for_each_constraint(db, f);
     }
 
+    /// Simplifies a BDD, by finding all invalid inputs and ensuring that the BDD always maps those
+    /// to false.
+    ///
+    /// An input can be invalid because BDD variables represent constraints, and certain
+    /// combinations constraints might be impossible. For instance, `T ≤ bool` implies `T ≤ int`,
+    /// so we don't need to care what the BDD evaluates to when `T ≤ bool ∧ T ≰ int`, since that is
+    /// not a valid combination of constraints.
+    ///
+    /// XXX: rename
+    fn simplify_new(self, db: &'db dyn Db) -> Self {
+        // TODO: Simplifying to `false` for invalid assignments is correct, but means that our
+        // display output is not always as compact as it could be. Ideally, we would map impossible
+        // inputs to a new "don't care" terminal, and update our `Display` impl to display the
+        // smallest formula, choosing arbitrarily whether each "don't care" is true or false. Since
+        // that doesn't effect _correctness_, just the rendering in our test cases, I've punted on
+        // that for now.
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::Interior(interior) => interior.simplify_new(db),
+        }
+    }
+
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
     fn simplify(self, db: &'db dyn Db) -> Self {
         match self {
@@ -1005,6 +1027,68 @@ impl<'db> InteriorNode<'db> {
                 found_in_true || found_in_false,
             )
         }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplify_new(self, db: &'db dyn Db) -> Node<'db> {
+        // To simplify a non-terminal BDD, we construct a new BDD representing the domain of valid
+        // inputs. For instance, assume we have BDD variables `x` representing `T ≤ bool` and `y`
+        // representing `T ≤ int`. Since `bool ≤ int`, `x → y` must always be true, so we will add
+        // it to the domain BDD. (Or more accurately, we will _remove_ its negation `x ∧ ¬y` from
+        // the domain BDD.)
+        let mut all_constraints = FxHashSet::default();
+        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+            all_constraints.insert(constraint);
+        });
+
+        let mut domain = Node::AlwaysTrue;
+        for (&left, &right) in all_constraints.iter().tuple_combinations() {
+            if left.typevar(db) != right.typevar(db) {
+                continue;
+            }
+
+            let left_constraint = Node::new_constraint(db, left);
+            let right_constraint = Node::new_constraint(db, right);
+
+            if left.implies(db, right) {
+                // left → right = ¬left ∨ right
+                let implication = left_constraint.negate(db).or(db, right_constraint);
+                domain = domain.and(db, implication);
+            } else if right.implies(db, left) {
+                // right → left = ¬right ∨ left
+                let implication = right_constraint.negate(db).or(db, left_constraint);
+                domain = domain.and(db, implication);
+            }
+
+            match left.intersect(db, right) {
+                Some(intersection) => {
+                    // Note that we don't have to record the backwards implication if the
+                    // intersection is not already mentioned in the BDD.
+                    if all_constraints.contains(&intersection)
+                        && intersection != left
+                        && intersection != right
+                    {
+                        // (left ∧ right) → intersection
+                        let backwards_implication = (left_constraint.negate(db))
+                            .or(db, right_constraint.negate(db))
+                            .or(db, Node::new_constraint(db, intersection));
+                        domain = domain.and(db, backwards_implication);
+                    }
+                }
+
+                None => {
+                    // If left ∩ right == ∅, then left and right cannot both be true.
+                    let no_conflict = left_constraint
+                        .negate(db)
+                        .or(db, right_constraint.negate(db));
+                    domain = domain.and(db, no_conflict);
+                }
+            }
+        }
+
+        // Having done that, we just have to AND the original BDD with its domain. This will map
+        // all invalid inputs to false.
+        Node::Interior(self).and(db, domain)
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
