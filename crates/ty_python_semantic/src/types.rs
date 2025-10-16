@@ -32,7 +32,7 @@ pub(crate) use self::signatures::{CallableSignature, Parameter, Parameters, Sign
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
-use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
+use crate::place::{Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
@@ -60,7 +60,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
@@ -1430,7 +1430,7 @@ impl<'db> Type<'db> {
                     )
                     .place;
 
-                if let Place::Type(ty, Boundness::Bound) = call_symbol {
+                if let Place::Defined(ty, _, Definedness::AlwaysDefined) = call_symbol {
                     ty.try_upcast_to_callable(db)
                 } else {
                     None
@@ -1532,6 +1532,7 @@ impl<'db> Type<'db> {
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
+    #[salsa::tracked(cycle_fn=is_redundant_with_cycle_recover, cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
             .is_always_satisfied()
@@ -1625,14 +1626,16 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(KnownInstanceType::Field(field)), right)
                 if relation.is_assignability() =>
             {
-                field.default_type(db).has_relation_to_impl(
-                    db,
-                    right,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
+                field.default_type(db).when_none_or(|default_type| {
+                    default_type.has_relation_to_impl(
+                        db,
+                        right,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
@@ -2539,7 +2542,7 @@ impl<'db> Type<'db> {
                 other
                     .member(db, member.name())
                     .place
-                    .ignore_possibly_unbound()
+                    .ignore_possibly_undefined()
                     .when_none_or(|attribute_type| {
                         member.has_disjoint_type_from(
                             db,
@@ -2907,14 +2910,14 @@ impl<'db> Type<'db> {
                 disjointness_visitor.visit((self, other), || {
                     protocol.interface(db).members(db).when_any(db, |member| {
                         match other.member(db, member.name()).place {
-                            Place::Type(attribute_type, _) => member.has_disjoint_type_from(
+                            Place::Defined(attribute_type, _, _) => member.has_disjoint_type_from(
                                 db,
                                 attribute_type,
                                 inferable,
                                 disjointness_visitor,
                                 relation_visitor,
                             ),
-                            Place::Unbound => ConstraintSet::from(false),
+                            Place::Undefined => ConstraintSet::from(false),
                         }
                     })
                 })
@@ -3144,7 +3147,7 @@ impl<'db> Type<'db> {
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
                 .place
-                .ignore_possibly_unbound()
+                .ignore_possibly_undefined()
                 .when_none_or(|dunder_call| {
                     dunder_call
                         .has_relation_to_impl(
@@ -3462,7 +3465,7 @@ impl<'db> Type<'db> {
                     ),
                     (Some(KnownClass::FunctionType), "__set__" | "__delete__") => {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
-                        Some(Place::Unbound.into())
+                        Some(Place::Undefined.into())
                     }
                     (Some(KnownClass::Property), "__get__") => Some(
                         Place::bound(Type::WrapperDescriptor(
@@ -3515,7 +3518,7 @@ impl<'db> Type<'db> {
             // MRO of the class `object`.
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 if policy.mro_no_object_fallback() {
-                    Some(Place::Unbound.into())
+                    Some(Place::Undefined.into())
                 } else {
                     KnownClass::Object
                         .to_class_literal(db)
@@ -3685,7 +3688,7 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Unbound.into(),
+            Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -3703,10 +3706,10 @@ impl<'db> Type<'db> {
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                Place::Unbound.into()
+                Place::Undefined.into()
             }
 
-            Type::TypedDict(_) => Place::Unbound.into(),
+            Type::TypedDict(_) => Place::Undefined.into(),
 
             Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),
         }
@@ -3719,9 +3722,9 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name).place
-        } else if let place @ Place::Type(_, _) = self.class_member(db, name.into()).place {
+        } else if let place @ Place::Defined(_, _, _) = self.class_member(db, name.into()).place {
             place
-        } else if let Some(place @ Place::Type(_, _)) =
+        } else if let Some(place @ Place::Defined(_, _, _)) =
             self.find_name_in_mro(db, name).map(|inner| inner.place)
         {
             place
@@ -3774,11 +3777,11 @@ impl<'db> Type<'db> {
 
         let descr_get = self.class_member(db, "__get__".into()).place;
 
-        if let Place::Type(descr_get, descr_get_boundness) = descr_get {
+        if let Place::Defined(descr_get, _, descr_get_boundness) = descr_get {
             let return_ty = descr_get
                 .try_call(db, &CallArguments::positional([self, instance, owner]))
                 .map(|bindings| {
-                    if descr_get_boundness == Boundness::Bound {
+                    if descr_get_boundness == Definedness::AlwaysDefined {
                         bindings.return_type(db)
                     } else {
                         UnionType::from_elements(db, [bindings.return_type(db), self])
@@ -3817,19 +3820,20 @@ impl<'db> Type<'db> {
             //
             // The same is true for `Never`.
             PlaceAndQualifiers {
-                place: Place::Type(Type::Dynamic(_) | Type::Never, _),
+                place: Place::Defined(Type::Dynamic(_) | Type::Never, _, _),
                 qualifiers: _,
             } => (attribute, AttributeKind::DataDescriptor),
 
             PlaceAndQualifiers {
-                place: Place::Type(Type::Union(union), boundness),
+                place: Place::Defined(Type::Union(union), origin, boundness),
                 qualifiers,
             } => (
                 union
                     .map_with_boundness(db, |elem| {
-                        Place::Type(
+                        Place::Defined(
                             elem.try_call_dunder_get(db, instance, owner)
                                 .map_or(*elem, |(ty, _)| ty),
+                            origin,
                             boundness,
                         )
                     })
@@ -3846,14 +3850,15 @@ impl<'db> Type<'db> {
             ),
 
             PlaceAndQualifiers {
-                place: Place::Type(Type::Intersection(intersection), boundness),
+                place: Place::Defined(Type::Intersection(intersection), origin, boundness),
                 qualifiers,
             } => (
                 intersection
                     .map_with_boundness(db, |elem| {
-                        Place::Type(
+                        Place::Defined(
                             elem.try_call_dunder_get(db, instance, owner)
                                 .map_or(*elem, |(ty, _)| ty),
+                            origin,
                             boundness,
                         )
                     })
@@ -3863,13 +3868,16 @@ impl<'db> Type<'db> {
             ),
 
             PlaceAndQualifiers {
-                place: Place::Type(attribute_ty, boundness),
+                place: Place::Defined(attribute_ty, origin, boundness),
                 qualifiers: _,
             } => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
                 {
-                    (Place::Type(return_ty, boundness).into(), attribute_kind)
+                    (
+                        Place::Defined(return_ty, origin, boundness).into(),
+                        attribute_kind,
+                    )
                 } else {
                     (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
@@ -3908,11 +3916,11 @@ impl<'db> Type<'db> {
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
             _ => {
-                !self.class_member(db, "__set__".into()).place.is_unbound()
+                !self.class_member(db, "__set__".into()).place.is_undefined()
                     || !self
                         .class_member(db, "__delete__".into())
                         .place
-                        .is_unbound()
+                        .is_undefined()
             }
         }
     }
@@ -3960,25 +3968,28 @@ impl<'db> Type<'db> {
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ Place::Type(_, _), _, Place::Unbound) => {
+            (meta_attr @ Place::Defined(_, _, _), _, Place::Undefined) => {
                 meta_attr.with_qualifiers(meta_attr_qualifiers)
             }
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
-            (meta_attr @ Place::Type(_, Boundness::Bound), AttributeKind::DataDescriptor, _) => {
-                meta_attr.with_qualifiers(meta_attr_qualifiers)
-            }
+            (
+                meta_attr @ Place::Defined(_, _, Definedness::AlwaysDefined),
+                AttributeKind::DataDescriptor,
+                _,
+            ) => meta_attr.with_qualifiers(meta_attr_qualifiers),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
             // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
-                Place::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                Place::Defined(meta_attr_ty, meta_origin, Definedness::PossiblyUndefined),
                 AttributeKind::DataDescriptor,
-                Place::Type(fallback_ty, fallback_boundness),
-            ) => Place::Type(
+                Place::Defined(fallback_ty, fallback_origin, fallback_boundness),
+            ) => Place::Defined(
                 UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                meta_origin.merge(fallback_origin),
                 fallback_boundness,
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
@@ -3992,9 +4003,9 @@ impl<'db> Type<'db> {
             // would require us to statically infer if an instance attribute is always set, which
             // is something we currently don't attempt to do.
             (
-                Place::Type(_, _),
+                Place::Defined(_, _, _),
                 AttributeKind::NormalOrNonDataDescriptor,
-                fallback @ Place::Type(_, Boundness::Bound),
+                fallback @ Place::Defined(_, _, Definedness::AlwaysDefined),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 fallback.with_qualifiers(fallback_qualifiers)
             }
@@ -4003,17 +4014,18 @@ impl<'db> Type<'db> {
             // unbound or the policy argument is `No`. In both cases, the `fallback` type does
             // not completely shadow the non-data descriptor, so we build a union of the two.
             (
-                Place::Type(meta_attr_ty, meta_attr_boundness),
+                Place::Defined(meta_attr_ty, meta_origin, meta_attr_boundness),
                 AttributeKind::NormalOrNonDataDescriptor,
-                Place::Type(fallback_ty, fallback_boundness),
-            ) => Place::Type(
+                Place::Defined(fallback_ty, fallback_origin, fallback_boundness),
+            ) => Place::Defined(
                 UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                meta_origin.merge(fallback_origin),
                 meta_attr_boundness.max(fallback_boundness),
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
-            (Place::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
+            (Place::Undefined, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
         }
     }
 
@@ -4176,7 +4188,7 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
             // If a protocol does not include a member and the policy disables falling back to
-            // `object`, we return `Place::Unbound` here. This short-circuits attribute lookup
+            // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
             // before we find the "fallback to attribute access on `object`" logic later on
             // (otherwise we would infer that all synthesized protocols have `__getattribute__`
             // methods, and therefore that all synthesized protocols have all possible attributes.)
@@ -4189,13 +4201,13 @@ impl<'db> Type<'db> {
             }) if policy.mro_no_object_fallback()
                 && !protocol.interface().includes_member(db, name_str) =>
             {
-                Place::Unbound.into()
+                Place::Undefined.into()
             }
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
-                Place::Unbound.into(),
+                Place::Undefined.into(),
                 InstanceFallbackShadowsNonDataDescriptor::No,
                 policy,
             ),
@@ -4223,7 +4235,7 @@ impl<'db> Type<'db> {
             {
                 enum_metadata(db, enum_literal.enum_class(db))
                     .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
-                    .map_or_else(|| Place::Unbound, Place::bound)
+                    .map_or_else(|| Place::Undefined, Place::bound)
                     .into()
             }
 
@@ -4267,7 +4279,7 @@ impl<'db> Type<'db> {
                             .and_then(|instance| instance.known_class(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
-                        return Place::Unbound.into();
+                        return Place::Undefined.into();
                     }
 
                     self.try_call_dunder(
@@ -4278,14 +4290,14 @@ impl<'db> Type<'db> {
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
-                    .unwrap_or(Place::Unbound)
+                    .unwrap_or(Place::Undefined)
                     .into()
                 };
 
                 let custom_getattribute_result = || {
                     // Avoid cycles when looking up `__getattribute__`
                     if "__getattribute__" == name.as_str() {
-                        return Place::Unbound.into();
+                        return Place::Undefined.into();
                     }
 
                     // Typeshed has a `__getattribute__` method defined on `builtins.object` so we
@@ -4299,29 +4311,29 @@ impl<'db> Type<'db> {
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
-                    .unwrap_or(Place::Unbound)
+                    .unwrap_or(Place::Undefined)
                     .into()
                 };
 
                 if result.is_class_var() && self.is_typed_dict() {
                     // `ClassVar`s on `TypedDictFallback` can not be accessed on inhabitants of `SomeTypedDict`.
                     // They can only be accessed on `SomeTypedDict` directly.
-                    return Place::Unbound.into();
+                    return Place::Undefined.into();
                 }
 
                 match result {
                     member @ PlaceAndQualifiers {
-                        place: Place::Type(_, Boundness::Bound),
+                        place: Place::Defined(_, _, Definedness::AlwaysDefined),
                         qualifiers: _,
                     } => member,
                     member @ PlaceAndQualifiers {
-                        place: Place::Type(_, Boundness::PossiblyUnbound),
+                        place: Place::Defined(_, _, Definedness::PossiblyUndefined),
                         qualifiers: _,
                     } => member
                         .or_fall_back_to(db, custom_getattribute_result)
                         .or_fall_back_to(db, custom_getattr_result),
                     PlaceAndQualifiers {
-                        place: Place::Unbound,
+                        place: Place::Undefined,
                         qualifiers: _,
                     } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
                 }
@@ -4346,14 +4358,11 @@ impl<'db> Type<'db> {
                 } {
                     if let Some(metadata) = enum_metadata(db, enum_class) {
                         if let Some(resolved_name) = metadata.resolve_member(&name) {
-                            return Place::Type(
-                                Type::EnumLiteral(EnumLiteralType::new(
-                                    db,
-                                    enum_class,
-                                    resolved_name,
-                                )),
-                                Boundness::Bound,
-                            )
+                            return Place::bound(Type::EnumLiteral(EnumLiteralType::new(
+                                db,
+                                enum_class,
+                                resolved_name,
+                            )))
                             .into();
                         }
                     }
@@ -5349,15 +5358,15 @@ impl<'db> Type<'db> {
                     )
                     .place
                 {
-                    Place::Type(dunder_callable, boundness) => {
+                    Place::Defined(dunder_callable, _, boundness) => {
                         let mut bindings = dunder_callable.bindings(db);
                         bindings.replace_callable_type(dunder_callable, self);
-                        if boundness == Boundness::PossiblyUnbound {
+                        if boundness == Definedness::PossiblyUndefined {
                             bindings.set_dunder_call_is_possibly_unbound();
                         }
                         bindings
                     }
-                    Place::Unbound => CallableBinding::not_callable(self).into(),
+                    Place::Undefined => CallableBinding::not_callable(self).into(),
                 }
             }
 
@@ -5470,17 +5479,17 @@ impl<'db> Type<'db> {
             )
             .place
         {
-            Place::Type(dunder_callable, boundness) => {
+            Place::Defined(dunder_callable, _, boundness) => {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
                     .check_types(db, argument_types, &tcx)?;
-                if boundness == Boundness::PossiblyUnbound {
+                if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
                 Ok(bindings)
             }
-            Place::Unbound => Err(CallDunderError::MethodNotAvailable),
+            Place::Undefined => Err(CallDunderError::MethodNotAvailable),
         }
     }
 
@@ -5510,11 +5519,113 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
-        // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
-        // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
-        // However, it's probably very rare to need heterogeneous unpacking inference for long string literals
-        // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
-        const MAX_TUPLE_LENGTH: usize = 128;
+        fn non_async_special_case<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+        ) -> Option<Cow<'db, TupleSpec<'db>>> {
+            // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
+            // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
+            // However, it's probably very rare to need heterogeneous unpacking inference for long string literals
+            // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
+            const MAX_TUPLE_LENGTH: usize = 128;
+
+            match ty {
+                Type::NominalInstance(nominal) => nominal.tuple_spec(db),
+                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
+                    Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
+                        "*tuple[] annotations"
+                    ))))
+                }
+                Type::StringLiteral(string_literal_ty) => {
+                    let string_literal = string_literal_ty.value(db);
+                    let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
+                        TupleSpec::heterogeneous(
+                            string_literal
+                                .chars()
+                                .map(|c| Type::string_literal(db, &c.to_string())),
+                        )
+                    } else {
+                        TupleSpec::homogeneous(Type::LiteralString)
+                    };
+                    Some(Cow::Owned(spec))
+                }
+                Type::BytesLiteral(bytes) => {
+                    let bytes_literal = bytes.value(db);
+                    let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
+                        TupleSpec::heterogeneous(
+                            bytes_literal
+                                .iter()
+                                .map(|b| Type::IntLiteral(i64::from(*b))),
+                        )
+                    } else {
+                        TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
+                    };
+                    Some(Cow::Owned(spec))
+                }
+                Type::Never => {
+                    // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
+                    // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
+                    // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
+                    // TODO: Consider removing this special case, and instead hide the indexing
+                    // diagnostic in unreachable code.
+                    Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
+                }
+                Type::TypeAlias(alias) => {
+                    non_async_special_case(db, alias.value_type(db))
+                }
+                Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        non_async_special_case(db, bound)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(union) => non_async_special_case(db, Type::Union(union)),
+                },
+                Type::Union(union) => {
+                    let elements = union.elements(db);
+                    if elements.len() < MAX_TUPLE_LENGTH {
+                        let mut elements_iter = elements.iter();
+                        let first_element_spec = elements_iter.next()?.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?;
+                        let mut builder = TupleSpecBuilder::from(&*first_element_spec);
+                        for element in elements_iter {
+                            builder = builder.union(db, &*element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?);
+                        }
+                        Some(Cow::Owned(builder.build()))
+                    } else {
+                        None
+                    }
+                }
+                // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
+                Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+
+                Type::FunctionLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::BoundMethod(_)
+                | Type::KnownBoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_)
+                | Type::ModuleLiteral(_)
+                // We could infer a precise tuple spec for enum classes with members,
+                // but it's not clear whether that's worth the added complexity:
+                // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
+                // (enums can have `EnumMeta` subclasses as their metaclasses).
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::EnumLiteral(_)
+                | Type::BoundSuper(_)
+                | Type::TypeIs(_)
+                | Type::TypedDict(_) => None
+            }
+        }
 
         if mode.is_async() {
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
@@ -5581,95 +5692,7 @@ impl<'db> Type<'db> {
             };
         }
 
-        let special_case = match self {
-            Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                    "*tuple[] annotations"
-                ))))
-            }
-            Type::StringLiteral(string_literal_ty) => {
-                let string_literal = string_literal_ty.value(db);
-                let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
-                    TupleSpec::heterogeneous(
-                        string_literal
-                            .chars()
-                            .map(|c| Type::string_literal(db, &c.to_string())),
-                    )
-                } else {
-                    TupleSpec::homogeneous(Type::LiteralString)
-                };
-                Some(Cow::Owned(spec))
-            }
-            Type::BytesLiteral(bytes) => {
-                let bytes_literal = bytes.value(db);
-                let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
-                    TupleSpec::heterogeneous(
-                        bytes_literal
-                            .iter()
-                            .map(|b| Type::IntLiteral(i64::from(*b))),
-                    )
-                } else {
-                    TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
-                };
-                Some(Cow::Owned(spec))
-            }
-            Type::Never => {
-                // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
-                // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
-                // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
-                // TODO: Consider removing this special case, and instead hide the indexing
-                // diagnostic in unreachable code.
-                Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-            }
-            Type::TypeAlias(alias) => {
-                Some(alias.value_type(db).try_iterate_with_mode(db, mode)?)
-            }
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        Some(bound.try_iterate_with_mode(db, mode)?)
-                    }
-                    // TODO: could we create a "union of tuple specs"...?
-                    // (Same question applies to the `Type::Union()` branch lower down)
-                    Some(TypeVarBoundOrConstraints::Constraints(_)) | None => None
-                }
-            },
-            // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
-            Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(self))),
-
-            Type::FunctionLiteral(_)
-            | Type::GenericAlias(_)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::Callable(_)
-            | Type::ModuleLiteral(_)
-            // We could infer a precise tuple spec for enum classes with members,
-            // but it's not clear whether that's worth the added complexity:
-            // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
-            // (enums can have `EnumMeta` subclasses as their metaclasses).
-            | Type::ClassLiteral(_)
-            | Type::SubclassOf(_)
-            | Type::ProtocolInstance(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::PropertyInstance(_)
-            | Type::Union(_)
-            | Type::Intersection(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::TypeIs(_)
-            | Type::TypedDict(_) => None
-        };
-
-        if let Some(special_case) = special_case {
+        if let Some(special_case) = non_async_special_case(db, self) {
             return Ok(special_case);
         }
 
@@ -5985,16 +6008,16 @@ impl<'db> Type<'db> {
         let new_method = self_type.lookup_dunder_new(db, ());
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
-                Place::Type(new_method, boundness) => {
+                Place::Defined(new_method, _, boundness) => {
                     let result =
                         new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
-                    if boundness == Boundness::PossiblyUnbound {
+                    if boundness == Definedness::PossiblyUndefined {
                         Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
                     } else {
                         Some(result.map_err(DunderNewCallError::CallError))
                     }
                 }
-                Place::Unbound => None,
+                Place::Undefined => None,
             }
         });
 
@@ -6014,7 +6037,7 @@ impl<'db> Type<'db> {
                         | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 )
                 .place
-                .is_unbound()
+                .is_undefined()
         {
             Some(init_ty.try_call_dunder(db, "__init__", argument_types, tcx))
         } else {
@@ -7239,6 +7262,25 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_redundant_with_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _subtype: Type<'db>,
+    _supertype: Type<'db>,
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn is_redundant_with_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _subtype: Type<'db>,
+    _supertype: Type<'db>,
+) -> bool {
+    true
+}
+
 fn apply_specialization_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Type<'db>,
@@ -7402,7 +7444,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
-            visitor.visit_type(db, field.default_type(db));
+            if let Some(default_ty) = field.default_type(db) {
+                visitor.visit_type(db, default_ty);
+            }
         }
     }
 }
@@ -7502,9 +7546,11 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
-                        f.write_str("dataclasses.Field[")?;
-                        field.default_type(self.db).display(self.db).fmt(f)?;
-                        f.write_str("]")
+                        f.write_str("dataclasses.Field")?;
+                        if let Some(default_ty) = field.default_type(self.db) {
+                            write!(f, "[{}]", default_ty.display(self.db))?;
+                        }
+                        Ok(())
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
                         let constraints = tracked_set.constraints(self.db);
@@ -7668,18 +7714,23 @@ impl TypeQualifiers {
 #[derive(Clone, Debug, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
+    origin: TypeOrigin,
     qualifiers: TypeQualifiers,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
-    pub(crate) fn new(inner: Type<'db>, qualifiers: TypeQualifiers) -> Self {
-        Self { inner, qualifiers }
+    pub(crate) fn new(inner: Type<'db>, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
+        Self {
+            inner,
+            origin,
+            qualifiers,
+        }
     }
 
-    /// Constructor that creates a [`TypeAndQualifiers`] instance with type `Unknown` and no qualifiers.
-    pub(crate) fn unknown() -> Self {
+    pub(crate) fn declared(inner: Type<'db>) -> Self {
         Self {
-            inner: Type::unknown(),
+            inner,
+            origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
         }
     }
@@ -7687,6 +7738,10 @@ impl<'db> TypeAndQualifiers<'db> {
     /// Forget about type qualifiers and only return the inner type.
     pub(crate) fn inner_type(&self) -> Type<'db> {
         self.inner
+    }
+
+    pub(crate) fn origin(&self) -> TypeOrigin {
+        self.origin
     }
 
     /// Insert/add an additional type qualifier.
@@ -7697,15 +7752,6 @@ impl<'db> TypeAndQualifiers<'db> {
     /// Return the set of type qualifiers.
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
-    }
-}
-
-impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
-    fn from(inner: Type<'db>) -> Self {
-        Self {
-            inner,
-            qualifiers: TypeQualifiers::empty(),
-        }
     }
 }
 
@@ -7854,7 +7900,7 @@ impl<'db> InvalidTypeExpression<'db> {
         let Some(module_member_with_same_name) = ty
             .member(db, module_name_final_part)
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
         else {
             return;
         };
@@ -7891,7 +7937,7 @@ impl get_size2::GetSize for DeprecatedInstance<'_> {}
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
-    pub default_type: Type<'db>,
+    pub default_type: Option<Type<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
@@ -7907,7 +7953,8 @@ impl<'db> FieldInstance<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         FieldInstance::new(
             db,
-            self.default_type(db).normalized_impl(db, visitor),
+            self.default_type(db)
+                .map(|ty| ty.normalized_impl(db, visitor)),
             self.init(db),
             self.kw_only(db),
         )
@@ -10515,18 +10562,18 @@ impl<'db> ModuleLiteralType<'db> {
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
-            if let Place::Type(getattr_type, boundness) = getattr_symbol.place {
+            if let Place::Defined(getattr_type, origin, boundness) = getattr_symbol.place {
                 // If we found a __getattr__ function, try to call it with the name argument
                 if let Ok(outcome) = getattr_type.try_call(
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
                 ) {
-                    return Place::Type(outcome.return_type(db), boundness).into();
+                    return Place::Defined(outcome.return_type(db), origin, boundness).into();
                 }
             }
         }
 
-        Place::Unbound.into()
+        Place::Undefined.into()
     }
 
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -10561,7 +10608,7 @@ impl<'db> ModuleLiteralType<'db> {
             .unwrap_or_default();
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
-        if place_and_qualifiers.place.is_unbound() {
+        if place_and_qualifiers.place.is_undefined() {
             return self.try_module_getattr(db, name);
         }
 
@@ -10958,14 +11005,16 @@ impl<'db> UnionType<'db> {
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
+        let mut origin = TypeOrigin::Declared;
         for ty in self.elements(db) {
             let ty_member = transform_fn(ty);
             match ty_member {
-                Place::Unbound => {
+                Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Type(ty_member, member_boundness) => {
-                    if member_boundness == Boundness::PossiblyUnbound {
+                Place::Defined(ty_member, member_origin, member_boundness) => {
+                    origin = origin.merge(member_origin);
+                    if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
                     }
 
@@ -10976,14 +11025,15 @@ impl<'db> UnionType<'db> {
         }
 
         if all_unbound {
-            Place::Unbound
+            Place::Undefined
         } else {
-            Place::Type(
+            Place::Defined(
                 builder.build(),
+                origin,
                 if possibly_unbound {
-                    Boundness::PossiblyUnbound
+                    Definedness::PossiblyUndefined
                 } else {
-                    Boundness::Bound
+                    Definedness::AlwaysDefined
                 },
             )
         }
@@ -10999,6 +11049,7 @@ impl<'db> UnionType<'db> {
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
+        let mut origin = TypeOrigin::Declared;
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
                 place: ty_member,
@@ -11006,11 +11057,12 @@ impl<'db> UnionType<'db> {
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
             match ty_member {
-                Place::Unbound => {
+                Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Type(ty_member, member_boundness) => {
-                    if member_boundness == Boundness::PossiblyUnbound {
+                Place::Defined(ty_member, member_origin, member_boundness) => {
+                    origin = origin.merge(member_origin);
+                    if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
                     }
 
@@ -11021,14 +11073,15 @@ impl<'db> UnionType<'db> {
         }
         PlaceAndQualifiers {
             place: if all_unbound {
-                Place::Unbound
+                Place::Undefined
             } else {
-                Place::Type(
+                Place::Defined(
                     builder.build(),
+                    origin,
                     if possibly_unbound {
-                        Boundness::PossiblyUnbound
+                        Definedness::PossiblyUndefined
                     } else {
-                        Boundness::Bound
+                        Definedness::AlwaysDefined
                     },
                 )
             },
@@ -11233,13 +11286,15 @@ impl<'db> IntersectionType<'db> {
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
+        let mut origin = TypeOrigin::Declared;
         for ty in self.positive_elements_or_object(db) {
             let ty_member = transform_fn(&ty);
             match ty_member {
-                Place::Unbound => {}
-                Place::Type(ty_member, member_boundness) => {
+                Place::Undefined => {}
+                Place::Defined(ty_member, member_origin, member_boundness) => {
+                    origin = origin.merge(member_origin);
                     all_unbound = false;
-                    if member_boundness == Boundness::Bound {
+                    if member_boundness == Definedness::AlwaysDefined {
                         any_definitely_bound = true;
                     }
 
@@ -11249,14 +11304,15 @@ impl<'db> IntersectionType<'db> {
         }
 
         if all_unbound {
-            Place::Unbound
+            Place::Undefined
         } else {
-            Place::Type(
+            Place::Defined(
                 builder.build(),
+                origin,
                 if any_definitely_bound {
-                    Boundness::Bound
+                    Definedness::AlwaysDefined
                 } else {
-                    Boundness::PossiblyUnbound
+                    Definedness::PossiblyUndefined
                 },
             )
         }
@@ -11272,6 +11328,7 @@ impl<'db> IntersectionType<'db> {
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
+        let mut origin = TypeOrigin::Declared;
         for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
@@ -11279,10 +11336,11 @@ impl<'db> IntersectionType<'db> {
             } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
-                Place::Unbound => {}
-                Place::Type(ty_member, member_boundness) => {
+                Place::Undefined => {}
+                Place::Defined(ty_member, member_origin, member_boundness) => {
+                    origin = origin.merge(member_origin);
                     all_unbound = false;
-                    if member_boundness == Boundness::Bound {
+                    if member_boundness == Definedness::AlwaysDefined {
                         any_definitely_bound = true;
                     }
 
@@ -11293,14 +11351,15 @@ impl<'db> IntersectionType<'db> {
 
         PlaceAndQualifiers {
             place: if all_unbound {
-                Place::Unbound
+                Place::Undefined
             } else {
-                Place::Type(
+                Place::Defined(
                     builder.build(),
+                    origin,
                     if any_definitely_bound {
-                        Boundness::Bound
+                        Definedness::AlwaysDefined
                     } else {
-                        Boundness::PossiblyUnbound
+                        Definedness::PossiblyUndefined
                     },
                 )
             },

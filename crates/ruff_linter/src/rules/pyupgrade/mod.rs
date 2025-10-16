@@ -19,7 +19,7 @@ mod tests {
     use crate::rules::{isort, pyupgrade};
     use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
     #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"))]
@@ -137,6 +137,28 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    fn type_var_default_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}__preview_diff", path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        );
         Ok(())
     }
 

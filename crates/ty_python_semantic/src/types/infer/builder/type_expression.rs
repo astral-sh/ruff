@@ -1429,7 +1429,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let ty = value_ty
                         .member(self.db(), &attr.id)
                         .place
-                        .ignore_possibly_unbound()
+                        .ignore_possibly_undefined()
                         .unwrap_or(Type::unknown());
                     self.store_expression_type(parameters, ty);
                     ty

@@ -242,6 +242,11 @@ pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/20660
+pub(crate) const fn is_type_var_default_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // github.com/astral-sh/ruff/issues/20004
 pub(crate) const fn is_b006_check_guaranteed_mutable_expr_enabled(
     settings: &LinterSettings,

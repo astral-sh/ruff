@@ -260,8 +260,22 @@ def g(
         reveal_type(x)  # revealed: int | str
     for y in b:
         reveal_type(y)  # revealed: str | int
-    for z in c:
-        reveal_type(z)  # revealed: LiteralString | int
+```
+
+## Union type as iterable where some elements in the union have precise tuple specs
+
+If all elements in a union can be iterated over, we "union together" their "tuple specs" and are
+able to infer the iterable element precisely when iterating over the union, in the same way that we
+infer a precise type for the iterable element when iterating over a `Literal` string or bytes type:
+
+```py
+from typing import Literal
+
+def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
+    for item in x:
+        reveal_type(item)  # revealed: Literal["f", "o", 98, 97, 114]
+    for item in y:
+        reveal_type(item)  # revealed: Literal["f", "o"] | int
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method
