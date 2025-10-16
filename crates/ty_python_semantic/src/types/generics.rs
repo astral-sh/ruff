@@ -251,7 +251,6 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
-#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     fn from_variables(
         db: &'db dyn Db,
@@ -312,25 +311,6 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
-        // The first inner function is so that salsa is caching the FxHashSet, not the
-        // InferableTypeVars that wraps it. (That way InferableTypeVars can contain references, and
-        // doesn't need to impl salsa::Update.)
-        InferableTypeVars::One(self.inferable_typevars_inner(db))
-    }
-
-    #[salsa::tracked(
-        returns(ref),
-        cycle_fn=inferable_typevars_cycle_recover,
-        cycle_initial=inferable_typevars_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
-    fn inferable_typevars_inner(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-        // The second inner function is because the salsa macros seem to not like nested structs
-        // and impl blocks inside the function.
-        self.inferable_typevars_innerer(db)
-    }
-
-    fn inferable_typevars_innerer(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarIdentity<'db>> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
@@ -367,11 +347,27 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        let visitor = CollectTypeVars::default();
-        for bound_typevar in self.variables(db) {
-            visitor.visit_bound_type_var_type(db, bound_typevar);
+        #[salsa::tracked(
+            returns(ref),
+            cycle_fn=inferable_typevars_cycle_recover,
+            cycle_initial=inferable_typevars_cycle_initial,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn inferable_typevars_inner<'db>(
+            db: &'db dyn Db,
+            generic_context: GenericContext<'db>,
+        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+            let visitor = CollectTypeVars::default();
+            for bound_typevar in generic_context.variables(db) {
+                visitor.visit_bound_type_var_type(db, bound_typevar);
+            }
+            visitor.typevars.into_inner()
         }
-        visitor.typevars.into_inner()
+
+        // This ensures that salsa caches the FxHashSet, not the InferableTypeVars that wraps it.
+        // (That way InferableTypeVars can contain references, and doesn't need to impl
+        // salsa::Update.)
+        InferableTypeVars::One(inferable_typevars_inner(db, self))
     }
 
     pub(crate) fn variables(
