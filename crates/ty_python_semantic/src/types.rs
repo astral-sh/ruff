@@ -1233,22 +1233,35 @@ impl<'db> Type<'db> {
         if yes { self.negate(db) } else { *self }
     }
 
-    /// Remove the union elements that are not related to `target`.
+    /// If the type is a union, filters union elements based on the provided predicate.
+    ///
+    /// Otherwise, returns the type unchanged.
+    pub(crate) fn filter_union(
+        self,
+        db: &'db dyn Db,
+        f: impl FnMut(&Type<'db>) -> bool,
+    ) -> Type<'db> {
+        if let Type::Union(union) = self {
+            union.filter(db, f)
+        } else {
+            self
+        }
+    }
+
+    /// If the type is a union, removes union elements that are disjoint from `target`.
+    ///
+    /// Otherwise, returns the type unchanged.
     pub(crate) fn filter_disjoint_elements(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> Type<'db> {
-        if let Type::Union(union) = self {
-            union.filter(db, |elem| {
-                !elem
-                    .when_disjoint_from(db, target, inferable)
-                    .is_always_satisfied()
-            })
-        } else {
-            self
-        }
+        self.filter_union(db, |elem| {
+            !elem
+                .when_disjoint_from(db, target, inferable)
+                .is_always_satisfied()
+        })
     }
 
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type
@@ -11185,9 +11198,9 @@ impl<'db> UnionType<'db> {
     pub(crate) fn filter(
         self,
         db: &'db dyn Db,
-        filter_fn: impl FnMut(&&Type<'db>) -> bool,
+        mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
+        Self::from_elements(db, self.elements(db).iter().filter(|ty| f(ty)))
     }
 
     pub(crate) fn map_with_boundness(

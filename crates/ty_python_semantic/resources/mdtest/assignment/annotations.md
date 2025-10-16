@@ -190,8 +190,7 @@ k: list[tuple[list[int], ...]] | None = [([],), ([1, 2], [3, 4]), ([5], [6], [7]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] | None = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-# TODO: this should be `tuple[list[int], list[Any | int], list[Any | int], list[str]]`
-reveal_type(l)  # revealed: tuple[list[Unknown | int], list[Unknown | int], list[Unknown | int], list[Unknown | str]]
+reveal_type(l)  # revealed: tuple[list[int], list[Any | int], list[Any | int], list[str]]
 
 type IntList = list[int]
 
@@ -416,13 +415,14 @@ a = f("a")
 reveal_type(a)  # revealed: list[Literal["a"]]
 
 b: list[int | Literal["a"]] = f("a")
-reveal_type(b)  # revealed: list[int | Literal["a"]]
+reveal_type(b)  # revealed: list[Literal["a"] | int]
 
 c: list[int | str] = f("a")
-reveal_type(c)  # revealed: list[int | str]
+reveal_type(c)  # revealed: list[str | int]
 
 d: list[int | tuple[int, int]] = f((1, 2))
-reveal_type(d)  # revealed: list[int | tuple[int, int]]
+# TODO: We could avoid reordering the union elements here.
+reveal_type(d)  # revealed: list[tuple[int, int] | int]
 
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
@@ -437,8 +437,49 @@ def f2[T: int](x: T) -> T:
     return x
 
 i: int = f2(True)
-reveal_type(i)  # revealed: int
+reveal_type(i)  # revealed: Literal[True]
 
 j: int | str = f2(True)
 reveal_type(j)  # revealed: Literal[True]
+```
+
+Types are not widened unnecessarily:
+
+```py
+def id[T](x: T) -> T:
+    return x
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def _(i: int):
+    a: int | None = i
+    b: int | None = id(i)
+    c: int | str | None = id(i)
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+
+    a: list[int | None] | None = [i]
+    b: list[int | None] | None = id([i])
+    c: list[int | None] | int | None = id([i])
+    reveal_type(a)  # revealed: list[int | None]
+    # TODO: these should reveal `list[int | None]`
+    # we currently do not use the call expression annotation as type context for argument inference
+    reveal_type(b)  # revealed: list[Unknown | int]
+    reveal_type(c)  # revealed: list[Unknown | int]
+
+    a: list[int | None] | None = [i]
+    b: list[int | None] | None = lst(i)
+    c: list[int | None] | int | None = lst(i)
+    reveal_type(a)  # revealed: list[int | None]
+    reveal_type(b)  # revealed: list[int | None]
+    reveal_type(c)  # revealed: list[int | None]
+
+    a: list | None = []
+    b: list | None = id([])
+    c: list | int | None = id([])
+    reveal_type(a)  # revealed: list[Unknown]
+    reveal_type(b)  # revealed: list[Unknown]
+    reveal_type(c)  # revealed: list[Unknown]
 ```

@@ -11,7 +11,7 @@ class Member:
     role: str = field(default="user")
     tag: str | None = field(default=None, init=False)
 
-# revealed: (self: Member, name: str, role: str = str) -> None
+# revealed: (self: Member, name: str, role: str = Literal["user"]) -> None
 reveal_type(Member.__init__)
 
 alice = Member(name="Alice", role="admin")
@@ -37,7 +37,7 @@ class Data:
     content: list[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now, init=False)
 
-# revealed: (self: Data, content: list[int] = list[int]) -> None
+# revealed: (self: Data, content: list[int] = Unknown) -> None
 reveal_type(Data.__init__)
 
 data = Data([1, 2, 3])
@@ -64,7 +64,7 @@ class Person:
     role: str = field(default="user", kw_only=True)
 
 # TODO: this would ideally show a default value of `None` for `age`
-# revealed: (self: Person, name: str, *, age: int | None = int | None, role: str = str) -> None
+# revealed: (self: Person, name: str, *, age: int | None = None, role: str = Literal["user"]) -> None
 reveal_type(Person.__init__)
 
 alice = Person(role="admin", name="Alice")
