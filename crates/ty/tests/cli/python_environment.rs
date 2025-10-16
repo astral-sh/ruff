@@ -435,6 +435,7 @@ fn many_search_paths() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command()
+            .arg("--python-platform").arg("linux")
             .arg("--extra-search-path").arg("extra1")
             .arg("--extra-search-path").arg("extra2")
             .arg("--extra-search-path").arg("extra3")
@@ -469,6 +470,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     // Shows all with `-v`
     assert_cmd_snapshot!(
         case.command()
+            .arg("--python-platform").arg("linux")
             .arg("--extra-search-path").arg("extra1")
             .arg("--extra-search-path").arg("extra2")
             .arg("--extra-search-path").arg("extra3")
@@ -501,8 +503,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `darwin`
-    INFO Python version: Python 3.14, platform: darwin
+    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 7 file(s) in 0.000s
     ");
     Ok(())
