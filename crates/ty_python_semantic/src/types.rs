@@ -874,6 +874,18 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
+    /// Is a value of this type only usable in typing contexts?
+    pub(crate) fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
+            Type::FunctionLiteral(f) => {
+                // TODO(PR): implement `@type_check_only` for functions
+                false
+            }
+            _ => false,
+        }
+    }
+
     // If the type is a specialized instance of the given `KnownClass`, returns the specialization.
     pub(crate) fn known_specialization(
         &self,

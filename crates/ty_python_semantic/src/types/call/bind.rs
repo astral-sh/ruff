@@ -922,6 +922,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.body_scope(db),
                                     class_literal.known(db),
                                     class_literal.deprecated(db),
+                                    class_literal.type_check_only(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                 )));

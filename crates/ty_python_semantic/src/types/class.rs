@@ -1387,6 +1387,8 @@ pub struct ClassLiteral<'db> {
     /// If this class is deprecated, this holds the deprecation message.
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
+    pub(crate) type_check_only: bool,
+
     pub(crate) dataclass_params: Option<DataclassParams>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }

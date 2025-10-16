@@ -2565,6 +2565,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = class_node;
 
         let mut deprecated = None;
+        let mut type_check_only = false;
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
         for decorator in decorator_list {
@@ -2586,6 +2587,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 decorator_ty
             {
                 deprecated = Some(deprecated_inst);
+                continue;
+            }
+
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::TypeCheckOnly))
+            {
+                type_check_only = true;
                 continue;
             }
 
@@ -2634,6 +2643,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 body_scope,
                 maybe_known_class,
                 deprecated,
+                type_check_only,
                 dataclass_params,
                 dataclass_transformer_params,
             )),
