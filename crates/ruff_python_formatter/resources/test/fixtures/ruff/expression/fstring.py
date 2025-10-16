@@ -706,8 +706,6 @@ f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
 f'{1: abcd "{'aa'}" }'
 f'{1=: "abcd {'aa'}}'
-# FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-# spec, which is valid even before 3.12.
 f'{x:a{z:hy "user"}} \'\'\''
 
 # Changing the outer quotes is fine because the format-spec is in a nested expression.

@@ -59,7 +59,7 @@ use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
-use crate::place::{Boundness, Place, place_from_bindings};
+use crate::place::{Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
@@ -314,7 +314,7 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, scope);
 
-        let Place::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
+        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
             place_from_bindings(db, use_def.bindings_at_use(use_id))
         else {
             return None;

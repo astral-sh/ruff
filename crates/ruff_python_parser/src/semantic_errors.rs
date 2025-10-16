@@ -229,6 +229,11 @@ impl SemanticSyntaxChecker {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
                 }
             }
+            Stmt::Continue(ast::StmtContinue { range, .. }) => {
+                if !ctx.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
+                }
+            }
             _ => {}
         }
 
@@ -1131,6 +1136,7 @@ impl Display for SemanticSyntaxError {
                 write!(f, "Future feature `{name}` is not defined")
             }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
+            SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
         }
     }
 }
@@ -1507,6 +1513,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `break` statement outside of a loop.
     BreakOutsideLoop,
+
+    /// Represents the use of a `continue` statement outside of a loop.
+    ContinueOutsideLoop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

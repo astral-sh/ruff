@@ -712,8 +712,6 @@ f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
 f'{1: abcd "{'aa'}" }'
 f'{1=: "abcd {'aa'}}'
-# FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-# spec, which is valid even before 3.12.
 f'{x:a{z:hy "user"}} \'\'\''
 
 # Changing the outer quotes is fine because the format-spec is in a nested expression.
@@ -1536,8 +1534,6 @@ f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
 f'{1: abcd "{"aa"}" }'
 f'{1=: "abcd {'aa'}}'
-# FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-# spec, which is valid even before 3.12.
 f"{x:a{z:hy \"user\"}} '''"
 
 # Changing the outer quotes is fine because the format-spec is in a nested expression.
@@ -2365,8 +2361,6 @@ f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
 f'{1: abcd "{"aa"}" }'
 f'{1=: "abcd {'aa'}}'
-# FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-# spec, which is valid even before 3.12.
 f"{x:a{z:hy \"user\"}} '''"
 
 # Changing the outer quotes is fine because the format-spec is in a nested expression.
@@ -2418,30 +2412,6 @@ print(f"{ {}, 1 }")
 
 
 ### Unsupported Syntax Errors
-error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:764:19
-    |
-762 | # FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-763 | # spec, which is valid even before 3.12.
-764 | f"{x:a{z:hy \"user\"}} '''"
-    |                   ^
-765 |
-766 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
-    |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
-error[invalid-syntax]: Cannot use an escape sequence (backslash) in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:764:13
-    |
-762 | # FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-763 | # spec, which is valid even before 3.12.
-764 | f"{x:a{z:hy \"user\"}} '''"
-    |             ^
-765 |
-766 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
-    |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> fstring.py:178:8
     |
@@ -2450,29 +2420,5 @@ error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python
 178 | f"foo {"'bar'"}"
     |        ^
 179 | f"foo {'"bar"'}"
-    |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:773:14
-    |
-771 | f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
-772 | f"{1=: abcd \'\'}"  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
-773 | f"{1=: abcd \"\"}"  # Changing the quotes here is fine because the inner quotes are escaped
-    |              ^
-774 | # Don't change the quotes in the following cases:
-775 | f'{x=:hy "user"} \'\'\''
-    |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:764:14
-    |
-762 | # FIXME(brent) This should not be a syntax error on output. The escaped quotes are in the format
-763 | # spec, which is valid even before 3.12.
-764 | f"{x:a{z:hy \"user\"}} '''"
-    |              ^
-765 |
-766 | # Changing the outer quotes is fine because the format-spec is in a nested expression.
     |
 warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.

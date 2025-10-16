@@ -711,6 +711,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(pyflakes::rules::BreakOutsideLoop, error.range);
                 }
             }
+            SemanticSyntaxErrorKind::ContinueOutsideLoop => {
+                // F702
+                if self.is_rule_enabled(Rule::ContinueOutsideLoop) {
+                    self.report_diagnostic(pyflakes::rules::ContinueOutsideLoop, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)

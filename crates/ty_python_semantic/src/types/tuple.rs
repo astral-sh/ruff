@@ -1583,6 +1583,59 @@ impl<'db> TupleSpecBuilder<'db> {
         }
     }
 
+    fn all_elements(&self) -> impl Iterator<Item = &Type<'db>> {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => Either::Left(elements.iter()),
+            TupleSpecBuilder::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => Either::Right(prefix.iter().chain(std::iter::once(variable)).chain(suffix)),
+        }
+    }
+
+    /// Return a new tuple-spec builder that reflects the union of this tuple and another tuple.
+    ///
+    /// For example, if `self` is a tuple-spec builder for `tuple[Literal[42], str]` and `other` is a
+    /// tuple-spec for `tuple[Literal[56], str]`, the result will be a tuple-spec builder for
+    /// `tuple[Literal[42, 56], str]`.
+    ///
+    /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
+    /// a tuple spec if both `self` and `other` have the exact same length. For example,
+    /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
+    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
+    /// `tuple[int | str | bytes, ...]`. We could consider improving this in the future if real-world
+    /// use cases arise.
+    pub(crate) fn union(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+        match (&mut self, other) {
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
+                if our_elements.len() == new_elements.len() =>
+            {
+                for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
+                    *existing = UnionType::from_elements(db, [*existing, *new]);
+                }
+                self
+            }
+
+            // We *could* have a branch here where both `self` and `other` are mixed tuples
+            // with same-length prefixes and same-length suffixes. We *could* zip the two
+            // `prefix` vecs together, unioning each pair of elements to create a new `prefix`
+            // vec, and do the same for the `suffix` vecs. This would preserve the tuple specs
+            // of the union elements more closely. But it's hard to think of a test where this
+            // would actually lead to more precise inference, so it's probably not worth the
+            // complexity.
+            _ => {
+                let unioned =
+                    UnionType::from_elements(db, self.all_elements().chain(other.all_elements()));
+                TupleSpecBuilder::Variable {
+                    prefix: vec![],
+                    variable: unioned,
+                    suffix: vec![],
+                }
+            }
+        }
+    }
+
     pub(super) fn build(self) -> TupleSpec<'db> {
         match self {
             TupleSpecBuilder::Fixed(elements) => {

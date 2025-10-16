@@ -14,7 +14,7 @@ use anyhow::Result;
 use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
-use crate::logging::setup_tracing;
+use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
@@ -128,6 +128,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
+    db.project()
+        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     if !check_paths.is_empty() {
         db.project().set_included_paths(&mut db, check_paths);
     }

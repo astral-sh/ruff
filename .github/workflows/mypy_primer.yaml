@@ -29,7 +29,7 @@ env:
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -72,7 +72,7 @@ jobs:
 
   memory_usage:
     name: Run memory statistics
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
