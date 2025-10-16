@@ -83,15 +83,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
         (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
 
-        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => left.cmp(right),
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
-        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => left.cmp(right),
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 

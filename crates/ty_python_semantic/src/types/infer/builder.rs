@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use super::{
     CycleRecovery, DefinitionInference, DefinitionInferenceExtra, ExpressionInference,
@@ -59,6 +60,7 @@ use crate::types::diagnostic::{
     IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
     UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
     report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
@@ -150,6 +152,12 @@ type BinaryComparisonVisitor<'db> = CycleDetector<
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, CompareUnsupportedError<'db>>,
 >;
+
+/// We currently store one dataclass field-specifiers inline, because that covers standard
+/// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
+/// uses 7 field specifiers. We could probably store more inline if this turns out to be a
+/// performance problem. For now, we optimize for memory usage.
+const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 
 /// Builder to infer all types in a region.
 ///
@@ -276,6 +284,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
+
+    /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
+    /// the right hand side of an annotated assignment in a class that is a dataclass).
+    dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -311,6 +323,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: None,
             cycle_recovery: None,
             all_definitely_bound: true,
+            dataclass_field_specifiers: SmallVec::new(),
         }
     }
 
@@ -2573,7 +2586,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
-                dataclass_params = Some(DataclassParams::default());
+                dataclass_params = Some(DataclassParams::default_params(self.db()));
                 continue;
             }
 
@@ -2594,11 +2607,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // overload, or an overload and the implementation both. Nevertheless, this is not
                 // allowed. We do not try to treat the offenders intelligently -- just use the
                 // params of the last seen usage of `@dataclass_transform`
-                let params = f
+                let transformer_params = f
                     .iter_overloads_and_implementation(self.db())
                     .find_map(|overload| overload.dataclass_transformer_params(self.db()));
-                if let Some(params) = params {
-                    dataclass_params = Some(params.into());
+                if let Some(transformer_params) = transformer_params {
+                    dataclass_params = Some(DataclassParams::from_transformer_params(
+                        self.db(),
+                        transformer_params,
+                    ));
                     continue;
                 }
             }
@@ -4516,10 +4532,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
+            fn field_specifiers<'db>(
+                db: &'db dyn Db,
+                index: &'db SemanticIndex<'db>,
+                scope: ScopeId<'db>,
+            ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
+                let enclosing_scope = index.scope(scope.file_scope_id(db));
+                let class_node = enclosing_scope.node().as_class()?;
+                let class_definition = index.expect_single_definition(class_node);
+                let class_literal = infer_definition_types(db, class_definition)
+                    .declaration_type(class_definition)
+                    .inner_type()
+                    .as_class_literal()?;
+
+                class_literal
+                    .dataclass_params(db)
+                    .map(|params| SmallVec::from(params.field_specifiers(db)))
+                    .or_else(|| {
+                        class_literal
+                            .try_metaclass(db)
+                            .ok()
+                            .and_then(|(_, params)| params)
+                            .map(|params| SmallVec::from(params.field_specifiers(db)))
+                    })
+            }
+
+            if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
+                self.dataclass_field_specifiers = specifiers;
+            }
+
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
+
+            self.dataclass_field_specifiers.clear();
+
             let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
@@ -4789,21 +4837,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let program = Program::get(self.db());
                 let typeshed_versions = program.search_paths(self.db()).typeshed_versions();
 
-                if let Some(version_range) = typeshed_versions.exact(&module_name) {
-                    // We know it is a stdlib module on *some* Python versions...
-                    let python_version = program.python_version(self.db());
-                    if !version_range.contains(python_version) {
-                        // ...But not on *this* Python version.
-                        diagnostic.info(format_args!(
-                            "The stdlib module `{module_name}` is only available on Python {version_range}",
-                            version_range = version_range.diagnostic_display(),
-                        ));
-                        add_inferred_python_version_hint_to_diagnostic(
-                            self.db(),
-                            &mut diagnostic,
-                            "resolving modules",
-                        );
-                        return;
+                // Loop over ancestors in case we have info on the parent module but not submodule
+                for module_name in module_name.ancestors() {
+                    if let Some(version_range) = typeshed_versions.exact(&module_name) {
+                        // We know it is a stdlib module on *some* Python versions...
+                        let python_version = program.python_version(self.db());
+                        if !version_range.contains(python_version) {
+                            // ...But not on *this* Python version.
+                            diagnostic.info(format_args!(
+                                "The stdlib module `{module_name}` is only available on Python {version_range}",
+                                version_range = version_range.diagnostic_display(),
+                            ));
+                            add_inferred_python_version_hint_to_diagnostic(
+                                self.db(),
+                                &mut diagnostic,
+                                "resolving modules",
+                            );
+                            return;
+                        }
+                        // We found the most precise answer we could, stop searching
+                        break;
                     }
                 }
             }
@@ -6675,7 +6728,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = match bindings.check_types(self.db(), &call_arguments, &tcx) {
+        let mut bindings = match bindings.check_types(
+            self.db(),
+            &call_arguments,
+            &tcx,
+            &self.dataclass_field_specifiers[..],
+        ) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
@@ -7523,13 +7581,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ),
                             );
                         } else {
-                            builder.into_diagnostic(
+                            let diagnostic = builder.into_diagnostic(
                                 format_args!(
                                     "Type `{}` has no attribute `{}`",
                                     value_type.display(db),
                                     attr.id
                                 ),
                             );
+                            hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
                         }
                         }
                     }
@@ -9259,8 +9318,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
             .match_parameters(self.db(), &call_argument_types)
-            .check_types(self.db(), &call_argument_types, &TypeContext::default())
-        {
+            .check_types(
+                self.db(),
+                &call_argument_types,
+                &TypeContext::default(),
+                &self.dataclass_field_specifiers[..],
+            ) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, subscript.into());
@@ -9792,6 +9855,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             all_definitely_bound,
+            dataclass_field_specifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -9858,8 +9922,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
-            all_definitely_bound: _,
             // builder only state
+            dataclass_field_specifiers: _,
+            all_definitely_bound: _,
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,
@@ -9926,12 +9991,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
-            all_definitely_bound: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
 
             // Builder only state
+            dataclass_field_specifiers: _,
+            all_definitely_bound: _,
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,

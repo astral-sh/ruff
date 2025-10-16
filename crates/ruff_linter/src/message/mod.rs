@@ -16,7 +16,7 @@ use ruff_db::files::File;
 pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 pub use sarif::SarifEmitter;
 
 use crate::Fix;
@@ -25,24 +25,6 @@ use crate::settings::types::{OutputFormat, RuffOutputFormat};
 
 mod grouped;
 mod sarif;
-
-/// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
-///
-/// This is almost identical to `ruff_db::diagnostic::create_syntax_error_diagnostic`, except the
-/// `message` is stored as the primary diagnostic message instead of on the primary annotation.
-///
-/// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
-/// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
-pub fn create_syntax_error_diagnostic(
-    span: impl Into<Span>,
-    message: impl std::fmt::Display,
-    range: impl Ranged,
-) -> Diagnostic {
-    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
-    let span = span.into().with_range(range.range());
-    diag.annotate(Annotation::primary(span));
-    diag
-}
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -260,8 +242,6 @@ mod tests {
     use crate::message::{Emitter, EmitterContext, create_lint_diagnostic};
     use crate::{Edit, Fix};
 
-    use super::create_syntax_error_diagnostic;
-
     pub(super) fn create_syntax_error_diagnostics() -> Vec<Diagnostic> {
         let source = r"from os import
 
@@ -274,7 +254,7 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+                Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
             })
             .collect()
     }
