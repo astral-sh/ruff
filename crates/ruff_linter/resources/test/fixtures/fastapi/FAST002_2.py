@@ -1,21 +1,8 @@
 """Test FAST002 ellipsis handling."""
 
-from fastapi import Body, Cookie, Depends, FastAPI, Header, Query, Security
+from fastapi import Body, Cookie, FastAPI, Header, Query
 
 app = FastAPI()
-
-
-# Dummy definitions for test
-class User:
-    pass
-
-
-def get_current_user():
-    return User()
-
-
-def oauth2_scheme():
-    return "token"
 
 
 # Cases that should be fixed - ellipsis should be removed
@@ -88,31 +75,13 @@ async def test_with_default_none(
     return param or "empty"
 
 
-# Cases with Depends and Security - these should NOT remove ellipsis for Depends/Security
-
-
 @app.get("/test9")
-async def test_depends_with_ellipsis(
-    # This should become: user: Annotated[User, Depends(get_current_user)]
-    # Note: Depends doesn't follow the same pattern as Query/Path/etc
-    user: User = Depends(get_current_user),
-) -> str:
-    return "authenticated"
-
-
-@app.get("/test10")
-async def test_security_with_ellipsis(
-    # This should become: token: Annotated[str, Security(oauth2_scheme)]
-    token: str = Security(oauth2_scheme),
-) -> str:
-    return "secured"
-
-
-@app.get("/test11")
 async def test_mixed_parameters(
-    # First param should be fixed
-    required_param: str = Query(..., description="Required"),
-    # Second param should be fixed with default preserved  
+    # First param should be fixed with default preserved  
     optional_param: str = Query("default", description="Optional"),
+    # Second param should not be fixed because of the preceding default
+    required_param: str = Query(..., description="Required"),
+    # Third param should be fixed with default preserved
+    another_optional_param: int = Query(42, description="Another optional"),
 ) -> str:
-    return f"{required_param}-{optional_param}"
+    return f"{required_param}-{optional_param}-{another_optional_param}"

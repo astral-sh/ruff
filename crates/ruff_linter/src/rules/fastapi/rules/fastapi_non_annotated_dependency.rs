@@ -276,13 +276,16 @@ fn create_diagnostic(
                     .join(", ");
 
                 // Check if the default argument is ellipsis (...), which in FastAPI means "required"
-                let is_default_argument_ellipsis = matches!(dependency_call.default_argument.value(), ast::Expr::EllipsisLiteral(_));
-                
+                let is_default_argument_ellipsis = matches!(
+                    dependency_call.default_argument.value(),
+                    ast::Expr::EllipsisLiteral(_)
+                );
+
                 if is_default_argument_ellipsis && seen_default {
                     // For ellipsis after a parameter with default, can't remove the default
                     return Ok(None);
                 }
-                
+
                 if !is_default_argument_ellipsis {
                     // For actual default values, mark that we've seen a default
                     seen_default = true;
@@ -298,7 +301,8 @@ fn create_diagnostic(
                 );
 
                 if is_default_argument_ellipsis {
-                    // For ellipsis, don't add a default value since Query() already means required
+                    // For ellipsis, don't add a default value since the parameter
+                    // should remain required after conversion to Annotated
                     base_format
                 } else {
                     // For actual default values, preserve them
