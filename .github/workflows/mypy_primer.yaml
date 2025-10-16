@@ -19,6 +19,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -49,7 +53,6 @@ jobs:
         run: rustup show
 
       - name: Run mypy_primer
-        shell: bash
         env:
           PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
           DIFF_FILE: mypy_primer.diff
@@ -92,7 +95,6 @@ jobs:
         run: rustup show
 
       - name: Run mypy_primer
-        shell: bash
         env:
           TY_MAX_PARALLELISM: 1 # for deterministic memory numbers
           TY_MEMORY_REPORT: mypy_primer
