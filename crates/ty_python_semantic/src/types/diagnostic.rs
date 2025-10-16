@@ -3165,19 +3165,25 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     let Some(file) = module.file(db) else {
         return;
     };
-    // Must be a stdlib module
     let Some(search_path) = module.search_path(db) else {
         return;
     };
     if !search_path.is_standard_library() {
         return;
     }
-    // We must be aware that this is a real symbol on *some* version
+
+    // We populate place_table entries for stdlib items across all known versions and platforms,
+    // so if this lookup succeeds then we know that this lookup *could* succeed with possible
+    // configuration changes.
     let symbol_table = place_table(db, global_scope(db, file));
     if symbol_table.symbol_by_name(attr).is_none() {
         return;
     }
 
+    // For now, we just mention the current version they're on, and hope that's enough of a nudge.
+    // TODO: determine what version they need to be on
+    // TODO: also mention the platform we're assuming
+    // TODO: determine what platform they need to be on
     add_inferred_python_version_hint_to_diagnostic(
         db,
         &mut diagnostic,
