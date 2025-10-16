@@ -2360,7 +2360,7 @@ impl<'db> Type<'db> {
             // never subtypes of any other variants
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
-                debug_assert!(!inferable.is_inferable(db, bound_typevar));
+                assert!(!inferable.is_inferable(db, bound_typevar));
                 ConstraintSet::from(false)
             }
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
