@@ -1519,7 +1519,7 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `continue` statement outside of a loop.
     ContinueOutsideLoop,
-    
+
     /// Represents the use of alternative patterns in a `match` statement that bind different names.
     ///
     /// Python requires all alternatives in an OR pattern (`|`) to bind the same set of names.
