@@ -850,26 +850,14 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn is_bound_parameter(&self, name: &str) -> bool {
         for scope in self.semantic.current_scopes() {
             match scope.kind {
-                ScopeKind::Class(_) => {
-                    return false;
-                }
-                ScopeKind::Function(_) | ScopeKind::Lambda(_) => {
-                    if let Some(mut binding_id) = scope.get(name) {
-                        loop {
-                            let binding = self.semantic.binding(binding_id);
-                            if matches!(binding.kind, BindingKind::Argument) {
-                                return true;
-                            }
-                            if let Some(shadowed_id) = scope.shadowed_binding(binding_id) {
-                                binding_id = shadowed_id;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                    return false;
-                }
-                ScopeKind::Generator { .. }
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { parameters, .. })
+                | ScopeKind::Lambda(ast::ExprLambda {
+                    parameters: Some(parameters),
+                    ..
+                }) => return parameters.includes(name),
+                ScopeKind::Lambda(_)
+                | ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
                 | ScopeKind::DunderClassCell => {}
