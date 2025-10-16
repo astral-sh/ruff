@@ -2524,6 +2524,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
     call_expression_tcx: &'a TypeContext<'db>,
+    return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
     inferable_typevars: InferableTypeVars<'db, 'db>,
@@ -2531,6 +2532,7 @@ struct ArgumentTypeChecker<'a, 'db> {
 }
 
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
+    #[expect(clippy::too_many_arguments)]
     fn new(
         db: &'db dyn Db,
         signature: &'a Signature<'db>,
@@ -2538,6 +2540,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
         call_expression_tcx: &'a TypeContext<'db>,
+        return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
         Self {
@@ -2547,6 +2550,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             argument_matches,
             parameter_tys,
             call_expression_tcx,
+            return_ty,
             errors,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
@@ -2588,25 +2592,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
-        // Note that we infer the annotated type _before_ the arguments if this call is part of
-        // an annotated assignment, to closer match the order of any unions written in the type
-        // annotation.
-        if let Some(return_ty) = self.signature.return_ty
-            && let Some(call_expression_tcx) = self.call_expression_tcx.annotation
-        {
-            match call_expression_tcx {
-                // A type variable is not a useful type-context for expression inference, and applying it
-                // to the return type can lead to confusing unions in nested generic calls.
-                Type::TypeVar(_) => {}
-
-                _ => {
-                    // Ignore any specialization errors here, because the type context is only used as a hint
-                    // to infer a more assignable return type.
-                    let _ = builder.infer(return_ty, call_expression_tcx);
-                }
-            }
-        }
-
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
@@ -2631,7 +2616,41 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        self.specialization = Some(builder.build(generic_context, *self.call_expression_tcx));
+        // Build the specialization first without inferring the type context.
+        let isolated_specialization = builder.build(generic_context, *self.call_expression_tcx);
+        let isolated_return_ty = self
+            .return_ty
+            .apply_specialization(self.db, isolated_specialization);
+
+        let mut try_infer_tcx = || {
+            let return_ty = self.signature.return_ty?;
+            let call_expression_tcx = self.call_expression_tcx.annotation?;
+
+            // A type variable is not a useful type-context for expression inference, and applying it
+            // to the return type can lead to confusing unions in nested generic calls.
+            if call_expression_tcx.is_type_var() {
+                return None;
+            }
+
+            // If the return type is already assignable to the annotated type, we can ignore the
+            // type context and prefer the narrower inferred type.
+            if isolated_return_ty.is_assignable_to(self.db, call_expression_tcx) {
+                return None;
+            }
+
+            // TODO: Ideally we would infer the annotated type _before_ the arguments if this call is part of an
+            // annotated assignment, to closer match the order of any unions written in the type annotation.
+            builder.infer(return_ty, call_expression_tcx).ok()?;
+
+            // Otherwise, build the specialization again after inferring the type context.
+            let specialization = builder.build(generic_context, *self.call_expression_tcx);
+            let return_ty = return_ty.apply_specialization(self.db, specialization);
+
+            Some((Some(specialization), return_ty))
+        };
+
+        (self.specialization, self.return_ty) =
+            try_infer_tcx().unwrap_or((Some(isolated_specialization), isolated_return_ty));
     }
 
     fn check_argument_type(
@@ -2826,8 +2845,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
-    fn finish(self) -> (InferableTypeVars<'db, 'db>, Option<Specialization<'db>>) {
-        (self.inferable_typevars, self.specialization)
+    fn finish(
+        self,
+    ) -> (
+        InferableTypeVars<'db, 'db>,
+        Option<Specialization<'db>>,
+        Type<'db>,
+    ) {
+        (self.inferable_typevars, self.specialization, self.return_ty)
     }
 }
 
@@ -2985,18 +3010,16 @@ impl<'db> Binding<'db> {
             &self.argument_matches,
             &mut self.parameter_tys,
             call_expression_tcx,
+            self.return_ty,
             &mut self.errors,
         );
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
         checker.infer_specialization();
-
         checker.check_argument_types();
-        (self.inferable_typevars, self.specialization) = checker.finish();
-        if let Some(specialization) = self.specialization {
-            self.return_ty = self.return_ty.apply_specialization(db, specialization);
-        }
+
+        (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {

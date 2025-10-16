@@ -1354,6 +1354,7 @@ impl<'db> SpecializationBuilder<'db> {
                     let tcx = tcx_specialization.and_then(|specialization| {
                         specialization.get(self.db, variable.bound_typevar)
                     });
+
                     ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
                 }
 
@@ -1376,7 +1377,7 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
-        mut actual: Type<'db>,
+        actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -1407,9 +1408,11 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
-        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
-        // So, here we remove the union elements that are not related to `formal`.
-        actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+        // Remove the union elements that are not related to `formal`.
+        //
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T`
+        // to `int`.
+        let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
