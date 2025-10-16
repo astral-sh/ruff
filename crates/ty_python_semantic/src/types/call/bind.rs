@@ -978,11 +978,12 @@ impl<'db> Bindings<'db> {
                                 overload.parameter_type_by_name("kw_only").unwrap_or(None);
 
                             let default_ty = match (default, default_factory) {
-                                (Some(default_ty), _) => default_ty,
+                                (Some(default_ty), _) => Some(default_ty),
                                 (_, Some(default_factory_ty)) => default_factory_ty
                                     .try_call(db, &CallArguments::none())
-                                    .map_or(Type::unknown(), |binding| binding.return_type(db)),
-                                _ => Type::unknown(),
+                                    .ok()
+                                    .map(|binding| binding.return_type(db)),
+                                _ => None,
                             };
 
                             let init = init

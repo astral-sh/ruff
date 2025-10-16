@@ -1636,14 +1636,16 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(KnownInstanceType::Field(field)), right)
                 if relation.is_assignability() =>
             {
-                field.default_type(db).has_relation_to_impl(
-                    db,
-                    right,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
+                field.default_type(db).when_none_or(|default_type| {
+                    default_type.has_relation_to_impl(
+                        db,
+                        right,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
@@ -7499,7 +7501,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
-            visitor.visit_type(db, field.default_type(db));
+            if let Some(default_ty) = field.default_type(db) {
+                visitor.visit_type(db, default_ty);
+            }
         }
     }
 }
@@ -7599,9 +7603,11 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
-                        f.write_str("dataclasses.Field[")?;
-                        field.default_type(self.db).display(self.db).fmt(f)?;
-                        f.write_str("]")
+                        f.write_str("dataclasses.Field")?;
+                        if let Some(default_ty) = field.default_type(self.db) {
+                            write!(f, "[{}]", default_ty.display(self.db))?;
+                        }
+                        Ok(())
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
                         let constraints = tracked_set.constraints(self.db);
@@ -7988,7 +7994,7 @@ impl get_size2::GetSize for DeprecatedInstance<'_> {}
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
-    pub default_type: Type<'db>,
+    pub default_type: Option<Type<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
@@ -8004,7 +8010,8 @@ impl<'db> FieldInstance<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         FieldInstance::new(
             db,
-            self.default_type(db).normalized_impl(db, visitor),
+            self.default_type(db)
+                .map(|ty| ty.normalized_impl(db, visitor)),
             self.init(db),
             self.kw_only(db),
         )
