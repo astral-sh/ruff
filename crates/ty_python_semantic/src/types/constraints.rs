@@ -61,6 +61,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
+use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, UnionType};
@@ -259,7 +260,6 @@ impl From<bool> for ConstraintSet<'_> {
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarIdentity<'db>,
     lower: Type<'db>,
@@ -299,12 +299,19 @@ impl<'db> ConstrainedTypeVar<'db> {
         let upper = upper.normalized(db);
         Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
     }
+
     fn when_true(self) -> ConstraintAssignment<'db> {
         ConstraintAssignment::Positive(self)
     }
 
     fn when_false(self) -> ConstraintAssignment<'db> {
         ConstraintAssignment::Negative(self)
+    }
+
+    fn cmp(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.typevar(db)
+            .cmp(&other.typevar(db))
+            .then_with(|| self.as_id().cmp(&other.as_id()))
     }
 
     fn contains(self, db: &'db dyn Db, other: Self) -> bool {
@@ -417,13 +424,13 @@ impl<'db> Node<'db> {
         if_true: Node<'db>,
         if_false: Node<'db>,
     ) -> Self {
+        debug_assert!((if_true.root_constraint(db)).is_none_or(|root_constraint| {
+            (root_constraint.cmp(db, constraint)) == Ordering::Greater
+        }));
         debug_assert!(
-            (if_true.root_constraint(db))
-                .is_none_or(|root_constraint| root_constraint > constraint)
-        );
-        debug_assert!(
-            (if_false.root_constraint(db))
-                .is_none_or(|root_constraint| root_constraint > constraint)
+            (if_false.root_constraint(db)).is_none_or(|root_constraint| {
+                (root_constraint.cmp(db, constraint)) == Ordering::Greater
+            })
         );
         if if_true == if_false {
             return if_true;
@@ -858,7 +865,7 @@ impl<'db> InteriorNode<'db> {
     fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
+        match self_constraint.cmp(db, other_constraint) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
@@ -884,7 +891,7 @@ impl<'db> InteriorNode<'db> {
     fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
+        match self_constraint.cmp(db, other_constraint) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
@@ -910,7 +917,7 @@ impl<'db> InteriorNode<'db> {
     fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
+        match self_constraint.cmp(db, other_constraint) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
@@ -942,7 +949,7 @@ impl<'db> InteriorNode<'db> {
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_constraint = self.constraint(db);
-        if assignment.constraint() < self_constraint {
+        if assignment.constraint().cmp(db, self_constraint) == Ordering::Less {
             return (Node::Interior(self), false);
         }
 
