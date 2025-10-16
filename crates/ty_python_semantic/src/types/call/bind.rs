@@ -34,7 +34,7 @@ use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, UnionBuilder, UnionType, ValidSpecializationsConstraintSet,
+    TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -601,13 +601,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
                                     ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
-                                let valid_specializations = (ty_a.valid_specializations(db))
-                                    .and(db, || ty_b.valid_specializations(db));
-                                let result = ValidSpecializationsConstraintSet::new(
-                                    db,
-                                    Some(valid_specializations),
-                                    constraints,
-                                );
+                                let result = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(result),
                                 ));
@@ -618,13 +612,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
                                     ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
-                                let valid_specializations = (ty_a.valid_specializations(db))
-                                    .and(db, || ty_b.valid_specializations(db));
-                                let result = ValidSpecializationsConstraintSet::new(
-                                    db,
-                                    Some(valid_specializations),
-                                    constraints,
-                                );
+                                let result = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(result),
                                 ));
@@ -635,13 +623,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
                                     ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
-                                let valid_specializations = (ty_a.valid_specializations(db))
-                                    .and(db, || ty_b.valid_specializations(db));
-                                let result = ValidSpecializationsConstraintSet::new(
-                                    db,
-                                    Some(valid_specializations),
-                                    constraints,
-                                );
+                                let result = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(result),
                                 ));
@@ -652,13 +634,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
                                     ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
-                                let valid_specializations = (ty_a.valid_specializations(db))
-                                    .and(db, || ty_b.valid_specializations(db));
-                                let result = ValidSpecializationsConstraintSet::new(
-                                    db,
-                                    Some(valid_specializations),
-                                    constraints,
-                                );
+                                let result = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(result),
                                 ));

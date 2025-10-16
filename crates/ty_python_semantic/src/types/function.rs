@@ -82,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, ValidSpecializationsConstraintSet, binding_type, todo_type, walk_signature,
+    NormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext,
+    TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1706,7 +1706,7 @@ impl KnownFunction {
                 };
 
                 let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
-                let result = ValidSpecializationsConstraintSet::new(db, None, constraints);
+                let result = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     result,
                 )));
@@ -1719,7 +1719,7 @@ impl KnownFunction {
                 };
 
                 let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
-                let result = ValidSpecializationsConstraintSet::new(db, None, constraints);
+                let result = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     result,
                 )));

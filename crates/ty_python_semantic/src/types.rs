@@ -4522,9 +4522,11 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) => {
-                Truthiness::from(constraints.holds_for_all_valid_specializations(db))
-            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => Truthiness::from(
+                tracked_set
+                    .constraints(db)
+                    .satisfies_all_typevars(db, InferableTypeVars::None),
+            ),
 
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -7291,39 +7293,19 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// A constraint set, along with the valid specializations of a list of typevars.
+// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
+/// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
+/// constraint sets to check things like assignability; they're only used as a debugging aid in
+/// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct ValidSpecializationsConstraintSet<'db> {
-    #[returns(as_ref)]
-    valid_specializations: Option<ConstraintSet<'db>>,
-
+pub struct TrackedConstraintSet<'db> {
     #[returns(ref)]
     constraints: ConstraintSet<'db>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for ValidSpecializationsConstraintSet<'_> {}
-
-impl<'db> ValidSpecializationsConstraintSet<'db> {
-    fn limit_to_valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
-        let constraints = self.constraints(db);
-        let Some(valid_specializations) = self.valid_specializations(db) else {
-            return *constraints;
-        };
-        constraints.and(db, || *valid_specializations)
-    }
-
-    fn holds_for_all_valid_specializations(self, db: &'db dyn Db) -> bool {
-        let constraints = self.constraints(db);
-        match self.valid_specializations(db) {
-            Some(valid_specializations) => valid_specializations
-                .implies(db, || *self.constraints(db))
-                .is_always_satisfied(),
-            _ => constraints.is_always_satisfied(),
-        }
-    }
-}
+impl get_size2::GetSize for TrackedConstraintSet<'_> {}
 
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`NominalInstanceType`].
@@ -7370,7 +7352,7 @@ pub enum KnownInstanceType<'db> {
 
     /// A constraint set, which is exposed in mdtests as an instance of
     /// `ty_extensions.ConstraintSet`.
-    ConstraintSet(ValidSpecializationsConstraintSet<'db>),
+    ConstraintSet(TrackedConstraintSet<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7509,19 +7491,11 @@ impl<'db> KnownInstanceType<'db> {
                             eprintln!("==> combined    {}", combined.display(self.db));
                         }
                         */
-                        let constraints = tracked_set.limit_to_valid_specializations(self.db);
+                        let constraints = tracked_set.constraints(self.db);
                         if constraints.is_always_satisfied() {
                             f.write_str("ty_extensions.ConstraintSet[always]")
                         } else if constraints.is_never_satisfied() {
                             f.write_str("ty_extensions.ConstraintSet[never]")
-                        } else if tracked_set.valid_specializations(self.db).is_some() {
-                            let is_valid = tracked_set.holds_for_all_valid_specializations(self.db);
-                            write!(
-                                f,
-                                "ty_extensions.ConstraintSet[{} valid specializations: {}]",
-                                if is_valid { "all" } else { "some" },
-                                constraints.display(self.db)
-                            )
                         } else {
                             write!(
                                 f,
