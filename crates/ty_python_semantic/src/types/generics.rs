@@ -1,8 +1,9 @@
-use std::marker::PhantomData;
+use std::cell::RefCell;
+use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast as ast;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
@@ -14,14 +15,16 @@ use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -106,7 +109,6 @@ pub(crate) fn typing_self<'db>(
     scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
-    typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
 ) -> Option<Type<'db>> {
     let index = semantic_index(db, scope_id.file(db));
 
@@ -118,7 +120,7 @@ pub(crate) fn typing_self<'db>(
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(
         db,
-        class.identity_specialization(db, typevar_to_type),
+        class.identity_specialization(db),
     ));
     let typevar = TypeVarInstance::new(
         db,
@@ -138,17 +140,70 @@ pub(crate) fn typing_self<'db>(
         typevar_binding_context,
         typevar,
     )
-    .map(typevar_to_type)
+    .map(Type::TypeVar)
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum InferableTypeVars<'a, 'db> {
     None,
-    // TODO: This variant isn't used, and only exists so that we can include the 'a and 'db in the
-    // type definition. They will be used soon when we start creating real InferableTypeVars
-    // instances.
-    #[expect(unused)]
-    Unused(PhantomData<&'a &'db ()>),
+    One(&'a FxHashSet<BoundTypeVarIdentity<'db>>),
+    Two(
+        &'a InferableTypeVars<'a, 'db>,
+        &'a InferableTypeVars<'a, 'db>,
+    ),
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn is_inferable(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        match inferable {
+            InferableTypeVars::None => false,
+            InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
+            InferableTypeVars::Two(left, right) => {
+                self.is_inferable(db, *left) || self.is_inferable(db, *right)
+            }
+        }
+    }
+}
+
+impl<'a, 'db> InferableTypeVars<'a, 'db> {
+    pub(crate) fn merge(&'a self, other: Option<&'a InferableTypeVars<'a, 'db>>) -> Self {
+        match other {
+            Some(other) => InferableTypeVars::Two(self, other),
+            None => *self,
+        }
+    }
+
+    // Keep this around for debugging purposes
+    #[expect(dead_code)]
+    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
+        fn find_typevars<'db>(
+            result: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
+            inferable: &InferableTypeVars<'_, 'db>,
+        ) {
+            match inferable {
+                InferableTypeVars::None => {}
+                InferableTypeVars::One(typevars) => result.extend(typevars.iter().copied()),
+                InferableTypeVars::Two(left, right) => {
+                    find_typevars(result, left);
+                    find_typevars(result, right);
+                }
+            }
+        }
+
+        let mut typevars = FxHashSet::default();
+        find_typevars(&mut typevars, self);
+        format!(
+            "[{}]",
+            typevars
+                .into_iter()
+                .map(|identity| identity.display(db))
+                .format(", ")
+        )
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -253,6 +308,66 @@ impl<'db> GenericContext<'db> {
                 .chain(other.variables_inner(db).values())
                 .copied(),
         )
+    }
+
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+        #[derive(Default)]
+        struct CollectTypeVars<'db> {
+            typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars
+                    .borrow_mut()
+                    .insert(bound_typevar.identity(db));
+                walk_bound_type_var_type(db, bound_typevar, self);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
+                            // If we have already seen this type, we can skip it.
+                            return;
+                        }
+                        walk_non_atomic_type(db, non_atomic_type, self);
+                    }
+                }
+            }
+        }
+
+        #[salsa::tracked(
+            returns(ref),
+            cycle_fn=inferable_typevars_cycle_recover,
+            cycle_initial=inferable_typevars_cycle_initial,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn inferable_typevars_inner<'db>(
+            db: &'db dyn Db,
+            generic_context: GenericContext<'db>,
+        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+            let visitor = CollectTypeVars::default();
+            for bound_typevar in generic_context.variables(db) {
+                visitor.visit_bound_type_var_type(db, bound_typevar);
+            }
+            visitor.typevars.into_inner()
+        }
+
+        // This ensures that salsa caches the FxHashSet, not the InferableTypeVars that wraps it.
+        // (That way InferableTypeVars can contain references, and doesn't need to impl
+        // salsa::Update.)
+        InferableTypeVars::One(inferable_typevars_inner(db, self))
     }
 
     pub(crate) fn variables(
@@ -410,14 +525,8 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
-    /// The second parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on
-    /// the use case.
-    pub(crate) fn identity_specialization(
-        self,
-        db: &'db dyn Db,
-        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
-    ) -> Specialization<'db> {
-        let types = self.variables(db).map(typevar_to_type).collect();
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        let types = self.variables(db).map(Type::TypeVar).collect();
         self.specialize(db, types)
     }
 
@@ -541,6 +650,22 @@ impl<'db> GenericContext<'db> {
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
+}
+
+fn inferable_typevars_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &FxHashSet<BoundTypeVarIdentity<'db>>,
+    _count: u32,
+    _self: GenericContext<'db>,
+) -> salsa::CycleRecoveryAction<FxHashSet<BoundTypeVarIdentity<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn inferable_typevars_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: GenericContext<'db>,
+) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+    FxHashSet::default()
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -1357,7 +1482,9 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar)) => {
+            (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
+                if bound_typevar.is_inferable(self.db, self.inferable) =>
+            {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty

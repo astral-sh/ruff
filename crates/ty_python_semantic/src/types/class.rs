@@ -1627,15 +1627,10 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
-    /// Returns a specialization of this class where each typevar is mapped to itself. The second
-    /// parameter can be `Type::TypeVar` or `Type::NonInferableTypeVar`, depending on the use case.
-    pub(crate) fn identity_specialization(
-        self,
-        db: &'db dyn Db,
-        typevar_to_type: &impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
-    ) -> ClassType<'db> {
+    /// Returns a specialization of this class where each typevar is mapped to itself.
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.identity_specialization(db, typevar_to_type)
+            generic_context.identity_specialization(db)
         })
     }
 

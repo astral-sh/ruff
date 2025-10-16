@@ -3617,7 +3617,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::NonInferableTypeVar(..)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -5513,6 +5512,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Retrieve the parameter type for the current argument in a given overload and its binding.
+            let db = self.db();
             let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
                 let argument_index = if binding.bound_type.is_some() {
                     argument_index + 1
@@ -5525,7 +5525,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 };
 
-                overload.signature.parameters()[*parameter_index].annotated_type()
+                let parameter_type =
+                    overload.signature.parameters()[*parameter_index].annotated_type()?;
+
+                // TODO: For now, skip any parameter annotations that mention any typevars. There
+                // are two issues:
+                //
+                // First, if we include those typevars in the type context that we use to infer the
+                // corresponding argument type, the typevars might end up appearing in the inferred
+                // argument type as well. As part of analyzing this call, we're going to (try to)
+                // infer a specialization of those typevars, and would need to substitute those
+                // typevars in the inferred argument type. We can't do that easily at the moment,
+                // since specialization inference occurs _after_ we've inferred argument types, and
+                // we can't _update_ an expression's inferred type after the fact.
+                //
+                // Second, certain kinds of arguments themselves have typevars that we need to
+                // infer specializations for. (For instance, passing the result of _another_  call
+                // to the argument of _this_ call, where both are calls to generic functions.) In
+                // that case, we want to "tie together" the typevars of the two calls so that we
+                // can infer their specializations at the same time — or at least, for the
+                // specialization of one to influence the specialization of the other. It's not yet
+                // clear how we're going to do that. (We might have to start inferring constraint
+                // sets for each expression, instead of simple types?)
+                //
+                // Regardless, for now, the expedient "solution" is to not perform bidi type
+                // checking for these kinds of parameters.
+                if parameter_type.has_typevar(db) {
+                    return None;
+                }
+
+                Some(parameter_type)
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with
@@ -5910,11 +5939,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
-        // TODO: Use the list of inferable typevars from the generic context of tuple.
-        let inferable = InferableTypeVars::None;
-
         // Remove any union elements of that are unrelated to the tuple type.
         let tcx = tcx.map(|annotation| {
+            let inferable = KnownClass::Tuple
+                .try_to_class_literal(self.db())
+                .and_then(|class| class.generic_context(self.db()))
+                .map(|generic_context| generic_context.inferable_typevars(self.db()))
+                .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
                 self.db(),
                 KnownClass::Tuple.to_instance(self.db()),
@@ -6057,10 +6088,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let elt_tys = |collection_class: KnownClass| {
             let class_literal = collection_class.try_to_class_literal(self.db())?;
             let generic_context = class_literal.generic_context(self.db())?;
-            Some((class_literal, generic_context.variables(self.db())))
+            Some((
+                class_literal,
+                generic_context,
+                generic_context.variables(self.db()),
+            ))
         };
 
-        let Some((class_literal, elt_tys)) = elt_tys(collection_class) else {
+        let Some((class_literal, generic_context, elt_tys)) = elt_tys(collection_class) else {
             // Infer the element types without type context, and fallback to unknown for
             // custom typesheds.
             for elt in elts.flatten().flatten() {
@@ -6070,9 +6105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        // TODO: Use the list of inferable typevars from the generic context of the collection
-        // class.
-        let inferable = InferableTypeVars::None;
+        let inferable = generic_context.inferable_typevars(self.db());
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -6154,7 +6187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let class_type = class_literal.apply_specialization(self.db(), |generic_context| {
+        let class_type = class_literal.apply_specialization(self.db(), |_| {
             builder.build(generic_context, TypeContext::default())
         });
 
@@ -7732,7 +7765,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
-                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -8119,7 +8151,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
-                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -8149,7 +8180,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
-                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),

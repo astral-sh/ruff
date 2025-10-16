@@ -2589,7 +2589,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
-        // TODO: Use the list of inferable typevars from the generic context of the callable.
+        self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
         let parameters = self.signature.parameters();

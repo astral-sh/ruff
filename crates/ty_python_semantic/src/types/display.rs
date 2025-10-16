@@ -560,9 +560,7 @@ impl Display for DisplayRepresentation<'_> {
                     .display_with(self.db, self.settings.clone()),
                 literal_name = enum_literal.name(self.db)
             ),
-            Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                bound_typevar.identity(self.db).display(self.db).fmt(f)
-            }
+            Type::TypeVar(bound_typevar) => bound_typevar.identity(self.db).display(self.db).fmt(f),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
