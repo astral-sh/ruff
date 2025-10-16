@@ -237,7 +237,7 @@ jobs:
 
   cargo-test-linux:
     name: "cargo test (linux)"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -299,7 +299,7 @@ jobs:
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -332,7 +332,7 @@ jobs:
 
   cargo-test-windows:
     name: "cargo test (windows)"
-    runs-on: depot-windows-2022-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -424,7 +424,7 @@ jobs:
 
   cargo-build-msrv:
     name: "cargo build (msrv)"
-    runs-on: depot-ubuntu-latest-8
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -538,7 +538,7 @@ jobs:
 
   ecosystem:
     name: "ecosystem"
-    runs-on: depot-ubuntu-latest-8
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
     needs:
       - cargo-test-linux
       - determine_changes
@@ -663,7 +663,7 @@ jobs:
 
   fuzz-ty:
     name: "Fuzz for new ty panics"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs:
       - cargo-test-linux
       - determine_changes
@@ -723,7 +723,7 @@ jobs:
 
   ty-completion-evaluation:
     name: "ty completion evaluation"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main' }}
     steps:
@@ -769,7 +769,7 @@ jobs:
 
   pre-commit:
     name: "pre-commit"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -943,8 +943,12 @@ jobs:
     runs-on: ubuntu-24.04
     needs: determine_changes
     if: |
-      github.ref == 'refs/heads/main' ||
-      (needs.determine_changes.outputs.formatter == 'true' || needs.determine_changes.outputs.linter == 'true')
+      github.repository == 'astral-sh/ruff' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        needs.determine_changes.outputs.formatter == 'true' ||
+        needs.determine_changes.outputs.linter == 'true'
+      )
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
@@ -978,8 +982,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: determine_changes
     if: |
-      github.ref == 'refs/heads/main' ||
-      needs.determine_changes.outputs.ty == 'true'
+      github.repository == 'astral-sh/ruff' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        needs.determine_changes.outputs.ty == 'true'
+      )
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
