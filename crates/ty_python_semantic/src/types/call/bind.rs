@@ -24,7 +24,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
-    DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionType,
+    KnownFunction, OverloadLiteral,
 };
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
@@ -32,9 +33,9 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
+    BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType,
+    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -135,6 +136,7 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: &TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
         for element in &mut self.elements {
             if let Some(mut updated_argument_forms) =
@@ -147,7 +149,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db);
+        self.evaluate_known_cases(db, dataclass_field_specifiers);
 
         // In order of precedence:
         //
@@ -269,7 +271,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db, dataclass_field_specifiers: &[Type<'db>]) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -596,6 +598,70 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    function @ Type::FunctionLiteral(function_type)
+                        if dataclass_field_specifiers.contains(&function)
+                            || function_type.is_known(db, KnownFunction::Field) =>
+                    {
+                        let has_default_value = overload
+                            .parameter_type_by_name("default", false)
+                            .is_ok_and(|ty| ty.is_some())
+                            || overload
+                                .parameter_type_by_name("default_factory", false)
+                                .is_ok_and(|ty| ty.is_some())
+                            || overload
+                                .parameter_type_by_name("factory", false)
+                                .is_ok_and(|ty| ty.is_some());
+
+                        let init = overload
+                            .parameter_type_by_name("init", true)
+                            .unwrap_or(None);
+                        let kw_only = overload
+                            .parameter_type_by_name("kw_only", true)
+                            .unwrap_or(None);
+
+                        // `dataclasses.field` and field-specifier functions of commonly used
+                        // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
+                        // the default type for the field (or `Any`) instead of an actual `Field`
+                        // instance, even if this is not what happens at runtime (see also below).
+                        // We still make use of this fact and pretend that all field specifiers
+                        // return the type of the default value:
+                        let default_ty = if has_default_value {
+                            Some(overload.return_ty)
+                        } else {
+                            None
+                        };
+
+                        let init = init
+                            .map(|init| !init.bool(db).is_always_false())
+                            .unwrap_or(true);
+
+                        let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
+                        {
+                            match kw_only {
+                                // We are more conservative here when turning the type for `kw_only`
+                                // into a bool, because a field specifier in a stub might use
+                                // `kw_only: bool = ...` and the truthiness of `...` is always true.
+                                // This is different from `init` above because may need to fall back
+                                // to `kw_only_default`, whereas `init_default` does not exist.
+                                Some(Type::BooleanLiteral(yes)) => Some(yes),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        // `typeshed` pretends that `dataclasses.field()` returns the type of the
+                        // default value directly. At runtime, however, this function returns an
+                        // instance of `dataclasses.Field`. We also model it this way and return
+                        // a known-instance type with information about the field. The drawback
+                        // of this approach is that we need to pretend that instances of `Field`
+                        // are assignable to `T` if the default type of the field is assignable
+                        // to `T`. Otherwise, we would error on `name: str = field(default="")`.
+                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
+                            FieldInstance::new(db, default_ty, init, kw_only),
+                        )));
+                    }
+
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
@@ -871,42 +937,44 @@ impl<'db> Bindings<'db> {
                                 weakref_slot,
                             ] = overload.parameter_types()
                             {
-                                let mut params = DataclassParams::empty();
+                                let mut flags = DataclassFlags::empty();
 
                                 if to_bool(init, true) {
-                                    params |= DataclassParams::INIT;
+                                    flags |= DataclassFlags::INIT;
                                 }
                                 if to_bool(repr, true) {
-                                    params |= DataclassParams::REPR;
+                                    flags |= DataclassFlags::REPR;
                                 }
                                 if to_bool(eq, true) {
-                                    params |= DataclassParams::EQ;
+                                    flags |= DataclassFlags::EQ;
                                 }
                                 if to_bool(order, false) {
-                                    params |= DataclassParams::ORDER;
+                                    flags |= DataclassFlags::ORDER;
                                 }
                                 if to_bool(unsafe_hash, false) {
-                                    params |= DataclassParams::UNSAFE_HASH;
+                                    flags |= DataclassFlags::UNSAFE_HASH;
                                 }
                                 if to_bool(frozen, false) {
-                                    params |= DataclassParams::FROZEN;
+                                    flags |= DataclassFlags::FROZEN;
                                 }
                                 if to_bool(match_args, true) {
-                                    params |= DataclassParams::MATCH_ARGS;
+                                    flags |= DataclassFlags::MATCH_ARGS;
                                 }
                                 if to_bool(kw_only, false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                        params |= DataclassParams::KW_ONLY;
+                                        flags |= DataclassFlags::KW_ONLY;
                                     } else {
                                         // TODO: emit diagnostic
                                     }
                                 }
                                 if to_bool(slots, false) {
-                                    params |= DataclassParams::SLOTS;
+                                    flags |= DataclassFlags::SLOTS;
                                 }
                                 if to_bool(weakref_slot, false) {
-                                    params |= DataclassParams::WEAKREF_SLOT;
+                                    flags |= DataclassFlags::WEAKREF_SLOT;
                                 }
+
+                                let params = DataclassParams::from_flags(db, flags);
 
                                 overload.set_return_type(Type::DataclassDecorator(params));
                             }
@@ -915,7 +983,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(Type::ClassLiteral(class_literal))] =
                                 overload.parameter_types()
                             {
-                                let params = DataclassParams::default();
+                                let params = DataclassParams::default_params(db);
                                 overload.set_return_type(Type::from(ClassLiteral::new(
                                     db,
                                     class_literal.name(db),
@@ -938,80 +1006,37 @@ impl<'db> Bindings<'db> {
                                 _kwargs,
                             ] = overload.parameter_types()
                             {
-                                let mut params = DataclassTransformerParams::empty();
+                                let mut flags = DataclassTransformerFlags::empty();
 
                                 if to_bool(eq_default, true) {
-                                    params |= DataclassTransformerParams::EQ_DEFAULT;
+                                    flags |= DataclassTransformerFlags::EQ_DEFAULT;
                                 }
                                 if to_bool(order_default, false) {
-                                    params |= DataclassTransformerParams::ORDER_DEFAULT;
+                                    flags |= DataclassTransformerFlags::ORDER_DEFAULT;
                                 }
                                 if to_bool(kw_only_default, false) {
-                                    params |= DataclassTransformerParams::KW_ONLY_DEFAULT;
+                                    flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
                                 }
                                 if to_bool(frozen_default, false) {
-                                    params |= DataclassTransformerParams::FROZEN_DEFAULT;
+                                    flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
                                 }
 
-                                if let Some(field_specifiers_type) = field_specifiers {
-                                    // For now, we'll do a simple check: if field_specifiers is not
-                                    // None/empty, we assume it might contain dataclasses.field
-                                    // TODO: Implement proper parsing to check for
-                                    //   dataclasses.field/Field specifically
-                                    if !field_specifiers_type.is_none(db) {
-                                        params |= DataclassTransformerParams::FIELD_SPECIFIERS;
-                                    }
-                                }
+                                let field_specifiers: Box<[Type<'db>]> = field_specifiers
+                                    .map(|tuple_type| {
+                                        tuple_type
+                                            .exact_tuple_instance_spec(db)
+                                            .iter()
+                                            .flat_map(|tuple_spec| tuple_spec.fixed_elements())
+                                            .copied()
+                                            .collect()
+                                    })
+                                    .unwrap_or_default();
+
+                                let params =
+                                    DataclassTransformerParams::new(db, flags, field_specifiers);
 
                                 overload.set_return_type(Type::DataclassTransformer(params));
                             }
-                        }
-
-                        Some(KnownFunction::Field) => {
-                            let default =
-                                overload.parameter_type_by_name("default").unwrap_or(None);
-                            let default_factory = overload
-                                .parameter_type_by_name("default_factory")
-                                .unwrap_or(None);
-                            let init = overload.parameter_type_by_name("init").unwrap_or(None);
-                            let kw_only =
-                                overload.parameter_type_by_name("kw_only").unwrap_or(None);
-
-                            // `dataclasses.field` and field-specifier functions of commonly used
-                            // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
-                            // the default type for the field (or `Any`) instead of an actual `Field`
-                            // instance, even if this is not what happens at runtime (see also below).
-                            // We still make use of this fact and pretend that all field specifiers
-                            // return the type of the default value:
-                            let default_ty = if default.is_some() || default_factory.is_some() {
-                                Some(overload.return_ty)
-                            } else {
-                                None
-                            };
-
-                            let init = init
-                                .map(|init| !init.bool(db).is_always_false())
-                                .unwrap_or(true);
-
-                            let kw_only =
-                                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                    kw_only.map(|kw_only| !kw_only.bool(db).is_always_false())
-                                } else {
-                                    None
-                                };
-
-                            // `typeshed` pretends that `dataclasses.field()` returns the type of the
-                            // default value directly. At runtime, however, this function returns an
-                            // instance of `dataclasses.Field`. We also model it this way and return
-                            // a known-instance type with information about the field. The drawback
-                            // of this approach is that we need to pretend that instances of `Field`
-                            // are assignable to `T` if the default type of the field is assignable
-                            // to `T`. Otherwise, we would error on `name: str = field(default="")`.
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::Field(FieldInstance::new(
-                                    db, default_ty, init, kw_only,
-                                )),
-                            ));
                         }
 
                         _ => {
@@ -1030,36 +1055,41 @@ impl<'db> Bindings<'db> {
                                             // the argument type and overwrite the corresponding flag in `dataclass_params` after
                                             // constructing them from the `dataclass_transformer`-parameter defaults.
 
-                                            let mut dataclass_params =
-                                                DataclassParams::from(params);
+                                            let dataclass_params =
+                                                DataclassParams::from_transformer_params(
+                                                    db, params,
+                                                );
+                                            let mut flags = dataclass_params.flags(db);
 
                                             if let Ok(Some(Type::BooleanLiteral(order))) =
-                                                overload.parameter_type_by_name("order")
+                                                overload.parameter_type_by_name("order", false)
                                             {
-                                                dataclass_params.set(DataclassParams::ORDER, order);
+                                                flags.set(DataclassFlags::ORDER, order);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(eq))) =
-                                                overload.parameter_type_by_name("eq")
+                                                overload.parameter_type_by_name("eq", false)
                                             {
-                                                dataclass_params.set(DataclassParams::EQ, eq);
+                                                flags.set(DataclassFlags::EQ, eq);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(kw_only))) =
-                                                overload.parameter_type_by_name("kw_only")
+                                                overload.parameter_type_by_name("kw_only", false)
                                             {
-                                                dataclass_params
-                                                    .set(DataclassParams::KW_ONLY, kw_only);
+                                                flags.set(DataclassFlags::KW_ONLY, kw_only);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(frozen))) =
-                                                overload.parameter_type_by_name("frozen")
+                                                overload.parameter_type_by_name("frozen", false)
                                             {
-                                                dataclass_params
-                                                    .set(DataclassParams::FROZEN, frozen);
+                                                flags.set(DataclassFlags::FROZEN, frozen);
                                             }
 
-                                            Type::DataclassDecorator(dataclass_params)
+                                            Type::DataclassDecorator(DataclassParams::new(
+                                                db,
+                                                flags,
+                                                dataclass_params.field_specifiers(db),
+                                            ))
                                         },
                                     )
                                 })
@@ -2843,6 +2873,7 @@ impl<'db> MatchedArgument<'db> {
 }
 
 /// Indicates that a parameter of the given name was not found.
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct UnknownParameterNameError;
 
 /// Binding information for one of the overloads of a callable.
@@ -2993,15 +3024,24 @@ impl<'db> Binding<'db> {
     pub(crate) fn parameter_type_by_name(
         &self,
         parameter_name: &str,
+        fallback_to_default: bool,
     ) -> Result<Option<Type<'db>>, UnknownParameterNameError> {
-        let index = self
-            .signature
-            .parameters()
+        let parameters = self.signature.parameters();
+
+        let index = parameters
             .keyword_by_name(parameter_name)
             .map(|(i, _)| i)
             .ok_or(UnknownParameterNameError)?;
 
-        Ok(self.parameter_tys[index])
+        let parameter_ty = self.parameter_tys[index];
+
+        if parameter_ty.is_some() {
+            Ok(parameter_ty)
+        } else if fallback_to_default {
+            Ok(parameters[index].default_type())
+        } else {
+            Ok(None)
+        }
     }
 
     pub(crate) fn arguments_for_parameter<'a>(
