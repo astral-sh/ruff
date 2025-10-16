@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_text_size::Ranged;
-use ruff_python_ast::visitor::{walk_stmt, walk_expr, Visitor};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -55,7 +55,7 @@ fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
     struct YieldFinder {
         found: bool,
     }
-    
+
     impl Visitor<'_> for YieldFinder {
         fn visit_expr(&mut self, expr: &ast::Expr) {
             if matches!(expr, ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
@@ -65,7 +65,7 @@ fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
             }
         }
     }
-    
+
     let mut finder = YieldFinder { found: false };
     for stmt in body {
         walk_stmt(&mut finder, stmt);
@@ -89,7 +89,7 @@ pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRai
             }
         }
     }
-    
+
     if !in_generator_function {
         return;
     }
