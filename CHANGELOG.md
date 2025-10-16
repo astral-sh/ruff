@@ -6,7 +6,7 @@ Released on 2025-10-16.
 
 ### Preview features
 
-- Remove parentheses around multiple exception types on Python 3.14+ ([#20768](https://github.com/astral-sh/ruff/pull/20768))
+- [formatter] Remove parentheses around multiple exception types on Python 3.14+ ([#20768](https://github.com/astral-sh/ruff/pull/20768))
 - \[`flake8-bugbear`\] Omit annotation in preview fix for `B006` ([#20877](https://github.com/astral-sh/ruff/pull/20877))
 - \[`flake8-logging-format`\] Avoid dropping implicitly concatenated pieces in the `G004` fix ([#20793](https://github.com/astral-sh/ruff/pull/20793))
 - \[`pydoclint`\] Implement `docstring-extraneous-parameter` (`DOC102`) ([#20376](https://github.com/astral-sh/ruff/pull/20376))
@@ -26,8 +26,7 @@ Released on 2025-10-16.
 
 - \[`airflow`\] Add warning to `airflow.datasets.DatasetEvent` usage (`AIR301`) ([#20551](https://github.com/astral-sh/ruff/pull/20551))
 - \[`flake8-bugbear`\] Mark `B905` and `B912` fixes as unsafe ([#20695](https://github.com/astral-sh/ruff/pull/20695))
-- \[`ruff`\] Use DiagnosticTag for more flake8 and numpy rules ([#20758](https://github.com/astral-sh/ruff/pull/20758))
-- \[`ruff`\] Use `DiagnosticTag` for more pyupgrade rules ([#20734](https://github.com/astral-sh/ruff/pull/20734))
+- Use `DiagnosticTag` for more rules - changes display in editors ([#20758](https://github.com/astral-sh/ruff/pull/20758),[#20734](https://github.com/astral-sh/ruff/pull/20734))
 
 ### Documentation
 
@@ -35,11 +34,11 @@ Released on 2025-10-16.
 - Update `lint.flake8-type-checking.quoted-annotations` docs ([#20765](https://github.com/astral-sh/ruff/pull/20765))
 - Update setup instructions for Zed 0.208.0+ ([#20902](https://github.com/astral-sh/ruff/pull/20902))
 - \[`flake8-datetimez`\] Clarify docs for several rules ([#20778](https://github.com/astral-sh/ruff/pull/20778))
-- fix(docs): Fix typo in `RUF015` description ([#20873](https://github.com/astral-sh/ruff/pull/20873))
+- Fix typo in `RUF015` description ([#20873](https://github.com/astral-sh/ruff/pull/20873))
 
 ### Other changes
 
-- Enable lto=fat ([#20863](https://github.com/astral-sh/ruff/pull/20863))
+- Reduce binary size ([#20863](https://github.com/astral-sh/ruff/pull/20863))
 - Improved error recovery for unclosed strings (including f- and t-strings) ([#20848](https://github.com/astral-sh/ruff/pull/20848))
 
 ### Contributors
