@@ -128,17 +128,13 @@ from typing import Literal
 class C:
     pass
 
-def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
+def _(x: Literal["foo", b"bar"] | int):
     match x:
-        case "foo" if reveal_type(x):  # revealed: Literal["foo"] | int | float | complex
+        case "foo" if reveal_type(x):  # revealed: Literal["foo"] | int
             pass
-        case 42 if reveal_type(x):  # revealed: int | float | complex
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
             pass
-        case 6.0 if reveal_type(x):  # revealed: Literal["foo", "bar", b"foo"] | int | float | complex
-            pass
-        case 1j if reveal_type(x):  # revealed: Literal["foo", "bar", b"foo"] | int | float | complex
-            pass
-        case b"foo" if reveal_type(x):  # revealed: int | Literal[b"foo"] | float | complex
+        case 42 if reveal_type(x):  # revealed: int
             pass
 ```
 
@@ -146,18 +142,54 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
 
 ```py
 from typing import Literal
+from enum import Enum
 
-def _(x: Literal["foo", "bar", 42] | bool | float | None):
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def _(color: Color):
+    match color:
+        case Color.RED | Color.GREEN:
+            reveal_type(color)  # revealed: Literal[Color.RED, Color.GREEN]
+        case Color.BLUE:
+            reveal_type(color)  # revealed: Literal[Color.BLUE]
+
+    match color:
+        case Color.RED | Color.GREEN | Color.BLUE:
+            reveal_type(color)  # revealed: Color
+
+    match color:
+        case Color.RED:
+            reveal_type(color)  # revealed: Literal[Color.RED]
+        case _:
+            reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
     match x:
-        case "foo" | 42 | None:
-            reveal_type(x)  # revealed: Literal["foo"] | int | float | None
-        case "foo" | tuple():
-            reveal_type(x)  # revealed: (int & ~Literal[42]) | float
-        case True | False:
-            reveal_type(x)  # revealed: bool
-        case 3.14 | 2.718 | 1.414:
-            # revealed: Literal["bar"] | (int & ~Literal[42] & ~Literal[True] & ~Literal[False]) | float
-            reveal_type(x)
+        case A() | B():
+            reveal_type(x)  # revealed: A | B
+        case C():
+            reveal_type(x)  # revealed: C & ~A & ~B
+        case _:
+            reveal_type(x)  # revealed: Never
+
+    match x:
+        case A() | B() | C():
+            reveal_type(x)  # revealed: A | B | C
+        case _:
+            reveal_type(x)  # revealed: Never
+
+    match x:
+        case A():
+            reveal_type(x)  # revealed: A
+        case _:
+            reveal_type(x)  # revealed: (B & ~A) | (C & ~A)
 ```
 
 ## Or patterns with guard
@@ -165,15 +197,13 @@ def _(x: Literal["foo", "bar", 42] | bool | float | None):
 ```py
 from typing import Literal
 
-def _(x: Literal["foo", "bar", 42] | bool | float | None):
+def _(x: Literal["foo", b"bar"] | int):
     match x:
-        case "foo" | 42 | None if reveal_type(x):  # revealed: Literal["foo"] | int | float | None
+        case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo"] | int
             pass
-        case "foo" | tuple() if reveal_type(x):  # revealed: Literal["foo"] | int | float
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
             pass
-        case True | False if reveal_type(x):  # revealed: bool
-            pass
-        case 3.14 | 2.718 | 1.414 if reveal_type(x):  # revealed: Literal["foo", "bar"] | int | float | None
+        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
             pass
 ```
 
