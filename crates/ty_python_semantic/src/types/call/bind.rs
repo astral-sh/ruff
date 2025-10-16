@@ -602,10 +602,10 @@ impl<'db> Bindings<'db> {
                         if dataclass_field_specifiers.contains(&function)
                             || function_type.is_known(db, KnownFunction::Field) =>
                     {
-                        let default = overload.parameter_type_by_name("default").unwrap_or(None);
-                        let default_factory = overload
-                            .parameter_type_by_name("default_factory")
-                            .unwrap_or(None);
+                        let has_default_value = overload.parameter_type_by_name("default").is_ok()
+                            || overload.parameter_type_by_name("default_factory").is_ok()
+                            || overload.parameter_type_by_name("factory").is_ok();
+
                         let init = overload.parameter_type_by_name("init").unwrap_or(None);
                         let kw_only = overload.parameter_type_by_name("kw_only").unwrap_or(None);
 
@@ -615,7 +615,7 @@ impl<'db> Bindings<'db> {
                         // instance, even if this is not what happens at runtime (see also below).
                         // We still make use of this fact and pretend that all field specifiers
                         // return the type of the default value:
-                        let default_ty = if default.is_some() || default_factory.is_some() {
+                        let default_ty = if has_default_value {
                             Some(overload.return_ty)
                         } else {
                             None
