@@ -6,7 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::Type;
+use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
@@ -20,7 +20,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model).map(HoverContent::Type);
+    let ty = goto_target.inferred_type(&model);
     let docs = goto_target
         .get_definition_targets(
             file,
@@ -30,13 +30,25 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         .and_then(|definitions| definitions.docstring(db))
         .map(HoverContent::Docstring);
 
-    if let Some(HoverContent::Type(ty)) = ty {
-        tracing::debug!("Inferred type of covering node is {}", ty.display(db));
-    }
-
     // TODO: Render the symbol's signature instead of just its type.
     let mut contents = Vec::new();
-    contents.extend(ty);
+    if let Some(ty) = ty {
+        tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+        contents.push(match ty {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
+                .bind_pep695(db)
+                .map_or(HoverContent::Type(ty, None), |typevar| {
+                    HoverContent::Type(
+                        Type::NonInferableTypeVar(typevar),
+                        Some(typevar.variance(db)),
+                    )
+                }),
+            Type::TypeVar(typevar) | Type::NonInferableTypeVar(typevar) => {
+                HoverContent::Type(ty, Some(typevar.variance(db)))
+            }
+            _ => HoverContent::Type(ty, None),
+        });
+    }
     contents.extend(docs);
 
     if contents.is_empty() {
@@ -110,7 +122,7 @@ impl fmt::Display for DisplayHover<'_> {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HoverContent<'db> {
-    Type(Type<'db>),
+    Type(Type<'db>, Option<TypeVarVariance>),
     Docstring(Docstring),
 }
 
@@ -133,13 +145,24 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
-            HoverContent::Type(ty) => self
-                .kind
-                .fenced_code_block(
-                    ty.display_with(self.db, DisplaySettings::default().multiline()),
-                    "python",
-                )
-                .fmt(f),
+            HoverContent::Type(ty, variance) => {
+                let variance = match variance {
+                    Some(TypeVarVariance::Covariant) => " (covariant)",
+                    Some(TypeVarVariance::Contravariant) => " (contravariant)",
+                    Some(TypeVarVariance::Invariant) => " (invariant)",
+                    Some(TypeVarVariance::Bivariant) => " (bivariant)",
+                    None => "",
+                };
+                self.kind
+                    .fenced_code_block(
+                        format!(
+                            "{}{variance}",
+                            ty.display_with(self.db, DisplaySettings::default().multiline())
+                        ),
+                        "python",
+                    )
+                    .fmt(f)
+            }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
         }
     }
@@ -1590,10 +1613,10 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @r"
-        T@Alias
+        T@Alias (invariant)
         ---------------------------------------------
         ```python
-        T@Alias
+        T@Alias (invariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2056,6 +2079,444 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_class_typevar_variance() {
+        let test = cursor_test(
+            r#"
+        class Covariant[T<CURSOR>]:
+            def get(self) -> T:
+                raise ValueError
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@Covariant (covariant)
+        ---------------------------------------------
+        ```python
+        T@Covariant (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:17
+          |
+        2 | class Covariant[T]:
+          |                 ^- Cursor offset
+          |                 |
+          |                 source
+        3 |     def get(self) -> T:
+        4 |         raise ValueError
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        class Covariant[T]:
+            def get(self) -> T<CURSOR>:
+                raise ValueError
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@Covariant (covariant)
+        ---------------------------------------------
+        ```python
+        T@Covariant (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:22
+          |
+        2 | class Covariant[T]:
+        3 |     def get(self) -> T:
+          |                      ^- Cursor offset
+          |                      |
+          |                      source
+        4 |         raise ValueError
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        class Contravariant[T<CURSOR>]:
+            def set(self, x: T):
+                pass
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@Contravariant (contravariant)
+        ---------------------------------------------
+        ```python
+        T@Contravariant (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:21
+          |
+        2 | class Contravariant[T]:
+          |                     ^- Cursor offset
+          |                     |
+          |                     source
+        3 |     def set(self, x: T):
+        4 |         pass
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        class Contravariant[T]:
+            def set(self, x: T<CURSOR>):
+                pass
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@Contravariant (contravariant)
+        ---------------------------------------------
+        ```python
+        T@Contravariant (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:22
+          |
+        2 | class Contravariant[T]:
+        3 |     def set(self, x: T):
+          |                      ^- Cursor offset
+          |                      |
+          |                      source
+        4 |         pass
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_function_typevar_variance() {
+        let test = cursor_test(
+            r#"
+        def covariant[T<CURSOR>]() -> T:
+            raise ValueError
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@covariant (covariant)
+        ---------------------------------------------
+        ```python
+        T@covariant (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:15
+          |
+        2 | def covariant[T]() -> T:
+          |               ^- Cursor offset
+          |               |
+          |               source
+        3 |     raise ValueError
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        def covariant[T]() -> T<CURSOR>:
+            raise ValueError
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@covariant (covariant)
+        ---------------------------------------------
+        ```python
+        T@covariant (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:23
+          |
+        2 | def covariant[T]() -> T:
+          |                       ^- Cursor offset
+          |                       |
+          |                       source
+        3 |     raise ValueError
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        def contravariant[T<CURSOR>](x: T):
+            pass
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@contravariant (contravariant)
+        ---------------------------------------------
+        ```python
+        T@contravariant (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:19
+          |
+        2 | def contravariant[T](x: T):
+          |                   ^- Cursor offset
+          |                   |
+          |                   source
+        3 |     pass
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        def contravariant[T](x: T<CURSOR>):
+            pass
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@contravariant (contravariant)
+        ---------------------------------------------
+        ```python
+        T@contravariant (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:25
+          |
+        2 | def contravariant[T](x: T):
+          |                         ^- Cursor offset
+          |                         |
+          |                         source
+        3 |     pass
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_type_alias_typevar_variance() {
+        let test = cursor_test(
+            r#"
+        type List[T<CURSOR>] = list[T]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@List (invariant)
+        ---------------------------------------------
+        ```python
+        T@List (invariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:11
+          |
+        2 | type List[T] = list[T]
+          |           ^- Cursor offset
+          |           |
+          |           source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        type List[T] = list[T<CURSOR>]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@List (invariant)
+        ---------------------------------------------
+        ```python
+        T@List (invariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:21
+          |
+        2 | type List[T] = list[T]
+          |                     ^- Cursor offset
+          |                     |
+          |                     source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        type Tuple[T<CURSOR>] = tuple[T]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@Tuple (covariant)
+        ---------------------------------------------
+        ```python
+        T@Tuple (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:12
+          |
+        2 | type Tuple[T] = tuple[T]
+          |            ^- Cursor offset
+          |            |
+          |            source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        type Tuple[T] = tuple[T<CURSOR>]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@Tuple (covariant)
+        ---------------------------------------------
+        ```python
+        T@Tuple (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:23
+          |
+        2 | type Tuple[T] = tuple[T]
+          |                       ^- Cursor offset
+          |                       |
+          |                       source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_legacy_typevar_variance() {
+        let test = cursor_test(
+            r#"
+        from typing import TypeVar
+
+        T<CURSOR> = TypeVar('T', covariant=True)
+
+        def covariant() -> T:
+            raise ValueError
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        typing.TypeVar
+        ---------------------------------------------
+        ```python
+        typing.TypeVar
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:1
+          |
+        2 | from typing import TypeVar
+        3 |
+        4 | T = TypeVar('T', covariant=True)
+          | ^- Cursor offset
+          | |
+          | source
+        5 |
+        6 | def covariant() -> T:
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        from typing import TypeVar
+
+        T = TypeVar('T', covariant=True)
+
+        def covariant() -> T<CURSOR>:
+            raise ValueError
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@covariant (covariant)
+        ---------------------------------------------
+        ```python
+        T@covariant (covariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:20
+          |
+        4 | T = TypeVar('T', covariant=True)
+        5 |
+        6 | def covariant() -> T:
+          |                    ^- Cursor offset
+          |                    |
+          |                    source
+        7 |     raise ValueError
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        from typing import TypeVar
+
+        T<CURSOR> = TypeVar('T', contravariant=True)
+
+        def contravariant(x: T):
+            pass
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        typing.TypeVar
+        ---------------------------------------------
+        ```python
+        typing.TypeVar
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:1
+          |
+        2 | from typing import TypeVar
+        3 |
+        4 | T = TypeVar('T', contravariant=True)
+          | ^- Cursor offset
+          | |
+          | source
+        5 |
+        6 | def contravariant(x: T):
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+        from typing import TypeVar
+
+        T = TypeVar('T', contravariant=True)
+
+        def contravariant(x: T<CURSOR>):
+            pass
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        T@contravariant (contravariant)
+        ---------------------------------------------
+        ```python
+        T@contravariant (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:22
+          |
+        4 | T = TypeVar('T', contravariant=True)
+        5 |
+        6 | def contravariant(x: T):
+          |                      ^- Cursor offset
+          |                      |
+          |                      source
+        7 |     pass
+          |
+        ");
     }
 
     impl CursorTest {

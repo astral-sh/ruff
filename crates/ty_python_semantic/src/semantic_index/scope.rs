@@ -11,6 +11,7 @@ use crate::{
     semantic_index::{
         SemanticIndex, reachability_constraints::ScopedReachabilityConstraintId, semantic_index,
     },
+    types::{GenericContext, binding_type, infer_definition_types},
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -429,6 +430,38 @@ impl NodeWithScopeKind {
 
     pub(crate) fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
         self.as_type_alias().expect("expected type alias")
+    }
+
+    pub(crate) fn generic_context<'db>(
+        &self,
+        db: &'db dyn Db,
+        index: &SemanticIndex<'db>,
+    ) -> Option<GenericContext<'db>> {
+        match self {
+            NodeWithScopeKind::Class(class) => {
+                let definition = index.expect_single_definition(class);
+                binding_type(db, definition)
+                    .as_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                let definition = index.expect_single_definition(function);
+                infer_definition_types(db, definition)
+                    .undecorated_type()
+                    .expect("function should have undecorated type")
+                    .as_function_literal()?
+                    .last_definition_signature(db)
+                    .generic_context
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias);
+                binding_type(db, definition)
+                    .as_type_alias()?
+                    .as_pep_695_type_alias()?
+                    .generic_context(db)
+            }
+            _ => None,
+        }
     }
 }
 
