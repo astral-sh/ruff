@@ -1536,7 +1536,7 @@ f'{f"""other " """}'
 f'{1: hy "user"}'
 f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
-f'{1: abcd "{"aa"}" }'
+f'{1: abcd "{'aa'}" }'
 f'{1=: "abcd {'aa'}}'
 f"{x:a{z:hy \"user\"}} '''"
 
@@ -1588,7 +1588,7 @@ print(f"{ {}, 1 }")
 
 
 # The inner quotes should not be changed to double quotes before Python 3.12
-f"{f'''{"nested"} inner'''} outer"
+f"{f'''{'nested'} inner'''} outer"
 ```
 
 
@@ -2367,7 +2367,7 @@ f'{f"""other " """}'
 f'{1: hy "user"}'
 f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
-f'{1: abcd "{"aa"}" }'
+f'{1: abcd "{'aa'}" }'
 f'{1=: "abcd {'aa'}}'
 f"{x:a{z:hy \"user\"}} '''"
 
@@ -2419,20 +2419,11 @@ print(f"{ {}, 1 }")
 
 
 # The inner quotes should not be changed to double quotes before Python 3.12
-f"{f'''{"nested"} inner'''} outer"
+f"{f'''{'nested'} inner'''} outer"
 ```
 
 
 ### Unsupported Syntax Errors
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
-   --> fstring.py:812:9
-    |
-811 | # The inner quotes should not be changed to double quotes before Python 3.12
-812 | f"{f'''{"nested"} inner'''} outer"
-    |         ^
-    |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
    --> fstring.py:178:8
     |
