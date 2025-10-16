@@ -2560,17 +2560,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Some(return_ty) = self.signature.return_ty
             && let Some(call_expression_tcx) = self.call_expression_tcx.annotation
         {
-            match call_expression_tcx {
+            // Ignore any specialization errors here, because the type context is only used as a hint
+            // to infer a more assignable return type.
+            let _ = builder.infer_filter(return_ty, call_expression_tcx, |_, ty| {
                 // A type variable is not a useful type-context for expression inference, and applying it
                 // to the return type can lead to confusing unions in nested generic calls.
-                Type::TypeVar(_) => {}
-
-                _ => {
-                    // Ignore any specialization errors here, because the type context is only used as a hint
-                    // to infer a more assignable return type.
-                    let _ = builder.infer(return_ty, call_expression_tcx);
-                }
-            }
+                !ty.is_type_var()
+            });
         }
 
         let parameters = self.signature.parameters();

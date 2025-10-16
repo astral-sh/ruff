@@ -1239,7 +1239,16 @@ impl<'db> SpecializationBuilder<'db> {
         generic_context.specialize_partial(self.db, types)
     }
 
-    fn add_type_mapping(&mut self, bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) {
+    fn add_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        filter: impl Fn(BoundTypeVarInstance<'db>, Type<'db>) -> bool,
+    ) {
+        if !filter(bound_typevar, ty) {
+            return;
+        }
+
         self.types
             .entry(bound_typevar.identity(self.db))
             .and_modify(|existing| {
@@ -1251,7 +1260,17 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        self.infer_filter(formal, actual, |_, _| true)
+    }
+
+    /// Infers a type, but only adds type mappings that match the provided filter.
+    pub(crate) fn infer_filter(
+        &mut self,
+        formal: Type<'db>,
         mut actual: Type<'db>,
+        filter: impl Fn(BoundTypeVarInstance<'db>, Type<'db>) -> bool,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -1330,7 +1349,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if remaining_actual.is_never() {
                     return Ok(());
                 }
-                self.add_type_mapping(*formal_bound_typevar, remaining_actual);
+                self.add_type_mapping(*formal_bound_typevar, remaining_actual, filter);
             }
             (Type::Union(formal), _) => {
                 // Second, if the formal is a union, and precisely one union element _is_ a typevar (not
@@ -1340,7 +1359,7 @@ impl<'db> SpecializationBuilder<'db> {
                 let bound_typevars =
                     (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
                 if let Ok(bound_typevar) = bound_typevars.exactly_one() {
-                    self.add_type_mapping(bound_typevar, actual);
+                    self.add_type_mapping(bound_typevar, actual, filter);
                 }
             }
 
@@ -1366,7 +1385,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 argument: ty,
                             });
                         }
-                        self.add_type_mapping(bound_typevar, ty);
+                        self.add_type_mapping(bound_typevar, ty, filter);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         for constraint in constraints.elements(self.db) {
@@ -1374,7 +1393,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 .when_assignable_to(self.db, *constraint, self.inferable)
                                 .is_always_satisfied()
                             {
-                                self.add_type_mapping(bound_typevar, *constraint);
+                                self.add_type_mapping(bound_typevar, *constraint, filter);
                                 return Ok(());
                             }
                         }
@@ -1384,7 +1403,7 @@ impl<'db> SpecializationBuilder<'db> {
                         });
                     }
                     _ => {
-                        self.add_type_mapping(bound_typevar, ty);
+                        self.add_type_mapping(bound_typevar, ty, filter);
                     }
                 }
             }
