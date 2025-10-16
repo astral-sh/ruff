@@ -284,13 +284,13 @@ impl GotoTarget<'_> {
             // When asking the type of a callable, usually you want the callable itself?
             // (i.e. the type of `MyClass` in `MyClass()` is `<class MyClass>` and not `() -> MyClass`)
             GotoTarget::Call { callable, .. } => callable.inferred_type(model),
+            GotoTarget::TypeParamTypeVarName(typevar) => typevar.inferred_type(model),
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
             | GotoTarget::PatternKeywordArgument(_)
             | GotoTarget::PatternMatchStarName(_)
             | GotoTarget::PatternMatchAsName(_)
             | GotoTarget::ImportModuleComponent { .. }
-            | GotoTarget::TypeParamTypeVarName(_)
             | GotoTarget::TypeParamParamSpecName(_)
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
