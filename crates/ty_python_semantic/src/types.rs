@@ -627,16 +627,16 @@ bitflags! {
     /// [1]: https://docs.python.org/3/library/dataclasses.html
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub struct DataclassFlags: u16 {
-        const INIT = 0b0000_0000_0001;
-        const REPR = 0b0000_0000_0010;
-        const EQ = 0b0000_0000_0100;
-        const ORDER = 0b0000_0000_1000;
-        const UNSAFE_HASH = 0b0000_0001_0000;
-        const FROZEN = 0b0000_0010_0000;
-        const MATCH_ARGS = 0b0000_0100_0000;
-        const KW_ONLY = 0b0000_1000_0000;
-        const SLOTS = 0b0001_0000_0000;
-        const WEAKREF_SLOT = 0b0010_0000_0000;
+        const INIT = 1 << 0;
+        const REPR = 1 << 1;
+        const EQ = 1 << 2;
+        const ORDER = 1 << 3;
+        const UNSAFE_HASH = 1 << 4;
+        const FROZEN = 1 << 5;
+        const MATCH_ARGS = 1 << 6;
+        const KW_ONLY = 1 << 7;
+        const SLOTS = 1 << 8   ;
+        const WEAKREF_SLOT = 1 << 9;
     }
 }
 
