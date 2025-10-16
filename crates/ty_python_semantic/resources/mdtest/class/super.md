@@ -163,14 +163,13 @@ class A:
 
 class B(A):
     def __init__(self, a: int):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, B>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, B>
         reveal_type(super(object, super()))  # revealed: <super: <class 'object'>, super>
         super().__init__(a)
 
     @classmethod
     def f(cls):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
+        # TODO: Once `cls` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
         reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
         super().f()
 
@@ -358,15 +357,15 @@ from __future__ import annotations
 
 class A:
     def test(self):
-        reveal_type(super())  # revealed: <super: <class 'A'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'A'>, A>
 
     class B:
         def test(self):
-            reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+            reveal_type(super())  # revealed: <super: <class 'B'>, B>
 
             class C(A.B):
                 def test(self):
-                    reveal_type(super())  # revealed: <super: <class 'C'>, Unknown>
+                    reveal_type(super())  # revealed: <super: <class 'C'>, C>
 
             def inner(t: C):
                 reveal_type(super())  # revealed: <super: <class 'B'>, C>
@@ -616,7 +615,7 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
+        # error: [unresolved-attribute] "Type `<super: <class 'B'>, B>` has no attribute `a`"
         super().a
 
 # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"

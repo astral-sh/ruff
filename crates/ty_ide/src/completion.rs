@@ -1957,14 +1957,31 @@ class Quux:
 ",
         );
 
-        // FIXME: This should list completions on `self`, which should
-        // include, at least, `foo` and `bar`. At time of writing
-        // (2025-06-04), the type of `self` is inferred as `Unknown` in
-        // this context. This in turn prevents us from getting a list
-        // of available attributes.
-        //
-        // See: https://github.com/astral-sh/ty/issues/159
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        assert_snapshot!(test.completions_without_builtins(), @r"
+        __annotations__
+        __class__
+        __delattr__
+        __dict__
+        __dir__
+        __doc__
+        __eq__
+        __format__
+        __getattribute__
+        __getstate__
+        __hash__
+        __init__
+        __init_subclass__
+        __module__
+        __ne__
+        __new__
+        __reduce__
+        __reduce_ex__
+        __repr__
+        __setattr__
+        __sizeof__
+        __str__
+        __subclasshook__
+        ");
     }
 
     #[test]
