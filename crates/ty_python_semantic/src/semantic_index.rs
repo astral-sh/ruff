@@ -1167,7 +1167,6 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             "
 class C:
     def __init__(self):
-        self.x = 1
         [None for self.z in range(1)]
 ",
         );

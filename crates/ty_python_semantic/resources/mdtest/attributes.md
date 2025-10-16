@@ -380,6 +380,11 @@ reveal_type(c_instance.y)  # revealed: Unknown | int
 
 #### Attributes defined in comprehensions
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 class IntIterator:
     def __next__(self) -> int:
@@ -405,13 +410,6 @@ class C:
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
-        def f():
-            [... for self.h in IntIterable()]
-
-        def g():
-            [... for self.i in IntIterable()]
-        g()
-
 class D:
     g: int
 
@@ -432,14 +430,56 @@ reveal_type(c_instance.f)  # revealed: Unknown | int
 # This one is correctly not resolved as an attribute:
 # error: [unresolved-attribute]
 reveal_type(c_instance.g)  # revealed: Unknown
+```
+
+It does not matter how much the comprehension is nested.
+
+Similarly attributes defined by the comprehension in a generic method are recognized.
+
+```py
+class C:
+    def f[T](self):
+        [... for self.a in [1]]
+        [[... for self.b in [1]] for _ in [1]]
+
+c_instance = C()
+
+reveal_type(c_instance.a)  # revealed: Unknown | int
+reveal_type(c_instance.b)  # revealed: Unknown | int
+```
+
+If the comprehension is inside another scope like function then that attribute is not inferred.
+
+```py
+class C:
+    def __init__(self):
+        def f():
+            [... for self.a in IntIterable()]
+
+        def g():
+            [... for self.b in IntIterable()]
+        g()
+
+c_instance = C()
 
 # This attribute is in the function f and is not reachable
 # error: [unresolved-attribute]
-reveal_type(c_instance.h)  # revealed: Unknown
+reveal_type(c_instance.a)  # revealed: Unknown
 
 # TODO: Even though g method is called and is reachable we do not record this attribute assignment
 # error: [unresolved-attribute]
-reveal_type(c_instance.i)  # revealed: Unknown
+reveal_type(c_instance.b)  # revealed: Unknown
+```
+
+If the comprehension is nested in any other eager scope it still can assign attributes.
+
+```py
+class C:
+    def __init__(self):
+        class D:
+            [[... for self.a in IntIterable()] for _ in IntIterable()]
+
+reveal_type(C().a)  # revealed: Unknown | int
 ```
 
 #### Conditionally declared / bound attributes

@@ -185,10 +185,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Returns the scope ID of the method scope if the current scope
-    /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
-    /// scope is a function body outside of a class, or if the current scope is not a
+    /// is a method inside a class body or current scope is in eagerly executed scope in a method.
+    /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
     /// function body.
-    fn is_method_of_class(&self) -> Option<FileScopeId> {
+    fn is_method_or_eagerly_executed_in_method(&self) -> Option<FileScopeId> {
         let mut scopes_rev = self
             .scope_stack
             .iter()
@@ -1678,7 +1678,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
-                    if self.is_method_of_class().is_some() {
+                    if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
                         // if we're inside a method. This allows type inference to infer the type
                         // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
@@ -2350,7 +2350,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_of_class() {
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
                         if let PlaceExpr::Member(member) = &mut place_expr {
                             if member.is_instance_attribute_candidate() {
                                 // We specifically mark attribute assignments to the first parameter of a method,
