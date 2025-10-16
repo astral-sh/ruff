@@ -1543,6 +1543,7 @@ impl<'db> Type<'db> {
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
+    #[salsa::tracked(cycle_fn=is_redundant_with_cycle_recover, cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
             .is_always_satisfied()
@@ -7324,6 +7325,25 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_redundant_with_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _subtype: Type<'db>,
+    _supertype: Type<'db>,
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn is_redundant_with_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _subtype: Type<'db>,
+    _supertype: Type<'db>,
+) -> bool {
+    true
 }
 
 fn apply_specialization_cycle_recover<'db>(
