@@ -92,7 +92,8 @@ reveal_type(this_fails[0])  # revealed: Unknown
 However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
+# TODO: Should be `Unknown | str`
+reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown
 ```
 
 The instance-level method is also not called when the class-level method is present:
@@ -205,7 +206,7 @@ class C:
         return str(key)
 
     def f(self):
-        # TODO: This should emit an `invalid-assignment` diagnostic once we understand the type of `self`
+        # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class

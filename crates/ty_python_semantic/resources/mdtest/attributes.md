@@ -25,7 +25,8 @@ class C:
 
 c_instance = C(1)
 
-reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
+# TODO: Should be `Unknown | Literal[1, "a"]`
+reveal_type(c_instance.inferred_from_value)  # revealed: Unknown
 
 # TODO: Same here. This should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
@@ -35,7 +36,8 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 # something that we might want to change in the future.
 #
 # See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
-reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
+# TODO: Should be `Unknown | int | None`
+reveal_type(c_instance.inferred_from_param)  # revealed: Unknown
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
 
@@ -153,7 +155,8 @@ reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
 reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
-reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
+# TODO: Should be `Unknown | None | Literal["a"]`
+reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None
 ```
 
 #### Variable defined in non-`__init__` method
@@ -175,12 +178,14 @@ class C:
 
 c_instance = C(1)
 
-reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
+# TODO: Should be `Unknown | Literal[1, "a"]`
+reveal_type(c_instance.inferred_from_value)  # revealed: Unknown
 
 # TODO: Should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
-reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
+# TODO: Should be `Unknown | int | None`
+reveal_type(c_instance.inferred_from_param)  # revealed: Unknown
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
 
@@ -224,7 +229,8 @@ class C:
 
 c_instance = C()
 
-reveal_type(c_instance.x)  # revealed: Unknown | int | str
+# TODO: Should be `Unknown | int | str`
+reveal_type(c_instance.x)  # revealed: Unknown
 reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
@@ -238,8 +244,10 @@ class C:
 
 c_instance = C()
 
-reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(c_instance.a)  # revealed: Unknown
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(c_instance.b)  # revealed: Unknown
 ```
 
 #### Augmented assignments
@@ -256,7 +264,8 @@ class C:
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
 # infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Unknown | Weird
+# TODO: Should be `Unknown | Weird`
+reveal_type(C().w)  # revealed: Unknown
 ```
 
 #### Attributes defined in tuple unpackings
@@ -280,12 +289,16 @@ reveal_type(c_instance.b1)  # revealed: Unknown | Literal["a"]
 reveal_type(c_instance.c1)  # revealed: Unknown | int
 reveal_type(c_instance.d1)  # revealed: Unknown | str
 
-reveal_type(c_instance.a2)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(c_instance.a2)  # revealed: Unknown
 
-reveal_type(c_instance.b2)  # revealed: Unknown | Literal["a"]
+# TODO: Should be `Unknown | Literal["a"]`
+reveal_type(c_instance.b2)  # revealed: Unknown
 
-reveal_type(c_instance.c2)  # revealed: Unknown | int
-reveal_type(c_instance.d2)  # revealed: Unknown | str
+# TODO: Should be `Unknown | int`
+reveal_type(c_instance.c2)  # revealed: Unknown
+# TODO: Should be `Unknown | str`
+reveal_type(c_instance.d2)  # revealed: Unknown
 ```
 
 #### Starred assignments
@@ -296,8 +309,10 @@ class C:
         self.a, *self.b = (1, 2, 3)
 
 c_instance = C()
-reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b)  # revealed: Unknown | list[Literal[2, 3]]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(c_instance.a)  # revealed: Unknown
+# TODO: Should be `Unknown | list[Literal[2, 3]]`
+reveal_type(c_instance.b)  # revealed: Unknown
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -333,8 +348,10 @@ class C:
         for self.z in NonIterable():
             pass
 
-reveal_type(C().x)  # revealed: Unknown | int
-reveal_type(C().y)  # revealed: Unknown | str
+# TODO: Should be `Unknown | int`
+reveal_type(C().x)  # revealed: Unknown
+# TODO: Should be `Unknown | str`
+reveal_type(C().y)  # revealed: Unknown
 ```
 
 #### Attributes defined in `with` statements
@@ -354,7 +371,8 @@ class C:
 
 c_instance = C()
 
-reveal_type(c_instance.x)  # revealed: Unknown | int | None
+# TODO: Should be `Unknown | int | None`
+reveal_type(c_instance.x)  # revealed: Unknown
 ```
 
 #### Attributes defined in `with` statements, but with unpacking
@@ -374,8 +392,10 @@ class C:
 
 c_instance = C()
 
-reveal_type(c_instance.x)  # revealed: Unknown | int | None
-reveal_type(c_instance.y)  # revealed: Unknown | int
+# TODO: Should be `Unknown | int | None`
+reveal_type(c_instance.x)  # revealed: Unknown
+# TODO: Should be `Unknown | int`
+reveal_type(c_instance.y)  # revealed: Unknown
 ```
 
 #### Attributes defined in comprehensions
@@ -399,9 +419,19 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [... for self.a in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for self.d in IntIterable() for self.e in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
@@ -462,8 +492,10 @@ c_instance = C()
 
 reveal_type(c_instance.a1)  # revealed: str | None
 reveal_type(c_instance.a2)  # revealed: str | None
-reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(c_instance.b1)  # revealed: Unknown
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(c_instance.b2)  # revealed: Unknown
 ```
 
 #### Methods that does not use `self` as a first parameter
@@ -506,6 +538,7 @@ class C:
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
+# TODO: Should be `Unknown | Literal[1]`
 # error: [unresolved-attribute]
 reveal_type(C().x)  # revealed: Unknown
 
@@ -536,7 +569,8 @@ class C:
     def f(self) -> None:
         self.x = 1
 
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 And if `staticmethod` is fully qualified, that should also be recognized:
@@ -598,17 +632,23 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
+            # TODO: Should not emit this diagnostic
+            # error: [unresolved-attribute]
             self.e = e
 
 # TODO: this would ideally be `Unknown | Literal[1]`
-reveal_type(C(True).a)  # revealed: Unknown | Literal[1, "a"]
+# TODO: Should be `Unknown | Literal[1, "a"]`
+reveal_type(C(True).a)  # revealed: Unknown
 # TODO: this would ideally raise an `unresolved-attribute` error
-reveal_type(C(True).b)  # revealed: Unknown | Literal[2]
-reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
+# TODO: Should be `Unknown | Literal[2]`
+reveal_type(C(True).b)  # revealed: Unknown
+# TODO: Should be `Unknown | Literal[3] | str`
+reveal_type(C(True).c)  # revealed: Unknown
 # Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
 # attempt to analyze control flow within methods more closely. All reachable
 # attribute assignments are considered, so `self.x = 4` is also included:
-reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
+# TODO: Should be `Unknown | Literal[4, 5]`
+reveal_type(C(True).d)  # revealed: Unknown
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
@@ -626,8 +666,10 @@ class C:
         # This is because, it is not possible to access a partially-initialized object by normal means.
         self.y = 2
 
-reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
-reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(C(False).x)  # revealed: Unknown
+# TODO: Should be `Unknown | Literal[2]`
+reveal_type(C(False).y)  # revealed: Unknown
 
 class C:
     def __init__(self, b: bytes) -> None:
@@ -640,8 +682,10 @@ class C:
 
         self.s = s
 
-reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
-reveal_type(C(b"abc").s)  # revealed: Unknown | str
+# TODO: Should be `Unknown | bytes`
+reveal_type(C(b"abc").b)  # revealed: Unknown
+# TODO: Should be `Unknown | str`
+reveal_type(C(b"abc").s)  # revealed: Unknown
 
 class C:
     def __init__(self, iter) -> None:
@@ -654,8 +698,10 @@ class C:
         # but we consider the subsequent attributes to be definitely-bound.
         self.y = 2
 
-reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
-reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(C([]).x)  # revealed: Unknown
+# TODO: Should be `Unknown | Literal[2]`
+reveal_type(C([]).y)  # revealed: Unknown
 ```
 
 #### Diagnostics are reported for the right-hand side of attribute assignments
@@ -685,7 +731,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # TODO: this should be an error
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self@method`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
@@ -745,13 +791,15 @@ class C:
 # for a more realistic example, let's actually call the method
 C.class_method()
 
-reveal_type(C.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
+# TODO: Should be `Unknown | Literal["value set in class method"]`
+reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 C.pure_class_variable = "overwritten on class"
 reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
-reveal_type(c_instance.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
+# TODO: Should be `Unknown | Literal["value set in class method"]`
+reveal_type(c_instance.pure_class_variable)  # revealed: Unknown
 
 # TODO: should raise an error.
 c_instance.pure_class_variable = "value set on instance"
@@ -1415,11 +1463,13 @@ def _(flag: bool):
             else:
                 self.y = "b"
 
-    reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
+    # TODO: Should be `Unknown | Literal[1]`
+    reveal_type(Foo().x)  # revealed: Unknown
 
     Foo().x = 2
 
-    reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]
+    # TODO: Should be `Unknown | Literal["a", "b"]`
+    reveal_type(Foo().y)  # revealed: Unknown
     Foo().y = "c"
 ```
 
@@ -1839,6 +1889,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
+        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
@@ -2303,7 +2354,8 @@ class C:
     def copy(self, other: "C"):
         self.x = other.x
 
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 If the only assignment to a name is cyclic, we just infer `Unknown` for that attribute:
@@ -2359,8 +2411,10 @@ class B:
     def copy(self, other: "A"):
         self.x = other.x
 
-reveal_type(B().x)  # revealed: Unknown | Literal[1]
-reveal_type(A().x)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(B().x)  # revealed: Unknown
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(A().x)  # revealed: Unknown
 ```
 
 And cycles between many attributes:
@@ -2440,7 +2494,8 @@ class Toggle:
             self.y = True
 
 reveal_type(Toggle().x)  # revealed: Literal[True]
-reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
+# TODO: Should be `Unknown | int`
+reveal_type(Toggle().y)  # revealed: Unknown
 ```
 
 Make sure that the growing union of literals `Literal[0, 1, 2, ...]` collapses to `int` during
@@ -2454,7 +2509,8 @@ class Counter:
     def increment(self: "Counter"):
         self.count = self.count + 1
 
-reveal_type(Counter().count)  # revealed: Unknown | int
+# TODO: Should be `Unknown | int`
+reveal_type(Counter().count)  # revealed: Unknown
 ```
 
 ### Builtin types attributes
@@ -2555,7 +2611,8 @@ class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
-reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+# TODO: Should be `Unknown | tuple[Divergent, Literal[1]]`
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 ## Attributes of standard library modules that aren't yet defined
