@@ -59,6 +59,7 @@ use crate::types::diagnostic::{
     IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
     UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
     report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
@@ -7497,13 +7498,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ),
                             );
                         } else {
-                            builder.into_diagnostic(
+                            let diagnostic = builder.into_diagnostic(
                                 format_args!(
                                     "Type `{}` has no attribute `{}`",
                                     value_type.display(db),
                                     attr.id
                                 ),
                             );
+                            hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
                         }
                         }
                     }

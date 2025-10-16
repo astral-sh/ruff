@@ -26,7 +26,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -37,12 +37,19 @@ fn config_override_python_version() -> anyhow::Result<()> {
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
+    info: Python 3.11 was assumed when accessing `last_exc`
+     --> pyproject.toml:3:18
+      |
+    2 | [tool.ty.environment]
+    3 | python-version = "3.11"
+      |                  ^^^^^^ Python 3.11 assumed due to this configuration setting
+      |
     info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r###"
     success: true
@@ -951,7 +958,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -963,12 +970,20 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
       |
+    info: Python 3.10 was assumed when accessing `grantpt`
+     --> ty.toml:3:18
+      |
+    2 | [environment]
+    3 | python-version = "3.10"
+      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+    4 | python-platform = "linux"
+      |
     info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     // Use default (which should be latest supported)
     let case = CliTest::with_files([
