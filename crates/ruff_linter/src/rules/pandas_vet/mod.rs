@@ -309,6 +309,14 @@ mod tests {
         "PD011_pass_numpy_typed_unique_inverse"
     )]
     #[test_case(
+        r"
+        import pandas as pd
+        p = 1
+        result = p.values
+    ",
+        "PD011_pass_simple_non_pandas"
+    )]
+    #[test_case(
         r#"
         import pandas as pd
         x = pd.DataFrame()

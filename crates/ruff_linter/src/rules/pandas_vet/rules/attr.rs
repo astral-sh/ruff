@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{Modules, analyze::typing::find_binding_value};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -43,38 +43,6 @@ impl Violation for PandasUseOfDotValues {
     }
 }
 
-/// Check if a binding comes from a NumPy function that returns a `NamedTuple` with a `.values` field.
-fn is_numpy_namedtuple_binding(
-    expr: &Expr,
-    semantic: &ruff_python_semantic::SemanticModel,
-) -> bool {
-    let Expr::Name(name) = expr else {
-        return false;
-    };
-
-    let Some(binding_id) = semantic.resolve_name(name) else {
-        return false;
-    };
-    let binding = semantic.binding(binding_id);
-
-    let Some(assigned_value) = find_binding_value(binding, semantic) else {
-        return false;
-    };
-
-    let Some(call_expr) = assigned_value.as_call_expr() else {
-        return false;
-    };
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call_expr.func) else {
-        return false;
-    };
-
-    matches!(
-        qualified_name.segments(),
-        ["numpy", "unique_inverse" | "unique_all" | "unique_counts"]
-    )
-}
-
 /// PD011
 pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
@@ -106,11 +74,6 @@ pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
         test_expression(attribute.value.as_ref(), checker.semantic()),
         Resolution::RelevantLocal
     ) {
-        return;
-    }
-
-    // Avoid flagging on NumPy `NamedTuples` that have a legitimate `.values` field
-    if is_numpy_namedtuple_binding(attribute.value.as_ref(), checker.semantic()) {
         return;
     }
 
