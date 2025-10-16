@@ -894,11 +894,9 @@ class Intermediate(Base):
         # TODO: This should be an error (violates Liskov)
         self.redeclared_in_method_with_wider_type: object = object()
 
-        # TODO: This should be an `invalid-assignment` error
-        self.overwritten_in_subclass_method = None
+        self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
-        # TODO: This should be an `invalid-assignment` error
-        self.pure_overwritten_in_subclass_method = None
+        self.pure_overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
         self.pure_undeclared = "intermediate"
 
