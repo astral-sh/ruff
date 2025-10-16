@@ -42,10 +42,6 @@ Used to determine the name of the active Conda environment.
 Used to detect the path of an active Conda environment.
 If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
 
-### `_CONDA_ROOT`
-
-Used to determine the root install path of Conda.
-
 ### `PYTHONPATH`
 
 Adds additional directories to ty's search paths.
@@ -67,4 +63,8 @@ Used to detect an activated virtual environment.
 ### `XDG_CONFIG_HOME`
 
 Path to user-level configuration directory on Unix systems.
+
+### `_CONDA_ROOT`
+
+Used to determine the root install path of Conda.
 
