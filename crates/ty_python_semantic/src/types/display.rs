@@ -591,7 +591,15 @@ impl Display for DisplayRepresentation<'_> {
                 .0
                 .display_with(self.db, self.settings.clone())
                 .fmt(f),
-            Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
+            Type::TypeAlias(alias) => {
+                f.write_str(alias.name(self.db))?;
+                match alias.specialization(self.db) {
+                    None => Ok(()),
+                    Some(specialization) => specialization
+                        .display_short(self.db, TupleSpecialization::No, self.settings.clone())
+                        .fmt(f),
+                }
+            }
         }
     }
 }

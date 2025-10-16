@@ -114,7 +114,7 @@ h: list[list[int]] = [[], [42]]
 reveal_type(h)  # revealed: list[list[int]]
 
 i: list[typing.Any] = [1, 2, "3", ([4],)]
-reveal_type(i)  # revealed: list[Any | int | str | tuple[list[Unknown | int]]]
+reveal_type(i)  # revealed: list[Any]
 
 j: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
 reveal_type(j)  # revealed: list[tuple[str | int, ...]]
@@ -123,7 +123,7 @@ k: list[tuple[list[int], ...]] = [([],), ([1, 2], [3, 4]), ([5], [6], [7])]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-reveal_type(l)  # revealed: tuple[list[int], list[Any | int], list[Any | int], list[str]]
+reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
 
 type IntList = list[int]
 
@@ -187,7 +187,7 @@ h: list[list[int]] | None = [[], [42]]
 reveal_type(h)  # revealed: list[list[int]]
 
 i: list[typing.Any] | None = [1, 2, "3", ([4],)]
-reveal_type(i)  # revealed: list[Any | int | str | tuple[list[Unknown | int]]]
+reveal_type(i)  # revealed: list[Any]
 
 j: list[tuple[str | int, ...]] | None = [(1, 2), ("foo", "bar"), ()]
 reveal_type(j)  # revealed: list[tuple[str | int, ...]]
@@ -196,7 +196,7 @@ k: list[tuple[list[int], ...]] | None = [([],), ([1, 2], [3, 4]), ([5], [6], [7]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] | None = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-reveal_type(l)  # revealed: tuple[list[int], list[Any | int], list[Any | int], list[str]]
+reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
 
 type IntList = list[int]
 
@@ -282,7 +282,7 @@ reveal_type(k)  # revealed: list[Literal[1, 2, 3]]
 type Y[T] = list[T]
 
 l: Y[Y[Literal[1]]] = [[1]]
-reveal_type(l)  # revealed: list[list[Literal[1]]]
+reveal_type(l)  # revealed: list[Y[Literal[1]]]
 
 m: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(m)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]

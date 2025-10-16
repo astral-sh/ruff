@@ -6179,6 +6179,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let inferred_elt_ty = self.get_or_infer_expression(elt, elt_tcx);
 
+                // Simplify the inference based on the declared type of the element.
+                if let Some(elt_tcx) = elt_tcx.annotation {
+                    if inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
+                        continue;
+                    }
+                }
+
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
                 let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db(), elt_tcx);
