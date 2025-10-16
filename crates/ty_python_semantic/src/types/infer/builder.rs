@@ -4532,13 +4532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 scope: ScopeId<'db>,
             ) -> Option<SmallVec<[Type<'db>; 2]>> {
                 let enclosing_scope = index.scope(scope.file_scope_id(db));
-
-                if enclosing_scope.kind() != ScopeKind::Class {
-                    return None;
-                }
-
                 let class_node = enclosing_scope.node().as_class()?;
-
                 let class_definition = index.expect_single_definition(class_node);
                 let class_literal = infer_definition_types(db, class_definition)
                     .declaration_type(class_definition)
