@@ -155,7 +155,7 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
 
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(
-        &self,
+        self,
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
