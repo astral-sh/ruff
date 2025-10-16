@@ -108,7 +108,7 @@ class A:
     name: str = field(init=False)
 
 # field(init=False) should be ignored for dataclass_transform without explicit field_specifiers
-reveal_type(A.__init__)  # revealed: (self: A, name: str = Unknown) -> None
+reveal_type(A.__init__)  # revealed: (self: A, name: str) -> None
 
 @dataclass
 class B:
