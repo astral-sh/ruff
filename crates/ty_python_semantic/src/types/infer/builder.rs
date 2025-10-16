@@ -78,7 +78,7 @@ use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, LegacyGenericBase, SpecializationBuilder, bind_typevar,
+    GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
     enclosing_generic_contexts,
 };
 use crate::types::infer::nearest_enclosing_function;
@@ -5919,11 +5919,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
-        // TODO: Use the list of inferable typevars from the generic context of tuple.
-        let inferable = InferableTypeVars::None;
-
         // Remove any union elements of that are unrelated to the tuple type.
         let tcx = tcx.map(|annotation| {
+            let inferable = KnownClass::Tuple
+                .try_to_class_literal(self.db())
+                .and_then(|class| class.generic_context(self.db()))
+                .map(|generic_context| generic_context.inferable_typevars(self.db()))
+                .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
                 self.db(),
                 KnownClass::Tuple.to_instance(self.db()),
