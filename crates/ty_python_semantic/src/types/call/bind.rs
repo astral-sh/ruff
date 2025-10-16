@@ -603,17 +603,21 @@ impl<'db> Bindings<'db> {
                             || function_type.is_known(db, KnownFunction::Field) =>
                     {
                         let has_default_value = overload
-                            .parameter_type_by_name("default")
+                            .parameter_type_by_name("default", false)
                             .is_ok_and(|ty| ty.is_some())
                             || overload
-                                .parameter_type_by_name("default_factory")
+                                .parameter_type_by_name("default_factory", false)
                                 .is_ok_and(|ty| ty.is_some())
                             || overload
-                                .parameter_type_by_name("factory")
+                                .parameter_type_by_name("factory", false)
                                 .is_ok_and(|ty| ty.is_some());
 
-                        let init = overload.parameter_type_by_name("init").unwrap_or(None);
-                        let kw_only = overload.parameter_type_by_name("kw_only").unwrap_or(None);
+                        let init = overload
+                            .parameter_type_by_name("init", true)
+                            .unwrap_or(None);
+                        let kw_only = overload
+                            .parameter_type_by_name("kw_only", true)
+                            .unwrap_or(None);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -633,7 +637,10 @@ impl<'db> Bindings<'db> {
 
                         let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
                         {
-                            kw_only.map(|kw_only| !kw_only.bool(db).is_always_false())
+                            match kw_only {
+                                Some(Type::BooleanLiteral(yes)) => Some(yes),
+                                _ => None,
+                            }
                         } else {
                             None
                         };
@@ -1050,25 +1057,25 @@ impl<'db> Bindings<'db> {
                                             let mut flags = dataclass_params.flags(db);
 
                                             if let Ok(Some(Type::BooleanLiteral(order))) =
-                                                overload.parameter_type_by_name("order")
+                                                overload.parameter_type_by_name("order", false)
                                             {
                                                 flags.set(DataclassFlags::ORDER, order);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(eq))) =
-                                                overload.parameter_type_by_name("eq")
+                                                overload.parameter_type_by_name("eq", false)
                                             {
                                                 flags.set(DataclassFlags::EQ, eq);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(kw_only))) =
-                                                overload.parameter_type_by_name("kw_only")
+                                                overload.parameter_type_by_name("kw_only", false)
                                             {
                                                 flags.set(DataclassFlags::KW_ONLY, kw_only);
                                             }
 
                                             if let Ok(Some(Type::BooleanLiteral(frozen))) =
-                                                overload.parameter_type_by_name("frozen")
+                                                overload.parameter_type_by_name("frozen", false)
                                             {
                                                 flags.set(DataclassFlags::FROZEN, frozen);
                                             }
@@ -3012,15 +3019,24 @@ impl<'db> Binding<'db> {
     pub(crate) fn parameter_type_by_name(
         &self,
         parameter_name: &str,
+        fallback_to_default: bool,
     ) -> Result<Option<Type<'db>>, UnknownParameterNameError> {
-        let index = self
-            .signature
-            .parameters()
+        let parameters = self.signature.parameters();
+
+        let index = parameters
             .keyword_by_name(parameter_name)
             .map(|(i, _)| i)
             .ok_or(UnknownParameterNameError)?;
 
-        Ok(self.parameter_tys[index])
+        let parameter_ty = self.parameter_tys[index];
+
+        if parameter_ty.is_some() {
+            Ok(parameter_ty)
+        } else if fallback_to_default {
+            Ok(parameters[index].default_type())
+        } else {
+            Ok(None)
+        }
     }
 
     pub(crate) fn arguments_for_parameter<'a>(

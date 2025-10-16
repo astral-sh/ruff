@@ -545,6 +545,29 @@ reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 ```
 
+### With default arguments
+
+Field specifiers can have default arguments that should be respected:
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field()
+    name: str = fancy_field(init=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
+
+Person(name="Alice")
+```
+
 ### With overloaded field specifiers
 
 ```py
