@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: duplicate type parameter
+ --> resources/test/fixtures/semantic_errors/duplicate_type_parameter.py:1:12
+  |
+1 | class C[T, T]: pass
+  |            ^
+  |
