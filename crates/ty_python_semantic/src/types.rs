@@ -8390,7 +8390,9 @@ fn lazy_bound_cycle_initial<'db>(
 }
 
 /// Where a type variable is bound and usable.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
+)]
 pub enum BindingContext<'db> {
     /// The definition of the generic class, function, or type alias that binds this typevar.
     Definition(Definition<'db>),
@@ -8424,7 +8426,9 @@ impl<'db> BindingContext<'db> {
 /// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
 /// if they represent the same logical typevar bound in the same context, even if their bounds
 /// have been materialized differently.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(
+    Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::Update,
+)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
