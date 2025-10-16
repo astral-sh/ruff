@@ -196,7 +196,7 @@ k: list[tuple[list[int], ...]] | None = [([],), ([1, 2], [3, 4]), ([5], [6], [7]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] | None = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-reveal_type(l)  # revealed: tuple[list[int], list[Any | int], list[Any | int], list[str]]
+reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
 
 type IntList = list[int]
 
