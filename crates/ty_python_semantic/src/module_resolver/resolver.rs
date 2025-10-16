@@ -1205,6 +1205,7 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
             return;
         }
 
+        // Don't traverse into nested bodies.
         if self.in_body {
             return;
         }
@@ -1287,12 +1288,10 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
         }
 
         // Test that this is an `extend_path(__path__, __name__)` call
-
         if maybe_extend_path != "extend_path" {
             return;
         }
 
-        // TODO: Verify if these are positional only arguments
         let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
             return;
         };
