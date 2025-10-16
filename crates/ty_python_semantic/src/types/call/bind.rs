@@ -602,9 +602,15 @@ impl<'db> Bindings<'db> {
                         if dataclass_field_specifiers.contains(&function)
                             || function_type.is_known(db, KnownFunction::Field) =>
                     {
-                        let has_default_value = overload.parameter_type_by_name("default").is_ok()
-                            || overload.parameter_type_by_name("default_factory").is_ok()
-                            || overload.parameter_type_by_name("factory").is_ok();
+                        let has_default_value = overload
+                            .parameter_type_by_name("default")
+                            .is_ok_and(|ty| ty.is_some())
+                            || overload
+                                .parameter_type_by_name("default_factory")
+                                .is_ok_and(|ty| ty.is_some())
+                            || overload
+                                .parameter_type_by_name("factory")
+                                .is_ok_and(|ty| ty.is_some());
 
                         let init = overload.parameter_type_by_name("init").unwrap_or(None);
                         let kw_only = overload.parameter_type_by_name("kw_only").unwrap_or(None);
@@ -2855,6 +2861,7 @@ impl<'db> MatchedArgument<'db> {
 }
 
 /// Indicates that a parameter of the given name was not found.
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct UnknownParameterNameError;
 
 /// Binding information for one of the overloads of a callable.
