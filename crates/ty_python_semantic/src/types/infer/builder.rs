@@ -152,11 +152,11 @@ type BinaryComparisonVisitor<'db> = CycleDetector<
     Result<Type<'db>, CompareUnsupportedError<'db>>,
 >;
 
-/// We currently store three dataclass field-specifiers inline, because that covers standard
-/// dataclasses with 1 specifier, attrs with 2 specifiers, and pydantic with 3 specifiers.
-/// SQLAlchemy uses 7 field specifiers, but they need to go to the heap. If we ever need to
-/// reduce memory usage, we can consider storing just 1 specifier inline.
-const NUM_FIELD_SPECIFIERS_INLINE: usize = 3;
+/// We currently store one dataclass field-specifiers inline, because that covers standard
+/// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
+/// uses 7 field specifiers. We could probably store more inline if this turns out to be a
+/// performance problem. For now, we optimize for memory usage.
+const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 
 /// Builder to infer all types in a region.
 ///
