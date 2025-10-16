@@ -977,13 +977,16 @@ impl<'db> Bindings<'db> {
                             let kw_only =
                                 overload.parameter_type_by_name("kw_only").unwrap_or(None);
 
-                            let default_ty = match (default, default_factory) {
-                                (Some(default_ty), _) => Some(default_ty),
-                                (_, Some(default_factory_ty)) => default_factory_ty
-                                    .try_call(db, &CallArguments::none())
-                                    .ok()
-                                    .map(|binding| binding.return_type(db)),
-                                _ => None,
+                            // `dataclasses.field` and field-specifier functions of commonly used
+                            // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
+                            // the default type for the field (or `Any`) instead of an actual `Field`
+                            // instance, even if this is not what happens at runtime (see also below).
+                            // We still make use of this fact and pretend that all field specifiers
+                            // return the type of the default value:
+                            let default_ty = if default.is_some() || default_factory.is_some() {
+                                Some(overload.return_ty)
+                            } else {
+                                None
                             };
 
                             let init = init
