@@ -1600,6 +1600,34 @@ impl<'db> Type<'db> {
         }
 
         match (self, target) {
+            // A non-inferable typevar satisfies a relation when...it satisfies the relation. Yes
+            // that's a tautology! We're moving the caller's subtyping/assignability requirement
+            // into a constraint set. If the typevar has an upper bound or constraints, then the
+            // relation only has to hold when the typevar has a valid specialization (i.e., one
+            // that satisfies the upper bound/constraints).
+            (Type::TypeVar(bound_typevar), _) if !inferable.is_inferable(db, bound_typevar) => {
+                bound_typevar.valid_specializations(db).and(db, || {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        bound_typevar,
+                        Type::Never,
+                        target,
+                        relation,
+                    )
+                })
+            }
+            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(db, bound_typevar) => {
+                bound_typevar.valid_specializations(db).implies(db, || {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        bound_typevar,
+                        self,
+                        Type::object(),
+                        relation,
+                    )
+                })
+            }
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object() => {
                 ConstraintSet::from(true)
@@ -1820,34 +1848,6 @@ impl<'db> Type<'db> {
                         relation,
                         relation_visitor,
                         disjointness_visitor,
-                    )
-                })
-            }
-
-            // A non-inferable typevar satisfies a relation when...it satisfies the relation. Yes
-            // that's a tautology! We're moving the caller's subtyping/assignability requirement
-            // into a constraint set. If the typevar has an upper bound or constraints, then the
-            // relation only has to hold when the typevar has a valid specialization (i.e., one
-            // that satisfies the upper bound/constraints).
-            (Type::TypeVar(bound_typevar), _) if !inferable.is_inferable(db, bound_typevar) => {
-                bound_typevar.valid_specializations(db).implies(db, || {
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        bound_typevar,
-                        Type::Never,
-                        target,
-                        relation,
-                    )
-                })
-            }
-            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(db, bound_typevar) => {
-                bound_typevar.valid_specializations(db).implies(db, || {
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        bound_typevar,
-                        self,
-                        Type::object(),
-                        relation,
                     )
                 })
             }
