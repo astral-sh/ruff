@@ -421,6 +421,7 @@ c: list[int | str] = f("a")
 reveal_type(c)  # revealed: list[str | int]
 
 d: list[int | tuple[int, int]] = f((1, 2))
+# TODO: We could avoid reordering the union elements here.
 reveal_type(d)  # revealed: list[tuple[int, int] | int]
 
 e: list[int] = f(True)
