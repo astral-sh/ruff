@@ -152,6 +152,12 @@ type BinaryComparisonVisitor<'db> = CycleDetector<
     Result<Type<'db>, CompareUnsupportedError<'db>>,
 >;
 
+/// We currently store three dataclass field-specifiers inline, because that covers standard
+/// dataclasses with 1 specifier, attrs with 2 specifiers, and pydantic with 3 specifiers.
+/// SQLAlchemy uses 7 field specifiers, but they need to go to the heap. If we ever need to
+/// reduce memory usage, we can consider storing just 1 specifier inline.
+const NUM_FIELD_SPECIFIERS_INLINE: usize = 3;
+
 /// Builder to infer all types in a region.
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
@@ -280,7 +286,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
-    dataclass_field_specifiers: SmallVec<[Type<'db>; 2]>,
+    dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -4530,7 +4536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db: &'db dyn Db,
                 index: &'db SemanticIndex<'db>,
                 scope: ScopeId<'db>,
-            ) -> Option<SmallVec<[Type<'db>; 2]>> {
+            ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
                 let enclosing_scope = index.scope(scope.file_scope_id(db));
                 let class_node = enclosing_scope.node().as_class()?;
                 let class_definition = index.expect_single_definition(class_node);
