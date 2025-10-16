@@ -144,6 +144,12 @@ reveal_type(q)  # revealed: dict[int | str, int]
 
 r: dict[int | str, int | str] = {1: 1, 2: 2, 3: 3}
 reveal_type(r)  # revealed: dict[int | str, int | str]
+
+s: dict[int | str, int | str]
+s = {1: 1, 2: 2, 3: 3}
+reveal_type(s)  # revealed: dict[int | str, int | str]
+(s := {1: 1, 2: 2, 3: 3})
+reveal_type(s)  # revealed: dict[int | str, int | str]
 ```
 
 ## Optional collection literal annotations are understood
@@ -296,6 +302,12 @@ reveal_type(q)  # revealed: list[int]
 
 r: list[Literal[1, 2, 3, 4]] = [1, 2]
 reveal_type(r)  # revealed: list[Literal[1, 2, 3, 4]]
+
+s: list[Literal[1]]
+s = [1]
+reveal_type(s)  # revealed: list[Literal[1]]
+(s := [1])
+reveal_type(s)  # revealed: list[Literal[1]]
 ```
 
 ## PEP-604 annotations are supported
