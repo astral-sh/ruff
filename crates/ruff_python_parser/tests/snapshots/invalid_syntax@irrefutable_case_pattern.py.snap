@@ -433,6 +433,6 @@ Module(
  9 |     case 2: ...
 10 | match x:
 11 |     case enum.variant | var: ...  # or pattern with irrefutable part
-   |                         ^^^ Syntax Error: variable `var` is not bound in all patterns
+   |                         ^^^ Syntax Error: alternative patterns bind different names
 12 |     case 2: ...
    |

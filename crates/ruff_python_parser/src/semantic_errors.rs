@@ -1137,8 +1137,8 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
-            SemanticSyntaxErrorKind::AlternateBindedPattern(name) => {
-                write!(f, "variable `{name}` is not bound in all patterns")
+            SemanticSyntaxErrorKind::AlternateBindedPattern => {
+                write!(f, "alternative patterns bind different names")
             }
         }
     }
@@ -1368,10 +1368,7 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1389,10 +1386,7 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1525,7 +1519,20 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `continue` statement outside of a loop.
     ContinueOutsideLoop,
-    AlternateBindedPattern(String),
+    
+    /// Represents the use of alternative patterns in a `match` statement that bind different names.
+    ///
+    /// Python requires all alternatives in an OR pattern (`|`) to bind the same set of names.
+    /// Using different names results in a `SyntaxError`.
+    ///
+    /// ## Example:
+    ///
+    /// ```python
+    /// match 5:
+    ///     case [x] | [y]:  # error
+    ///         ...
+    /// ```
+    AlternateBindedPattern,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1788,7 +1795,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         previous_names = Some(visitor.names);
                         continue;
                     };
-                    if let Some(name) = prev.symmetric_difference(&visitor.names).next() {
+                    if prev.symmetric_difference(&visitor.names).next().is_some() {
                         // test_err alternate_binded_pattern
                         // match x:
                         //     case [a] | [b]: ...
@@ -1813,7 +1820,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [a] | [C(a)]: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
-                            SemanticSyntaxErrorKind::AlternateBindedPattern(name.to_string()),
+                            SemanticSyntaxErrorKind::AlternateBindedPattern,
                             pattern.range(),
                         );
                         break;
