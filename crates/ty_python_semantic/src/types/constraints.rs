@@ -523,6 +523,21 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the `xor` of two BDDs.
+    fn xor(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
+            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysFalse,
+            (Node::AlwaysTrue, Node::Interior(interior))
+            | (Node::Interior(interior), Node::AlwaysTrue) => interior.negate(db),
+            (Node::Interior(a), Node::Interior(b)) => {
+                // AND is commutative, which lets us halve the cache requirements
+                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                a.xor(db, b)
+            }
+        }
+    }
+
     /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
     /// result.
     fn iff(self, db: &'db dyn Db, other: Self) -> Self {
@@ -906,6 +921,32 @@ impl<'db> InteriorNode<'db> {
                 other_constraint,
                 Node::Interior(self).and(db, other.if_true(db)),
                 Node::Interior(self).and(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn xor(self, db: &'db dyn Db, other: Self) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        let other_constraint = other.constraint(db);
+        match self_constraint.cmp(db, other_constraint) {
+            Ordering::Equal => Node::new(
+                db,
+                self_constraint,
+                self.if_true(db).xor(db, other.if_true(db)),
+                self.if_false(db).xor(db, other.if_false(db)),
+            ),
+            Ordering::Less => Node::new(
+                db,
+                self_constraint,
+                self.if_true(db).xor(db, Node::Interior(other)),
+                self.if_false(db).xor(db, Node::Interior(other)),
+            ),
+            Ordering::Greater => Node::new(
+                db,
+                other_constraint,
+                Node::Interior(self).xor(db, other.if_true(db)),
+                Node::Interior(self).xor(db, other.if_false(db)),
             ),
         }
     }
