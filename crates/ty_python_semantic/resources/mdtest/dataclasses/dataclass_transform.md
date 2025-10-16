@@ -569,6 +569,40 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
+### Nested dataclass-transformers
+
+Make sure that models are only affected by the field specifiers of their own transformer:
+
+```py
+from typing_extensions import dataclass_transform, Any
+from dataclasses import field
+
+def outer_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(outer_field,))
+def outer_model[T](cls: type[T]) -> type[T]:
+    # ...
+    return cls
+
+def inner_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(inner_field,))
+def inner_model[T](cls: type[T]) -> type[T]:
+    # ...
+    return cls
+
+@outer_model
+class Outer:
+    @inner_model
+    class Inner:
+        inner_a: int = inner_field(init=False)
+        inner_b: str = outer_field(init=False)
+
+    outer_a: int = outer_field(init=False)
+    outer_b: str = inner_field(init=False)
+
+reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = Any) -> None
+reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = Any) -> None
+```
+
 ## Overloaded dataclass-like decorators
 
 In the case of an overloaded decorator, the `dataclass_transform` decorator can be applied to the
