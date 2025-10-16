@@ -638,6 +638,11 @@ impl<'db> Bindings<'db> {
                         let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
                         {
                             match kw_only {
+                                // We are more conservative here when turning the type for `kw_only`
+                                // into a bool, because a field specifier in a stub might use
+                                // `kw_only: bool = ...` and the truthiness of `...` is always true.
+                                // This is different from `init` above because may need to fall back
+                                // to `kw_only_default`, whereas `init_default` does not exist.
                                 Some(Type::BooleanLiteral(yes)) => Some(yes),
                                 _ => None,
                             }
