@@ -7,8 +7,8 @@ use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_source_file::NewlineWithTrailingNewline;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_source_file::{LineRanges, NewlineWithTrailingNewline};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -588,10 +588,10 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
     };
     let indentation = &first_arg[..first_arg.len() - first_arg.trim_start().len()];
 
-    let mut current_pos = 0;
+    let mut current_pos = TextSize::ZERO;
     for line in content.lines() {
         let line_start = current_pos;
-        let line_end = current_pos + line.len();
+        current_pos = content.full_line_end(line_start);
 
         if let Some(entry) = line.strip_prefix(indentation) {
             if entry
@@ -600,27 +600,25 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
                 let Some((before_colon, _)) = entry.split_once(':') else {
-                    current_pos = line_end + 1;
                     continue;
                 };
                 if let Some(param) = before_colon.split_whitespace().next() {
                     let param_name = param.trim_start_matches('*');
                     if is_identifier(param_name) {
-                        let param_start = line_start + indentation.len();
-                        let param_end = param_start + param.len();
+                        let param_start = line_start + indentation.text_len();
+                        let param_end = param_start + param.text_len();
 
                         entries.push(ParameterEntry {
                             name: param_name,
                             range: TextRange::new(
-                                content_start + TextSize::try_from(param_start).unwrap(),
-                                content_start + TextSize::try_from(param_end).unwrap(),
+                                content_start + param_start,
+                                content_start + param_end,
                             ),
                         });
                     }
                 }
             }
         }
-        current_pos = line_end + 1;
     }
     entries
 }
@@ -643,10 +641,10 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
 
-    let mut current_pos = dashes.len() + 1;
+    let mut current_pos = content.full_line_end(dashes.text_len());
     for potential in lines {
         let line_start = current_pos;
-        let line_end = current_pos + potential.len();
+        current_pos = content.full_line_end(line_start);
 
         if let Some(entry) = potential.strip_prefix(indentation) {
             if entry
@@ -658,21 +656,20 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                     let param = before_colon.trim_end();
                     let param_name = param.trim_start_matches('*');
                     if is_identifier(param_name) {
-                        let param_start = line_start + indentation.len();
-                        let param_end = param_start + param.len();
+                        let param_start = line_start + indentation.text_len();
+                        let param_end = param_start + param.text_len();
 
                         entries.push(ParameterEntry {
                             name: param_name,
                             range: TextRange::new(
-                                content_start + TextSize::try_from(param_start).unwrap(),
-                                content_start + TextSize::try_from(param_end).unwrap(),
+                                content_start + param_start,
+                                content_start + param_end,
                             ),
                         });
                     }
                 }
             }
         }
-        current_pos = line_end + 1;
     }
     entries
 }
