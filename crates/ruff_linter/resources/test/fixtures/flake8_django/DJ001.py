@@ -46,3 +46,39 @@ class CorrectModel(models.Model):
         max_length=255, null=True, blank=True, unique=True
     )
     urlfieldu = models.URLField(max_length=255, null=True, blank=True, unique=True)
+
+
+class IncorrectModelWithAnnotations(models.Model):
+    charfield: models.CharField[str, str] = models.CharField(max_length=255, null=True)
+    textfield: models.TextField[str, str] = models.TextField(max_length=255, null=True)
+    slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=True)
+    emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=True)
+    filepathfield: models.FilePathField[str, str] = models.FilePathField(max_length=255, null=True)
+    urlfield: models.URLField[str, str] = models.URLField(max_length=255, null=True)
+
+
+class IncorrectModelWithSimpleAnnotations(models.Model):
+    charfield: models.CharField = models.CharField(max_length=255, null=True)
+    textfield: models.TextField = models.TextField(max_length=255, null=True)
+    slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
+    emailfield: models.EmailField = models.EmailField(max_length=255, null=True)
+    filepathfield: models.FilePathField = models.FilePathField(max_length=255, null=True)
+    urlfield: models.URLField = models.URLField(max_length=255, null=True)
+
+
+class CorrectModelWithAnnotations(models.Model):
+    charfield: models.CharField[str, str] = models.CharField(max_length=255, null=False, blank=True)
+    textfield: models.TextField[str, str] = models.TextField(max_length=255, null=False, blank=True)
+    slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=False, blank=True)
+    emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=False, blank=True)
+    filepathfield: models.FilePathField[str, str] = models.FilePathField(max_length=255, null=False, blank=True)
+    urlfield: models.URLField[str, str] = models.URLField(max_length=255, null=False, blank=True)
+
+    charfieldu: models.CharField[str, str] = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    textfieldu: models.TextField[str, str] = models.TextField(max_length=255, null=True, blank=True, unique=True)
+    slugfieldu: models.SlugField[str, str] = models.SlugField(max_length=255, null=True, blank=True, unique=True)
+    emailfieldu: models.EmailField[str, str] = models.EmailField(max_length=255, null=True, blank=True, unique=True)
+    filepathfieldu: models.FilePathField[str, str] = models.FilePathField(
+        max_length=255, null=True, blank=True, unique=True
+    )
+    urlfieldu: models.URLField[str, str] = models.URLField(max_length=255, null=True, blank=True, unique=True)
