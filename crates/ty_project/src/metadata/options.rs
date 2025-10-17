@@ -784,9 +784,7 @@ impl SrcOptions {
     Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", transparent)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
-    #[cfg_attr(feature = "schemars", schemars(with = "schema::Rules"))]
     #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
@@ -798,6 +796,59 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
         Self {
             inner: iter.into_iter().collect(),
         }
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Rules {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("Rules")
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        use serde_json::{Map, Value};
+
+        let registry = ty_python_semantic::default_lint_registry();
+        let level_schema = generator.subschema_for::<Level>();
+
+        let properties: Map<String, Value> = registry
+            .lints()
+            .iter()
+            .map(|lint| {
+                let mut schema = schemars::Schema::default();
+                let object = schema.ensure_object();
+                object.insert(
+                    "title".to_string(),
+                    Value::String(lint.summary().to_string()),
+                );
+                object.insert(
+                    "description".to_string(),
+                    Value::String(lint.documentation()),
+                );
+                if lint.status.is_deprecated() {
+                    object.insert("deprecated".to_string(), Value::Bool(true));
+                }
+                object.insert(
+                    "default".to_string(),
+                    Value::String(lint.default_level.to_string()),
+                );
+                object.insert(
+                    "oneOf".to_string(),
+                    Value::Array(vec![level_schema.clone().into()]),
+                );
+
+                (lint.name().to_string(), schema.into())
+            })
+            .collect();
+
+        let mut schema = schemars::json_schema!({ "type": "object" });
+        let object = schema.ensure_object();
+        object.insert("properties".to_string(), Value::Object(properties));
+        // Allow unknown rules: ty will warn about them. It gives a better experience when using an older
+        // ty version because the schema will not deny rules that have been removed in newer versions.
+        object.insert("additionalProperties".to_string(), level_schema.into());
+
+        schema
     }
 }
 
@@ -1532,68 +1583,6 @@ impl Display for ToSettingsError {
 }
 
 impl std::error::Error for ToSettingsError {}
-
-#[cfg(feature = "schemars")]
-mod schema {
-    use schemars::JsonSchema;
-    use schemars::r#gen::SchemaGenerator;
-    use schemars::schema::{
-        InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
-    };
-    use ty_python_semantic::lint::Level;
-
-    pub(super) struct Rules;
-
-    impl JsonSchema for Rules {
-        fn schema_name() -> String {
-            "Rules".to_string()
-        }
-
-        fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-            let registry = ty_python_semantic::default_lint_registry();
-
-            let level_schema = generator.subschema_for::<Level>();
-
-            let properties: schemars::Map<String, Schema> = registry
-                .lints()
-                .iter()
-                .map(|lint| {
-                    (
-                        lint.name().to_string(),
-                        Schema::Object(SchemaObject {
-                            metadata: Some(Box::new(Metadata {
-                                title: Some(lint.summary().to_string()),
-                                description: Some(lint.documentation()),
-                                deprecated: lint.status.is_deprecated(),
-                                default: Some(lint.default_level.to_string().into()),
-                                ..Metadata::default()
-                            })),
-                            subschemas: Some(Box::new(SubschemaValidation {
-                                one_of: Some(vec![level_schema.clone()]),
-                                ..Default::default()
-                            })),
-                            ..Default::default()
-                        }),
-                    )
-                })
-                .collect();
-
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::Object.into()),
-                object: Some(Box::new(ObjectValidation {
-                    properties,
-                    // Allow unknown rules: ty will warn about them.
-                    // It gives a better experience when using an older ty version because
-                    // the schema will not deny rules that have been removed in newer versions.
-                    additional_properties: Some(Box::new(level_schema)),
-                    ..ObjectValidation::default()
-                })),
-
-                ..Default::default()
-            })
-        }
-    }
-}
 
 #[derive(Error, Debug)]
 pub enum TyTomlError {
