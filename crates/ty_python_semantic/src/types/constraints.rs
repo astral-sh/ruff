@@ -771,6 +771,51 @@ impl<'db> Node<'db> {
 
         DisplayNode { node: self, db }
     }
+
+    // Keep this around for debugging purposes
+    #[expect(dead_code)]
+    fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
+        struct DisplayNode<'a, 'db> {
+            node: Node<'db>,
+            db: &'db dyn Db,
+            prefix: &'a dyn Display,
+        }
+
+        impl Display for DisplayNode<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.node {
+                    Node::AlwaysTrue => write!(f, "always"),
+                    Node::AlwaysFalse => write!(f, "never"),
+                    Node::Interior(interior) => {
+                        interior.constraint(self.db).display(self.db).fmt(f)?;
+                        write!(
+                            f,
+                            "\n{}┡━₁ {}",
+                            self.prefix,
+                            interior
+                                .if_true(self.db)
+                                .display_graph(self.db, &format_args!("{}│   ", self.prefix))
+                        )?;
+                        write!(
+                            f,
+                            "\n{}└─₀ {}",
+                            self.prefix,
+                            interior
+                                .if_false(self.db)
+                                .display_graph(self.db, &format_args!("{}    ", self.prefix))
+                        )?;
+                        Ok(())
+                    }
+                }
+            }
+        }
+
+        DisplayNode {
+            node: self,
+            db,
+            prefix,
+        }
+    }
 }
 
 /// An interior node of a BDD
