@@ -636,17 +636,15 @@ impl<'db> Node<'db> {
     }
 
     fn minimize(self, db: &'db dyn Db) -> Node<'db> {
-        self.smallest_minimizations(db).take_one()
+        self.minimizations(db).take_one()
     }
 
-    fn smallest_minimizations(self, db: &'db dyn Db) -> MinimizedNode<'db, 'db> {
+    fn minimizations(self, db: &'db dyn Db) -> MinimizedNode<'db, 'db> {
         match self {
             Node::AlwaysTrue => MinimizedNode::One(Node::AlwaysTrue),
             Node::AlwaysFalse => MinimizedNode::One(Node::AlwaysFalse),
-            Node::Impossible => MinimizedNode::Two([Node::AlwaysTrue, Node::AlwaysFalse]),
-            Node::Interior(interior) => {
-                MinimizedNode::Many(interior.smallest_minimizations(db).as_ref())
-            }
+            Node::Impossible => MinimizedNode::Two([Node::AlwaysFalse, Node::AlwaysTrue]),
+            Node::Interior(interior) => MinimizedNode::Many(interior.minimizations(db).as_ref()),
         }
     }
 
@@ -1047,10 +1045,10 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-    fn smallest_minimizations(self, db: &'db dyn Db) -> Box<[Node<'db>]> {
+    fn minimizations(self, db: &'db dyn Db) -> Box<[Node<'db>]> {
         let constraint = self.constraint(db);
-        let if_true = self.if_true(db).smallest_minimizations(db);
-        let if_false = self.if_false(db).smallest_minimizations(db);
+        let if_true = self.if_true(db).minimizations(db);
+        let if_false = self.if_false(db).minimizations(db);
         let mut minimizations =
             Vec::with_capacity(if_true.as_slice().len() * if_false.as_slice().len());
         for if_true in if_true.as_slice() {
@@ -1058,12 +1056,7 @@ impl<'db> InteriorNode<'db> {
                 minimizations.push(Node::new(db, constraint, *if_true, *if_false));
             }
         }
-        let minimum_size = minimizations
-            .iter()
-            .map(|node| node.interior_node_count(db))
-            .min()
-            .unwrap_or_default();
-        minimizations.retain(|node| node.interior_node_count(db) == minimum_size);
+        minimizations.sort_by_key(|node| node.interior_node_count(db));
         minimizations.into_boxed_slice()
     }
 }
