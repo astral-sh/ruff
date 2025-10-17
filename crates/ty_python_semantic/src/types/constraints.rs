@@ -409,6 +409,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 enum Node<'db> {
     AlwaysFalse,
     AlwaysTrue,
+    Impossible,
     Interior(InteriorNode<'db>),
 }
 
@@ -464,11 +465,22 @@ impl<'db> Node<'db> {
         matches!(self, Node::AlwaysFalse)
     }
 
+    /// Given a BDD that evaluates to `false` for some conditions, returns a new BDD where those
+    /// conditions are `impossible`.
+    fn impossible(self, db: &'db dyn Db) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse | Node::Impossible => Node::Impossible,
+            Node::Interior(interior) => interior.impossible(db),
+        }
+    }
+
     /// Returns the negation of this BDD.
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysFalse,
             Node::AlwaysFalse => Node::AlwaysTrue,
+            Node::Impossible => Node::Impossible,
             Node::Interior(interior) => interior.negate(db),
         }
     }
@@ -476,6 +488,7 @@ impl<'db> Node<'db> {
     /// Returns the `or` or union of two BDDs.
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
             (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
             (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
             (Node::Interior(a), Node::Interior(b)) => {
@@ -489,6 +502,7 @@ impl<'db> Node<'db> {
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
             (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
             (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
             (Node::Interior(a), Node::Interior(b)) => {
@@ -502,6 +516,7 @@ impl<'db> Node<'db> {
     /// Returns the `xor` of two BDDs.
     fn xor(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
             (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
             (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysFalse,
             (Node::AlwaysTrue, Node::Interior(interior))
@@ -518,6 +533,7 @@ impl<'db> Node<'db> {
     /// result.
     fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
             (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
                 Node::AlwaysTrue
             }
@@ -578,6 +594,7 @@ impl<'db> Node<'db> {
         match self {
             Node::AlwaysTrue => (Node::AlwaysTrue, false),
             Node::AlwaysFalse => (Node::AlwaysFalse, false),
+            Node::Impossible => (Node::Impossible, false),
             Node::Interior(interior) => interior.restrict_one(db, assignment),
         }
     }
@@ -603,14 +620,8 @@ impl<'db> Node<'db> {
     /// so we don't need to care what the BDD evaluates to when `T ≤ bool ∧ T ≰ int`, since that is
     /// not a valid combination of constraints.
     fn simplify(self, db: &'db dyn Db) -> Self {
-        // TODO: Simplifying to `false` for invalid assignments is correct, but means that our
-        // display output is not always as compact as it could be. Ideally, we would map impossible
-        // inputs to a new "don't care" terminal, and update our `Display` impl to display the
-        // smallest formula, choosing arbitrarily whether each "don't care" is true or false. Since
-        // that doesn't effect _correctness_, just the rendering in our test cases, I've punted on
-        // that for now.
         match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Impossible => self,
             Node::Interior(interior) => interior.simplify(db),
         }
     }
@@ -626,7 +637,7 @@ impl<'db> Node<'db> {
         impl<'db> Searcher<'db> {
             fn visit_node(&mut self, db: &'db dyn Db, node: Node<'db>) {
                 match node {
-                    Node::AlwaysFalse => {}
+                    Node::AlwaysFalse | Node::Impossible => {}
                     Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
                     Node::Interior(interior) => {
                         let interior_constraint = interior.constraint(db);
@@ -665,6 +676,7 @@ impl<'db> Node<'db> {
                 match self.node {
                     Node::AlwaysTrue => f.write_str("always"),
                     Node::AlwaysFalse => f.write_str("never"),
+                    Node::Impossible => f.write_str("impossible"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
                         clauses.simplify(self.db);
@@ -706,6 +718,7 @@ impl<'db> Node<'db> {
                 match self.node {
                     Node::AlwaysTrue => write!(f, "always"),
                     Node::AlwaysFalse => write!(f, "never"),
+                    Node::Impossible => write!(f, "impossible"),
                     Node::Interior(interior) => {
                         interior.constraint(self.db).display(self.db).fmt(f)?;
                         write!(
@@ -751,6 +764,16 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn impossible(self, db: &'db dyn Db) -> Node<'db> {
+        Node::new(
+            db,
+            self.constraint(db),
+            self.if_true(db).impossible(db),
+            self.if_false(db).impossible(db),
+        )
+    }
+
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn negate(self, db: &'db dyn Db) -> Node<'db> {
         Node::new(
@@ -920,11 +943,11 @@ impl<'db> InteriorNode<'db> {
             if left.implies(db, right) {
                 // left → right = ¬left ∨ right
                 let implication = left_constraint.negate(db).or(db, right_constraint);
-                domain = domain.and(db, implication);
+                domain = domain.and(db, implication.impossible(db));
             } else if right.implies(db, left) {
                 // right → left = ¬right ∨ left
                 let implication = right_constraint.negate(db).or(db, left_constraint);
-                domain = domain.and(db, implication);
+                domain = domain.and(db, implication.impossible(db));
             }
 
             match left.intersect(db, right) {
@@ -939,7 +962,7 @@ impl<'db> InteriorNode<'db> {
                         let implication = (left_constraint.negate(db))
                             .or(db, right_constraint.negate(db))
                             .or(db, intersection_constraint);
-                        domain = domain.and(db, implication);
+                        domain = domain.and(db, implication.impossible(db));
 
                         // But we also want to perform some replacements:
                         //   - `left ∧ right` becomes `intersection`
@@ -974,7 +997,7 @@ impl<'db> InteriorNode<'db> {
                     let no_conflict = left_constraint
                         .negate(db)
                         .or(db, right_constraint.negate(db));
-                    domain = domain.and(db, no_conflict);
+                    domain = domain.and(db, no_conflict.impossible(db));
                 }
             }
         }
