@@ -139,7 +139,7 @@ class FuzzResult:
                 case Executable.TY:
                     panic_message = f"The following code triggers a {new}ty panic:"
                 case _ as unreachable:
-                    assert_never(unreachable)
+                    assert_never(unreachable)  # ty: ignore[type-assertion-failure]
 
             print(colored(panic_message, "red"))
             print()
