@@ -891,7 +891,8 @@ impl<'db> InteriorNode<'db> {
         // it to the domain BDD. (Or more accurately, we will _remove_ its negation `x ∧ ¬y` from
         // the domain BDD.)
         let mut all_constraints = FxHashSet::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+        let mut simplified = Node::Interior(self);
+        simplified.for_each_constraint(db, &mut |constraint| {
             all_constraints.insert(constraint);
         });
 
@@ -916,17 +917,32 @@ impl<'db> InteriorNode<'db> {
 
             match left.intersect(db, right) {
                 Some(intersection) => {
-                    // Note that we don't have to record the backwards implication if the
-                    // intersection is not already mentioned in the BDD.
-                    if all_constraints.contains(&intersection)
-                        && intersection != left
-                        && intersection != right
-                    {
+                    if intersection != left && intersection != right {
                         // (left ∧ right) → intersection
-                        let backwards_implication = (left_constraint.negate(db))
+
+                        // If the intersection is non-empty, we want to add the resulting
+                        // implication (shown above) to the domain, just like with all of the other
+                        // simplifications.
+                        let intersection_constraint = Node::new_constraint(db, intersection);
+                        let implication = (left_constraint.negate(db))
                             .or(db, right_constraint.negate(db))
-                            .or(db, Node::new_constraint(db, intersection));
-                        domain = domain.and(db, backwards_implication);
+                            .or(db, intersection_constraint);
+                        domain = domain.and(db, implication);
+
+                        // But we also want to _replace_ `left ∧ right` with `intersection`. To do
+                        // that, we construct a new BDD representing the fact that `intersection`
+                        // is true whenever `left ∧ right` is, and OR that together with the
+                        // original BDD. That takes care of adding `intersection` to the result;
+                        // intersection with the domain below will take care of removing
+                        // `left ∧ right`.
+                        let (when_intersection_is_true, _) =
+                            simplified.restrict(db, [left.when_true(), right.when_true()]);
+                        let intersected = intersection_constraint.ite(
+                            db,
+                            when_intersection_is_true,
+                            Node::AlwaysFalse,
+                        );
+                        simplified = simplified.or(db, intersected);
                     }
                 }
 
@@ -942,7 +958,7 @@ impl<'db> InteriorNode<'db> {
 
         // Having done that, we just have to AND the original BDD with its domain. This will map
         // all invalid inputs to false.
-        Node::Interior(self).and(db, domain)
+        simplified.and(db, domain)
     }
 }
 
