@@ -50,7 +50,7 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, PartialSpecialization, Specialization, bind_typevar,
@@ -879,8 +879,12 @@ impl<'db> Type<'db> {
         match self {
             Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
             Type::FunctionLiteral(f) => {
-                // TODO(PR): implement `@type_check_only` for functions
-                false
+                if f.is_known(db, KnownFunction::TypeCheckOnly) {
+                    // `@typing.type_check_only` is itself unavailable at runtime
+                    true
+                } else {
+                    f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
+                }
             }
             _ => false,
         }

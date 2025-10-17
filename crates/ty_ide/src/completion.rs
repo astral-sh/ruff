@@ -852,16 +852,15 @@ fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
 /// 2) Names starting with `_` but not dunders
 /// 3) `__dunder__` names
 ///
-/// Among each category, type-check-only items are sorted last.
+/// Among each category, type-check-only items are sorted last,
+/// and otherwise completions are sorted lexicographically.
 ///
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
     let (kind1, kind2) = (NameKind::classify(&c1.name), NameKind::classify(&c2.name));
 
-    (kind1, c1.is_type_check_only)
-        .cmp(&(kind2, c2.is_type_check_only))
-        .then_with(|| c1.name.cmp(&c2.name))
+    (kind1, c1.is_type_check_only, &c1.name).cmp(&(kind2, c2.is_type_check_only, &c2.name))
 }
 
 #[cfg(test)]
@@ -3414,8 +3413,27 @@ from os.<CURSOR>
                     .unwrap()
             });
 
+        assert!(completions[apple_pos].is_type_check_only);
         assert!(apple_pos > banana_pos.max(cat_pos).max(azo_pos));
         assert!(ann_pos > apple_pos);
+    }
+
+    #[test]
+    fn type_check_only_is_type_check_only() {
+        // `@typing.type_check_only` is a function that's unavailable at runtime
+        // and so should be the last "non-underscore" completion in `typing`
+        let test = cursor_test("from typing import t<CURSOR>");
+
+        let settings = CompletionSettings::default();
+        let completions = completion(&test.db, &settings, test.cursor.file, test.cursor.offset);
+        let last_nonunderscore = completions
+            .into_iter()
+            .filter(|c| !c.name.starts_with("_"))
+            .last()
+            .unwrap();
+
+        assert_eq!(&last_nonunderscore.name, "type_check_only");
+        assert!(last_nonunderscore.is_type_check_only);
     }
 
     #[test]
