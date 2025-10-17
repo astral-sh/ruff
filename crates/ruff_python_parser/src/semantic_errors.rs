@@ -1137,7 +1137,7 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
-            SemanticSyntaxErrorKind::AlternateBindedPattern => {
+            SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
             }
         }
@@ -1532,7 +1532,7 @@ pub enum SemanticSyntaxErrorKind {
     ///     case [x] | [y]:  # error
     ///         ...
     /// ```
-    AlternateBindedPattern,
+    DifferentMatchPatternBindings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1798,7 +1798,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         continue;
                     };
                     if prev.symmetric_difference(&visitor.names).next().is_some() {
-                        // test_err alternate_binded_pattern
+                        // test_err different_match_pattern_bindings
                         // match x:
                         //     case [a] | [b]: ...
                         //     case [a] | []: ...
@@ -1813,7 +1813,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [C(D(a))] | [C(D(b))]: ...
                         //     case [(a, b)] | [(c, d)]: ...
 
-                        // test_ok alternate_binded_pattern
+                        // test_ok different_match_pattern_bindings
                         // match x:
                         //     case [a] | [a]: ...
                         //     case (x, y) | (x, y): ...
@@ -1822,7 +1822,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [a] | [C(a)]: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
-                            SemanticSyntaxErrorKind::AlternateBindedPattern,
+                            SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
                             *range,
                         );
                         break;
