@@ -940,22 +940,19 @@ impl<'db> InteriorNode<'db> {
                         // intersecting with the domain below will take care of removing each LHS.
                         let (left_and_right, _) = Node::Interior(self)
                             .restrict(db, [left.when_true(), right.when_true()]);
-                        let replacement =
-                            intersection_constraint.ite(db, left_and_right, Node::AlwaysFalse);
-                        simplified = simplified.or(db, replacement);
-
                         let (left_and_not_right, _) = Node::Interior(self)
                             .restrict(db, [left.when_true(), right.when_false()]);
-                        let replacement = left_constraint
-                            .and(db, intersection_constraint.negate(db))
-                            .ite(db, left_and_not_right, Node::AlwaysFalse);
-                        simplified = simplified.or(db, replacement);
-
                         let (not_left_and_right, _) = Node::Interior(self)
                             .restrict(db, [left.when_false(), right.when_true()]);
-                        let replacement = right_constraint
-                            .and(db, intersection_constraint.negate(db))
-                            .ite(db, not_left_and_right, Node::AlwaysFalse);
+                        let replacement = intersection_constraint.ite(
+                            db,
+                            left_and_right,
+                            left_constraint.ite(
+                                db,
+                                left_and_not_right,
+                                right_constraint.ite(db, not_left_and_right, Node::AlwaysFalse),
+                            ),
+                        );
                         simplified = simplified.or(db, replacement);
                     }
                 }
