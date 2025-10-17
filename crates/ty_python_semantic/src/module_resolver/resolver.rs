@@ -982,8 +982,9 @@ where
         if is_regular_package {
             // This is the only place where we need to consider the existence of legacy namespace
             // packages, as we are explicitly searching for the *parent* package of the module
-            // we actually want. Here, such a package should be treated as a namespace package.
-            // In all other contexts it acts like a normal package and needs no special handling.
+            // we actually want. Here, such a package should be treated as a PEP-420 ("modern")
+            // namespace package. In all other contexts it acts like a normal package and needs
+            // no special handling.
             in_namespace_package = is_legacy_namespace_package(&package_path, resolver_state);
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
@@ -1023,9 +1024,9 @@ where
 
 /// Determines whether a package is a legacy namespace package.
 ///
-/// Before PEP 420 introduce proper namespace packages, the ecosystem developed
+/// Before PEP 420 introduced implicit namespace packages, the ecosystem developed
 /// its own form of namespace packages. These legacy namespace packages continue to persist
-/// in modern codebases because they work with ancient pythons and if it ain't broke don't fix it.
+/// in modern codebases because they work with ancient Pythons and if it ain't broke, don't fix it.
 ///
 /// A legacy namespace package is distinguished by having an `__init__.py` that contains an
 /// expression to the effect of:
@@ -1037,7 +1038,8 @@ where
 /// The resulting package simultaneously has properties of both regular packages and namespace ones:
 ///
 /// * Like regular packages, `__init__.py` is defined and can contain items other than submodules
-/// * Like namespace packages, multiple copies of the package may exist with different submodules
+/// * Like implicit namespace packages, multiple copies of the package may exist with different
+///   submodules, and they will be merged into one namespace at runtime by the interpreter
 ///
 /// Now, you may rightly wonder: "What if the `__init__.py` files have different contents?"
 /// The apparent official answer is: "Don't do that!"
