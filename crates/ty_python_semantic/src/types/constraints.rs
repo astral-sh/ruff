@@ -1080,15 +1080,30 @@ impl<'db> InteriorNode<'db> {
     #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
     fn minimizations(self, db: &'db dyn Db) -> Box<[Node<'db>]> {
         let constraint = self.constraint(db);
-        let if_true = self.if_true(db).minimizations(db);
-        let if_false = self.if_false(db).minimizations(db);
-        let mut minimizations =
-            Vec::with_capacity(if_true.as_slice().len() * if_false.as_slice().len());
-        for if_true in if_true.as_slice() {
-            for if_false in if_false.as_slice() {
+        let if_true = self.if_true(db);
+        let if_true_minimizations = if_true.minimizations(db);
+        let if_false = self.if_false(db);
+        let if_false_minimizations = if_false.minimizations(db);
+
+        // This node's potential minimizations include each of the minimizations of its true and
+        // false branches, combined back together into an interior node.
+        let mut minimizations = Vec::with_capacity(
+            if_true_minimizations.as_slice().len() * if_false_minimizations.as_slice().len(),
+        );
+        for if_true in if_true_minimizations.as_slice() {
+            for if_false in if_false_minimizations.as_slice() {
                 minimizations.push(Node::new(db, constraint, *if_true, *if_false));
             }
         }
+
+        // If either of the original outgoing edges are impossible, we can also skip checking this
+        // node's variable entirely, and just use the result of the possible edge.
+        if matches!(if_true, Node::Impossible) {
+            minimizations.extend_from_slice(if_false_minimizations.as_slice());
+        } else if matches!(if_false, Node::Impossible) {
+            minimizations.extend_from_slice(if_true_minimizations.as_slice());
+        }
+
         minimizations.sort_by_key(|node| node.interior_node_count(db));
         minimizations.into_boxed_slice()
     }
