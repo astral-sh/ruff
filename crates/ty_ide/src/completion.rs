@@ -3428,8 +3428,8 @@ from os.<CURSOR>
         let completions = completion(&test.db, &settings, test.cursor.file, test.cursor.offset);
         let last_nonunderscore = completions
             .into_iter()
-            .filter(|c| !c.name.starts_with("_"))
-            .last()
+            .filter(|c| !c.name.starts_with('_'))
+            .next_back()
             .unwrap();
 
         assert_eq!(&last_nonunderscore.name, "type_check_only");
