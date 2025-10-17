@@ -48,9 +48,10 @@ jobs:
         run: |
           # shellcheck disable=SC2046
           (
-            uvx \
-            --python=3.12 \
-            --from=./python/py-fuzzer \
+            uv run \
+            --python=3.13 \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable=target/debug/ruff \
             --bin=ruff \
