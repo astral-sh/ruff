@@ -34,3 +34,7 @@ def foo():
 # https://github.com/astral-sh/ruff/issues/18776
 flag_stars = {}
 for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+
+# Regression test for https://github.com/astral-sh/ruff/issues/18778
+d = {}
+for country, stars in zip(d.keys(*x), d.values("hello")):...

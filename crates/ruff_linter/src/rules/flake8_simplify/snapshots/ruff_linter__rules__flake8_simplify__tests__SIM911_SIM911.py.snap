@@ -81,6 +81,8 @@ SIM911 [*] Use ` flag_stars.items()` instead of `(zip)(flag_stars.keys(), flag_s
 35 | flag_stars = {}
 36 | for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |
+38 | # Regression test for https://github.com/astral-sh/ruff/issues/18778
    |
 help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.items()`
 33 | 
@@ -88,3 +90,6 @@ help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.
 35 | flag_stars = {}
    - for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
 36 + for country, stars in flag_stars.items():...
+37 | 
+38 | # Regression test for https://github.com/astral-sh/ruff/issues/18778
+39 | d = {}
