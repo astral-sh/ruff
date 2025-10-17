@@ -52,8 +52,8 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType,
-    KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
+    FunctionType, KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, PartialSpecialization, Specialization, bind_typevar,
