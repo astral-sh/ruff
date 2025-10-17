@@ -674,10 +674,22 @@ impl<'db> Node<'db> {
             }
         }
 
-        DisplayNode {
+        let simplified = self.simplify(db);
+        let d = DisplayNode {
             node: self.simplify(db),
             db,
         }
+        .to_string();
+
+        eprintln!("====> display");
+        eprintln!(" ---> original");
+        eprintln!("  {}", self.display_graph(db, &"  "));
+        eprintln!(" ---> simplified");
+        eprintln!("  {}", simplified.display_graph(db, &"  "));
+        eprintln!(" ---> rendered");
+        eprintln!("  {d}");
+
+        d
     }
 
     // Keep this around for debugging purposes
@@ -969,6 +981,13 @@ impl<'db> InteriorNode<'db> {
 
         // Having done that, we just have to AND the original BDD with its domain. This will map
         // all invalid inputs to false.
+        eprintln!("====> simplify");
+        eprintln!(" ---> original");
+        eprintln!("  {}", Node::Interior(self).display_graph(db, &"  "));
+        eprintln!(" ---> simplified");
+        eprintln!("  {}", simplified.display_graph(db, &"  "));
+        eprintln!(" ---> domain");
+        eprintln!("  {}", domain.display_graph(db, &"  "));
         simplified.and(db, domain)
     }
 }
