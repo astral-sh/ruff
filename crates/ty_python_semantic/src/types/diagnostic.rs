@@ -6,6 +6,7 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::diagnostic::did_you_mean;
+use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
@@ -24,7 +25,6 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     infer_isolated_expression, protocol_class::ProtocolClass,
 };
-use crate::util::diagnostics::format_enumeration;
 use crate::{
     Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
 };

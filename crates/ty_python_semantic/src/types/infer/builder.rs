@@ -17,6 +17,7 @@ use super::{
     infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, infer_unpack_types,
 };
+use crate::diagnostic::format_enumeration;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
     KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
@@ -45,6 +46,7 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
+use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
@@ -104,8 +106,6 @@ use crate::types::{
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
-use crate::util::diagnostics::format_enumeration;
-use crate::util::subscript::{PyIndex, PySlice};
 use crate::{Db, FxOrderSet, Program};
 
 mod annotation_expression;
