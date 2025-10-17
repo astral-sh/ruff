@@ -621,7 +621,7 @@ Module(
  7 |     case *foo:
  8 |         pass
  9 |     case *foo | 1:
-   |                 ^ Syntax Error: alternative patterns bind different names
+   |          ^^^^^^^^ Syntax Error: alternative patterns bind different names
 10 |         pass
 11 |     case 1 | *foo:
    |
@@ -631,7 +631,7 @@ Module(
  9 |     case *foo | 1:
 10 |         pass
 11 |     case 1 | *foo:
-   |              ^^^^ Syntax Error: alternative patterns bind different names
+   |          ^^^^^^^^ Syntax Error: alternative patterns bind different names
 12 |         pass
 13 |     case Foo(*_):
    |

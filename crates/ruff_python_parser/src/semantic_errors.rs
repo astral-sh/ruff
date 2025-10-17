@@ -1775,7 +1775,9 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                     self.insert(name);
                 }
             }
-            Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+            Pattern::MatchOr(ast::PatternMatchOr {
+                patterns, range, ..
+            }) => {
                 // each of these patterns should be visited separately because patterns can only be
                 // duplicated within a single arm of the or pattern. For example, the case below is
                 // a valid pattern.
@@ -1821,7 +1823,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::AlternateBindedPattern,
-                            pattern.range(),
+                            *range,
                         );
                         break;
                     }
