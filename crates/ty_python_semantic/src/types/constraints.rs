@@ -1001,23 +1001,23 @@ impl<'db> ConstraintAssignment<'db> {
             ) => other_constraint.implies(db, self_constraint),
 
             // For a positive and negative constraint, the ranges have to be disjoint, and the
-            // negative range implies the positive range.
+            // positive range implies the negative range.
             //
             //     |---------------|...self...|---|
             //     ..|---other---|................|
             (
-                ConstraintAssignment::Negative(self_constraint),
-                ConstraintAssignment::Positive(other_constraint),
+                ConstraintAssignment::Positive(self_constraint),
+                ConstraintAssignment::Negative(other_constraint),
             ) => self_constraint.intersect(db, other_constraint).is_none(),
 
-            // It's theoretically possible for a positive constraint to imply a negative constraint
+            // It's theoretically possible for a negative constraint to imply a positive constraint
             // if the positive constraint is always satisfied (`Never ≤ T ≤ object`). But we never
-            // create constraints of that form, so with our representation, a positive constraint
-            // can never imply a negative constraint.
+            // create constraints of that form, so with our representation, a negative constraint
+            // can never imply a positive constraint.
             //
             //     |-------self--------|
             //     |---|...other...|---|
-            (ConstraintAssignment::Positive(_), ConstraintAssignment::Negative(_)) => false,
+            (ConstraintAssignment::Negative(_), ConstraintAssignment::Positive(_)) => false,
         }
     }
 
