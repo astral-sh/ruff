@@ -82,6 +82,8 @@ mod tests {
     #[test_case(Rule::UndocumentedPublicNestedClass, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D104/__init__.py"))]
+    #[test_case(Rule::UndocumentedPublicClassAttribute, Path::new("D1001_D1002.py"))]
+    #[test_case(Rule::UndocumentedPublicModuleVariable, Path::new("D1001_D1002.py"))]
     #[test_case(Rule::MissingSectionNameColon, Path::new("D.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("D214_module.py"))]

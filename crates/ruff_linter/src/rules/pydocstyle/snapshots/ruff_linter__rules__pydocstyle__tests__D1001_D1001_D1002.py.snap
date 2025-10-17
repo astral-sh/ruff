@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D1001 Missing docstring in public class attribute
+  --> D1001_D1002.py:37:5
+   |
+36 |     # Should trigger D1001 - undocumented public class attribute (annotated)
+37 |     class_var: int = 10
+   |     ^^^^^^^^^
+38 |
+39 |     # Should NOT trigger - has docstring
+   |
+
+D1001 Missing docstring in public class attribute
+  --> D1001_D1002.py:47:5
+   |
+46 |     # Should trigger D1001 - undocumented public class attribute (regular)
+47 |     another_class_var = 30
+   |     ^^^^^^^^^^^^^^^^^
+48 |
+49 |     # Should NOT trigger - documented
+   |
+
