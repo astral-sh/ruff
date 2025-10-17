@@ -498,9 +498,10 @@ jobs:
           chmod +x "${DOWNLOAD_PATH}/ruff"
 
           (
-            uvx \
+            uv run \
             --python="${PYTHON_VERSION}" \
-            --from=./python/py-fuzzer \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable="${DOWNLOAD_PATH}/ruff" \
             --bin=ruff \
@@ -694,9 +695,10 @@ jobs:
           chmod +x "${PWD}/ty" "${NEW_TY}/ty"
 
           (
-            uvx \
+            uv run \
             --python="${PYTHON_VERSION}" \
-            --from=./python/py-fuzzer \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable="${NEW_TY}/ty" \
             --baseline-executable="${PWD}/ty" \
