@@ -3896,6 +3896,55 @@ print(t'''{Foo} and Foo.zqzq<CURSOR>
         assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
     }
 
+    #[test]
+    fn typevar_with_upper_bound() {
+        let test = cursor_test(
+            "\
+def f[T: str](msg: T):
+    msg.<CURSOR>
+",
+        );
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+    }
+
+    #[test]
+    fn typevar_with_constraints() {
+        // Test TypeVar with constraints
+        let test = cursor_test(
+            "\
+from typing import TypeVar
+
+class A:
+    only_on_a: int
+    on_a_and_b: str
+
+class B:
+    only_on_b: float
+    on_a_and_b: str
+
+T = TypeVar('T', A, B)
+
+def f(x: T):
+    x.<CURSOR>
+",
+        );
+        test.assert_completions_include("on_a_and_b");
+        test.assert_completions_do_not_include("only_on_a");
+        test.assert_completions_do_not_include("only_on_b");
+    }
+
+    #[test]
+    fn typevar_without_bounds_or_constraints() {
+        let test = cursor_test(
+            "\
+def f[T](x: T):
+    x.<CURSOR>
+",
+        );
+        test.assert_completions_include("__repr__");
+    }
+
     // NOTE: The methods below are getting somewhat ridiculous.
     // We should refactor this by converting to using a builder
     // to set different modes. ---AG

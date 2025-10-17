@@ -14,7 +14,7 @@ use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{
     ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
-    class::CodeGeneratorKind,
+    TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
@@ -177,6 +177,29 @@ impl<'db> AllMembers<'db> {
 
             Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
 
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    None => {
+                        self.extend_with_type(db, Type::object());
+                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        self.extend_with_type(db, bound);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        self.members.extend(
+                            constraints
+                                .elements(db)
+                                .iter()
+                                .map(|ty| AllMembers::of(db, *ty).members)
+                                .reduce(|acc, members| {
+                                    acc.intersection(&members).cloned().collect()
+                                })
+                                .unwrap_or_default(),
+                        );
+                    }
+                }
+            }
+
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
@@ -194,7 +217,6 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
