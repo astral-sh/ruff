@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -19,6 +23,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.13"
+  NEXTEST_PROFILE: ci
 
 jobs:
   determine_changes:
@@ -271,9 +276,6 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        shell: bash
-        env:
-          NEXTEST_PROFILE: "ci"
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest
 
       # Check for broken links in the documentation.
@@ -299,9 +301,13 @@ jobs:
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    # release builds timeout on GitHub runners, so this job is just skipped on forks in the `if` check
+    runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    if: |
+      github.repository == 'astral-sh/ruff' &&
+      !contains(github.event.pull_request.labels.*.name, 'no-test') &&
+      (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main')
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -325,9 +331,6 @@ jobs:
         with:
           enable-cache: "true"
       - name: "Run tests"
-        shell: bash
-        env:
-          NEXTEST_PROFILE: "ci"
         run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
 
   cargo-test-windows:
@@ -352,9 +355,7 @@ jobs:
         with:
           enable-cache: "true"
       - name: "Run tests"
-        shell: bash
         env:
-          NEXTEST_PROFILE: "ci"
           # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
@@ -385,9 +386,6 @@ jobs:
         with:
           enable-cache: "true"
       - name: "Run tests"
-        shell: bash
-        env:
-          NEXTEST_PROFILE: "ci"
         run: |
           cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
@@ -445,7 +443,6 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Build tests"
-        shell: bash
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: cargo "+${MSRV}" test --no-run --all-features

@@ -84,17 +84,14 @@ impl Diagnostic {
     /// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
     /// the other way around. And since we want to do this conversion in a couple
     /// places, it makes sense to centralize it _somewhere_. So it's here for now.
-    ///
-    /// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
-    /// message.
     pub fn invalid_syntax(
         span: impl Into<Span>,
         message: impl IntoDiagnosticMessage,
         range: impl Ranged,
     ) -> Diagnostic {
-        let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+        let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = span.into().with_range(range.range());
-        diag.annotate(Annotation::primary(span).message(message));
+        diag.annotate(Annotation::primary(span));
         diag
     }
 

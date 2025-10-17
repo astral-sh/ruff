@@ -153,21 +153,23 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
     ),
 }
 
-impl<'a, 'db> InferableTypeVars<'a, 'db> {
+impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(
-        &self,
+        self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
-        match self {
+        match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::One(typevars) => typevars.contains(&bound_typevar.identity(db)),
+            InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
             InferableTypeVars::Two(left, right) => {
-                left.is_inferable(db, bound_typevar) || right.is_inferable(db, bound_typevar)
+                self.is_inferable(db, *left) || self.is_inferable(db, *right)
             }
         }
     }
+}
 
+impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn merge(&'a self, other: Option<&'a InferableTypeVars<'a, 'db>>) -> Self {
         match other {
             Some(other) => InferableTypeVars::Two(self, other),
@@ -310,25 +312,7 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
-        // The first inner function is so that salsa is caching the FxHashSet, not the
-        // InferableTypeVars that wraps it. (That way InferableTypeVars can contain references, and
-        // doesn't need to impl salsa::Update.)
-        InferableTypeVars::One(self.inferable_typevars_inner(db))
-    }
-
-    #[salsa::tracked(
-        returns(ref),
-        cycle_fn=inferable_typevars_cycle_recover,
-        cycle_initial=inferable_typevars_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
-    fn inferable_typevars_inner(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-        // The second inner function is because the salsa macros seem to not like nested structs
-        // and impl blocks inside the function.
-        self.inferable_typevars_innerer(db)
-    }
-
-    fn inferable_typevars_innerer(self, db: &'db dyn Db) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
             seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
@@ -364,14 +348,27 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        let visitor = CollectTypeVars {
-            typevars: RefCell::new(FxHashSet::default()),
-            seen_types: RefCell::new(FxIndexSet::default()),
-        };
-        for bound_typevar in self.variables(db) {
-            visitor.visit_bound_type_var_type(db, bound_typevar);
+        #[salsa::tracked(
+            returns(ref),
+            cycle_fn=inferable_typevars_cycle_recover,
+            cycle_initial=inferable_typevars_cycle_initial,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn inferable_typevars_inner<'db>(
+            db: &'db dyn Db,
+            generic_context: GenericContext<'db>,
+        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+            let visitor = CollectTypeVars::default();
+            for bound_typevar in generic_context.variables(db) {
+                visitor.visit_bound_type_var_type(db, bound_typevar);
+            }
+            visitor.typevars.into_inner()
         }
-        visitor.typevars.into_inner()
+
+        // This ensures that salsa caches the FxHashSet, not the InferableTypeVars that wraps it.
+        // (That way InferableTypeVars can contain references, and doesn't need to impl
+        // salsa::Update.)
+        InferableTypeVars::One(inferable_typevars_inner(db, self))
     }
 
     pub(crate) fn variables(
@@ -1358,6 +1355,7 @@ impl<'db> SpecializationBuilder<'db> {
                     let tcx = tcx_specialization.and_then(|specialization| {
                         specialization.get(self.db, variable.bound_typevar)
                     });
+
                     ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
                 }
 
@@ -1380,7 +1378,7 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
-        mut actual: Type<'db>,
+        actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -1411,9 +1409,11 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
-        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T` to `int`.
-        // So, here we remove the union elements that are not related to `formal`.
-        actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+        // Remove the union elements that are not related to `formal`.
+        //
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T`
+        // to `int`.
+        let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
@@ -1484,7 +1484,7 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
-                if self.inferable.is_inferable(self.db, bound_typevar) =>
+                if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {

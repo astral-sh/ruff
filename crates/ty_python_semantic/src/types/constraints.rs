@@ -259,7 +259,7 @@ impl<'db> ConstraintSet<'db> {
                 .project_typevar(db, typevar.identity(db))
                 .and(db, valid_specializations.node);
             eprintln!(" -> typevar {}", typevar.identity(db).display(db));
-            let satisfied = if inferable.is_inferable(db, typevar) {
+            let satisfied = if typevar.is_inferable(db, inferable) {
                 eprintln!("    inferable");
                 !restricted.is_never_satisfied()
             } else {

@@ -33,13 +33,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syn
 # Diagnostics
 
 ```
-error[invalid-syntax]
+error[invalid-syntax]: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
  --> src/mdtest_snippet.py:6:19
   |
 4 | async def f():
 5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax…
 6 |     return {n: [x async for x in elements(n)] for n in range(3)}
-  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
 7 | async def test():
 8 |     # error: [not-iterable] "Object of type `range` is not async-iterable"
   |

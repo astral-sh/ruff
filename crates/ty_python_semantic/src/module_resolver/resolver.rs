@@ -348,9 +348,15 @@ impl SearchPaths {
         })
     }
 
+    /// Registers the file roots for all non-dynamically discovered search paths that aren't first-party.
     pub(crate) fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
-        for path in self.static_paths.iter().chain(self.site_packages.iter()) {
+        for path in self
+            .static_paths
+            .iter()
+            .chain(self.site_packages.iter())
+            .chain(&self.stdlib_path)
+        {
             if let Some(system_path) = path.as_system_path() {
                 if !path.is_first_party() {
                     files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
@@ -451,9 +457,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             continue;
         }
 
-        let site_packages_root = files
-            .root(db, &site_packages_dir)
-            .expect("Site-package root to have been created");
+        let site_packages_root = files.expect_root(db, &site_packages_dir);
 
         // This query needs to be re-executed each time a `.pth` file
         // is added, modified or removed from the `site-packages` directory.
@@ -500,6 +504,23 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                             "Adding editable installation to module resolution path {path}",
                             path = installation
                         );
+
+                        // Register a file root for editable installs that are outside any other root
+                        // (Most importantly, don't register a root for editable installations from the project
+                        // directory as that would change the durability of files within those folders).
+                        // Not having an exact file root for editable installs just means that
+                        // some queries (like `list_modules_in`) will run slightly more frequently
+                        // than they would otherwise.
+                        if let Some(dynamic_path) = search_path.as_system_path() {
+                            if files.root(db, dynamic_path).is_none() {
+                                files.try_add_root(
+                                    db,
+                                    dynamic_path,
+                                    FileRootKind::LibrarySearchPath,
+                                );
+                            }
+                        }
+
                         dynamic_paths.push(search_path);
                     }
 

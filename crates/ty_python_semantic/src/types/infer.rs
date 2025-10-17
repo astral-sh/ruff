@@ -391,7 +391,7 @@ impl<'db> TypeContext<'db> {
             .and_then(|ty| ty.known_specialization(db, known_class))
     }
 
-    pub(crate) fn map_annotation(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
         }

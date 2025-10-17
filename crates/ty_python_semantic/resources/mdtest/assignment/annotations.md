@@ -114,7 +114,7 @@ h: list[list[int]] = [[], [42]]
 reveal_type(h)  # revealed: list[list[int]]
 
 i: list[typing.Any] = [1, 2, "3", ([4],)]
-reveal_type(i)  # revealed: list[Any | int | str | tuple[list[Unknown | int]]]
+reveal_type(i)  # revealed: list[Any]
 
 j: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
 reveal_type(j)  # revealed: list[tuple[str | int, ...]]
@@ -123,7 +123,7 @@ k: list[tuple[list[int], ...]] = [([],), ([1, 2], [3, 4]), ([5], [6], [7])]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-reveal_type(l)  # revealed: tuple[list[int], list[Any | int], list[Any | int], list[str]]
+reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
 
 type IntList = list[int]
 
@@ -144,6 +144,12 @@ reveal_type(q)  # revealed: dict[int | str, int]
 
 r: dict[int | str, int | str] = {1: 1, 2: 2, 3: 3}
 reveal_type(r)  # revealed: dict[int | str, int | str]
+
+s: dict[int | str, int | str]
+s = {1: 1, 2: 2, 3: 3}
+reveal_type(s)  # revealed: dict[int | str, int | str]
+(s := {1: 1, 2: 2, 3: 3})
+reveal_type(s)  # revealed: dict[int | str, int | str]
 ```
 
 ## Optional collection literal annotations are understood
@@ -181,7 +187,7 @@ h: list[list[int]] | None = [[], [42]]
 reveal_type(h)  # revealed: list[list[int]]
 
 i: list[typing.Any] | None = [1, 2, "3", ([4],)]
-reveal_type(i)  # revealed: list[Any | int | str | tuple[list[Unknown | int]]]
+reveal_type(i)  # revealed: list[Any]
 
 j: list[tuple[str | int, ...]] | None = [(1, 2), ("foo", "bar"), ()]
 reveal_type(j)  # revealed: list[tuple[str | int, ...]]
@@ -190,8 +196,7 @@ k: list[tuple[list[int], ...]] | None = [([],), ([1, 2], [3, 4]), ([5], [6], [7]
 reveal_type(k)  # revealed: list[tuple[list[int], ...]]
 
 l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] | None = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
-# TODO: this should be `tuple[list[int], list[Any | int], list[Any | int], list[str]]`
-reveal_type(l)  # revealed: tuple[list[Unknown | int], list[Unknown | int], list[Unknown | int], list[Unknown | str]]
+reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
 
 type IntList = list[int]
 
@@ -277,7 +282,7 @@ reveal_type(k)  # revealed: list[Literal[1, 2, 3]]
 type Y[T] = list[T]
 
 l: Y[Y[Literal[1]]] = [[1]]
-reveal_type(l)  # revealed: list[list[Literal[1]]]
+reveal_type(l)  # revealed: list[Y[Literal[1]]]
 
 m: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(m)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
@@ -297,6 +302,12 @@ reveal_type(q)  # revealed: list[int]
 
 r: list[Literal[1, 2, 3, 4]] = [1, 2]
 reveal_type(r)  # revealed: list[Literal[1, 2, 3, 4]]
+
+s: list[Literal[1]]
+s = [1]
+reveal_type(s)  # revealed: list[Literal[1]]
+(s := [1])
+reveal_type(s)  # revealed: list[Literal[1]]
 ```
 
 ## PEP-604 annotations are supported
@@ -416,13 +427,14 @@ a = f("a")
 reveal_type(a)  # revealed: list[Literal["a"]]
 
 b: list[int | Literal["a"]] = f("a")
-reveal_type(b)  # revealed: list[int | Literal["a"]]
+reveal_type(b)  # revealed: list[Literal["a"] | int]
 
 c: list[int | str] = f("a")
-reveal_type(c)  # revealed: list[int | str]
+reveal_type(c)  # revealed: list[str | int]
 
 d: list[int | tuple[int, int]] = f((1, 2))
-reveal_type(d)  # revealed: list[int | tuple[int, int]]
+# TODO: We could avoid reordering the union elements here.
+reveal_type(d)  # revealed: list[tuple[int, int] | int]
 
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
@@ -437,8 +449,49 @@ def f2[T: int](x: T) -> T:
     return x
 
 i: int = f2(True)
-reveal_type(i)  # revealed: int
+reveal_type(i)  # revealed: Literal[True]
 
 j: int | str = f2(True)
 reveal_type(j)  # revealed: Literal[True]
+```
+
+Types are not widened unnecessarily:
+
+```py
+def id[T](x: T) -> T:
+    return x
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def _(i: int):
+    a: int | None = i
+    b: int | None = id(i)
+    c: int | str | None = id(i)
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+
+    a: list[int | None] | None = [i]
+    b: list[int | None] | None = id([i])
+    c: list[int | None] | int | None = id([i])
+    reveal_type(a)  # revealed: list[int | None]
+    # TODO: these should reveal `list[int | None]`
+    # we currently do not use the call expression annotation as type context for argument inference
+    reveal_type(b)  # revealed: list[Unknown | int]
+    reveal_type(c)  # revealed: list[Unknown | int]
+
+    a: list[int | None] | None = [i]
+    b: list[int | None] | None = lst(i)
+    c: list[int | None] | int | None = lst(i)
+    reveal_type(a)  # revealed: list[int | None]
+    reveal_type(b)  # revealed: list[int | None]
+    reveal_type(c)  # revealed: list[int | None]
+
+    a: list | None = []
+    b: list | None = id([])
+    c: list | int | None = id([])
+    reveal_type(a)  # revealed: list[Unknown]
+    reveal_type(b)  # revealed: list[Unknown]
+    reveal_type(c)  # revealed: list[Unknown]
 ```

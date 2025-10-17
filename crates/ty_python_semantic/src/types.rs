@@ -32,7 +32,9 @@ pub(crate) use self::signatures::{CallableSignature, Parameter, Parameters, Sign
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
-use crate::place::{Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol};
+use crate::place::{
+    Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol,
+};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
@@ -50,7 +52,8 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionSpans, FunctionType,
+    KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, PartialSpecialization, Specialization, bind_typevar,
@@ -618,64 +621,92 @@ impl<'db> PropertyInstanceType<'db> {
 }
 
 bitflags! {
-    /// Used for the return type of `dataclass(…)` calls. Keeps track of the arguments
-    /// that were passed in. For the precise meaning of the fields, see [1].
+    /// Used to store metadata about a dataclass or dataclass-like class.
+    /// For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/dataclasses.html
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct DataclassParams: u16 {
-        const INIT = 0b0000_0000_0001;
-        const REPR = 0b0000_0000_0010;
-        const EQ = 0b0000_0000_0100;
-        const ORDER = 0b0000_0000_1000;
-        const UNSAFE_HASH = 0b0000_0001_0000;
-        const FROZEN = 0b0000_0010_0000;
-        const MATCH_ARGS = 0b0000_0100_0000;
-        const KW_ONLY = 0b0000_1000_0000;
-        const SLOTS = 0b0001_0000_0000;
-        const WEAKREF_SLOT = 0b0010_0000_0000;
-        // This is not an actual argument from `dataclass(...)` but a flag signaling that no
-        // `field_specifiers` was specified for the `dataclass_transform`, see [1].
-        // [1]: https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-transform-parameters
-        const NO_FIELD_SPECIFIERS = 0b0100_0000_0000;
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct DataclassFlags: u16 {
+        const INIT = 1 << 0;
+        const REPR = 1 << 1;
+        const EQ = 1 << 2;
+        const ORDER = 1 << 3;
+        const UNSAFE_HASH = 1 << 4;
+        const FROZEN = 1 << 5;
+        const MATCH_ARGS = 1 << 6;
+        const KW_ONLY = 1 << 7;
+        const SLOTS = 1 << 8   ;
+        const WEAKREF_SLOT = 1 << 9;
     }
 }
 
-impl get_size2::GetSize for DataclassParams {}
+impl get_size2::GetSize for DataclassFlags {}
 
-impl Default for DataclassParams {
+impl Default for DataclassFlags {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
     }
 }
 
-impl From<DataclassTransformerParams> for DataclassParams {
-    fn from(params: DataclassTransformerParams) -> Self {
+impl From<DataclassTransformerFlags> for DataclassFlags {
+    fn from(params: DataclassTransformerFlags) -> Self {
         let mut result = Self::default();
 
         result.set(
             Self::EQ,
-            params.contains(DataclassTransformerParams::EQ_DEFAULT),
+            params.contains(DataclassTransformerFlags::EQ_DEFAULT),
         );
         result.set(
             Self::ORDER,
-            params.contains(DataclassTransformerParams::ORDER_DEFAULT),
+            params.contains(DataclassTransformerFlags::ORDER_DEFAULT),
         );
         result.set(
             Self::KW_ONLY,
-            params.contains(DataclassTransformerParams::KW_ONLY_DEFAULT),
+            params.contains(DataclassTransformerFlags::KW_ONLY_DEFAULT),
         );
         result.set(
             Self::FROZEN,
-            params.contains(DataclassTransformerParams::FROZEN_DEFAULT),
-        );
-
-        result.set(
-            Self::NO_FIELD_SPECIFIERS,
-            !params.contains(DataclassTransformerParams::FIELD_SPECIFIERS),
+            params.contains(DataclassTransformerFlags::FROZEN_DEFAULT),
         );
 
         result
+    }
+}
+
+/// Metadata for a dataclass. Stored inside a `Type::DataclassDecorator(…)`
+/// instance that we use as the return type of a `dataclasses.dataclass` and
+/// dataclass-transformer decorator calls.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DataclassParams<'db> {
+    flags: DataclassFlags,
+
+    #[returns(deref)]
+    field_specifiers: Box<[Type<'db>]>,
+}
+
+impl get_size2::GetSize for DataclassParams<'_> {}
+
+impl<'db> DataclassParams<'db> {
+    fn default_params(db: &'db dyn Db) -> Self {
+        Self::from_flags(db, DataclassFlags::default())
+    }
+
+    fn from_flags(db: &'db dyn Db, flags: DataclassFlags) -> Self {
+        let dataclasses_field = known_module_symbol(db, KnownModule::Dataclasses, "field")
+            .place
+            .ignore_possibly_undefined()
+            .unwrap_or_else(Type::unknown);
+
+        Self::new(db, flags, vec![dataclasses_field].into_boxed_slice())
+    }
+
+    fn from_transformer_params(db: &'db dyn Db, params: DataclassTransformerParams<'db>) -> Self {
+        Self::new(
+            db,
+            DataclassFlags::from(params.flags(db)),
+            params.field_specifiers(db),
+        )
     }
 }
 
@@ -719,9 +750,9 @@ pub enum Type<'db> {
     /// A special callable that is returned by a `dataclass(…)` call. It is usually
     /// used as a decorator. Note that this is only used as a return type for actual
     /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
-    DataclassDecorator(DataclassParams),
+    DataclassDecorator(DataclassParams<'db>),
     /// A special callable that is returned by a `dataclass_transform(…)` call.
-    DataclassTransformer(DataclassTransformerParams),
+    DataclassTransformer(DataclassTransformerParams<'db>),
     /// The type of an arbitrary callable object with a certain specified signature.
     Callable(CallableType<'db>),
     /// A specific module object
@@ -1196,22 +1227,35 @@ impl<'db> Type<'db> {
         if yes { self.negate(db) } else { *self }
     }
 
-    /// Remove the union elements that are not related to `target`.
+    /// If the type is a union, filters union elements based on the provided predicate.
+    ///
+    /// Otherwise, returns the type unchanged.
+    pub(crate) fn filter_union(
+        self,
+        db: &'db dyn Db,
+        f: impl FnMut(&Type<'db>) -> bool,
+    ) -> Type<'db> {
+        if let Type::Union(union) = self {
+            union.filter(db, f)
+        } else {
+            self
+        }
+    }
+
+    /// If the type is a union, removes union elements that are disjoint from `target`.
+    ///
+    /// Otherwise, returns the type unchanged.
     pub(crate) fn filter_disjoint_elements(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> Type<'db> {
-        if let Type::Union(union) = self {
-            union.filter(db, |elem| {
-                !elem
-                    .when_disjoint_from(db, target, inferable)
-                    .satisfies_all_typevars(db, inferable)
-            })
-        } else {
-            self
-        }
+        self.filter_union(db, |elem| {
+            !elem
+                .when_disjoint_from(db, target, inferable)
+                .satisfies_all_typevars(db, inferable)
+        })
     }
 
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type
@@ -1606,7 +1650,7 @@ impl<'db> Type<'db> {
             // into a constraint set. If the typevar has an upper bound or constraints, then the
             // relation only has to hold when the typevar has a valid specialization (i.e., one
             // that satisfies the upper bound/constraints).
-            (Type::TypeVar(bound_typevar), _) if !inferable.is_inferable(db, bound_typevar) => {
+            (Type::TypeVar(bound_typevar), _) if !bound_typevar.is_inferable(db, inferable) => {
                 bound_typevar.valid_specializations(db).and(db, || {
                     ConstraintSet::constrain_typevar(
                         db,
@@ -1617,7 +1661,7 @@ impl<'db> Type<'db> {
                     )
                 })
             }
-            (_, Type::TypeVar(bound_typevar)) if !inferable.is_inferable(db, bound_typevar) => {
+            (_, Type::TypeVar(bound_typevar)) if !bound_typevar.is_inferable(db, inferable) => {
                 bound_typevar.valid_specializations(db).implies(db, || {
                     ConstraintSet::constrain_typevar(
                         db,
@@ -1730,19 +1774,19 @@ impl<'db> Type<'db> {
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
             (Type::TypeVar(bound_typevar), Type::Union(union))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && intersection.positive(db).contains(&target) =>
             {
                 ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && intersection.negative(db).contains(&target) =>
             {
                 ConstraintSet::from(false)
@@ -1754,14 +1798,14 @@ impl<'db> Type<'db> {
             // Note that this is not handled by the early return at the beginning of this method,
             // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
-                if !inferable.is_inferable(db, lhs_bound_typevar)
+                if !lhs_bound_typevar.is_inferable(db, inferable)
                     && lhs_bound_typevar.identity(db) == rhs_bound_typevar.identity(db) =>
             {
                 ConstraintSet::from(true)
             }
 
             (Type::TypeVar(bound_typevar), _)
-                if inferable.is_inferable(db, bound_typevar) && relation.is_assignability() =>
+                if bound_typevar.is_inferable(db, inferable) && relation.is_assignability() =>
             {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
@@ -1861,7 +1905,7 @@ impl<'db> Type<'db> {
             (_, Type::Never) => ConstraintSet::from(false),
 
             (_, Type::TypeVar(typevar))
-                if inferable.is_inferable(db, typevar)
+                if typevar.is_inferable(db, inferable)
                     && relation.is_assignability()
                     && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
                         !self
@@ -1892,7 +1936,7 @@ impl<'db> Type<'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(bound_typevar), _) | (_, Type::TypeVar(bound_typevar))
-                if inferable.is_inferable(db, bound_typevar) =>
+                if bound_typevar.is_inferable(db, inferable) =>
             {
                 ConstraintSet::from(false)
             }
@@ -2332,7 +2376,7 @@ impl<'db> Type<'db> {
             // never subtypes of any other variants
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
-                debug_assert!(!inferable.is_inferable(db, bound_typevar));
+                assert!(!bound_typevar.is_inferable(db, inferable));
                 ConstraintSet::from(false)
             }
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
@@ -2568,7 +2612,7 @@ impl<'db> Type<'db> {
             // and `Any`!) Different typevars might be disjoint, depending on their bounds and
             // constraints, which are handled below.
             (Type::TypeVar(self_bound_typevar), Type::TypeVar(other_bound_typevar))
-                if !inferable.is_inferable(db, self_bound_typevar)
+                if !self_bound_typevar.is_inferable(db, inferable)
                     && self_bound_typevar.identity(db) == other_bound_typevar.identity(db) =>
             {
                 ConstraintSet::from(false)
@@ -2576,7 +2620,7 @@ impl<'db> Type<'db> {
 
             (tvar @ Type::TypeVar(bound_typevar), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar)
+                if !bound_typevar.is_inferable(db, inferable)
                     && intersection.negative(db).contains(&tvar) =>
             {
                 ConstraintSet::from(true)
@@ -2587,7 +2631,7 @@ impl<'db> Type<'db> {
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
             (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar))
-                if !inferable.is_inferable(db, bound_typevar) =>
+                if !bound_typevar.is_inferable(db, inferable) =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => ConstraintSet::from(false),
@@ -5404,7 +5448,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
             .match_parameters(db, argument_types)
-            .check_types(db, argument_types, &TypeContext::default())
+            .check_types(db, argument_types, &TypeContext::default(), &[])
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -5456,7 +5500,7 @@ impl<'db> Type<'db> {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, argument_types, &tcx)?;
+                    .check_types(db, argument_types, &tcx, &[])?;
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -10975,9 +11019,9 @@ impl<'db> UnionType<'db> {
     pub(crate) fn filter(
         self,
         db: &'db dyn Db,
-        filter_fn: impl FnMut(&&Type<'db>) -> bool,
+        mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
+        Self::from_elements(db, self.elements(db).iter().filter(|ty| f(ty)))
     }
 
     pub(crate) fn map_with_boundness(

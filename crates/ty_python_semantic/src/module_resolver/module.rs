@@ -175,10 +175,7 @@ fn all_submodule_names_for_package<'db>(
             // tree. When the revision gets bumped, the cache
             // that Salsa creates does for this routine will be
             // invalidated.
-            let root = db
-                .files()
-                .root(db, parent_directory)
-                .expect("System search path should have a registered root");
+            let root = db.files().expect_root(db, parent_directory);
             let _ = root.revision(db);
 
             db.system()

@@ -2558,6 +2558,28 @@ class C:
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
+## Attributes of standard library modules that aren't yet defined
+
+For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`main.py`:
+
+```py
+import datetime
+
+# error: [unresolved-attribute]
+reveal_type(datetime.UTC)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

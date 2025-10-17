@@ -92,42 +92,42 @@ fn test_quiet_output() -> anyhow::Result<()> {
 #[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> <temp_dir>/test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
 #[test]
 fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     let case = CliTest::with_files([(".test.py", "~")])?;
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> .test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -146,57 +146,57 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     "###);
 
     // Test that we can set to false via CLI
-    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test that we can set to false via config file
     case.write_file("ty.toml", "src.respect-ignore-files = false")?;
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Ensure CLI takes precedence
     case.write_file("ty.toml", "src.respect-ignore-files = true")?;
-    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 

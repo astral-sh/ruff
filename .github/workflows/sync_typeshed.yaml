@@ -28,6 +28,10 @@ on:
     # Run on the 1st and the 15th of every month:
     - cron: "0 0 1,15 * *"
 
+defaults:
+  run:
+    shell: bash
+
 env:
   # Don't set this flag globally for the workflow: it does strange things
   # to the snapshots in the `cargo insta test --accept` step in the MacOS job.
@@ -35,6 +39,7 @@ env:
   # FORCE_COLOR: 1
 
   CARGO_TERM_COLOR: always
+  NEXTEST_PROFILE: "ci"
   GH_TOKEN: ${{ github.token }}
 
   # The name of the upstream branch that the first worker creates,
@@ -133,7 +138,6 @@ jobs:
           git config --global user.email '<>'
       - name: Sync Windows docstrings
         id: docstrings
-        shell: bash
         env:
           FORCE_COLOR: 1
         run: ./scripts/codemod_docstrings.sh
