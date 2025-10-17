@@ -4,6 +4,7 @@ higher-level-symbols-preferred,main.py,0,
 higher-level-symbols-preferred,main.py,1,1
 import-deprioritizes-dunder,main.py,0,1
 import-deprioritizes-sunder,main.py,0,1
+import-deprioritizes-type_check-only,main.py,0,1
 internal-typeshed-hidden,main.py,0,4
 none-completion,main.py,0,11
 numpy-array,main.py,0,
