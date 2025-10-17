@@ -1322,7 +1322,7 @@ impl Display for DisplayParameter<'_> {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct TruncationPolicy {
     max: usize,
     max_when_elided: usize,
@@ -1342,6 +1342,7 @@ impl TruncationPolicy {
     }
 }
 
+#[derive(Debug)]
 struct DisplayOmitted {
     count: usize,
     singular: &'static str,
