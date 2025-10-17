@@ -65,6 +65,7 @@ fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<Module<'db>> {
+    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
     let mut lister = Lister::new(db, search_path.path(db));
     match search_path.path(db).as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
@@ -72,10 +73,7 @@ fn list_modules_in<'db>(
             // register an explicit dependency on this directory. When
             // the revision gets bumped, the cache that Salsa creates
             // for this routine will be invalidated.
-            let root = db
-                .files()
-                .root(db, system_search_path)
-                .expect("System search path should have a registered root");
+            let root = db.files().expect_root(db, system_search_path);
             let _ = root.revision(db);
 
             let Ok(it) = db.system().read_directory(system_search_path) else {
@@ -969,10 +967,6 @@ mod tests {
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
         db.files().try_add_root(&db, &src, FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
-        db.files()
-            .try_add_root(&db, &custom_typeshed, FileRootKind::LibrarySearchPath);
 
         Program::from_settings(
             &db,
@@ -1469,6 +1463,55 @@ not_a_directory
     }
 
     #[test]
+    fn editable_installs_into_first_party_search_path() {
+        let mut db = TestDb::new();
+
+        let src = SystemPath::new("/src");
+        let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
+        let site_packages_pth = venv_site_packages.join("foo.pth");
+        let editable_install_location = src.join("x/y/a.py");
+
+        db.write_files([
+            (&site_packages_pth, "/src/x/y/"),
+            (&editable_install_location, ""),
+        ])
+        .unwrap();
+
+        db.files()
+            .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    site_packages_paths: vec![venv_site_packages],
+                    ..SearchPathSettings::new(vec![src.to_path_buf()])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
+            },
+        );
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |m| m.name(&db).as_str() == "a"),
+            @r#"
+        [
+            Module::File("a", "editable", "/src/x/y/a.py", Module, None),
+        ]
+        "#,
+        );
+
+        let editable_root = db
+            .files()
+            .root(&db, &editable_install_location)
+            .expect("file root for editable install");
+
+        assert_eq!(editable_root.path(&db), src);
+    }
+
+    #[test]
     fn multiple_site_packages_with_editables() {
         let mut db = TestDb::new();
 
@@ -1490,12 +1533,6 @@ not_a_directory
 
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &venv_site_packages, FileRootKind::LibrarySearchPath);
-        db.files()
-            .try_add_root(&db, &system_site_packages, FileRootKind::LibrarySearchPath);
-        db.files()
-            .try_add_root(&db, SystemPath::new("/x"), FileRootKind::LibrarySearchPath);
 
         Program::from_settings(
             &db,
@@ -1625,8 +1662,6 @@ not_a_directory
 
         db.files()
             .try_add_root(&db, &project_directory, FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
 
         Program::from_settings(
             &db,

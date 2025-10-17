@@ -343,7 +343,7 @@ impl<'db> BoundSuperType<'db> {
             Type::TypeAlias(alias) => {
                 return delegate_with_error_mapped(alias.value_type(db), None);
             }
-            Type::TypeVar(type_var) | Type::NonInferableTypeVar(type_var) => {
+            Type::TypeVar(type_var) => {
                 let type_var = type_var.typevar(db);
                 return match type_var.bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {

@@ -26,7 +26,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{EmitterContext, create_syntax_error_diagnostic};
+use crate::message::EmitterContext;
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -405,7 +405,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             diagnostic
         })
         .chain(parsed.errors().iter().map(|parse_error| {
-            create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
         }))
         .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
@@ -419,7 +419,7 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
     let messages: Vec<_> = errors
         .iter()
         .map(|parse_error| {
-            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
         })
         .collect();
 

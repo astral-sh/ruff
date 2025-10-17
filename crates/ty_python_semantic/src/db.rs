@@ -12,6 +12,9 @@ pub trait Db: SourceDb {
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
     fn lint_registry(&self) -> &LintRegistry;
+
+    /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
+    fn verbose(&self) -> bool;
 }
 
 #[cfg(test)]
@@ -125,6 +128,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             default_lint_registry()
+        }
+
+        fn verbose(&self) -> bool {
+            false
         }
     }
 

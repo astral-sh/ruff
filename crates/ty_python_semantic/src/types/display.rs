@@ -560,9 +560,7 @@ impl Display for DisplayRepresentation<'_> {
                     .display_with(self.db, self.settings.clone()),
                 literal_name = enum_literal.name(self.db)
             ),
-            Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                bound_typevar.identity(self.db).display(self.db).fmt(f)
-            }
+            Type::TypeVar(bound_typevar) => bound_typevar.identity(self.db).display(self.db).fmt(f),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
@@ -593,7 +591,15 @@ impl Display for DisplayRepresentation<'_> {
                 .0
                 .display_with(self.db, self.settings.clone())
                 .fmt(f),
-            Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
+            Type::TypeAlias(alias) => {
+                f.write_str(alias.name(self.db))?;
+                match alias.specialization(self.db) {
+                    None => Ok(()),
+                    Some(specialization) => specialization
+                        .display_short(self.db, TupleSpecialization::No, self.settings.clone())
+                        .fmt(f),
+                }
+            }
         }
     }
 }

@@ -497,6 +497,8 @@ class A:
     a: str = field(kw_only=False)
     b: int = 0
 
+reveal_type(A.__init__)  # revealed: (self: A, a: str, *, b: int = Literal[0]) -> None
+
 A("hi")
 ```
 

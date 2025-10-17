@@ -24,7 +24,6 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::message::create_syntax_error_diagnostic;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
@@ -496,15 +495,15 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| {
-            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error)
+            Diagnostic::invalid_syntax(source_file.clone(), syntax_error, syntax_error)
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| create_syntax_error_diagnostic(source_file.clone(), error, error)),
+                .map(|error| Diagnostic::invalid_syntax(source_file.clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             if let Some(range) = diagnostic.range() {
