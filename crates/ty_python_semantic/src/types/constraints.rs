@@ -156,7 +156,7 @@ where
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, get_size2::GetSize, salsa::Update)]
 pub struct ConstraintSet<'db> {
     /// The BDD representing this constraint set
     node: Node<'db>,
@@ -187,20 +187,20 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.or(db, other.node).simplify(db);
+        self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.and(db, other.node).simplify(db);
+        self.node = self.node.and(db, other.node);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
-            node: self.node.negate(db).simplify(db),
+            node: self.node.negate(db),
         }
     }
 
@@ -823,7 +823,10 @@ impl<'db> Node<'db> {
             }
         }
 
-        DisplayNode { node: self, db }
+        DisplayNode {
+            node: self.simplify_new(db),
+            db,
+        }
     }
 
     // Keep this around for debugging purposes
