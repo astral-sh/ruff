@@ -762,7 +762,7 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => f.write_str("never"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
-                        clauses.simplify();
+                        clauses.simplify(self.db);
                         clauses.display(self.db).fmt(f)
                     }
                 }
@@ -1186,6 +1186,50 @@ impl<'db> ConstraintAssignment<'db> {
         *self = self.negated();
     }
 
+    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            // For two positive constraints, one range has to fully contain the other; the larger
+            // constraint implies the smaller.
+            //
+            //     ....|-----self------|....
+            //     ......|---other---|......
+            (
+                ConstraintAssignment::Positive(self_constraint),
+                ConstraintAssignment::Positive(other_constraint),
+            ) => self_constraint.implies(db, other_constraint),
+
+            // For two negative constraints, one range has to fully contain the other; the ranges
+            // represent "holes", though, so the constraint with the smaller range implies the one
+            // with the larger.
+            //
+            //     |-----|...self....|-----|
+            //     |---|.....other.....|---|
+            (
+                ConstraintAssignment::Negative(self_constraint),
+                ConstraintAssignment::Negative(other_constraint),
+            ) => other_constraint.implies(db, self_constraint),
+
+            // For a positive and negative constraint, the ranges have to be disjoint, and the
+            // negative range implies the positive range.
+            //
+            //     |---------------|...self...|---|
+            //     ..|---other---|................|
+            (
+                ConstraintAssignment::Negative(self_constraint),
+                ConstraintAssignment::Positive(other_constraint),
+            ) => self_constraint.intersect(db, other_constraint).is_none(),
+
+            // It's theoretically possible for a positive constraint to imply a negative constraint
+            // if the positive constraint is always satisfied (`Never ≤ T ≤ object`). But we never
+            // create constraints of that form, so with our representation, a positive constraint
+            // can never imply a negative constraint.
+            //
+            //     |-------self--------|
+            //     |---|...other...|---|
+            (ConstraintAssignment::Positive(_), ConstraintAssignment::Negative(_)) => false,
+        }
+    }
+
     // Keep this for future debugging needs, even though it's not currently used when rendering
     // constraint sets.
     #[expect(dead_code)]
@@ -1254,6 +1298,41 @@ impl<'db> SatisfiedClause<'db> {
         false
     }
 
+    /// Simplifies this clause by removing constraints that imply other constraints in the clause.
+    /// (Clauses are the intersection of constraints, so if two clauses are redundant, we want to
+    /// remove the larger one and keep the smaller one.)
+    fn simplify(&mut self, db: &'db dyn Db) -> bool {
+        let mut changes_made = false;
+        let mut i = 0;
+        // Loop through each constraint, comparing it with any constraints that appear later in the
+        // list.
+        'outer: while i < self.constraints.len() {
+            let mut j = i + 1;
+            while j < self.constraints.len() {
+                if self.constraints[j].implies(db, self.constraints[i]) {
+                    // If constraint `i` is removed, then we don't need to compare it with any
+                    // later constraints in the list. Note that we continue the outer loop, instead
+                    // of breaking from the inner loop, so that we don't bump index `i` below.
+                    // (We'll have swapped another element into place at that index, and want to
+                    // make sure that we process it.)
+                    self.constraints.swap_remove(i);
+                    changes_made = true;
+                    continue 'outer;
+                } else if self.constraints[i].implies(db, self.constraints[j]) {
+                    // If constraint `j` is removed, then we can continue the inner loop. We will
+                    // swap a new element into place at index `j`, and will continue comparing the
+                    // constraint at index `i` with later constraints.
+                    self.constraints.swap_remove(j);
+                    changes_made = true;
+                } else {
+                    j += 1;
+                }
+            }
+            i += 1;
+        }
+        changes_made
+    }
+
     fn display(&self, db: &'db dyn Db) -> String {
         // This is a bit heavy-handed, but we need to output the constraints in a consistent order
         // even though Salsa IDs are assigned non-deterministically. This Display output is only
@@ -1303,16 +1382,25 @@ impl<'db> SatisfiedClauses<'db> {
     /// Simplifies the DNF representation, removing redundancies that do not change the underlying
     /// function. (This is used when displaying a BDD, to make sure that the representation that we
     /// show is as simple as possible while still producing the same results.)
-    fn simplify(&mut self) {
-        while self.simplify_one_round() {
+    fn simplify(&mut self, db: &'db dyn Db) {
+        while self.simplify_one_round(db) {
             // Keep going
         }
     }
 
-    fn simplify_one_round(&mut self) -> bool {
+    fn simplify_one_round(&mut self, db: &'db dyn Db) -> bool {
         let mut changes_made = false;
 
-        // First remove any duplicate clauses. (The clause list will start out with no duplicates
+        // First simplify each clause individually, by removing constraints that are implied by
+        // other constraints in the clause.
+        for clause in &mut self.clauses {
+            changes_made |= clause.simplify(db);
+        }
+        if changes_made {
+            return true;
+        }
+
+        // Then remove any duplicate clauses. (The clause list will start out with no duplicates
         // in the first round of simplification, because of the guarantees provided by the BDD
         // structure. But earlier rounds of simplification might have made some clauses redundant.)
         // Note that we have to loop through the vector element indexes manually, since we might
