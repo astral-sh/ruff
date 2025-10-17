@@ -2205,6 +2205,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let known_function =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
+        // `type_check_only` is itself not available at runtime
+        if known_function == Some(KnownFunction::TypeCheckOnly) {
+            function_decorators |= FunctionDecorators::TYPE_CHECK_ONLY;
+        }
+
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Function(function))

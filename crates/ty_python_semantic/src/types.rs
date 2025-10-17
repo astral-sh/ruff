@@ -904,12 +904,7 @@ impl<'db> Type<'db> {
         match self {
             Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
             Type::FunctionLiteral(f) => {
-                if f.is_known(db, KnownFunction::TypeCheckOnly) {
-                    // `@typing.type_check_only` is itself unavailable at runtime
-                    true
-                } else {
-                    f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
-                }
+                f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
             }
             _ => false,
         }
