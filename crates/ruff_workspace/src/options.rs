@@ -469,6 +469,7 @@ pub struct Options {
     deny_unknown_fields,
     rename_all = "kebab-case"
 )]
+#[cfg_attr(feature = "schemars", schemars(!from))]
 pub struct LintOptions {
     #[serde(flatten)]
     pub common: LintCommonOptions,
@@ -563,8 +564,8 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
-    fn schema_name() -> String {
-        "DeprecatedTopLevelLintOptions".to_owned()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("DeprecatedTopLevelLintOptions")
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed(concat!(
@@ -573,28 +574,25 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        use schemars::schema::Schema;
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        use serde_json::Value;
 
-        let common_schema = LintCommonOptions::json_schema(generator);
-        let mut schema_obj = common_schema.into_object();
-
-        if let Some(object) = schema_obj.object.as_mut() {
-            for property in object.properties.values_mut() {
-                if let Schema::Object(property_object) = property {
-                    if let Some(metadata) = &mut property_object.metadata {
-                        metadata.deprecated = true;
-                    } else {
-                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
-                            deprecated: true,
-                            ..schemars::schema::Metadata::default()
-                        }));
-                    }
+        let mut schema = LintCommonOptions::json_schema(generator);
+        if let Some(properties) = schema
+            .ensure_object()
+            .get_mut("properties")
+            .and_then(|value| value.as_object_mut())
+        {
+            for property in properties.values_mut() {
+                if let Ok(property_schema) = <&mut schemars::Schema>::try_from(property) {
+                    property_schema
+                        .ensure_object()
+                        .insert("deprecated".to_string(), Value::Bool(true));
                 }
             }
         }
 
-        Schema::Object(schema_obj)
+        schema
     }
 }
 
@@ -603,6 +601,7 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
 // Don't add any new options to this struct. Add them to [`LintOptions`] directly to avoid exposing them in the
 // global settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schemars", schemars(inline))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
@@ -3891,6 +3890,7 @@ pub struct AnalyzeOptions {
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
 /// far better error messages when deserializing.
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LintOptionsWire {
@@ -3938,8 +3938,8 @@ pub struct LintOptionsWire {
     pyflakes: Option<PyflakesOptions>,
     pylint: Option<PylintOptions>,
     pyupgrade: Option<PyUpgradeOptions>,
-    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
-    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    per_file_ignores: Option<BTreeMap<String, Vec<RuleSelector>>>,
+    extend_per_file_ignores: Option<BTreeMap<String, Vec<RuleSelector>>>,
 
     exclude: Option<Vec<String>>,
     pydoclint: Option<PydoclintOptions>,
@@ -4004,6 +4004,11 @@ impl From<LintOptionsWire> for LintOptions {
             typing_extensions,
             future_annotations,
         } = value;
+
+        let per_file_ignores =
+            per_file_ignores.map(|map| map.into_iter().collect::<FxHashMap<_, _>>());
+        let extend_per_file_ignores =
+            extend_per_file_ignores.map(|map| map.into_iter().collect::<FxHashMap<_, _>>());
 
         LintOptions {
             #[expect(deprecated)]
