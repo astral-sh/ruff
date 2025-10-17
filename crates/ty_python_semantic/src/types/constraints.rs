@@ -1393,21 +1393,18 @@ impl<'db> SatisfiedClauses<'db> {
         while self.simplify_one_round(db) {
             // Keep going
         }
+
+        // Lastly simplify each clause individually, by removing constraints that are implied by
+        // other constraints in the clause.
+        for clause in &mut self.clauses {
+            clause.simplify(db);
+        }
     }
 
     fn simplify_one_round(&mut self, db: &'db dyn Db) -> bool {
         let mut changes_made = false;
 
-        // First simplify each clause individually, by removing constraints that are implied by
-        // other constraints in the clause.
-        for clause in &mut self.clauses {
-            changes_made |= clause.simplify(db);
-        }
-        if changes_made {
-            return true;
-        }
-
-        // Then remove any duplicate clauses. (The clause list will start out with no duplicates
+        // First remove any duplicate clauses. (The clause list will start out with no duplicates
         // in the first round of simplification, because of the guarantees provided by the BDD
         // structure. But earlier rounds of simplification might have made some clauses redundant.)
         // Note that we have to loop through the vector element indexes manually, since we might
