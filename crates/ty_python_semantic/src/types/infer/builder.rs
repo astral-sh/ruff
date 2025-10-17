@@ -6025,9 +6025,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // TODO: Checking assignability against the full declared type could help avoid
             // cases where the constraint solver is not smart enough to solve complex unions.
             // We should see revisit this after the new constraint solver is implemented.
-            if !speculated_bindings
-                .return_type(db)
-                .is_assignable_to(db, narrowed_ty)
+            if speculated_bindings
+                .callable_type()
+                .synthesized_constructor_return_ty(db)
+                .is_none()
+                && !speculated_bindings
+                    .return_type(db)
+                    .is_assignable_to(db, narrowed_ty)
             {
                 return None;
             }

@@ -2687,6 +2687,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
+    callable_type: Type<'db>,
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -2703,6 +2704,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
+        callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
@@ -2713,6 +2715,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
+            callable_type,
             call_expression_tcx,
             return_ty,
             errors,
@@ -2754,8 +2757,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         let return_with_tcx = self
-            .signature
-            .return_ty
+            .callable_type
+            .synthesized_constructor_return_ty(self.db)
+            .or(self.signature.return_ty)
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
@@ -2763,7 +2767,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Prefer the declared type of generic classes.
         let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
-            tcx.class_specialization(self.db)?;
+            tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
+                .class_specialization(self.db)?;
+
             builder.infer(return_ty, tcx).ok()?;
             Some(builder.type_mappings().clone())
         });
@@ -3196,6 +3202,7 @@ impl<'db> Binding<'db> {
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
+            self.callable_type,
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,
