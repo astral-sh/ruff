@@ -929,20 +929,34 @@ impl<'db> InteriorNode<'db> {
                             .or(db, intersection_constraint);
                         domain = domain.and(db, implication);
 
-                        // But we also want to _replace_ `left ∧ right` with `intersection`. To do
-                        // that, we construct a new BDD representing the fact that `intersection`
-                        // is true whenever `left ∧ right` is, and OR that together with the
-                        // original BDD. That takes care of adding `intersection` to the result;
-                        // intersection with the domain below will take care of removing
-                        // `left ∧ right`.
-                        let (when_intersection_is_true, _) =
-                            simplified.restrict(db, [left.when_true(), right.when_true()]);
-                        let intersected = intersection_constraint.ite(
-                            db,
-                            when_intersection_is_true,
-                            Node::AlwaysFalse,
-                        );
-                        simplified = simplified.or(db, intersected);
+                        // But we also want to perform some replacements:
+                        //   - `left ∧ right` becomes `intersection`
+                        //   - `left ∧ ¬right` becomes `left ∧ ¬intersection`
+                        //   - `¬left ∧ right` becomes `¬intersection ∧ right`
+                        //
+                        // To do that, we construct new BDDs that for each, of the form
+                        // `if RHS then LHS else false`, and OR those together with the original
+                        // BDD. That takes care of adding each replacement to the result;
+                        // intersecting with the domain below will take care of removing each LHS.
+                        let (left_and_right, _) = Node::Interior(self)
+                            .restrict(db, [left.when_true(), right.when_true()]);
+                        let replacement =
+                            intersection_constraint.ite(db, left_and_right, Node::AlwaysFalse);
+                        simplified = simplified.or(db, replacement);
+
+                        let (left_and_not_right, _) = Node::Interior(self)
+                            .restrict(db, [left.when_true(), right.when_false()]);
+                        let replacement = left_constraint
+                            .and(db, intersection_constraint.negate(db))
+                            .ite(db, left_and_not_right, Node::AlwaysFalse);
+                        simplified = simplified.or(db, replacement);
+
+                        let (not_left_and_right, _) = Node::Interior(self)
+                            .restrict(db, [left.when_false(), right.when_true()]);
+                        let replacement = right_constraint
+                            .and(db, intersection_constraint.negate(db))
+                            .ite(db, not_left_and_right, Node::AlwaysFalse);
+                        simplified = simplified.or(db, replacement);
                     }
                 }
 
