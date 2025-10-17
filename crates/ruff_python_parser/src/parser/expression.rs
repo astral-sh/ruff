@@ -1588,6 +1588,12 @@ impl<'src> Parser<'src> {
         // f"""{f"""{x}"""}"""                # mark the whole triple quote
         // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
 
+        // test_err pep701_nested_interpolation_py311
+        // # parse_options: {"target-version": "3.11"}
+        // # nested interpolations also need to be checked
+        // f'{1: abcd "{'aa'}" }'
+        // f'{1: abcd "{"\n"}" }'
+
         // test_err nested_quote_in_format_spec_py312
         // # parse_options: {"target-version": "3.12"}
         // f"{1:""}"  # this is a ParseError on all versions
