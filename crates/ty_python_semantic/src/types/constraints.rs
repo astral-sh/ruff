@@ -455,6 +455,15 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the number of internal nodes in this BDD. This is a decent proxy for the complexity
+    /// of the function that the BDD represents.
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Impossible => 0,
+            Node::Interior(interior) => interior.interior_node_count(db),
+        }
+    }
+
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied(self) -> bool {
         matches!(self, Node::AlwaysTrue)
@@ -626,6 +635,21 @@ impl<'db> Node<'db> {
         }
     }
 
+    fn minimize(self, db: &'db dyn Db) -> Node<'db> {
+        self.smallest_minimizations(db).take_one()
+    }
+
+    fn smallest_minimizations(self, db: &'db dyn Db) -> MinimizedNode<'db, 'db> {
+        match self {
+            Node::AlwaysTrue => MinimizedNode::One(Node::AlwaysTrue),
+            Node::AlwaysFalse => MinimizedNode::One(Node::AlwaysFalse),
+            Node::Impossible => MinimizedNode::Two([Node::AlwaysTrue, Node::AlwaysFalse]),
+            Node::Interior(interior) => {
+                MinimizedNode::Many(interior.smallest_minimizations(db).as_ref())
+            }
+        }
+    }
+
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
     /// to `true`. (This translates the boolean function that this BDD represents into DNF form.)
     fn satisfied_clauses(self, db: &'db dyn Db) -> SatisfiedClauses<'db> {
@@ -687,8 +711,9 @@ impl<'db> Node<'db> {
         }
 
         let simplified = self.simplify(db);
+        let minimized = simplified.minimize(db);
         let d = DisplayNode {
-            node: self.simplify(db),
+            node: self.simplify(db).minimize(db),
             db,
         }
         .to_string();
@@ -698,6 +723,8 @@ impl<'db> Node<'db> {
         eprintln!("  {}", self.display_graph(db, &"  "));
         eprintln!(" ---> simplified");
         eprintln!("  {}", simplified.display_graph(db, &"  "));
+        eprintln!(" ---> minimized");
+        eprintln!("  {}", minimized.display_graph(db, &"  "));
         eprintln!(" ---> rendered");
         eprintln!("  {d}");
 
@@ -764,6 +791,11 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        1 + self.if_true(db).interior_node_count(db) + self.if_false(db).interior_node_count(db)
+    }
+
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn impossible(self, db: &'db dyn Db) -> Node<'db> {
         Node::new(
@@ -1012,6 +1044,53 @@ impl<'db> InteriorNode<'db> {
         eprintln!(" ---> domain");
         eprintln!("  {}", domain.display_graph(db, &"  "));
         simplified.and(db, domain)
+    }
+
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn smallest_minimizations(self, db: &'db dyn Db) -> Box<[Node<'db>]> {
+        let constraint = self.constraint(db);
+        let if_true = self.if_true(db).smallest_minimizations(db);
+        let if_false = self.if_false(db).smallest_minimizations(db);
+        let mut minimizations =
+            Vec::with_capacity(if_true.as_slice().len() * if_false.as_slice().len());
+        for if_true in if_true.as_slice() {
+            for if_false in if_false.as_slice() {
+                minimizations.push(Node::new(db, constraint, *if_true, *if_false));
+            }
+        }
+        let minimum_size = minimizations
+            .iter()
+            .map(|node| node.interior_node_count(db))
+            .min()
+            .unwrap_or_default();
+        minimizations.retain(|node| node.interior_node_count(db) == minimum_size);
+        minimizations.into_boxed_slice()
+    }
+}
+
+enum MinimizedNode<'a, 'db> {
+    One(Node<'db>),
+    Two([Node<'db>; 2]),
+    Many(&'a [Node<'db>]),
+}
+
+impl<'a, 'db> MinimizedNode<'a, 'db> {
+    fn take_one(self) -> Node<'db> {
+        match self {
+            MinimizedNode::One(node) | MinimizedNode::Two([node, _]) => node,
+            MinimizedNode::Many(nodes) => nodes
+                .first()
+                .copied()
+                .expect("should always be able to minimize BDD"),
+        }
+    }
+
+    fn as_slice(&'a self) -> &'a [Node<'db>] {
+        match self {
+            MinimizedNode::One(node) => std::slice::from_ref(node),
+            MinimizedNode::Two(nodes) => nodes.as_slice(),
+            MinimizedNode::Many(nodes) => nodes,
+        }
     }
 }
 
