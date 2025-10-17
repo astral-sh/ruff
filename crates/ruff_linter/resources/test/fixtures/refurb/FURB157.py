@@ -69,3 +69,10 @@ Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
 Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
 Decimal(float("   -" "nan"))
 Decimal(float("-nAn"))
+
+# Test cases for digit separators (safe fixes)
+# https://github.com/astral-sh/ruff/issues/20572
+Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
