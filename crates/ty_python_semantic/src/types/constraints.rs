@@ -498,12 +498,17 @@ impl<'db> Node<'db> {
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
-            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
-            (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
+            (Node::AlwaysTrue, Node::AlwaysTrue)
+            | (Node::AlwaysTrue, Node::AlwaysFalse)
+            | (Node::AlwaysFalse, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
+            // OR is commutative, which lets us halve the cache requirements
             (Node::Interior(a), Node::Interior(b)) => {
-                // OR is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-                a.or(db, b)
+                a.or(db, Node::Interior(b))
+            }
+            (Node::Interior(interior), terminal @ _) | (terminal @ _, Node::Interior(interior)) => {
+                interior.or(db, terminal)
             }
         }
     }
@@ -512,12 +517,17 @@ impl<'db> Node<'db> {
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
+            (Node::AlwaysFalse, Node::AlwaysFalse)
+            | (Node::AlwaysTrue, Node::AlwaysFalse)
+            | (Node::AlwaysFalse, Node::AlwaysTrue) => Node::AlwaysFalse,
+            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
+            // OR is commutative, which lets us halve the cache requirements
             (Node::Interior(a), Node::Interior(b)) => {
-                // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-                a.and(db, b)
+                a.and(db, Node::Interior(b))
+            }
+            (Node::Interior(interior), terminal @ _) | (terminal @ _, Node::Interior(interior)) => {
+                interior.and(db, terminal)
             }
         }
     }
@@ -526,14 +536,19 @@ impl<'db> Node<'db> {
     fn xor(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
-            (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
-            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysFalse,
-            (Node::AlwaysTrue, Node::Interior(interior))
-            | (Node::Interior(interior), Node::AlwaysTrue) => interior.negate(db),
+            (Node::AlwaysTrue, Node::AlwaysFalse) | (Node::AlwaysFalse, Node::AlwaysTrue) => {
+                Node::AlwaysTrue
+            }
+            (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
+                Node::AlwaysFalse
+            }
+            // XOR is commutative, which lets us halve the cache requirements
             (Node::Interior(a), Node::Interior(b)) => {
-                // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-                a.xor(db, b)
+                a.xor(db, Node::Interior(b))
+            }
+            (Node::Interior(interior), terminal @ _) | (terminal @ _, Node::Interior(interior)) => {
+                interior.xor(db, terminal)
             }
         }
     }
@@ -549,22 +564,13 @@ impl<'db> Node<'db> {
             (Node::AlwaysTrue, Node::AlwaysFalse) | (Node::AlwaysFalse, Node::AlwaysTrue) => {
                 Node::AlwaysFalse
             }
-            (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(interior)) => Node::new(
-                db,
-                interior.constraint(db),
-                self.iff(db, interior.if_true(db)),
-                self.iff(db, interior.if_false(db)),
-            ),
-            (Node::Interior(interior), Node::AlwaysTrue | Node::AlwaysFalse) => Node::new(
-                db,
-                interior.constraint(db),
-                interior.if_true(db).iff(db, other),
-                interior.if_false(db).iff(db, other),
-            ),
+            // IFF is commutative, which lets us halve the cache requirements
             (Node::Interior(a), Node::Interior(b)) => {
-                // IFF is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-                a.iff(db, b)
+                a.iff(db, Node::Interior(b))
+            }
+            (Node::Interior(interior), terminal @ _) | (terminal @ _, Node::Interior(interior)) => {
+                interior.iff(db, terminal)
             }
         }
     }
@@ -776,6 +782,30 @@ impl<'db> Node<'db> {
     }
 }
 
+/// The ordering of an interior node with another node, along with the typevar of the smaller node.
+/// If the "left" interior node is greater than or equal to, then the right node must also be an
+/// interior node, and we include that in the result too.
+enum NodeOrdering<'db> {
+    Less(ConstrainedTypeVar<'db>),
+    Equal(ConstrainedTypeVar<'db>, InteriorNode<'db>),
+    Greater(ConstrainedTypeVar<'db>, InteriorNode<'db>),
+}
+
+impl<'db> NodeOrdering<'db> {
+    fn from_constraints(
+        db: &'db dyn Db,
+        left_constraint: ConstrainedTypeVar<'db>,
+        right: InteriorNode<'db>,
+    ) -> NodeOrdering<'db> {
+        let right_constraint = right.constraint(db);
+        match left_constraint.cmp(db, right_constraint) {
+            Ordering::Less => NodeOrdering::Less(left_constraint),
+            Ordering::Equal => NodeOrdering::Equal(left_constraint, right),
+            Ordering::Greater => NodeOrdering::Greater(right_constraint, right),
+        }
+    }
+}
+
 /// An interior node of a BDD
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct InteriorNode<'db> {
@@ -792,6 +822,17 @@ impl<'db> InteriorNode<'db> {
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn interior_node_count(self, db: &'db dyn Db) -> usize {
         1 + self.if_true(db).interior_node_count(db) + self.if_false(db).interior_node_count(db)
+    }
+
+    fn cmp_constraints(self, db: &'db dyn Db, other: Node<'db>) -> NodeOrdering<'db> {
+        let self_constraint = self.constraint(db);
+        match other {
+            // Terminal nodes come after all interior nodes
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Impossible => {
+                NodeOrdering::Less(self_constraint)
+            }
+            Node::Interior(other) => NodeOrdering::from_constraints(db, self_constraint, other),
+        }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
@@ -815,105 +856,97 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        let other_constraint = other.constraint(db);
-        match self_constraint.cmp(db, other_constraint) {
-            Ordering::Equal => Node::new(
+    fn or(self, db: &'db dyn Db, other: Node<'db>) -> Node<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => Node::new(
                 db,
-                self_constraint,
+                constraint,
                 self.if_true(db).or(db, other.if_true(db)),
                 self.if_false(db).or(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            NodeOrdering::Less(constraint) => Node::new(
                 db,
-                self_constraint,
-                self.if_true(db).or(db, Node::Interior(other)),
-                self.if_false(db).or(db, Node::Interior(other)),
+                constraint,
+                self.if_true(db).or(db, other),
+                self.if_false(db).or(db, other),
             ),
-            Ordering::Greater => Node::new(
+            NodeOrdering::Greater(constraint, other) => Node::new(
                 db,
-                other_constraint,
-                Node::Interior(self).or(db, other.if_true(db)),
-                Node::Interior(self).or(db, other.if_false(db)),
+                constraint,
+                self.or(db, other.if_true(db)),
+                self.or(db, other.if_false(db)),
             ),
         }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        let other_constraint = other.constraint(db);
-        match self_constraint.cmp(db, other_constraint) {
-            Ordering::Equal => Node::new(
+    fn and(self, db: &'db dyn Db, other: Node<'db>) -> Node<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => Node::new(
                 db,
-                self_constraint,
+                constraint,
                 self.if_true(db).and(db, other.if_true(db)),
                 self.if_false(db).and(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            NodeOrdering::Less(constraint) => Node::new(
                 db,
-                self_constraint,
-                self.if_true(db).and(db, Node::Interior(other)),
-                self.if_false(db).and(db, Node::Interior(other)),
+                constraint,
+                self.if_true(db).and(db, other),
+                self.if_false(db).and(db, other),
             ),
-            Ordering::Greater => Node::new(
+            NodeOrdering::Greater(constraint, other) => Node::new(
                 db,
-                other_constraint,
-                Node::Interior(self).and(db, other.if_true(db)),
-                Node::Interior(self).and(db, other.if_false(db)),
+                constraint,
+                self.and(db, other.if_true(db)),
+                self.and(db, other.if_false(db)),
             ),
         }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn xor(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        let other_constraint = other.constraint(db);
-        match self_constraint.cmp(db, other_constraint) {
-            Ordering::Equal => Node::new(
+    fn xor(self, db: &'db dyn Db, other: Node<'db>) -> Node<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => Node::new(
                 db,
-                self_constraint,
+                constraint,
                 self.if_true(db).xor(db, other.if_true(db)),
                 self.if_false(db).xor(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            NodeOrdering::Less(constraint) => Node::new(
                 db,
-                self_constraint,
-                self.if_true(db).xor(db, Node::Interior(other)),
-                self.if_false(db).xor(db, Node::Interior(other)),
+                constraint,
+                self.if_true(db).xor(db, other),
+                self.if_false(db).xor(db, other),
             ),
-            Ordering::Greater => Node::new(
+            NodeOrdering::Greater(constraint, other) => Node::new(
                 db,
-                other_constraint,
-                Node::Interior(self).xor(db, other.if_true(db)),
-                Node::Interior(self).xor(db, other.if_false(db)),
+                constraint,
+                self.xor(db, other.if_true(db)),
+                self.xor(db, other.if_false(db)),
             ),
         }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        let other_constraint = other.constraint(db);
-        match self_constraint.cmp(db, other_constraint) {
-            Ordering::Equal => Node::new(
+    fn iff(self, db: &'db dyn Db, other: Node<'db>) -> Node<'db> {
+        match self.cmp_constraints(db, other) {
+            NodeOrdering::Equal(constraint, other) => Node::new(
                 db,
-                self_constraint,
+                constraint,
                 self.if_true(db).iff(db, other.if_true(db)),
                 self.if_false(db).iff(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            NodeOrdering::Less(constraint) => Node::new(
                 db,
-                self_constraint,
-                self.if_true(db).iff(db, Node::Interior(other)),
-                self.if_false(db).iff(db, Node::Interior(other)),
+                constraint,
+                self.if_true(db).iff(db, other),
+                self.if_false(db).iff(db, other),
             ),
-            Ordering::Greater => Node::new(
+            NodeOrdering::Greater(constraint, other) => Node::new(
                 db,
-                other_constraint,
-                Node::Interior(self).iff(db, other.if_true(db)),
-                Node::Interior(self).iff(db, other.if_false(db)),
+                constraint,
+                self.iff(db, other.if_true(db)),
+                self.iff(db, other.if_false(db)),
             ),
         }
     }
