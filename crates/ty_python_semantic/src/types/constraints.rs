@@ -1152,6 +1152,12 @@ impl<'db> SatisfiedClause<'db> {
                     // of breaking from the inner loop, so that we don't bump index `i` below.
                     // (We'll have swapped another element into place at that index, and want to
                     // make sure that we process it.)
+                    eprintln!(
+                        "===> A {} implies {}, removing {}",
+                        self.constraints[j].display(db),
+                        self.constraints[i].display(db),
+                        self.constraints[i].display(db),
+                    );
                     self.constraints.swap_remove(i);
                     changes_made = true;
                     continue 'outer;
@@ -1159,6 +1165,12 @@ impl<'db> SatisfiedClause<'db> {
                     // If constraint `j` is removed, then we can continue the inner loop. We will
                     // swap a new element into place at index `j`, and will continue comparing the
                     // constraint at index `i` with later constraints.
+                    eprintln!(
+                        "===> B {} implies {}, removing {}",
+                        self.constraints[i].display(db),
+                        self.constraints[j].display(db),
+                        self.constraints[j].display(db),
+                    );
                     self.constraints.swap_remove(j);
                     changes_made = true;
                 } else {
