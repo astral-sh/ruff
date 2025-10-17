@@ -4,7 +4,7 @@ use ruff_db::source::source_text;
 use thiserror::Error;
 use tracing::Level;
 
-pub use range::format_range;
+pub use range::{expand_and_collapse_ranges, format_range};
 use ruff_formatter::prelude::*;
 use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, format, write};
 use ruff_python_ast::{AnyNodeRef, Mod};
