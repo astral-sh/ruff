@@ -314,10 +314,6 @@ impl<'db> ConstrainedTypeVar<'db> {
             .then_with(|| self.as_id().cmp(&other.as_id()))
     }
 
-    fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        other.implies(db, self)
-    }
-
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
         if self.typevar(db) != other.typevar(db) {
             return false;
@@ -447,26 +443,6 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue,
             Node::AlwaysFalse,
         ))
-    }
-
-    /// Creates a new BDD node for a positive or negative individual constraint. (For a positive
-    /// constraint, this returns the same BDD node as [`new_constraint`][Self::new_constraint]. For
-    /// a negative constraint, it returns the negation of that BDD node.)
-    fn new_satisfied_constraint(db: &'db dyn Db, constraint: ConstraintAssignment<'db>) -> Self {
-        match constraint {
-            ConstraintAssignment::Positive(constraint) => Self::Interior(InteriorNode::new(
-                db,
-                constraint,
-                Node::AlwaysTrue,
-                Node::AlwaysFalse,
-            )),
-            ConstraintAssignment::Negative(constraint) => Self::Interior(InteriorNode::new(
-                db,
-                constraint,
-                Node::AlwaysFalse,
-                Node::AlwaysTrue,
-            )),
-        }
     }
 
     /// Returns the BDD variable of the root node of this BDD, or `None` if this BDD is a terminal
@@ -606,121 +582,6 @@ impl<'db> Node<'db> {
         }
     }
 
-    /// Returns a new BDD with any occurrence of `left ∧ right` replaced with `replacement`.
-    fn substitute_intersection(
-        self,
-        db: &'db dyn Db,
-        left: ConstraintAssignment<'db>,
-        right: ConstraintAssignment<'db>,
-        replacement: Node<'db>,
-    ) -> Self {
-        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
-        //   - left and right are both true
-        //   - left is false
-        //   - left is true and right is false
-        // This covers the entire truth table of `left ∧ right`.
-        let (when_left_and_right, both_found) = self.restrict(db, [left, right]);
-        if !both_found {
-            // If left and right are not both present in the input BDD, we should not even attempt
-            // the substitution, since the Shannon expansion might introduce the missing variables!
-            // That confuses us below when we try to detect whether the substitution is consistent
-            // with the input.
-            return self;
-        }
-        let (when_not_left, _) = self.restrict(db, [left.negated()]);
-        let (when_left_but_not_right, _) = self.restrict(db, [left, right.negated()]);
-
-        // The result should test `replacement`, and when it's true, it should produce the same
-        // output that input would when `left ∧ right` is true. When replacement is false, it
-        // should fall back on testing left and right individually to make sure we produce the
-        // correct outputs in the `¬(left ∧ right)` case. So the result is
-        //
-        //   if replacement
-        //     when_left_and_right
-        //   else if not left
-        //     when_not_left
-        //   else if not right
-        //     when_left_but_not_right
-        //   else
-        //     false
-        //
-        //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
-        let left_node = Node::new_satisfied_constraint(db, left);
-        let right_node = Node::new_satisfied_constraint(db, right);
-        let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
-        let left_result = left_node.ite(db, right_result, when_not_left);
-        let result = replacement.ite(db, when_left_and_right, left_result);
-
-        // Lastly, verify that the result is consistent with the input. (It must produce the same
-        // results when `left ∧ right`.) If it doesn't, the substitution isn't valid, and we should
-        // return the original BDD unmodified.
-        let validity = replacement.iff(db, left_node.and(db, right_node));
-        let constrained_original = self.and(db, validity);
-        let constrained_replacement = result.and(db, validity);
-        if constrained_original == constrained_replacement {
-            result
-        } else {
-            self
-        }
-    }
-
-    /// Returns a new BDD with any occurrence of `left ∨ right` replaced with `replacement`.
-    fn substitute_union(
-        self,
-        db: &'db dyn Db,
-        left: ConstraintAssignment<'db>,
-        right: ConstraintAssignment<'db>,
-        replacement: Node<'db>,
-    ) -> Self {
-        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
-        //   - left and right are both true
-        //   - left is true and right is false
-        //   - left is false and right is true
-        //   - left and right are both false
-        // This covers the entire truth table of `left ∨ right`.
-        let (when_l1_r1, both_found) = self.restrict(db, [left, right]);
-        if !both_found {
-            // If left and right are not both present in the input BDD, we should not even attempt
-            // the substitution, since the Shannon expansion might introduce the missing variables!
-            // That confuses us below when we try to detect whether the substitution is consistent
-            // with the input.
-            return self;
-        }
-        let (when_l0_r0, _) = self.restrict(db, [left.negated(), right.negated()]);
-        let (when_l1_r0, _) = self.restrict(db, [left, right.negated()]);
-        let (when_l0_r1, _) = self.restrict(db, [left.negated(), right]);
-
-        // The result should test `replacement`, and when it's true, it should produce the same
-        // output that input would when `left ∨ right` is true. For OR, this is the union of what
-        // the input produces for the three cases that comprise `left ∨ right`. When `replacement`
-        // is false, the result should produce the same output that input would when
-        // `¬(left ∨ right)`, i.e. when `left ∧ right`. So the result is
-        //
-        //   if replacement
-        //     or(when_l1_r1, when_l1_r0, when_r0_l1)
-        //   else
-        //     when_l0_r0
-        let result = replacement.ite(
-            db,
-            when_l1_r0.or(db, when_l0_r1.or(db, when_l1_r1)),
-            when_l0_r0,
-        );
-
-        // Lastly, verify that the result is consistent with the input. (It must produce the same
-        // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
-        // return the original BDD unmodified.
-        let left_node = Node::new_satisfied_constraint(db, left);
-        let right_node = Node::new_satisfied_constraint(db, right);
-        let validity = replacement.iff(db, left_node.or(db, right_node));
-        let constrained_original = self.and(db, validity);
-        let constrained_replacement = result.and(db, validity);
-        if constrained_original == constrained_replacement {
-            result
-        } else {
-            self
-        }
-    }
-
     /// Invokes a closure for each constraint variable that appears anywhere in a BDD. (Any given
     /// constraint can appear multiple times in different paths from the root; we do not
     /// deduplicate those constraints, and will instead invoke the callback each time we encounter
@@ -741,23 +602,13 @@ impl<'db> Node<'db> {
     /// combinations constraints might be impossible. For instance, `T ≤ bool` implies `T ≤ int`,
     /// so we don't need to care what the BDD evaluates to when `T ≤ bool ∧ T ≰ int`, since that is
     /// not a valid combination of constraints.
-    ///
-    /// XXX: rename
-    fn simplify_new(self, db: &'db dyn Db) -> Self {
+    fn simplify(self, db: &'db dyn Db) -> Self {
         // TODO: Simplifying to `false` for invalid assignments is correct, but means that our
         // display output is not always as compact as it could be. Ideally, we would map impossible
         // inputs to a new "don't care" terminal, and update our `Display` impl to display the
         // smallest formula, choosing arbitrarily whether each "don't care" is true or false. Since
         // that doesn't effect _correctness_, just the rendering in our test cases, I've punted on
         // that for now.
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
-            Node::Interior(interior) => interior.simplify_new(db),
-        }
-    }
-
-    /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
-    fn simplify(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => interior.simplify(db),
@@ -824,7 +675,7 @@ impl<'db> Node<'db> {
         }
 
         DisplayNode {
-            node: self.simplify_new(db),
+            node: self.simplify(db),
             db,
         }
     }
@@ -1033,7 +884,7 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify_new(self, db: &'db dyn Db) -> Node<'db> {
+    fn simplify(self, db: &'db dyn Db) -> Node<'db> {
         // To simplify a non-terminal BDD, we construct a new BDD representing the domain of valid
         // inputs. For instance, assume we have BDD variables `x` representing `T ≤ bool` and `y`
         // representing `T ≤ int`. Since `bool ≤ int`, `x → y` must always be true, so we will add
@@ -1092,211 +943,6 @@ impl<'db> InteriorNode<'db> {
         // Having done that, we just have to AND the original BDD with its domain. This will map
         // all invalid inputs to false.
         Node::Interior(self).and(db, domain)
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify(self, db: &'db dyn Db) -> Node<'db> {
-        // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
-        // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
-        // substitution to replace the pair with the simplification.
-        //
-        // Some of the simplifications create _new_ constraints that weren't originally present in
-        // the BDD. If we encounter one of those cases, we need to check if we can simplify things
-        // further relative to that new constraint.
-        //
-        // To handle this, we keep track of the individual constraints that we have already
-        // discovered (`seen_constraints`), and a queue of constraint pairs that we still need to
-        // check (`to_visit`).
-
-        // Seed the seen set with all of the constraints that are present in the input BDD, and the
-        // visit queue with all pairs of those constraints. (We use "combinations" because we don't
-        // need to compare a constraint against itself, and because ordering doesn't matter.)
-        let mut seen_constraints = FxHashSet::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
-            seen_constraints.insert(constraint);
-        });
-        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
-            .tuple_combinations()
-            .collect();
-
-        // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
-        // be simplified.
-        let mut simplified = Node::Interior(self);
-        while let Some((left_constraint, right_constraint)) = to_visit.pop() {
-            // If the constraints refer to different typevars, they trivially cannot be compared.
-            // TODO: We might need to consider when one constraint's upper or lower bound refers to
-            // the other constraint's typevar.
-            let typevar = left_constraint.typevar(db);
-            if typevar != right_constraint.typevar(db) {
-                continue;
-            }
-
-            // Containment: The range of one constraint might completely contain the range of the
-            // other. If so, there are several potential simplifications.
-            let larger_smaller = if left_constraint.contains(db, right_constraint) {
-                Some((left_constraint, right_constraint))
-            } else if right_constraint.contains(db, left_constraint) {
-                Some((right_constraint, left_constraint))
-            } else {
-                None
-            };
-            if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
-                // larger ∨ smaller = larger
-                simplified = simplified.substitute_union(
-                    db,
-                    larger_constraint.when_true(),
-                    smaller_constraint.when_true(),
-                    Node::new_satisfied_constraint(db, larger_constraint.when_true()),
-                );
-
-                // ¬larger ∧ ¬smaller = ¬larger
-                simplified = simplified.substitute_intersection(
-                    db,
-                    larger_constraint.when_false(),
-                    smaller_constraint.when_false(),
-                    Node::new_satisfied_constraint(db, larger_constraint.when_false()),
-                );
-
-                // smaller ∧ ¬larger = false
-                // (¬larger removes everything that's present in smaller)
-                simplified = simplified.substitute_intersection(
-                    db,
-                    larger_constraint.when_false(),
-                    smaller_constraint.when_true(),
-                    Node::AlwaysFalse,
-                );
-
-                // larger ∨ ¬smaller = true
-                // (larger fills in everything that's missing in ¬smaller)
-                simplified = simplified.substitute_union(
-                    db,
-                    larger_constraint.when_true(),
-                    smaller_constraint.when_false(),
-                    Node::AlwaysTrue,
-                );
-            }
-
-            // There are some simplifications we can make when the intersection of the two
-            // constraints is empty, and others that we can make when the intersection is
-            // non-empty.
-            match left_constraint.intersect(db, right_constraint) {
-                Some(intersection_constraint) => {
-                    // If the intersection is non-empty, we need to create a new constraint to
-                    // represent that intersection. We also need to add the new constraint to our
-                    // seen set and (if we haven't already seen it) to the to-visit queue.
-                    if seen_constraints.insert(intersection_constraint) {
-                        to_visit.extend(
-                            (seen_constraints.iter().copied())
-                                .filter(|seen| *seen != intersection_constraint)
-                                .map(|seen| (seen, intersection_constraint)),
-                        );
-                    }
-                    let positive_intersection_node =
-                        Node::new_satisfied_constraint(db, intersection_constraint.when_true());
-                    let negative_intersection_node =
-                        Node::new_satisfied_constraint(db, intersection_constraint.when_false());
-
-                    // left ∧ right = intersection
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        left_constraint.when_true(),
-                        right_constraint.when_true(),
-                        positive_intersection_node,
-                    );
-
-                    // ¬left ∨ ¬right = ¬intersection
-                    simplified = simplified.substitute_union(
-                        db,
-                        left_constraint.when_false(),
-                        right_constraint.when_false(),
-                        negative_intersection_node,
-                    );
-
-                    // left ∧ ¬right = left ∧ ¬intersection
-                    // (clip the negative constraint to the smallest range that actually removes
-                    // something from positive constraint)
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        left_constraint.when_true(),
-                        right_constraint.when_false(),
-                        Node::new_satisfied_constraint(db, left_constraint.when_true())
-                            .and(db, negative_intersection_node),
-                    );
-
-                    // ¬left ∧ right = ¬intersection ∧ right
-                    // (save as above but reversed)
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        left_constraint.when_false(),
-                        right_constraint.when_true(),
-                        Node::new_satisfied_constraint(db, right_constraint.when_true())
-                            .and(db, negative_intersection_node),
-                    );
-
-                    // left ∨ ¬right = intersection ∨ ¬right
-                    // (clip the positive constraint to the smallest range that actually adds
-                    // something to the negative constraint)
-                    simplified = simplified.substitute_union(
-                        db,
-                        left_constraint.when_true(),
-                        right_constraint.when_false(),
-                        Node::new_satisfied_constraint(db, right_constraint.when_false())
-                            .or(db, positive_intersection_node),
-                    );
-
-                    // ¬left ∨ right = ¬left ∨ intersection
-                    // (save as above but reversed)
-                    simplified = simplified.substitute_union(
-                        db,
-                        left_constraint.when_false(),
-                        right_constraint.when_true(),
-                        Node::new_satisfied_constraint(db, left_constraint.when_false())
-                            .or(db, positive_intersection_node),
-                    );
-                }
-
-                None => {
-                    // All of the below hold because we just proved that the intersection of left
-                    // and right is empty.
-
-                    // left ∧ right = false
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        left_constraint.when_true(),
-                        right_constraint.when_true(),
-                        Node::AlwaysFalse,
-                    );
-
-                    // ¬left ∨ ¬right = true
-                    simplified = simplified.substitute_union(
-                        db,
-                        left_constraint.when_false(),
-                        right_constraint.when_false(),
-                        Node::AlwaysTrue,
-                    );
-
-                    // left ∧ ¬right = left
-                    // (there is nothing in the hole of ¬right that overlaps with left)
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        left_constraint.when_true(),
-                        right_constraint.when_false(),
-                        Node::new_constraint(db, left_constraint),
-                    );
-
-                    // ¬left ∧ right = right
-                    // (save as above but reversed)
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        left_constraint.when_false(),
-                        right_constraint.when_true(),
-                        Node::new_constraint(db, right_constraint),
-                    );
-                }
-            }
-        }
-
-        simplified
     }
 }
 
