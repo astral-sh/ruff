@@ -26,7 +26,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -37,12 +37,19 @@ fn config_override_python_version() -> anyhow::Result<()> {
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
+    info: Python 3.11 was assumed when accessing `last_exc`
+     --> pyproject.toml:3:18
+      |
+    2 | [tool.ty.environment]
+    3 | python-version = "3.11"
+      |                  ^^^^^^ Python 3.11 assumed due to this configuration setting
+      |
     info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r###"
     success: true
@@ -422,6 +429,94 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
 }
 
 #[test]
+fn many_search_paths() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("extra1/foo1.py", ""),
+        ("extra2/foo2.py", ""),
+        ("extra3/foo3.py", ""),
+        ("extra4/foo4.py", ""),
+        ("extra5/foo5.py", ""),
+        ("extra6/foo6.py", ""),
+        ("test.py", "import foo1, baz"),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-platform").arg("linux")
+            .arg("--extra-search-path").arg("extra1")
+            .arg("--extra-search-path").arg("extra2")
+            .arg("--extra-search-path").arg("extra3")
+            .arg("--extra-search-path").arg("extra4")
+            .arg("--extra-search-path").arg("extra5")
+            .arg("--extra-search-path").arg("extra6"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:14
+      |
+    1 | import foo1, baz
+      |              ^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
+    info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
+    info:   3. <temp_dir>/extra3 (extra search path specified on the CLI or in your config file)
+    info:   4. <temp_dir>/extra4 (extra search path specified on the CLI or in your config file)
+    info:   5. <temp_dir>/extra5 (extra search path specified on the CLI or in your config file)
+    info:   ... and 3 more paths. Run with `-v` to see all paths.
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Shows all with `-v`
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-platform").arg("linux")
+            .arg("--extra-search-path").arg("extra1")
+            .arg("--extra-search-path").arg("extra2")
+            .arg("--extra-search-path").arg("extra3")
+            .arg("--extra-search-path").arg("extra4")
+            .arg("--extra-search-path").arg("extra5")
+            .arg("--extra-search-path").arg("extra6")
+            .arg("-v"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:14
+      |
+    1 | import foo1, baz
+      |              ^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
+    info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
+    info:   3. <temp_dir>/extra3 (extra search path specified on the CLI or in your config file)
+    info:   4. <temp_dir>/extra4 (extra search path specified on the CLI or in your config file)
+    info:   5. <temp_dir>/extra5 (extra search path specified on the CLI or in your config file)
+    info:   6. <temp_dir>/extra6 (extra search path specified on the CLI or in your config file)
+    info:   7. <temp_dir>/ (first-party code)
+    info:   8. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 7 file(s) in 0.000s
+    ");
+    Ok(())
+}
+
+#[test]
 fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
@@ -560,15 +655,15 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
      --> test.py:2:1
       |
     2 | match object():
-      | ^^^^^ Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
+      | ^^^^^
     3 |     case int():
     4 |         pass
       |
@@ -583,17 +678,17 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
      --> test.py:2:1
       |
     2 | match object():
-      | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+      | ^^^^^
     3 |     case int():
     4 |         pass
       |
@@ -602,7 +697,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -863,7 +958,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -875,12 +970,20 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
       |
+    info: Python 3.10 was assumed when accessing `grantpt`
+     --> ty.toml:3:18
+      |
+    2 | [environment]
+    3 | python-version = "3.10"
+      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+    4 | python-platform = "linux"
+      |
     info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     // Use default (which should be latest supported)
     let case = CliTest::with_files([

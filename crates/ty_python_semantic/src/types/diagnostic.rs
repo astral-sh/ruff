@@ -8,6 +8,7 @@ use super::{
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
+use crate::semantic_index::{global_scope, place_table};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
@@ -29,7 +30,7 @@ use crate::{
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -3138,6 +3139,56 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     ));
 
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+}
+
+/// This function receives an unresolved `foo.bar` attribute access,
+/// where `foo` can be resolved to have a type but that type does not
+/// have a `bar` attribute.
+///
+/// If the type of `foo` has a definition that originates in the
+/// standard library and `foo.bar` *does* exist as an attribute on *other*
+/// Python versions, we add a hint to the diagnostic that the user may have
+/// misconfigured their Python version.
+pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
+    db: &dyn Db,
+    mut diagnostic: LintDiagnosticGuard,
+    value_type: &Type,
+    attr: &Identifier,
+) {
+    // Currently we limit this analysis to attributes of stdlib modules,
+    // as this covers the most important cases while not being too noisy
+    // about basic typos or special types like `super(C, self)`
+    let Type::ModuleLiteral(module_ty) = value_type else {
+        return;
+    };
+    let module = module_ty.module(db);
+    let Some(file) = module.file(db) else {
+        return;
+    };
+    let Some(search_path) = module.search_path(db) else {
+        return;
+    };
+    if !search_path.is_standard_library() {
+        return;
+    }
+
+    // We populate place_table entries for stdlib items across all known versions and platforms,
+    // so if this lookup succeeds then we know that this lookup *could* succeed with possible
+    // configuration changes.
+    let symbol_table = place_table(db, global_scope(db, file));
+    if symbol_table.symbol_by_name(attr).is_none() {
+        return;
+    }
+
+    // For now, we just mention the current version they're on, and hope that's enough of a nudge.
+    // TODO: determine what version they need to be on
+    // TODO: also mention the platform we're assuming
+    // TODO: determine what platform they need to be on
+    add_inferred_python_version_hint_to_diagnostic(
+        db,
+        &mut diagnostic,
+        &format!("accessing `{}`", attr.id),
+    );
 }
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
