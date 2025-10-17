@@ -183,20 +183,20 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.or(db, other.node).simplify(db);
+        self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.and(db, other.node).simplify(db);
+        self.node = self.node.and(db, other.node);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
-            node: self.node.negate(db).simplify(db),
+            node: self.node.negate(db),
         }
     }
 
@@ -773,7 +773,10 @@ impl<'db> Node<'db> {
             }
         }
 
-        DisplayNode { node: self, db }
+        DisplayNode {
+            node: self.simplify(db),
+            db,
+        }
     }
 
     // Keep this around for debugging purposes
