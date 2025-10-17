@@ -277,7 +277,8 @@ jobs:
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest
-
+      # Dogfood ty on py-fuzzer
+      - run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -519,6 +520,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -533,6 +535,11 @@ jobs:
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
+      # Lint/format/type-check py-fuzzer
+      # (dogfooding with ty is done in a separate job)
+      - run: uv run --directory=./python/py-fuzzer mypy
+      - run: uv run --directory=./python/py-fuzzer ruff format --check
+      - run: uv run --directory=./python/py-fuzzer ruff check
 
   ecosystem:
     name: "ecosystem"
