@@ -11,6 +11,8 @@ pub(crate) static GOOGLE_SECTIONS: &[SectionKind] = &[
     SectionKind::References,
     SectionKind::Returns,
     SectionKind::SeeAlso,
+    SectionKind::Warnings,
+    SectionKind::Warns,
     SectionKind::Yields,
     // Google-only
     SectionKind::Args,
@@ -32,7 +34,5 @@ pub(crate) static GOOGLE_SECTIONS: &[SectionKind] = &[
     SectionKind::Tip,
     SectionKind::Todo,
     SectionKind::Warning,
-    SectionKind::Warnings,
-    SectionKind::Warns,
     SectionKind::Yield,
 ];
