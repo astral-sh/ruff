@@ -932,7 +932,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
-                protocol.validate_members(&self.context, self.index);
+                protocol.validate_members(&self.context);
             }
         }
     }

@@ -1150,6 +1150,7 @@ here too:
 ```py
 from typing import Protocol
 
+# Ensure the number of scopes in `b.py` is greater than the number of scopes in `c.py`:
 class SomethingUnrelated: ...
 
 class A(Protocol):

@@ -42,10 +42,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 ```
 1 | from typing import Protocol
 2 | 
-3 | class SomethingUnrelated: ...
-4 | 
-5 | class A(Protocol):
-6 |     x: int
+3 | # Ensure the number of scopes in `b.py` is greater than the number of scopes in `c.py`:
+4 | class SomethingUnrelated: ...
+5 | 
+6 | class A(Protocol):
+7 |     x: int
 ```
 
 ## c.py
