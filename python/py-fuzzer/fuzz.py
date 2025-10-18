@@ -66,7 +66,7 @@ def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
             "lint.select=[]",
             "--no-cache",
             "--target-version",
-            "py313",
+            "py314",
             "--preview",
             "-",
         ],
