@@ -865,6 +865,8 @@ pub enum Type<'db> {
     BoundSuper(BoundSuperType<'db>),
     /// A subtype of `bool` that allows narrowing in both positive and negative cases.
     TypeIs(TypeIsType<'db>),
+    /// A subtype of `bool` that allows narrowing in only the positive case.
+    TypeGuard(TypeGuardType<'db>),
     /// A type that represents an inhabitant of a `TypedDict`.
     TypedDict(TypedDictType<'db>),
     /// An aliased type (lazily not-yet-unpacked to its value type).
@@ -1618,6 +1620,9 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => visitor.visit(self, || {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
             }),
+            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+                type_guard.with_type(db, type_guard.return_type(db).normalized_impl(db, visitor))
+            }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
             Type::EnumLiteral(enum_literal)
                 if is_single_member_enum(db, enum_literal.enum_class(db)) =>
@@ -1753,6 +1758,20 @@ impl<'db> Type<'db> {
                 };
                 Some(type_is.with_type(db, ty))
             }
+            // TODO: deduplicate
+            Type::TypeGuard(type_guard) => {
+                let ty = if nested {
+                    type_guard
+                        .return_type(db)
+                        .recursive_type_normalized_impl(db, div, true)?
+                } else {
+                    type_guard
+                        .return_type(db)
+                        .recursive_type_normalized_impl(db, div, true)
+                        .unwrap_or(div)
+                };
+                Some(type_guard.with_type(db, ty))
+            }
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -1825,6 +1844,7 @@ impl<'db> Type<'db> {
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => false,
@@ -1939,6 +1959,7 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
             // TODO
@@ -2809,15 +2830,29 @@ impl<'db> Type<'db> {
                     )
                 }),
 
-            // `TypeIs[T]` is a subtype of `bool`.
-            (Type::TypeIs(_), _) => KnownClass::Bool.to_instance(db).has_relation_to_impl(
-                db,
-                target,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
+            // `TypeGuard` is covariant.
+            (Type::TypeGuard(left), Type::TypeGuard(right)) => {
+                left.return_type(db).has_relation_to_impl(
+                    db,
+                    right.return_type(db),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
+            // `TypeIs[T]` and `TypeGuard[T]` is a subtype of `bool`.
+            (Type::TypeIs(_) | Type::TypeGuard(_), _) => {
+                KnownClass::Bool.to_instance(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
 
             // Function-like callables are subtypes of `FunctionType`
             (Type::Callable(callable), _) if callable.is_function_like(db) => {
@@ -3787,8 +3822,14 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(!known_instance.is_instance_of(db, instance.class(db)))
             }
 
-            (Type::BooleanLiteral(..) | Type::TypeIs(_), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::BooleanLiteral(..) | Type::TypeIs(_)) => {
+            (
+                Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_),
+                Type::NominalInstance(instance),
+            )
+            | (
+                Type::NominalInstance(instance),
+                Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_),
+            ) => {
                 // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
                 KnownClass::Bool
@@ -3796,8 +3837,10 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::BooleanLiteral(..) | Type::TypeIs(_), _)
-            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_)) => ConstraintSet::from(true),
+            (Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_), _)
+            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_) | Type::TypeGuard(_)) => {
+                ConstraintSet::from(true)
+            }
 
             (Type::IntLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
@@ -4263,6 +4306,7 @@ impl<'db> Type<'db> {
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
+            Type::TypeGuard(type_guard) => type_guard.is_bound(db),
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
@@ -4324,6 +4368,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeIs(type_is) => type_is.is_bound(db),
+            Type::TypeGuard(type_is) => type_is.is_bound(db),
 
             Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
 
@@ -4480,6 +4525,7 @@ impl<'db> Type<'db> {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => None,
         }
@@ -4608,7 +4654,7 @@ impl<'db> Type<'db> {
             }
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
-            Type::BooleanLiteral(_) | Type::TypeIs(_) => {
+            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
                 KnownClass::Bool.to_instance(db).instance_member(db, name)
             }
             Type::StringLiteral(_) | Type::LiteralString => {
@@ -5278,6 +5324,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(..)
+            | Type::TypeGuard(..)
             | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
@@ -5605,7 +5652,8 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Callable(_)
             | Type::LiteralString
-            | Type::TypeIs(_) => Truthiness::Ambiguous,
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_) => Truthiness::Ambiguous,
 
             Type::TypedDict(_) => {
                 // TODO: We could do better here, but it's unclear if this is important.
@@ -6549,6 +6597,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
     }
@@ -6778,6 +6827,7 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
+                | Type::TypeGuard(_)
                 | Type::TypedDict(_) => None
             }
         }
@@ -7392,6 +7442,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => None,
         }
@@ -7448,6 +7499,7 @@ impl<'db> Type<'db> {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::InvalidType(*self, scope_id)
@@ -7737,7 +7789,9 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_literal(db),
+            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
+                KnownClass::Bool.to_class_literal(db)
+            }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
             Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
@@ -8038,6 +8092,9 @@ impl<'db> Type<'db> {
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
+            // TODO: check variance
+            Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+
             Type::TypeAlias(alias) => {
                 if TypeMapping::EagerExpansion == *type_mapping {
                     return alias.raw_value_type(db).expand_eagerly(db);
@@ -8237,6 +8294,15 @@ impl<'db> Type<'db> {
 
             Type::TypeIs(type_is) => {
                 type_is.return_type(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }
+
+            Type::TypeGuard(type_guard) => {
+                type_guard.return_type(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
                     typevars,
@@ -8506,7 +8572,8 @@ impl<'db> Type<'db> {
             // These types have no definition
             Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression)
             | Self::Callable(_)
-            | Self::TypeIs(_) => None,
+            | Self::TypeIs(_)
+            | Self::TypeGuard(_) => None,
         }
     }
 
@@ -8670,6 +8737,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
             Type::TypeIs(type_is_type) => type_is_type.variance_of(db, typevar),
+            Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Never
@@ -14755,6 +14823,73 @@ impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
         self.return_type(db)
             .with_polarity(TypeVarVariance::Invariant)
             .variance_of(db, typevar)
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct TypeGuardType<'db> {
+    return_type: Type<'db>,
+    /// The ID of the scope to which the place belongs
+    /// and the ID of the place itself within that scope.
+    place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
+}
+
+fn walk_typeguard_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typeguard_type: TypeGuardType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, typeguard_type.return_type(db));
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeGuardType<'_> {}
+
+impl<'db> TypeGuardType<'db> {
+    pub(crate) fn place_name(self, db: &'db dyn Db) -> Option<String> {
+        let (scope, place) = self.place_info(db)?;
+        let table = place_table(db, scope);
+
+        Some(format!("{}", table.place(place)))
+    }
+
+    pub(crate) fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        Type::TypeGuard(Self::new(db, ty, None))
+    }
+
+    pub(crate) fn bound(
+        db: &'db dyn Db,
+        return_type: Type<'db>,
+        scope: ScopeId<'db>,
+        place: ScopedPlaceId,
+    ) -> Type<'db> {
+        Type::TypeGuard(Self::new(db, return_type, Some((scope, place))))
+    }
+
+    #[must_use]
+    pub(crate) fn bind(
+        self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        place: ScopedPlaceId,
+    ) -> Type<'db> {
+        Self::bound(db, self.return_type(db), scope, place)
+    }
+
+    #[must_use]
+    pub(crate) fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        Type::TypeGuard(Self::new(db, ty, self.place_info(db)))
+    }
+
+    pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {
+        self.place_info(db).is_some()
+    }
+}
+
+impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
+    // TODO: comment
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.return_type(db).variance_of(db, typevar)
     }
 }
 

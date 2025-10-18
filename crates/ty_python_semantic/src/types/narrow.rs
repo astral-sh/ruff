@@ -269,6 +269,7 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)

@@ -986,6 +986,22 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 f.write_str("]")
             }
+            // TODO: deduplicate
+            Type::TypeGuard(type_guard) => {
+                f.with_type(Type::SpecialForm(SpecialFormType::TypeGuard))
+                    .write_str("TypeGuard")?;
+                f.write_char('[')?;
+                type_guard
+                    .return_type(self.db)
+                    .display_with(self.db, self.settings.singleline())
+                    .fmt_detailed(f)?;
+                if let Some(name) = type_guard.place_name(self.db) {
+                    f.set_invalid_type_annotation();
+                    f.write_str(" @ ")?;
+                    f.write_str(&name)?;
+                }
+                f.write_str("]")
+            }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class
                     .display_with(self.db, self.settings.clone())

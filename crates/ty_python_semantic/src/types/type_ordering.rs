@@ -5,7 +5,8 @@ use salsa::plumbing::AsId;
 use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
-    DynamicType, TodoType, Type, TypeIsType, class_base::ClassBase, subclass_of::SubclassOfInner,
+    DynamicType, TodoType, Type, TypeGuardType, TypeIsType, class_base::ClassBase,
+    subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -131,6 +132,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, *left, *right),
         (Type::TypeIs(_), _) => Ordering::Less,
         (_, Type::TypeIs(_)) => Ordering::Greater,
+
+        (Type::TypeGuard(left), Type::TypeGuard(right)) => typeguard_ordering(db, *left, *right),
+        (Type::TypeGuard(_), _) => Ordering::Less,
+        (_, Type::TypeGuard(_)) => Ordering::Greater,
 
         (Type::NominalInstance(left), Type::NominalInstance(right)) => {
             left.class(db).cmp(&right.class(db))
@@ -293,6 +298,23 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 /// * Symbol name: String comparison
 /// * Guarded type: [`union_or_intersection_elements_ordering`]
 fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
+    let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
+
+    match (left.place_info(db), right.place_info(db)) {
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+
+        (None, None) => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+
+        (Some(_), Some(_)) => match left.place_name(db).cmp(&right.place_name(db)) {
+            Ordering::Equal => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+            ordering => ordering,
+        },
+    }
+}
+
+// TODO: de-duplicate
+fn typeguard_ordering(db: &dyn Db, left: TypeGuardType, right: TypeGuardType) -> Ordering {
     let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
 
     match (left.place_info(db), right.place_info(db)) {
