@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 use crate::{
     Db, FxIndexSet,
     types::{
@@ -16,7 +18,10 @@ use crate::{
         walk_typed_dict_type, walk_typeis_type, walk_union,
     },
 };
-use std::cell::{Cell, RefCell};
+use std::{
+    cell::{Cell, RefCell},
+    collections::hash_map::Entry,
+};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -294,4 +299,134 @@ pub(super) fn any_over_type<'db>(
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
+}
+
+/// Returns the maximum number of layers of generic specializations for a given type.
+///
+/// For example, `int` has a depth of `0`, `list[int]` has a depth of `1`, and `list[set[int]]`
+/// has a depth of `2`. A set-theoretic type like `list[int] | list[list[int]]` has a maximum
+/// depth of `2`.
+pub(super) fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
+    struct SpecializationDepthVisitor<'db> {
+        seen_types: RefCell<FxHashMap<NonAtomicType<'db>, Option<usize>>>,
+        max_depth: Cell<usize>,
+    }
+
+    impl<'db> TypeVisitor<'db> for SpecializationDepthVisitor<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            match TypeKind::from(ty) {
+                TypeKind::Atomic => {
+                    if ty.is_divergent() {
+                        self.max_depth.set(usize::MAX);
+                    }
+                }
+                TypeKind::NonAtomic(non_atomic_type) => {
+                    match self.seen_types.borrow_mut().entry(non_atomic_type) {
+                        Entry::Occupied(cached_depth) => {
+                            self.max_depth
+                                .update(|current| current.max(cached_depth.get().unwrap_or(0)));
+                            return;
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(None);
+                        }
+                    }
+
+                    let self_depth: usize =
+                        matches!(non_atomic_type, NonAtomicType::GenericAlias(_)).into();
+
+                    let previous_max_depth = self.max_depth.replace(0);
+                    walk_non_atomic_type(db, non_atomic_type, self);
+
+                    self.max_depth.update(|max_child_depth| {
+                        previous_max_depth.max(max_child_depth.saturating_add(self_depth))
+                    });
+
+                    self.seen_types
+                        .borrow_mut()
+                        .insert(non_atomic_type, Some(self.max_depth.get()));
+                }
+            }
+        }
+    }
+
+    let visitor = SpecializationDepthVisitor {
+        seen_types: RefCell::new(FxHashMap::default()),
+        max_depth: Cell::new(0),
+    };
+    visitor.visit_type(db, ty);
+    visitor.max_depth.get()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{db::tests::setup_db, types::KnownClass};
+
+    #[test]
+    fn test_generics_layering_depth() {
+        let db = setup_db();
+
+        let list_of_int =
+            KnownClass::List.to_specialized_instance(&db, [KnownClass::Int.to_instance(&db)]);
+        assert_eq!(specialization_depth(&db, list_of_int), 1);
+
+        let list_of_list_of_int = KnownClass::List.to_specialized_instance(&db, [list_of_int]);
+        assert_eq!(specialization_depth(&db, list_of_list_of_int), 2);
+
+        let list_of_list_of_list_of_int =
+            KnownClass::List.to_specialized_instance(&db, [list_of_list_of_int]);
+        assert_eq!(specialization_depth(&db, list_of_list_of_list_of_int), 3);
+
+        let set_of_dict_of_str_and_list_of_int = KnownClass::Set.to_specialized_instance(
+            &db,
+            [KnownClass::Dict
+                .to_specialized_instance(&db, [KnownClass::Str.to_instance(&db), list_of_int])],
+        );
+        assert_eq!(
+            specialization_depth(&db, set_of_dict_of_str_and_list_of_int),
+            3
+        );
+
+        let union_type_1 =
+            UnionType::from_elements(&db, [list_of_list_of_list_of_int, list_of_list_of_int]);
+        assert_eq!(specialization_depth(&db, union_type_1), 3);
+
+        let union_type_2 =
+            UnionType::from_elements(&db, [list_of_list_of_int, list_of_list_of_list_of_int]);
+        assert_eq!(specialization_depth(&db, union_type_2), 3);
+
+        let tuple_of_tuple_of_int = Type::heterogeneous_tuple(
+            &db,
+            [Type::heterogeneous_tuple(
+                &db,
+                [KnownClass::Int.to_instance(&db)],
+            )],
+        );
+        assert_eq!(specialization_depth(&db, tuple_of_tuple_of_int), 2);
+
+        let tuple_of_list_of_int_and_str = KnownClass::Tuple
+            .to_specialized_instance(&db, [list_of_int, KnownClass::Str.to_instance(&db)]);
+        assert_eq!(specialization_depth(&db, tuple_of_list_of_int_and_str), 1);
+
+        let list_of_union_of_lists = KnownClass::List.to_specialized_instance(
+            &db,
+            [UnionType::from_elements(
+                &db,
+                [
+                    KnownClass::List
+                        .to_specialized_instance(&db, [KnownClass::Int.to_instance(&db)]),
+                    KnownClass::List
+                        .to_specialized_instance(&db, [KnownClass::Str.to_instance(&db)]),
+                    KnownClass::List
+                        .to_specialized_instance(&db, [KnownClass::Bytes.to_instance(&db)]),
+                ],
+            )],
+        );
+        assert_eq!(specialization_depth(&db, list_of_union_of_lists), 2);
+    }
 }
