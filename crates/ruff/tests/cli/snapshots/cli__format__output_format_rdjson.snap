@@ -1,6 +1,5 @@
 ---
 source: crates/ruff/tests/cli/format.rs
-assertion_line: 602
 info:
   program: ruff
   args:

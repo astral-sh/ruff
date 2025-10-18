@@ -1,13 +1,12 @@
 ---
 source: crates/ruff/tests/cli/format.rs
-assertion_line: 602
 info:
   program: ruff
   args:
     - format
     - "--no-cache"
     - "--output-format"
-    - github
+    - pylint
     - "--preview"
     - "--check"
     - input.py
@@ -15,6 +14,6 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-::error title=Ruff (unformatted),file=[TMP]/input.py,line=1,col=1,endLine=2,endColumn=1::input.py:1:1: unformatted: File would be reformatted
+input.py:1: [unformatted] File would be reformatted
 
 ----- stderr -----
