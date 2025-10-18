@@ -175,7 +175,7 @@ impl CliTest {
 
         command
     }
-    
+
     pub(crate) fn format_command(&self) -> Command {
         let mut command = self.command();
         command.args(["format", "--no-cache", "--isolated"]);
