@@ -627,16 +627,19 @@ if __name__ == "__main__":
 }
 
 #[test]
-fn output_format_notebook() {
-    let args = ["format", "--no-cache", "--isolated", "--preview", "--check"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn output_format_notebook() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let path = fixtures.join("unformatted.ipynb");
     insta::with_settings!({filters => vec![
         // Replace windows paths
         (r"\\", "/"),
+        // Replace absolute fixture path with relative path
+        (regex::escape(&project_root.join("resources").to_string_lossy()).as_str(), "resources"),
     ]}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).args(args).arg(path),
+            test.format_command().args(["--preview", "--check"]).arg(path),
             @r"
         success: false
         exit_code: 1
@@ -647,21 +650,21 @@ fn output_format_notebook() {
         1 | import numpy
           - maths = (numpy.arange(100)**2).sum()
           - stats= numpy.asarray([1,2,3,4]).median()
-        2 +
+        2 + 
         3 + maths = (numpy.arange(100) ** 2).sum()
         4 + stats = numpy.asarray([1, 2, 3, 4]).median()
          ::: cell 3
         1 | # A cell with IPython escape command
         2 | def some_function(foo, bar):
         3 |     pass
-        4 +
-        5 +
+        4 + 
+        5 + 
         6 | %matplotlib inline
           ::: cell 4
         1  | foo = %pwd
            - def some_function(foo,bar,):
-        2  +
-        3  +
+        2  + 
+        3  + 
         4  + def some_function(
         5  +     foo,
         6  +     bar,
@@ -673,8 +676,10 @@ fn output_format_notebook() {
         1 file would be reformatted
 
         ----- stderr -----
-        ");
+        "
+        );
     });
+    Ok(())
 }
 
 #[test]
@@ -1369,7 +1374,6 @@ fn test_diff_no_change() {
 
 
         ----- stderr -----
-        1 file would be reformatted
         "
         );
     });
