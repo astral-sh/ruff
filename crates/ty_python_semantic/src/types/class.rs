@@ -1341,6 +1341,8 @@ pub(crate) enum FieldKind<'db> {
         init: bool,
         /// Whether or not this field can only be passed as a keyword argument to `__init__`.
         kw_only: Option<bool>,
+        /// The name for this field in the `__init__` signature, if specified.
+        alias: Option<Box<str>>,
     },
     /// `TypedDict` field metadata
     TypedDict {
@@ -2314,14 +2316,15 @@ impl<'db> ClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only) = match field.kind {
-                    FieldKind::NamedTuple { default_ty } => (true, default_ty, None),
+                let (init, mut default_ty, kw_only, alias) = match &field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None),
                     FieldKind::Dataclass {
                         init,
                         default_ty,
                         kw_only,
+                        alias,
                         ..
-                    } => (init, default_ty, kw_only),
+                    } => (*init, *default_ty, *kw_only, alias.as_ref()),
                     FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
@@ -2387,10 +2390,13 @@ impl<'db> ClassLiteral<'db> {
                 let is_kw_only = name == "__replace__"
                     || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
 
+                // Use the alias name if provided, otherwise use the field name
+                let parameter_name = alias.map(Name::new).unwrap_or(field_name);
+
                 let mut parameter = if is_kw_only {
-                    Parameter::keyword_only(field_name)
+                    Parameter::keyword_only(parameter_name)
                 } else {
-                    Parameter::positional_or_keyword(field_name)
+                    Parameter::positional_or_keyword(parameter_name)
                 }
                 .with_annotated_type(field_ty);
 
@@ -2925,6 +2931,7 @@ impl<'db> ClassLiteral<'db> {
 
                 let mut init = true;
                 let mut kw_only = None;
+                let mut alias = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     if self
@@ -2938,6 +2945,7 @@ impl<'db> ClassLiteral<'db> {
                     } else {
                         init = field.init(db);
                         kw_only = field.kw_only(db);
+                        alias = field.alias(db);
                     }
                 }
 
@@ -2948,6 +2956,7 @@ impl<'db> ClassLiteral<'db> {
                         init_only: attr.is_init_var(),
                         init,
                         kw_only,
+                        alias,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
