@@ -470,6 +470,11 @@ impl File {
         self.source_type(db).is_stub()
     }
 
+    /// Returns `true` if the file is an `__init__.pyi`
+    pub fn is_package_stub(self, db: &dyn Db) -> bool {
+        self.path(db).as_str().ends_with("__init__.pyi")
+    }
+
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
         match self.path(db) {
             FilePath::System(path) => path

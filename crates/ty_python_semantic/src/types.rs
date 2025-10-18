@@ -39,7 +39,9 @@ use crate::place::{
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
+use crate::semantic_index::{
+    imported_modules, imported_relative_submodules_of_stub_package, place_table, semantic_index,
+};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -10613,6 +10615,11 @@ impl<'db> ModuleLiteralType<'db> {
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
+            .chain(
+                imported_relative_submodules_of_stub_package(db, self.module(db))
+                    .iter()
+                    .cloned(),
+            )
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 
