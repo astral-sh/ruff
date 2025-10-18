@@ -32,13 +32,13 @@ pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
         .map(|component| regex::escape(component))
         .collect();
 
-    // Create a pattern that matches any combination of /, \, and \/
+    // Create a pattern that matches any combination of backslashes and forward slashes
     // This handles regular paths, Windows paths, and JSON-escaped paths
-    let slash_pattern = r"[\\/]|\\/";
-    let filter = escaped_components.join(&format!("(?:{})", slash_pattern));
+    let slash_pattern = r"(\\|/)+";
+    let filter = escaped_components.join(slash_pattern);
 
     // Add optional trailing slash and filename
-    let full_filter = format!("{}({}[^\"\\s]*)?", filter, slash_pattern);
+    let full_filter = format!("{}{}[^\"\\s]*", filter, slash_pattern);
     eprintln!("DEBUG: tempdir_filter = {}", full_filter);
     full_filter
 }
