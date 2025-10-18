@@ -409,7 +409,7 @@ impl<'t> CompletionTargetTokens<'t> {
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
-        let before = tokens_start_before(parsed.tokens(), offset);
+        let before = strip_eof_newline(tokens_start_before(parsed.tokens(), offset));
         Some(
             // Our strategy when it comes to `object.attribute` here is
             // to look for the `.` and then take the token immediately
@@ -627,6 +627,19 @@ fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
     &tokens[..idx]
 }
 
+/// Strip trailing Newline token that the parser automatically adds at the
+/// end of the file.
+fn strip_eof_newline(tokens: &[Token]) -> &[Token] {
+    if tokens
+        .last()
+        .is_some_and(|t| t.kind() == TokenKind::Newline)
+    {
+        &tokens[..tokens.len() - 1]
+    } else {
+        tokens
+    }
+}
+
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
 ///
 /// If a suffix of `tokens` with the given `kinds` could not be found,
@@ -800,7 +813,7 @@ fn find_typed_text(
     offset: TextSize,
 ) -> Option<String> {
     let source = source_text(db, file);
-    let tokens = tokens_start_before(parsed.tokens(), offset);
+    let tokens = strip_eof_newline(tokens_start_before(parsed.tokens(), offset));
     let last = tokens.last()?;
     if !matches!(last.kind(), TokenKind::Name) {
         return None;
@@ -3943,6 +3956,21 @@ def f[T](x: T):
 ",
         );
         test.assert_completions_include("__repr__");
+    }
+
+    #[test]
+    fn attribute_at_eof_without_trailing_newline() {
+        // Regression test for https://github.com/astral-sh/ty/issues/1392
+        // This test ensures completions work when the cursor is at the end
+        // of the file with no trailing newline.
+
+        let test = cursor_test("def f(msg: str):\n    msg.<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+
+        let test = cursor_test("def f(msg: str):\n    msg.u<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_do_not_include("capitalize");
     }
 
     // NOTE: The methods below are getting somewhat ridiculous.
