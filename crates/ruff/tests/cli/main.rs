@@ -22,7 +22,10 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
-    format!(r"{}[\\/]?", regex::escape(path.as_ref()))
+    let escaped_path = regex::escape(path.as_ref());
+    // Handle both regular paths and JSON-escaped paths (where \ becomes \/)
+    let json_escaped_path = escaped_path.replace(r"\\", r"\\?/");
+    format!(r"(?:{}|{})[\\/]?", escaped_path, json_escaped_path)
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -75,10 +78,7 @@ impl CliTest {
         .to_path_buf();
 
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
-        settings.add_filter(
-            &dbg!(tempdir_filter(project_dir.to_str().unwrap())),
-            "[TMP]/",
-        );
+        settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
