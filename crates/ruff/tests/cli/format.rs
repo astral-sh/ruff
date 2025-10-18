@@ -2,14 +2,11 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::Result;
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use insta_cmd::assert_cmd_snapshot;
 
 use super::CliTest;
-
-const BIN_NAME: &str = "ruff";
 
 #[test]
 fn default_options() -> Result<()> {
