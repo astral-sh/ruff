@@ -15,6 +15,7 @@ use std::{
 };
 use tempfile::TempDir;
 
+mod format;
 mod lint;
 
 const BIN_NAME: &str = "ruff";

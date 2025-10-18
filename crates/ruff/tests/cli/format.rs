@@ -3,18 +3,14 @@
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::str;
 
 use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use regex::escape;
 use tempfile::TempDir;
 
-const BIN_NAME: &str = "ruff";
+use super::CliTest;
 
-fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
-}
+const BIN_NAME: &str = "ruff";
 
 #[test]
 fn default_options() {
@@ -50,22 +46,12 @@ if condition:
 
 #[test]
 fn default_files() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    fs::write(
-        tempdir.path().join("foo.py"),
-        r#"
-foo =     "needs formatting"
-"#,
-    )?;
-    fs::write(
-        tempdir.path().join("bar.py"),
-        r#"
-bar =     "needs formatting"
-"#,
-    )?;
+    let test = CliTest::new()?;
+    test.write_file("foo.py", r#"foo =     "needs formatting""#)?;
+    test.write_file("bar.py", r#"bar =     "needs formatting""#)?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r"
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--isolated", "--no-cache", "--check"]), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -146,81 +132,73 @@ fn config_override_rejected_if_invalid_toml() {
 
 #[test]
 fn too_many_config_files() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_dot_toml = tempdir.path().join("ruff.toml");
-    let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
-    fs::File::create(&ruff_dot_toml)?;
-    fs::File::create(&ruff2_dot_toml)?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "")?;
+    test.write_file("ruff2.toml", "")?;
+
+    let ruff_dot_toml = test.root().join("ruff.toml");
+    let ruff2_dot_toml = test.root().join("ruff2.toml");
+
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--config")
         .arg(&ruff2_dot_toml)
         .arg("."), @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: You cannot specify more than one configuration file on the command line.
+    ----- stderr -----
+    ruff failed
+      Cause: You cannot specify more than one configuration file on the command line.
 
-          tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
-               For more information, try `--help`.
-        ");
-    });
+      tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+           For more information, try `--help`.
+    ");
     Ok(())
 }
 
 #[test]
 fn config_file_and_isolated() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_dot_toml = tempdir.path().join("ruff.toml");
-    fs::File::create(&ruff_dot_toml)?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "")?;
+
+    let ruff_dot_toml = test.root().join("ruff.toml");
+
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--isolated")
         .arg("."), @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
-
-          tip: You cannot specify a configuration file and also specify `--isolated`,
-               as `--isolated` causes ruff to ignore all configuration files.
-               For more information, try `--help`.
-        ");
-    });
+    ----- stderr -----
+    ruff failed
+      Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+    ");
     Ok(())
 }
 
 #[test]
 fn config_override_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(&ruff_toml, "line-length = 100")?;
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "line-length = 70")?;
+
+    let ruff_toml = test.root().join("ruff.toml");
     let fixture = r#"
 def foo():
     print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
 
     "#;
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_toml)
-        // This overrides the long line length set in the config file
         .args(["--config", "line-length=80"])
         .arg("-")
         .pass_stdin(fixture), @r#"
@@ -239,15 +217,16 @@ def foo():
 
 #[test]
 fn config_doubly_overridden_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(&ruff_toml, "line-length = 70")?;
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "line-length = 70")?;
+
+    let ruff_toml = test.root().join("ruff.toml");
     let fixture = r#"
 def foo():
     print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
 
     "#;
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_toml)
@@ -270,10 +249,9 @@ def foo():
 
 #[test]
 fn format_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 indent-width = 8
 line-length = 84
@@ -286,7 +264,8 @@ line-ending = "cr-lf"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let ruff_toml = test.root().join("ruff.toml");
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -319,10 +298,9 @@ if condition:
 
 #[test]
 fn docstring_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r"
 [format]
 docstring-code-format = true
@@ -330,7 +308,8 @@ docstring-code-line-length = 20
 ",
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let ruff_toml = test.root().join("ruff.toml");
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -406,20 +385,19 @@ def f(x):
 
 #[test]
 fn mixed_line_endings() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
+    test.write_file(
+        "main.py",
         "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
     )?;
 
-    fs::write(
-        tempdir.path().join("test.py"),
+    test.write_file(
+        "test.py",
         "def say_hy(name: str):\r\n    print(f\"Hy {name}\")\r\n",
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--diff", "--isolated"])
         .arg("."), @r"
     success: true
@@ -434,10 +412,9 @@ fn mixed_line_endings() -> Result<()> {
 
 #[test]
 fn exclude() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-exclude = ["out"]
 
@@ -446,8 +423,8 @@ exclude = ["test.py", "generated.py"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
+    test.write_file(
+        "main.py",
         r#"
 from test import say_hy
 
@@ -457,16 +434,15 @@ if __name__ == "__main__":
     )?;
 
     // Excluded file but passed to the CLI directly, should be formatted
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    fs::write(
-        tempdir.path().join("generated.py"),
+    test.write_file(
+        "generated.py",
         r#"NUMBERS = [
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -475,17 +451,12 @@ OTHER = "OTHER"
 "#,
     )?;
 
-    let out_dir = tempdir.path().join("out");
-    fs::create_dir(&out_dir)?;
+    test.write_file("out/a.py", "a = a")?;
 
-    fs::write(out_dir.join("a.py"), "a = a")?;
-
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--check", "--config"])
-        .arg(ruff_toml.file_name().unwrap())
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--no-cache", "--check", "--config", "ruff.toml"])
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
-        .arg(test_path.file_name().unwrap())
+        .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
         .arg("."), @r"
     success: false
@@ -503,15 +474,11 @@ OTHER = "OTHER"
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let root = tempdir.path();
-
-    let main = root.join("main.py");
-    fs::write(&main, "x   = 1\n")?;
+    let test = CliTest::new()?;
+    test.write_file("main.py", "x   = 1\n")?;
 
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .current_dir(root)
+        test.command()
             .args(["format", "--no-cache", "--check"])
             .arg(".")
             .arg("main.py"),
@@ -531,17 +498,15 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
 
 #[test]
 fn syntax_error() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    fs::write(
-        tempdir.path().join("main.py"),
+    let test = CliTest::new()?;
+    test.write_file(
+        "main.py",
         r"
 from module import =
 ",
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--isolated", "--check"])
         .arg("main.py"), @r"
     success: false
@@ -557,10 +522,9 @@ from module import =
 
 #[test]
 fn messages() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    fs::write(
-        tempdir.path().join("main.py"),
+    let test = CliTest::new()?;
+    test.write_file(
+        "main.py",
         r#"
 from test import say_hy
 
@@ -569,8 +533,7 @@ if __name__ == "__main__":
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--isolated", "--check"])
         .arg("main.py"), @r"
     success: false
@@ -582,8 +545,7 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--isolated"])
         .arg("main.py"), @r"
     success: true
@@ -594,8 +556,7 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--isolated"])
         .arg("main.py"), @r"
     success: true
@@ -629,37 +590,23 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    let tempdir = TempDir::new()?;
-    let input = tempdir.path().join("input.py");
-    fs::write(&input, CONTENT)?;
+    let test = CliTest::new()?;
+    test.write_file("input.py", CONTENT)?;
 
     let snapshot = format!("output_format_{output_format}");
 
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-
-    insta::with_settings!({
-        filters => vec![
-            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
-            (ruff_linter::VERSION, "[VERSION]"),
-        ]
-    }, {
-        assert_cmd_snapshot!(
-            snapshot,
-            Command::new(get_cargo_bin(BIN_NAME))
-                .args([
-                    "format",
-                    "--no-cache",
-                    "--output-format",
-                    output_format,
-                    "--preview",
-                    "--check",
-                    "input.py",
-                ])
-                .current_dir(&tempdir),
-        );
-    });
+    assert_cmd_snapshot!(
+        snapshot,
+        test.command().args([
+            "format",
+            "--no-cache",
+            "--output-format",
+            output_format,
+            "--preview",
+            "--check",
+            "input.py",
+        ]),
+    );
 
     Ok(())
 }
@@ -685,21 +632,21 @@ fn output_format_notebook() {
         1 | import numpy
           - maths = (numpy.arange(100)**2).sum()
           - stats= numpy.asarray([1,2,3,4]).median()
-        2 + 
+        2 +
         3 + maths = (numpy.arange(100) ** 2).sum()
         4 + stats = numpy.asarray([1, 2, 3, 4]).median()
          ::: cell 3
         1 | # A cell with IPython escape command
         2 | def some_function(foo, bar):
         3 |     pass
-        4 + 
-        5 + 
+        4 +
+        5 +
         6 | %matplotlib inline
           ::: cell 4
         1  | foo = %pwd
            - def some_function(foo,bar,):
-        2  + 
-        3  + 
+        2  +
+        3  +
         4  + def some_function(
         5  +     foo,
         6  +     bar,
@@ -717,7 +664,7 @@ fn output_format_notebook() {
 
 #[test]
 fn exit_non_zero_on_format() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
     let contents = r#"
 from test import say_hy
@@ -726,20 +673,17 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    fs::write(tempdir.path().join("main.py"), contents)?;
+    test.write_file("main.py", contents)?;
 
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    cmd.current_dir(tempdir.path())
+    // First format should exit with code 1 since the file needed formatting
+    assert_cmd_snapshot!(test.command()
         .args([
             "format",
             "--no-cache",
             "--isolated",
             "--exit-non-zero-on-format",
         ])
-        .arg("main.py");
-
-    // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+        .arg("main.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -749,7 +693,14 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.command()
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "--exit-non-zero-on-format",
+        ])
+        .arg("main.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -759,20 +710,17 @@ if __name__ == "__main__":
     ");
 
     // Repeat the tests above with the --exit-non-zero-on-fix alias
-    fs::write(tempdir.path().join("main.py"), contents)?;
+    test.write_file("main.py", contents)?;
 
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    cmd.current_dir(tempdir.path())
+    // First format should exit with code 1 since the file needed formatting
+    assert_cmd_snapshot!(test.command()
         .args([
             "format",
             "--no-cache",
             "--isolated",
             "--exit-non-zero-on-fix",
         ])
-        .arg("main.py");
-
-    // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+        .arg("main.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -782,7 +730,14 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.command()
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "--exit-non-zero-on-fix",
+        ])
+        .arg("main.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -796,10 +751,9 @@ if __name__ == "__main__":
 
 #[test]
 fn force_exclude() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-exclude = ["out"]
 
@@ -808,8 +762,8 @@ exclude = ["test.py", "generated.py"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
+    test.write_file(
+        "main.py",
         r#"
 from test import say_hy
 
@@ -819,16 +773,15 @@ if __name__ == "__main__":
     )?;
 
     // Excluded file but passed to the CLI directly, should be formatted
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    fs::write(
-        tempdir.path().join("generated.py"),
+    test.write_file(
+        "generated.py",
         r#"NUMBERS = [
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -837,17 +790,12 @@ OTHER = "OTHER"
 "#,
     )?;
 
-    let out_dir = tempdir.path().join("out");
-    fs::create_dir(&out_dir)?;
+    test.write_file("out/a.py", "a = a")?;
 
-    fs::write(out_dir.join("a.py"), "a = a")?;
-
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--force-exclude", "--check", "--config"])
-        .arg(ruff_toml.file_name().unwrap())
-        // Explicitly pass test.py, should be respect the `format.exclude` when `--force-exclude` is present
-        .arg(test_path.file_name().unwrap())
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--no-cache", "--force-exclude", "--check", "--config", "ruff.toml"])
+        // Explicitly pass test.py, should not be formatted because of --force-exclude
+        .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
         .arg("."), @r"
     success: false
@@ -863,10 +811,9 @@ OTHER = "OTHER"
 
 #[test]
 fn exclude_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 ignore = ["Q000", "Q001", "Q002", "Q003"]
@@ -876,9 +823,8 @@ exclude = ["generated.py"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "-"])
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--config", "ruff.toml", "--stdin-filename", "generated.py", "-"])
         .pass_stdin(r#"
 from test import say_hy
 
@@ -903,10 +849,9 @@ if __name__ == '__main__':
 
 #[test]
 fn force_exclude_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 ignore = ["Q000", "Q001", "Q002", "Q003"]
@@ -916,9 +861,8 @@ exclude = ["generated.py"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "--force-exclude", "-"])
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--config", "ruff.toml", "--stdin-filename", "generated.py", "--force-exclude", "-"])
         .pass_stdin(r#"
 from test import say_hy
 
@@ -1033,7 +977,7 @@ if True:
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 1, column 1
           |
-        1 | 
+        1 |
           | ^
         unknown field `tab-size`
         ");
