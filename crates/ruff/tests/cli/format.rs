@@ -2,24 +2,17 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
-use std::str;
 
 use anyhow::Result;
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use regex::escape;
-use tempfile::TempDir;
+use insta_cmd::assert_cmd_snapshot;
 
-const BIN_NAME: &str = "ruff";
-
-fn tempdir_filter(path: impl AsRef<Path>) -> String {
-    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
-}
+use super::CliTest;
 
 #[test]
-fn default_options() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py"])
+fn default_options() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -46,26 +39,17 @@ if condition:
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
 fn default_files() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    fs::write(
-        tempdir.path().join("foo.py"),
-        r#"
-foo =     "needs formatting"
-"#,
-    )?;
-    fs::write(
-        tempdir.path().join("bar.py"),
-        r#"
-bar =     "needs formatting"
-"#,
-    )?;
+    let test = CliTest::new()?;
+    test.write_file("foo.py", r#"foo =     "needs formatting""#)?;
+    test.write_file("bar.py", r#"bar =     "needs formatting""#)?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r"
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--isolated", "--no-cache", "--check"]), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -80,9 +64,10 @@ bar =     "needs formatting"
 }
 
 #[test]
-fn format_warn_stdin_filename_with_files() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "foo.py"])
+fn format_warn_stdin_filename_with_files() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "foo.py"])
         .arg("foo.py")
         .pass_stdin("foo =     1"), @r"
     success: true
@@ -93,12 +78,14 @@ fn format_warn_stdin_filename_with_files() {
     ----- stderr -----
     warning: Ignoring file foo.py in favor of standard input.
     ");
+    Ok(())
 }
 
 #[test]
-fn nonexistent_config_file() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--config", "foo.toml", "."]), @r"
+fn nonexistent_config_file() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--config", "foo.toml", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -115,12 +102,14 @@ fn nonexistent_config_file() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn config_override_rejected_if_invalid_toml() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--config", "foo = bar", "."]), @r"
+fn config_override_rejected_if_invalid_toml() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--config", "foo = bar", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -142,85 +131,82 @@ fn config_override_rejected_if_invalid_toml() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
 fn too_many_config_files() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_dot_toml = tempdir.path().join("ruff.toml");
-    let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
-    fs::File::create(&ruff_dot_toml)?;
-    fs::File::create(&ruff2_dot_toml)?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "")?;
+    test.write_file("ruff2.toml", "")?;
+
+    let ruff_dot_toml = test.root().join("ruff.toml");
+    let ruff2_dot_toml = test.root().join("ruff2.toml");
+
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--config")
         .arg(&ruff2_dot_toml)
         .arg("."), @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: You cannot specify more than one configuration file on the command line.
+    ----- stderr -----
+    ruff failed
+      Cause: You cannot specify more than one configuration file on the command line.
 
-          tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
-               For more information, try `--help`.
-        ");
-    });
+      tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+           For more information, try `--help`.
+    ");
     Ok(())
 }
 
 #[test]
 fn config_file_and_isolated() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_dot_toml = tempdir.path().join("ruff.toml");
-    fs::File::create(&ruff_dot_toml)?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "")?;
+
+    let ruff_dot_toml = test.root().join("ruff.toml");
+
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--isolated")
         .arg("."), @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+    ----- stderr -----
+    ruff failed
+      Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
 
-          tip: You cannot specify a configuration file and also specify `--isolated`,
-               as `--isolated` causes ruff to ignore all configuration files.
-               For more information, try `--help`.
-        ");
-    });
+      tip: You cannot specify a configuration file and also specify `--isolated`,
+           as `--isolated` causes ruff to ignore all configuration files.
+           For more information, try `--help`.
+    ");
     Ok(())
 }
 
 #[test]
 fn config_override_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(&ruff_toml, "line-length = 100")?;
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "line-length = 70")?;
+
+    let ruff_toml = test.root().join("ruff.toml");
     let fixture = r#"
 def foo():
     print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
 
     "#;
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_toml)
-        // This overrides the long line length set in the config file
         .args(["--config", "line-length=80"])
         .arg("-")
         .pass_stdin(fixture), @r#"
@@ -239,15 +225,16 @@ def foo():
 
 #[test]
 fn config_doubly_overridden_via_cli() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(&ruff_toml, "line-length = 70")?;
+    let test = CliTest::new()?;
+    test.write_file("ruff.toml", "line-length = 70")?;
+
+    let ruff_toml = test.root().join("ruff.toml");
     let fixture = r#"
 def foo():
     print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
 
     "#;
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--config")
         .arg(&ruff_toml)
@@ -270,10 +257,9 @@ def foo():
 
 #[test]
 fn format_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 indent-width = 8
 line-length = 84
@@ -286,7 +272,8 @@ line-ending = "cr-lf"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let ruff_toml = test.root().join("ruff.toml");
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -319,10 +306,9 @@ if condition:
 
 #[test]
 fn docstring_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r"
 [format]
 docstring-code-format = true
@@ -330,7 +316,8 @@ docstring-code-line-length = 20
 ",
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    let ruff_toml = test.root().join("ruff.toml");
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -406,21 +393,20 @@ def f(x):
 
 #[test]
 fn mixed_line_endings() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
+    test.write_file(
+        "main.py",
         "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
     )?;
 
-    fs::write(
-        tempdir.path().join("test.py"),
+    test.write_file(
+        "test.py",
         "def say_hy(name: str):\r\n    print(f\"Hy {name}\")\r\n",
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--diff", "--isolated"])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--diff")
         .arg("."), @r"
     success: true
     exit_code: 0
@@ -434,10 +420,9 @@ fn mixed_line_endings() -> Result<()> {
 
 #[test]
 fn exclude() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-exclude = ["out"]
 
@@ -446,8 +431,8 @@ exclude = ["test.py", "generated.py"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
+    test.write_file(
+        "main.py",
         r#"
 from test import say_hy
 
@@ -457,16 +442,15 @@ if __name__ == "__main__":
     )?;
 
     // Excluded file but passed to the CLI directly, should be formatted
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    fs::write(
-        tempdir.path().join("generated.py"),
+    test.write_file(
+        "generated.py",
         r#"NUMBERS = [
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -475,17 +459,12 @@ OTHER = "OTHER"
 "#,
     )?;
 
-    let out_dir = tempdir.path().join("out");
-    fs::create_dir(&out_dir)?;
+    test.write_file("out/a.py", "a = a")?;
 
-    fs::write(out_dir.join("a.py"), "a = a")?;
-
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--check", "--config"])
-        .arg(ruff_toml.file_name().unwrap())
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--no-cache", "--check", "--config", "ruff.toml"])
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
-        .arg(test_path.file_name().unwrap())
+        .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
         .arg("."), @r"
     success: false
@@ -503,15 +482,11 @@ OTHER = "OTHER"
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let root = tempdir.path();
-
-    let main = root.join("main.py");
-    fs::write(&main, "x   = 1\n")?;
+    let test = CliTest::new()?;
+    test.write_file("main.py", "x   = 1\n")?;
 
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .current_dir(root)
+        test.command()
             .args(["format", "--no-cache", "--check"])
             .arg(".")
             .arg("main.py"),
@@ -531,18 +506,16 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
 
 #[test]
 fn syntax_error() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    fs::write(
-        tempdir.path().join("main.py"),
+    let test = CliTest::new()?;
+    test.write_file(
+        "main.py",
         r"
 from module import =
 ",
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--check"])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--check")
         .arg("main.py"), @r"
     success: false
     exit_code: 2
@@ -557,10 +530,9 @@ from module import =
 
 #[test]
 fn messages() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    fs::write(
-        tempdir.path().join("main.py"),
+    let test = CliTest::new()?;
+    test.write_file(
+        "main.py",
         r#"
 from test import say_hy
 
@@ -569,9 +541,8 @@ if __name__ == "__main__":
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--check"])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--check")
         .arg("main.py"), @r"
     success: false
     exit_code: 1
@@ -582,9 +553,7 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated"])
+    assert_cmd_snapshot!(test.format_command()
         .arg("main.py"), @r"
     success: true
     exit_code: 0
@@ -594,9 +563,7 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated"])
+    assert_cmd_snapshot!(test.format_command()
         .arg("main.py"), @r"
     success: true
     exit_code: 0
@@ -629,52 +596,52 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    let tempdir = TempDir::new()?;
-    let input = tempdir.path().join("input.py");
-    fs::write(&input, CONTENT)?;
+    let test = CliTest::with_settings(|_project_dir, mut settings| {
+        // JSON double escapes backslashes
+        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+
+        settings
+    })?;
+    test.write_file("input.py", CONTENT)?;
 
     let snapshot = format!("output_format_{output_format}");
 
-    let project_dir = dunce::canonicalize(tempdir.path())?;
-
-    insta::with_settings!({
-        filters => vec![
-            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
-            (ruff_linter::VERSION, "[VERSION]"),
-        ]
-    }, {
-        assert_cmd_snapshot!(
-            snapshot,
-            Command::new(get_cargo_bin(BIN_NAME))
-                .args([
-                    "format",
-                    "--no-cache",
-                    "--output-format",
-                    output_format,
-                    "--preview",
-                    "--check",
-                    "input.py",
-                ])
-                .current_dir(&tempdir),
-        );
-    });
+    assert_cmd_snapshot!(
+        snapshot,
+        test.command().args([
+            "format",
+            "--no-cache",
+            "--output-format",
+            output_format,
+            "--preview",
+            "--check",
+            "input.py",
+        ]),
+    );
 
     Ok(())
 }
 
 #[test]
-fn output_format_notebook() {
-    let args = ["format", "--no-cache", "--isolated", "--preview", "--check"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn output_format_notebook() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let path = fixtures.join("unformatted.ipynb");
+    // Normalize path separators to forward slashes for cross-platform compatibility
+    let project_root_normalized = project_root
+        .join("resources")
+        .display()
+        .to_string()
+        .replace('\\', "/");
     insta::with_settings!({filters => vec![
         // Replace windows paths
         (r"\\", "/"),
+        // Replace absolute fixture path with relative path
+        (regex::escape(&project_root_normalized).as_str(), "resources"),
     ]}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).args(args).arg(path),
+            test.format_command().args(["--preview", "--check"]).arg(path),
             @r"
         success: false
         exit_code: 1
@@ -711,13 +678,15 @@ fn output_format_notebook() {
         1 file would be reformatted
 
         ----- stderr -----
-        ");
+        "
+        );
     });
+    Ok(())
 }
 
 #[test]
 fn exit_non_zero_on_format() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
     let contents = r#"
 from test import say_hy
@@ -726,20 +695,12 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    fs::write(tempdir.path().join("main.py"), contents)?;
-
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    cmd.current_dir(tempdir.path())
-        .args([
-            "format",
-            "--no-cache",
-            "--isolated",
-            "--exit-non-zero-on-format",
-        ])
-        .arg("main.py");
+    test.write_file("main.py", contents)?;
 
     // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-format")
+        .arg("main.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -749,7 +710,9 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-format")
+        .arg("main.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -759,20 +722,12 @@ if __name__ == "__main__":
     ");
 
     // Repeat the tests above with the --exit-non-zero-on-fix alias
-    fs::write(tempdir.path().join("main.py"), contents)?;
-
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    cmd.current_dir(tempdir.path())
-        .args([
-            "format",
-            "--no-cache",
-            "--isolated",
-            "--exit-non-zero-on-fix",
-        ])
-        .arg("main.py");
+    test.write_file("main.py", contents)?;
 
     // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-fix")
+        .arg("main.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -782,7 +737,9 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-fix")
+        .arg("main.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -796,10 +753,9 @@ if __name__ == "__main__":
 
 #[test]
 fn force_exclude() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-exclude = ["out"]
 
@@ -808,8 +764,8 @@ exclude = ["test.py", "generated.py"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
+    test.write_file(
+        "main.py",
         r#"
 from test import say_hy
 
@@ -819,16 +775,15 @@ if __name__ == "__main__":
     )?;
 
     // Excluded file but passed to the CLI directly, should be formatted
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    fs::write(
-        tempdir.path().join("generated.py"),
+    test.write_file(
+        "generated.py",
         r#"NUMBERS = [
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -837,17 +792,12 @@ OTHER = "OTHER"
 "#,
     )?;
 
-    let out_dir = tempdir.path().join("out");
-    fs::create_dir(&out_dir)?;
+    test.write_file("out/a.py", "a = a")?;
 
-    fs::write(out_dir.join("a.py"), "a = a")?;
-
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--force-exclude", "--check", "--config"])
-        .arg(ruff_toml.file_name().unwrap())
-        // Explicitly pass test.py, should be respect the `format.exclude` when `--force-exclude` is present
-        .arg(test_path.file_name().unwrap())
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--no-cache", "--force-exclude", "--check", "--config", "ruff.toml"])
+        // Explicitly pass test.py, should not be formatted because of --force-exclude
+        .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
         .arg("."), @r"
     success: false
@@ -863,10 +813,9 @@ OTHER = "OTHER"
 
 #[test]
 fn exclude_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 ignore = ["Q000", "Q001", "Q002", "Q003"]
@@ -876,9 +825,8 @@ exclude = ["generated.py"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "-"])
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--config", "ruff.toml", "--stdin-filename", "generated.py", "-"])
         .pass_stdin(r#"
 from test import say_hy
 
@@ -903,10 +851,9 @@ if __name__ == '__main__':
 
 #[test]
 fn force_exclude_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend-select = ["B", "Q"]
 ignore = ["Q000", "Q001", "Q002", "Q003"]
@@ -916,9 +863,8 @@ exclude = ["generated.py"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "--force-exclude", "-"])
+    assert_cmd_snapshot!(test.command()
+        .args(["format", "--config", "ruff.toml", "--stdin-filename", "generated.py", "--force-exclude", "-"])
         .pass_stdin(r#"
 from test import say_hy
 
@@ -944,11 +890,9 @@ if __name__ == '__main__':
 
 #[test]
 fn format_option_inheritance() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    let base_toml = tempdir.path().join("base.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend = "base.toml"
 
@@ -960,17 +904,17 @@ quote-style = "single"
 "#,
     )?;
 
-    fs::write(
-        base_toml,
+    test.write_file(
+        "base.toml",
         r#"
 [format]
 indent-style = "tab"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
-        .arg(&ruff_toml)
+        .arg(test.root().join("ruff.toml"))
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -1003,19 +947,20 @@ if condition:
 
 #[test]
 fn deprecated_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r"
 tab-size = 2
 ",
     )?;
 
+    let ruff_toml = test.root().join("ruff.toml");
+
     insta::with_settings!({filters => vec![
         (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(test.command()
             .args(["format", "--config"])
             .arg(&ruff_toml)
             .arg("-")
@@ -1044,19 +989,20 @@ if True:
 /// Since 0.1.0 the legacy format option is no longer supported
 #[test]
 fn legacy_format_option() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 format = "json"
 "#,
     )?;
 
+    let ruff_toml = test.root().join("ruff.toml");
+
     insta::with_settings!({filters => vec![
         (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(test.command()
             .args(["check", "--select", "F401", "--no-cache", "--config"])
             .arg(&ruff_toml)
             .arg("-")
@@ -1083,10 +1029,9 @@ format = "json"
 
 #[test]
 fn conflicting_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 indent-width = 2
 
@@ -1115,18 +1060,17 @@ indent-style = "tab"
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r#"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1150,10 +1094,9 @@ def say_hy(name: str):
 
 #[test]
 fn conflicting_options_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 indent-width = 2
 
@@ -1179,9 +1122,9 @@ indent-style = "tab"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
-        .arg(&ruff_toml)
+        .arg(test.root().join("ruff.toml"))
         .arg("-")
         .pass_stdin(r#"
 def say_hy(name: str):
@@ -1209,10 +1152,9 @@ def say_hy(name: str):
 
 #[test]
 fn valid_linter_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ALL"]
@@ -1236,18 +1178,17 @@ quote-style = "single"
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1260,10 +1201,9 @@ def say_hy(name: str):
 
 #[test]
 fn valid_linter_options_preserve() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["Q"]
@@ -1278,18 +1218,17 @@ quote-style = "preserve"
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1302,29 +1241,26 @@ def say_hy(name: str):
 
 #[test]
 fn all_rules_default_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ALL"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1339,20 +1275,29 @@ def say_hy(name: str):
 }
 
 #[test]
-fn test_diff() {
-    let args = ["format", "--no-cache", "--isolated", "--diff"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let paths = [
         fixtures.join("unformatted.py"),
         fixtures.join("formatted.py"),
         fixtures.join("unformatted.ipynb"),
     ];
+    // Normalize path separators to forward slashes for cross-platform compatibility
+    let project_root_normalized = project_root
+        .join("resources")
+        .display()
+        .to_string()
+        .replace('\\', "/");
     insta::with_settings!({filters => vec![
         // Replace windows paths
         (r"\\", "/"),
+        // Replace absolute fixture path with relative path
+        (regex::escape(&project_root_normalized).as_str(), "resources"),
     ]}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
+            test.format_command().args(["--diff"]).args(paths),
             @r"
         success: false
         exit_code: 1
@@ -1403,19 +1348,29 @@ fn test_diff() {
         2 files would be reformatted, 1 file already formatted
         ");
     });
+    Ok(())
 }
 
 #[test]
-fn test_diff_no_change() {
-    let args = ["format", "--no-cache", "--isolated", "--diff"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff_no_change() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let paths = [fixtures.join("unformatted.py")];
+    // Normalize path separators to forward slashes for cross-platform compatibility
+    let project_root_normalized = project_root
+        .join("resources")
+        .display()
+        .to_string()
+        .replace('\\', "/");
     insta::with_settings!({filters => vec![
         // Replace windows paths
         (r"\\", "/"),
+        // Replace absolute fixture path with relative path
+        (regex::escape(&project_root_normalized).as_str(), "resources"),
     ]}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
+            test.format_command().args(["--diff"]).args(paths),
             @r"
         success: false
         exit_code: 1
@@ -1434,22 +1389,19 @@ fn test_diff_no_change() {
         "
         );
     });
+    Ok(())
 }
 
 #[test]
-fn test_diff_stdin_unformatted() {
-    let args = [
-        "format",
-        "--isolated",
-        "--diff",
-        "-",
-        "--stdin-filename",
-        "unformatted.py",
-    ];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff_stdin_unformatted() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let unformatted = fs::read(fixtures.join("unformatted.py")).unwrap();
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
+        test.format_command()
+            .args(["--diff", "-", "--stdin-filename", "unformatted.py"])
+            .pass_stdin(unformatted),
         @r"
     success: false
     exit_code: 1
@@ -1465,15 +1417,17 @@ fn test_diff_stdin_unformatted() {
 
     ----- stderr -----
     ");
+    Ok(())
 }
 
 #[test]
-fn test_diff_stdin_formatted() {
-    let args = ["format", "--isolated", "--diff", "-"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff_stdin_formatted() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let unformatted = fs::read(fixtures.join("formatted.py")).unwrap();
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
+        test.format_command().args(["--diff", "-"]).pass_stdin(unformatted),
         @r"
     success: true
     exit_code: 0
@@ -1481,14 +1435,17 @@ fn test_diff_stdin_formatted() {
 
     ----- stderr -----
     ");
+    Ok(())
 }
 
 #[test]
-fn test_notebook_trailing_semicolon() {
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_notebook_trailing_semicolon() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let unformatted = fs::read(fixtures.join("trailing_semicolon.ipynb")).unwrap();
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.ipynb"])
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.ipynb"])
         .arg("-")
         .pass_stdin(unformatted), @r##"
     success: true
@@ -1910,22 +1867,22 @@ fn test_notebook_trailing_semicolon() {
 
     ----- stderr -----
     "##);
+    Ok(())
 }
 
 #[test]
 fn syntax_error_in_notebooks() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    test.write_file(
+        "ruff.toml",
         r#"
 include = ["*.ipy"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.ipy"),
+    test.write_file(
+        "main.ipy",
         r#"
 {
     "cells": [
@@ -1976,11 +1933,10 @@ include = ["*.ipy"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--no-cache")
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
         .arg("."), @r"
     success: false
@@ -1995,18 +1951,17 @@ include = ["*.ipy"]
 
 #[test]
 fn extension() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    test.write_file(
+        "ruff.toml",
         r#"
 include = ["*.ipy"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.ipy"),
+    test.write_file(
+        "main.ipy",
         r#"
 {
  "cells": [
@@ -2046,11 +2001,10 @@ include = ["*.ipy"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--no-cache")
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
         .arg("."), @r"
     success: true
@@ -2064,9 +2018,10 @@ include = ["*.ipy"]
 }
 
 #[test]
-fn range_formatting() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:8-2:14"])
+fn range_formatting() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=2:8-2:14"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2086,12 +2041,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_formatting_unicode() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:21-3"])
+fn range_formatting_unicode() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=2:21-3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1="👋🏽" ): print("Format this" )
@@ -2105,15 +2062,15 @@ def foo(arg1="👋🏽" ): print("Format this" )
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_formatting_multiple_files() -> std::io::Result<()> {
-    let tempdir = TempDir::new()?;
-    let file1 = tempdir.path().join("file1.py");
+fn range_formatting_multiple_files() -> Result<()> {
+    let test = CliTest::new()?;
 
-    fs::write(
-        &file1,
+    test.write_file(
+        "file1.py",
         r#"
 def file1(arg1, arg2,):
     print("Shouldn't format this" )
@@ -2121,10 +2078,8 @@ def file1(arg1, arg2,):
 "#,
     )?;
 
-    let file2 = tempdir.path().join("file2.py");
-
-    fs::write(
-        &file2,
+    test.write_file(
+        "file2.py",
         r#"
 def file2(arg1, arg2,):
     print("Shouldn't format this" )
@@ -2132,10 +2087,10 @@ def file2(arg1, arg2,):
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--range=1:8-1:15"])
-        .arg(file1)
-        .arg(file2),  @r"
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--range=1:8-1:15"])
+        .arg("file1.py")
+        .arg("file2.py"),  @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2149,9 +2104,10 @@ def file2(arg1, arg2,):
 }
 
 #[test]
-fn range_formatting_out_of_bounds() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=100:40-200:1"])
+fn range_formatting_out_of_bounds() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=100:40-200:1"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2168,12 +2124,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_start_larger_than_end() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=90-50"])
+fn range_start_larger_than_end() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=90-50"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2190,12 +2148,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn range_line_numbers_only() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2-3"])
+fn range_line_numbers_only() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=2-3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2215,12 +2175,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_start_only() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=3"])
+fn range_start_only() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2236,12 +2198,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_end_only() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=-3"])
+fn range_end_only() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=-3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2260,12 +2224,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_missing_line() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=1-:20"])
+fn range_missing_line() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=1-:20"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2282,12 +2248,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn zero_line_number() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:2"])
+fn zero_line_number() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=0:2"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2305,12 +2273,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn column_and_line_zero() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:0"])
+fn column_and_line_zero() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=0:0"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2328,12 +2298,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn range_formatting_notebook() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--stdin-filename", "main.ipynb", "--range=1-2"])
+fn range_formatting_notebook() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "main.ipynb", "--range=1-2"])
         .arg("-")
         .pass_stdin(r#"
 {
@@ -2379,6 +2351,7 @@ fn range_formatting_notebook() {
     ----- stderr -----
     error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
     ");
+    Ok(())
 }
 
 /// Test that the formatter respects `per-file-target-version`. Context managers can't be
@@ -2386,10 +2359,11 @@ fn range_formatting_notebook() {
 ///
 /// Adapted from <https://github.com/python/cpython/issues/56991#issuecomment-1093555135>
 #[test]
-fn per_file_target_version_formatter() {
+fn per_file_target_version_formatter() -> Result<()> {
+    let test = CliTest::new()?;
     // without `per-file-target-version` this should not be reformatted in the same way
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--target-version=py38"])
         .arg("-")
         .pass_stdin(r#"
 with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
@@ -2406,8 +2380,8 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--target-version=py38"])
         .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
         .arg("-")
         .pass_stdin(r#"
@@ -2426,6 +2400,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 /// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
@@ -2436,21 +2411,18 @@ fn cookiecutter_globbing() -> Result<()> {
     // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
     // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
     // user's glob does not.
-    let tempdir = TempDir::new()?;
-    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
-    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
-    let tests = cookiecutter.join("tests");
-    fs::create_dir_all(&tests)?;
-    fs::write(
-        cookiecutter_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "{{cookiecutter.repo_name}}/pyproject.toml",
         r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
     )?;
-    let maintest = tests.join("maintest.py");
-    fs::write(maintest, "import foo\nimport bar\nimport foo\n")?;
+    test.write_file(
+        "{{cookiecutter.repo_name}}/tests/maintest.py",
+        "import foo\nimport bar\nimport foo\n",
+    )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(["format", "--no-cache", "--diff"])
-            .current_dir(tempdir.path()), @r"
+    assert_cmd_snapshot!(test.command()
+            .args(["format", "--no-cache", "--diff", "."]), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2463,19 +2435,20 @@ fn cookiecutter_globbing() -> Result<()> {
 }
 
 #[test]
-fn stable_output_format_warning() {
+fn stable_output_format_warning() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        test.command()
             .args(["format", "--output-format=full", "-"])
-            .pass_stdin("1"),
+            .pass_stdin(""),
         @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    1
 
     ----- stderr -----
     warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
     ",
     );
+    Ok(())
 }
