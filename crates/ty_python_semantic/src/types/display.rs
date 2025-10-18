@@ -814,6 +814,10 @@ impl Display for DisplayFunctionType<'_> {
 }
 
 impl<'db> GenericAlias<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayGenericAlias<'db> {
+        self.display_with(db, DisplaySettings::default())
+    }
+
     pub(crate) fn display_with(
         &'db self,
         db: &'db dyn Db,

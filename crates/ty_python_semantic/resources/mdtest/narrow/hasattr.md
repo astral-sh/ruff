@@ -95,6 +95,6 @@ def f(x: object):
         reveal_type(x.__str__)  # revealed: bound method object.__str__() -> str
         reveal_type(x.__dict__)  # revealed: dict[str, Any]
 
-        # error: [unresolved-attribute] "Type `<Protocol with members '__qualname__'>` has no attribute `foo`"
+        # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
 ```

@@ -311,7 +311,7 @@ reveal_type(C.f(1))  # revealed: str
 The method `f` can not be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Type `C` has no attribute `f`"
+# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
