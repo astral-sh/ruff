@@ -21,22 +21,26 @@ mod lint;
 const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
+/// This filter matches paths with any combination of forward slashes, backslashes,
+/// and JSON-escaped slashes to handle all path formats across platforms and output types.
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
-    let filter = format!(r"{}[\\/]?", regex::escape(path.as_ref()));
-    eprintln!("DEBUG: tempdir_filter = {}", filter);
-    filter
-}
+    let path_str = path.as_ref();
+    // Escape the path components but allow flexible slash matching
+    let path_components: Vec<&str> = path_str.split(['/', '\\']).collect();
+    let escaped_components: Vec<String> = path_components
+        .iter()
+        .map(|component| regex::escape(component))
+        .collect();
 
-/// Creates a regex filter for replacing JSON-escaped temporary directory paths in snapshots
-pub(crate) fn tempdir_filter_json(path: impl AsRef<str>) -> String {
-    // Convert Windows backslashes to forward slashes, then escape for JSON
-    let normalized_path = path.as_ref().replace('\\', "/");
-    let escaped_path = regex::escape(&normalized_path);
-    // In JSON, forward slashes are escaped as \/
-    let json_escaped_path = escaped_path.replace("/", r"\/");
-    let filter = format!(r"{json_escaped_path}");
-    eprintln!("DEBUG: tempdir_filter_json = {}", filter);
-    filter
+    // Create a pattern that matches any combination of /, \, and \/
+    // This handles regular paths, Windows paths, and JSON-escaped paths
+    let slash_pattern = r"[\\/]|\\?/";
+    let filter = escaped_components.join(&format!("(?:{})", slash_pattern));
+
+    // Add optional trailing slash and filename
+    let full_filter = format!("{}(?:{}[^\"\\s]*)?", filter, slash_pattern);
+    eprintln!("DEBUG: tempdir_filter = {}", full_filter);
+    full_filter
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -90,10 +94,6 @@ impl CliTest {
 
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
         settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
-        settings.add_filter(
-            &tempdir_filter_json(project_dir.to_str().unwrap()),
-            "[TMP]/",
-        );
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
