@@ -29,9 +29,12 @@ pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
 
 /// Creates a regex filter for replacing JSON-escaped temporary directory paths in snapshots
 pub(crate) fn tempdir_filter_json(path: impl AsRef<str>) -> String {
-    let escaped_path = regex::escape(path.as_ref());
-    let json_escaped_path = escaped_path.replace(r"\\", r"\\?/");
-    let filter = format!(r"{json_escaped_path}[\\/]?");
+    // Convert Windows backslashes to forward slashes, then escape for JSON
+    let normalized_path = path.as_ref().replace('\\', "/");
+    let escaped_path = regex::escape(&normalized_path);
+    // In JSON, forward slashes are escaped as \/
+    let json_escaped_path = escaped_path.replace("/", r"\/");
+    let filter = format!(r"{json_escaped_path}");
     eprintln!("DEBUG: tempdir_filter_json = {}", filter);
     filter
 }
