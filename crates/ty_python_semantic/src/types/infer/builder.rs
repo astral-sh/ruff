@@ -6291,48 +6291,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprListComp {
             range: _,
             node_index: _,
-            elt: _,
+            elt,
             generators,
         } = listcomp;
 
         self.infer_first_comprehension_iter(generators);
 
-        KnownClass::List
-            .to_specialized_instance(self.db(), [todo_type!("list comprehension element type")])
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::ListComprehension(listcomp));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let element_type = inference.expression_type(elt.as_ref());
+
+        KnownClass::List.to_specialized_instance(self.db(), [element_type])
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
         let ast::ExprDictComp {
             range: _,
             node_index: _,
-            key: _,
-            value: _,
+            key,
+            value,
             generators,
         } = dictcomp;
 
         self.infer_first_comprehension_iter(generators);
 
-        KnownClass::Dict.to_specialized_instance(
-            self.db(),
-            [
-                todo_type!("dict comprehension key type"),
-                todo_type!("dict comprehension value type"),
-            ],
-        )
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::DictComprehension(dictcomp));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let key_type = inference.expression_type(key.as_ref());
+        let value_type = inference.expression_type(value.as_ref());
+
+        KnownClass::Dict.to_specialized_instance(self.db(), [key_type, value_type])
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
         let ast::ExprSetComp {
             range: _,
             node_index: _,
-            elt: _,
+            elt,
             generators,
         } = setcomp;
 
         self.infer_first_comprehension_iter(generators);
 
-        KnownClass::Set
-            .to_specialized_instance(self.db(), [todo_type!("set comprehension element type")])
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::SetComprehension(setcomp));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let element_type = inference.expression_type(elt.as_ref());
+
+        KnownClass::Set.to_specialized_instance(self.db(), [element_type])
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
