@@ -30,6 +30,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::signatures::{CallableSignature, Parameter, Parameters, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
+pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{
@@ -69,7 +70,6 @@ pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_t
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
-pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;

@@ -28,7 +28,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
+use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
     PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
@@ -840,28 +840,11 @@ impl Rules {
                         .and_then(|path| system_path_to_file(db, path).ok());
 
                     // TODO: Add a note if the value was configured on the CLI
-                    let diagnostic = match error {
-                        GetLintError::Unknown(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
-                            OptionDiagnostic::new(
-                                DiagnosticId::UnknownRule,
-                                format!(
-                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
-                                ),
-                                Severity::Warning,
-                            )
-                        }
-
-                        GetLintError::Removed(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                    };
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::UnknownRule,
+                        error.to_string(),
+                        Severity::Warning,
+                    );
 
                     let annotation = file.map(Span::from).map(|span| {
                         Annotation::primary(span.with_optional_range(rule_name.range()))
