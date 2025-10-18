@@ -401,8 +401,8 @@ fn mixed_line_endings() -> Result<()> {
         "def say_hy(name: str):\r\n    print(f\"Hy {name}\")\r\n",
     )?;
 
-    assert_cmd_snapshot!(test.command()
-        .args(["format", "--no-cache", "--diff", "--isolated"])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--diff")
         .arg("."), @r"
     success: true
     exit_code: 0
@@ -510,8 +510,8 @@ from module import =
 ",
     )?;
 
-    assert_cmd_snapshot!(test.command()
-        .args(["format", "--no-cache", "--isolated", "--check"])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--check")
         .arg("main.py"), @r"
     success: false
     exit_code: 2
@@ -537,8 +537,8 @@ if __name__ == "__main__":
 "#,
     )?;
 
-    assert_cmd_snapshot!(test.command()
-        .args(["format", "--no-cache", "--isolated", "--check"])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--check")
         .arg("main.py"), @r"
     success: false
     exit_code: 1
@@ -549,8 +549,7 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(test.command()
-        .args(["format", "--no-cache", "--isolated"])
+    assert_cmd_snapshot!(test.format_command()
         .arg("main.py"), @r"
     success: true
     exit_code: 0
@@ -560,8 +559,7 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(test.command()
-        .args(["format", "--no-cache", "--isolated"])
+    assert_cmd_snapshot!(test.format_command()
         .arg("main.py"), @r"
     success: true
     exit_code: 0
@@ -685,13 +683,8 @@ if __name__ == "__main__":
     test.write_file("main.py", contents)?;
 
     // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(test.command()
-        .args([
-            "format",
-            "--no-cache",
-            "--isolated",
-            "--exit-non-zero-on-format",
-        ])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-format")
         .arg("main.py"), @r"
     success: false
     exit_code: 1
@@ -702,13 +695,8 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(test.command()
-        .args([
-            "format",
-            "--no-cache",
-            "--isolated",
-            "--exit-non-zero-on-format",
-        ])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-format")
         .arg("main.py"), @r"
     success: true
     exit_code: 0
@@ -722,13 +710,8 @@ if __name__ == "__main__":
     test.write_file("main.py", contents)?;
 
     // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(test.command()
-        .args([
-            "format",
-            "--no-cache",
-            "--isolated",
-            "--exit-non-zero-on-fix",
-        ])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-fix")
         .arg("main.py"), @r"
     success: false
     exit_code: 1
@@ -739,13 +722,8 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(test.command()
-        .args([
-            "format",
-            "--no-cache",
-            "--isolated",
-            "--exit-non-zero-on-fix",
-        ])
+    assert_cmd_snapshot!(test.format_command()
+        .arg("--exit-non-zero-on-fix")
         .arg("main.py"), @r"
     success: true
     exit_code: 0
