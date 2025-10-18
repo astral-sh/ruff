@@ -1539,103 +1539,9 @@ impl<'src> Parser<'src> {
             flags = flags.with_unclosed(true);
         }
 
-        // test_ok pep701_f_string_py312
-        // # parse_options: {"target-version": "3.12"}
-        // f'Magic wand: { bag['wand'] }'     # nested quotes
-        // f"{'\n'.join(a)}"                  # escape sequence
-        // f'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // f"test {a \
-        //     } more"                        # line continuation
-
-        // test_ok pep750_t_string_py314
-        // # parse_options: {"target-version": "3.14"}
-        // t'Magic wand: { bag['wand'] }'     # nested quotes
-        // t"{'\n'.join(a)}"                  # escape sequence
-        // t'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // t"test {a \
-        //     } more"                        # line continuation
-
-        // test_ok pep701_f_string_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f"outer {'# not a comment'}"
-        // f'outer {x:{"# not a comment"} }'
-        // f"""{f'''{f'{"# not a comment"}'}'''}"""
-        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
-        // f"escape outside of \t {expr}\n"
-        // f"test\"abcd"
-        // f"{1:\x64}"  # escapes are valid in the format spec
-        // f"{1:\"d\"}"  # this also means that escaped outer quotes are valid
-
-        // test_err pep701_f_string_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f'Magic wand: { bag['wand'] }'     # nested quotes
-        // f"{'\n'.join(a)}"                  # escape sequence
-        // f'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // f"test {a \
-        //     } more"                        # line continuation
-        // f"""{f"""{x}"""}"""                # mark the whole triple quote
-        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
-
-        // test_err nested_quote_in_format_spec_py312
-        // # parse_options: {"target-version": "3.12"}
-        // f"{1:""}"  # this is a ParseError on all versions
-
-        // test_ok non_nested_quote_in_format_spec_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f"{1:''}"  # but this is okay on all versions
-        let range = self.node_range(start);
-
-        if !self.options.target_version.supports_pep_701()
-            && matches!(kind, InterpolatedStringKind::FString)
-        {
-            let quote_bytes = flags.quote_str().as_bytes();
-            let quote_len = flags.quote_len();
-            for expr in elements.interpolations() {
-                // We need to check the whole expression range, including any leading or trailing
-                // debug text, but exclude the format spec, where escapes and escaped, reused quotes
-                // are allowed.
-                let range = expr
-                    .format_spec
-                    .as_ref()
-                    .map(|format_spec| TextRange::new(expr.start(), format_spec.start()))
-                    .unwrap_or(expr.range);
-                for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
-                    let slash_position = TextSize::try_from(slash_position).unwrap();
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(range.start() + slash_position, '\\'.text_len()),
-                    );
-                }
-
-                if let Some(quote_position) =
-                    memchr::memmem::find(self.source[range].as_bytes(), quote_bytes)
-                {
-                    let quote_position = TextSize::try_from(quote_position).unwrap();
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(range.start() + quote_position, quote_len),
-                    );
-                }
-            }
-
-            self.check_fstring_comments(range);
-        }
-
         InterpolatedStringData {
             elements,
-            range,
+            range: self.node_range(start),
             flags,
         }
     }
@@ -1921,12 +1827,110 @@ impl<'src> Parser<'src> {
             );
         }
 
+        // test_ok pep701_f_string_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep750_t_string_py314
+        // # parse_options: {"target-version": "3.14"}
+        // t'Magic wand: { bag['wand'] }'     # nested quotes
+        // t"{'\n'.join(a)}"                  # escape sequence
+        // t'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // t"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"outer {'# not a comment'}"
+        // f'outer {x:{"# not a comment"} }'
+        // f"""{f'''{f'{"# not a comment"}'}'''}"""
+        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"escape outside of \t {expr}\n"
+        // f"test\"abcd"
+        // f"{1:\x64}"  # escapes are valid in the format spec
+        // f"{1:\"d\"}"  # this also means that escaped outer quotes are valid
+
+        // test_err pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+        // f"""{f"""{x}"""}"""                # mark the whole triple quote
+        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+
+        // test_err pep701_nested_interpolation_py311
+        // # parse_options: {"target-version": "3.11"}
+        // # nested interpolations also need to be checked
+        // f'{1: abcd "{'aa'}" }'
+        // f'{1: abcd "{"\n"}" }'
+
+        // test_err nested_quote_in_format_spec_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f"{1:""}"  # this is a ParseError on all versions
+
+        // test_ok non_nested_quote_in_format_spec_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"{1:''}"  # but this is okay on all versions
+        let range = self.node_range(start);
+
+        if !self.options.target_version.supports_pep_701()
+            && matches!(string_kind, InterpolatedStringKind::FString)
+        {
+            // We need to check the whole expression range, including any leading or trailing
+            // debug text, but exclude the format spec, where escapes and escaped, reused quotes
+            // are allowed.
+            let range = format_spec
+                .as_ref()
+                .map(|format_spec| TextRange::new(range.start(), format_spec.start()))
+                .unwrap_or(range);
+
+            let quote_bytes = flags.quote_str().as_bytes();
+            let quote_len = flags.quote_len();
+            for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
+                let slash_position = TextSize::try_from(slash_position).unwrap();
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                    TextRange::at(range.start() + slash_position, '\\'.text_len()),
+                );
+            }
+
+            if let Some(quote_position) =
+                memchr::memmem::find(self.source[range].as_bytes(), quote_bytes)
+            {
+                let quote_position = TextSize::try_from(quote_position).unwrap();
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                    TextRange::at(range.start() + quote_position, quote_len),
+                );
+            }
+
+            self.check_fstring_comments(range);
+        }
+
         ast::InterpolatedElement {
             expression: Box::new(value.expr),
             debug_text,
             conversion,
             format_spec,
-            range: self.node_range(start),
+            range,
             node_index: AtomicNodeIndex::NONE,
         }
     }

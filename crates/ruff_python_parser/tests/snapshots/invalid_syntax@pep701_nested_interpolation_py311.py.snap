@@ -1,0 +1,231 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/pep701_nested_interpolation_py311.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..138,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 92..114,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 92..114,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 92..114,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 94..113,
+                                                        node_index: NodeIndex(None),
+                                                        expression: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 95..96,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            InterpolatedStringFormatSpec {
+                                                                range: 97..112,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 97..104,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: " abcd \"",
+                                                                        },
+                                                                    ),
+                                                                    Interpolation(
+                                                                        InterpolatedElement {
+                                                                            range: 104..110,
+                                                                            node_index: NodeIndex(None),
+                                                                            expression: StringLiteral(
+                                                                                ExprStringLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 105..109,
+                                                                                    value: StringLiteralValue {
+                                                                                        inner: Single(
+                                                                                            StringLiteral {
+                                                                                                range: 105..109,
+                                                                                                node_index: NodeIndex(None),
+                                                                                                value: "aa",
+                                                                                                flags: StringLiteralFlags {
+                                                                                                    quote_style: Single,
+                                                                                                    prefix: Empty,
+                                                                                                    triple_quoted: false,
+                                                                                                    unclosed: false,
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                            debug_text: None,
+                                                                            conversion: None,
+                                                                            format_spec: None,
+                                                                        },
+                                                                    ),
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 110..112,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "\" ",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 115..137,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 115..137,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 115..137,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 117..136,
+                                                        node_index: NodeIndex(None),
+                                                        expression: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 118..119,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            InterpolatedStringFormatSpec {
+                                                                range: 120..135,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 120..127,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: " abcd \"",
+                                                                        },
+                                                                    ),
+                                                                    Interpolation(
+                                                                        InterpolatedElement {
+                                                                            range: 127..133,
+                                                                            node_index: NodeIndex(None),
+                                                                            expression: StringLiteral(
+                                                                                ExprStringLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 128..132,
+                                                                                    value: StringLiteralValue {
+                                                                                        inner: Single(
+                                                                                            StringLiteral {
+                                                                                                range: 128..132,
+                                                                                                node_index: NodeIndex(None),
+                                                                                                value: "\n",
+                                                                                                flags: StringLiteralFlags {
+                                                                                                    quote_style: Double,
+                                                                                                    prefix: Empty,
+                                                                                                    triple_quoted: false,
+                                                                                                    unclosed: false,
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                            debug_text: None,
+                                                                            conversion: None,
+                                                                            format_spec: None,
+                                                                        },
+                                                                    ),
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 133..135,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "\" ",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | # nested interpolations also need to be checked
+3 | f'{1: abcd "{'aa'}" }'
+  |              ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+4 | f'{1: abcd "{"\n"}" }'
+  |
+
+
+  |
+2 | # nested interpolations also need to be checked
+3 | f'{1: abcd "{'aa'}" }'
+4 | f'{1: abcd "{"\n"}" }'
+  |               ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  |
