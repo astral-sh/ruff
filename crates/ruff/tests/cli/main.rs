@@ -22,27 +22,7 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
-    let path_str = path.as_ref();
-
-    // Check if this is a Windows path (contains a colon, e.g., "C:")
-    if path_str.contains(':') {
-        // For Windows paths, normalize to forward slashes and escape for regex
-        let normalized = path_str.replace('\\', "/");
-        let escaped = regex::escape(&normalized);
-
-        // Replace each forward slash with a pattern that matches:
-        // - Regular forward slash: /
-        // - JSON-escaped forward slash: \/
-        // - Backslash: \
-        // This handles paths in JSON output, file URIs, and regular Windows paths
-        let pattern = escaped.replace("/", r"(?:/|\\/|\\)");
-
-        // Include optional leading slash to match the third slash in file:///
-        // and optional trailing slash, so file:/// becomes file:// after replacement
-        format!(r"(?:/|\\)?{}(?:/|\\/|\\)?", pattern)
-    } else {
-        format!(r"{}[\\/]?", regex::escape(path_str))
-    }
+    format!(r"{}[\\/]?", regex::escape(path.as_ref()))
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -96,7 +76,7 @@ impl CliTest {
 
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
-        settings.add_filter(&dbg!(tempdir_filter(project_dir.to_str().unwrap())), "[TMP]/");
+        settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
