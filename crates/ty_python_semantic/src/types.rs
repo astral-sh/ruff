@@ -6648,7 +6648,7 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
-        match self {
+        let ty = match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
                     specialization.get(db, bound_typevar).unwrap_or(self)
@@ -6837,6 +6837,15 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_) => self,
+        };
+
+        match type_mapping {
+            TypeMapping::PromoteLiterals => {
+                // It is only sound to promote to a supertype (i.e. it is unsound to promote
+                // invariant generics).
+                if self.is_subtype_of(db, ty) { ty } else { self }
+            }
+            _ => ty,
         }
     }
 

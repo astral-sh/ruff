@@ -38,6 +38,21 @@ reveal_type(x[0].__name__)  # revealed: Unknown | str
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
+## Invariant generic elements
+
+We take care not to promote invariant generics:
+
+```py
+from typing import Literal
+
+def _(a: list[Literal[1]], b: Literal[2]):
+    c = [a]
+    reveal_type(c)  # revealed: list[Unknown | list[Literal[1]]]
+
+    d = [(a, b)]
+    reveal_type(d)  # revealed: list[Unknown | tuple[list[Literal[1]], int]]
+```
+
 ## List comprehensions
 
 ```py
