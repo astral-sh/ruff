@@ -650,21 +650,21 @@ fn output_format_notebook() -> Result<()> {
         1 | import numpy
           - maths = (numpy.arange(100)**2).sum()
           - stats= numpy.asarray([1,2,3,4]).median()
-        2 + 
+        2 +
         3 + maths = (numpy.arange(100) ** 2).sum()
         4 + stats = numpy.asarray([1, 2, 3, 4]).median()
          ::: cell 3
         1 | # A cell with IPython escape command
         2 | def some_function(foo, bar):
         3 |     pass
-        4 + 
-        5 + 
+        4 +
+        5 +
         6 | %matplotlib inline
           ::: cell 4
         1  | foo = %pwd
            - def some_function(foo,bar,):
-        2  + 
-        3  + 
+        2  +
+        3  +
         4  + def some_function(
         5  +     foo,
         6  +     bar,
@@ -947,19 +947,20 @@ if condition:
 
 #[test]
 fn deprecated_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r"
 tab-size = 2
 ",
     )?;
 
+    let ruff_toml = test.root().join("ruff.toml");
+
     insta::with_settings!({filters => vec![
         (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(test.command()
             .args(["format", "--config"])
             .arg(&ruff_toml)
             .arg("-")
@@ -988,19 +989,20 @@ if True:
 /// Since 0.1.0 the legacy format option is no longer supported
 #[test]
 fn legacy_format_option() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 format = "json"
 "#,
     )?;
 
+    let ruff_toml = test.root().join("ruff.toml");
+
     insta::with_settings!({filters => vec![
         (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(test.command()
             .args(["check", "--select", "F401", "--no-cache", "--config"])
             .arg(&ruff_toml)
             .arg("-")
@@ -1027,10 +1029,9 @@ format = "json"
 
 #[test]
 fn conflicting_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 indent-width = 2
 
@@ -1059,18 +1060,17 @@ indent-style = "tab"
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r#"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1094,10 +1094,9 @@ def say_hy(name: str):
 
 #[test]
 fn conflicting_options_stdin() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 indent-width = 2
 
@@ -1123,9 +1122,9 @@ indent-style = "tab"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
-        .arg(&ruff_toml)
+        .arg(test.root().join("ruff.toml"))
         .arg("-")
         .pass_stdin(r#"
 def say_hy(name: str):
@@ -1153,10 +1152,9 @@ def say_hy(name: str):
 
 #[test]
 fn valid_linter_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ALL"]
@@ -1180,18 +1178,17 @@ quote-style = "single"
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1204,10 +1201,9 @@ def say_hy(name: str):
 
 #[test]
 fn valid_linter_options_preserve() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["Q"]
@@ -1222,18 +1218,17 @@ quote-style = "preserve"
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1246,29 +1241,26 @@ def say_hy(name: str):
 
 #[test]
 fn all_rules_default_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 [lint]
 select = ["ALL"]
 "#,
     )?;
 
-    let test_path = tempdir.path().join("test.py");
-    fs::write(
-        &test_path,
+    test.write_file(
+        "test.py",
         r#"
 def say_hy(name: str):
         print(f"Hy {name}")"#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg(test_path), @r"
+        .arg(test.root().join("ruff.toml"))
+        .arg("test.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1283,9 +1275,10 @@ def say_hy(name: str):
 }
 
 #[test]
-fn test_diff() {
-    let args = ["format", "--no-cache", "--isolated", "--diff"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let paths = [
         fixtures.join("unformatted.py"),
         fixtures.join("formatted.py"),
@@ -1294,9 +1287,11 @@ fn test_diff() {
     insta::with_settings!({filters => vec![
         // Replace windows paths
         (r"\\", "/"),
+        // Replace absolute fixture path with relative path
+        (regex::escape(&project_root.join("resources").to_string_lossy()).as_str(), "resources"),
     ]}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
+            test.format_command().args(["--diff"]).args(paths),
             @r"
         success: false
         exit_code: 1
@@ -1347,19 +1342,23 @@ fn test_diff() {
         2 files would be reformatted, 1 file already formatted
         ");
     });
+    Ok(())
 }
 
 #[test]
-fn test_diff_no_change() {
-    let args = ["format", "--no-cache", "--isolated", "--diff"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff_no_change() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let paths = [fixtures.join("unformatted.py")];
     insta::with_settings!({filters => vec![
         // Replace windows paths
         (r"\\", "/"),
+        // Replace absolute fixture path with relative path
+        (regex::escape(&project_root.join("resources").to_string_lossy()).as_str(), "resources"),
     ]}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
+            test.format_command().args(["--diff"]).args(paths),
             @r"
         success: false
         exit_code: 1
@@ -1374,9 +1373,11 @@ fn test_diff_no_change() {
 
 
         ----- stderr -----
+        1 file would be reformatted
         "
         );
     });
+    Ok(())
 }
 
 #[test]
