@@ -32,9 +32,9 @@ pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
         .map(|component| regex::escape(component))
         .collect();
 
-    // Create a pattern that matches any combination of backslashes and forward slashes
+    // Create a pattern that matches single slash separators (avoid matching URI schemes like file://)
     // This handles regular paths, Windows paths, and JSON-escaped paths
-    let slash_pattern = r"(\\|/)+";
+    let slash_pattern = r"(?:\\|/|\\/)";
     let filter = escaped_components.join(slash_pattern);
 
     // Match temp directory with trailing slash
