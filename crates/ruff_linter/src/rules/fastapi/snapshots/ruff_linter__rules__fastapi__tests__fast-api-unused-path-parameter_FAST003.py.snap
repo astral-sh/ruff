@@ -363,3 +363,26 @@ help: Add `id` to function signature
 206 | 
 207 | # No errors
 note: This is an unsafe fix and may change runtime behavior
+
+FAST003 Parameter `import` appears in route path, but not in `get_import` signature
+   --> FAST003.py:261:20
+    |
+260 | # https://github.com/astral-sh/ruff/issues/20941
+261 | @app.get("/imports/{import}")
+    |                    ^^^^^^^^
+262 | async def get_import():
+263 |     ...
+    |
+help: Add `import` to function signature
+
+FAST003 Parameter `__debug__` appears in route path, but not in `get_debug` signature
+   --> FAST003.py:265:18
+    |
+263 |     ...
+264 |
+265 | @app.get("/debug/{__debug__}")
+    |                  ^^^^^^^^^^^
+266 | async def get_debug():
+267 |     ...
+    |
+help: Add `__debug__` to function signature
