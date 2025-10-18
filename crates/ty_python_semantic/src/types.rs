@@ -8000,6 +8000,9 @@ pub struct FieldInstance<'db> {
 
     /// Whether or not this field can only be passed as a keyword argument to `__init__`.
     pub kw_only: Option<bool>,
+
+    /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
+    pub alias: Option<Box<str>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -8013,6 +8016,7 @@ impl<'db> FieldInstance<'db> {
                 .map(|ty| ty.normalized_impl(db, visitor)),
             self.init(db),
             self.kw_only(db),
+            self.alias(db),
         )
     }
 }

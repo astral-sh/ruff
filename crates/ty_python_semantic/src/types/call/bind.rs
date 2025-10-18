@@ -618,6 +618,9 @@ impl<'db> Bindings<'db> {
                         let kw_only = overload
                             .parameter_type_by_name("kw_only", true)
                             .unwrap_or(None);
+                        let alias = overload
+                            .parameter_type_by_name("alias", true)
+                            .unwrap_or(None);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -650,6 +653,10 @@ impl<'db> Bindings<'db> {
                             None
                         };
 
+                        let alias = alias
+                            .and_then(Type::as_string_literal)
+                            .map(|literal| Box::from(literal.value(db)));
+
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
@@ -658,7 +665,7 @@ impl<'db> Bindings<'db> {
                         // are assignable to `T` if the default type of the field is assignable
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only),
+                            FieldInstance::new(db, default_ty, init, kw_only, alias),
                         )));
                     }
 

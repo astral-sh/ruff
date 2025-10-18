@@ -451,7 +451,7 @@ checkers do not seem to support this either.
 ```py
 from typing_extensions import dataclass_transform, Any
 
-def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 def fancy_model[T](cls: type[T]) -> type[T]:
     ...
@@ -460,7 +460,7 @@ def fancy_model[T](cls: type[T]) -> type[T]:
 @fancy_model
 class Person:
     id: int = fancy_field(init=False)
-    name: str = fancy_field()
+    internal_name: str = fancy_field(alias="name")
     age: int | None = fancy_field(kw_only=True)
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
@@ -468,7 +468,7 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int 
 alice = Person("Alice", age=30)
 
 reveal_type(alice.id)  # revealed: int
-reveal_type(alice.name)  # revealed: str
+reveal_type(alice.internal_name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 ```
 
@@ -477,7 +477,7 @@ reveal_type(alice.age)  # revealed: int | None
 ```py
 from typing_extensions import dataclass_transform, Any
 
-def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyMeta(type):
     def __new__(cls, name, bases, namespace):
@@ -488,7 +488,7 @@ class FancyBase(metaclass=FancyMeta): ...
 
 class Person(FancyBase):
     id: int = fancy_field(init=False)
-    name: str = fancy_field()
+    internal_name: str = fancy_field(alias="name")
     age: int | None = fancy_field(kw_only=True)
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
@@ -496,7 +496,7 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int 
 alice = Person("Alice", age=30)
 
 reveal_type(alice.id)  # revealed: int
-reveal_type(alice.name)  # revealed: str
+reveal_type(alice.internal_name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 ```
 
@@ -505,7 +505,7 @@ reveal_type(alice.age)  # revealed: int | None
 ```py
 from typing_extensions import dataclass_transform, Any
 
-def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyBase:
     def __init_subclass__(cls):
@@ -514,7 +514,7 @@ class FancyBase:
 
 class Person(FancyBase):
     id: int = fancy_field(init=False)
-    name: str = fancy_field()
+    internal_name: str = fancy_field(alias="name")
     age: int | None = fancy_field(kw_only=True)
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
@@ -522,7 +522,7 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int 
 alice = Person("Alice", age=30)
 
 reveal_type(alice.id)  # revealed: int
-reveal_type(alice.name)  # revealed: str
+reveal_type(alice.internal_name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 ```
 
@@ -547,6 +547,58 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
 
 Person(name="Alice")
+```
+
+### Support for `alias`
+
+The `alias` parameter in field specifiers allows providing an alternative name for the parameter in
+the synthesized `__init__` method.
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field_with_alias(*, alias: str | None = None, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(field_with_alias,))
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model
+class Person:
+    internal_name: str = field_with_alias(alias="name")
+    internal_age: int = field_with_alias(alias="age", kw_only=True)
+```
+
+The synthesized `__init__` method uses the alias names instead of the actual attribute names:
+
+```py
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int) -> None
+```
+
+We can construct instances using the alias names:
+
+```py
+p = Person(name="Alice", age=30)
+```
+
+Passing the `name` parameter positionally also works:
+
+```py
+p = Person("Alice", age=30)
+```
+
+But the attributes are still accessed by their actual names:
+
+```py
+reveal_type(p.internal_name)  # revealed: str
+reveal_type(p.internal_age)  # revealed: int
+```
+
+Trying to use the actual attribute names in the constructor results in an error:
+
+```py
+# error: [unknown-argument] "Argument `internal_age` does not match any known parameter"
+# error: [missing-argument] "No argument provided for required parameter `age`"
+p = Person(name="Alice", internal_age=30)
 ```
 
 ### With overloaded field specifiers
