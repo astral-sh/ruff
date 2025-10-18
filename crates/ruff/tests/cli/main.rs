@@ -38,7 +38,7 @@ pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
     let filter = escaped_components.join(&format!("(?:{})", slash_pattern));
 
     // Add optional trailing slash and filename
-    let full_filter = format!("{}(?:{}[^\"\\s]*)?", filter, slash_pattern);
+    let full_filter = format!("{}({}[^\"\\s]*)?", filter, slash_pattern);
     eprintln!("DEBUG: tempdir_filter = {}", full_filter);
     full_filter
 }
