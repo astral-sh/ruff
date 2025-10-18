@@ -34,7 +34,7 @@ pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
 
     // Create a pattern that matches any combination of /, \, and \/
     // This handles regular paths, Windows paths, and JSON-escaped paths
-    let slash_pattern = r"[\\/]|\\?/";
+    let slash_pattern = r"[\\/]|\\/";
     let filter = escaped_components.join(&format!("(?:{})", slash_pattern));
 
     // Add optional trailing slash and filename
