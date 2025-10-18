@@ -665,7 +665,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),
                 )
-                .is_always_satisfied()
+                .satisfies_all_typevars(db, InferableTypeVars::None)
         }
 
         #[expect(clippy::trivially_copy_pass_by_ref)]

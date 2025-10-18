@@ -23,6 +23,9 @@
 //! Note that all lower and upper bounds in a constraint must be fully static. We take the bottom
 //! and top materializations of the types to remove any gradual forms if needed.
 //!
+//! Lower and upper bounds must also be normalized. This lets us identify, for instance,
+//! two constraints with equivalent but differently ordered unions as their bounds.
+//!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
 //! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
@@ -60,7 +63,24 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use crate::Db;
-use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, UnionType};
+use crate::types::generics::InferableTypeVars;
+use crate::types::{
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
+    TypeVarBoundOrConstraints, UnionType,
+};
+
+fn simplify_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Node<'db>,
+    _count: u32,
+    _self: InteriorNode<'db>,
+) -> salsa::CycleRecoveryAction<Node<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn simplify_cycle_initial<'db>(_db: &'db dyn Db, this: InteriorNode<'db>) -> Node<'db> {
+    Node::Interior(this)
+}
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -171,6 +191,29 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+        relation: TypeRelation,
+    ) -> Self {
+        let (lower, upper) = match relation {
+            // TODO: Is this the correct constraint for redundancy?
+            TypeRelation::Subtyping | TypeRelation::Redundancy => (
+                lower.top_materialization(db),
+                upper.bottom_materialization(db),
+            ),
+            TypeRelation::Assignability => (
+                lower.bottom_materialization(db),
+                upper.top_materialization(db),
+            ),
+        };
+        let node = ConstrainedTypeVar::new_node(db, lower, typevar, upper);
+        Self { node }
+    }
+
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self) -> bool {
         self.node.is_never_satisfied()
@@ -179,6 +222,58 @@ impl<'db> ConstraintSet<'db> {
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self) -> bool {
         self.node.is_always_satisfied()
+    }
+
+    /// Returns whether this constraint set satisfies all of the typevars that it mentions.
+    ///
+    /// Each typevar is either _inferable_ or _non-inferable_. (You provide a list of the
+    /// `inferable` typevars; all others are considered non-inferable.) In either case, we
+    /// restrict the constraint set to only consider that typevar. For an inferable typevar, then
+    /// there must be _some_ type that the typevar can specialize to, and which satisfies the
+    /// bounds or constraints of the typevar. For a non-inferable typevar, then the restricted
+    /// constraint set must be satisfied for _all_ types that satisfy the bounds or constraints.
+    ///
+    /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
+    /// even if the constraint set was created to describe a type that contains other typevars,
+    /// since any other typevar cannot affect whether the constraint set is satisfied or not.
+    pub(crate) fn satisfies_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        match self.node {
+            Node::AlwaysTrue => return true,
+            Node::AlwaysFalse => return false,
+            Node::Interior(_) => {}
+        }
+
+        let mut typevars = FxHashSet::default();
+        self.node.for_each_constraint(db, &mut |constraint| {
+            typevars.insert(constraint.typevar(db));
+        });
+
+        eprintln!("==> satisfied {}", self.display(db));
+        for typevar in typevars {
+            let valid_specializations = typevar.valid_specializations(db);
+            let restricted = (self.node)
+                .project_typevar(db, typevar.identity(db))
+                .and(db, valid_specializations.node);
+            eprintln!(" -> typevar {}", typevar.identity(db).display(db));
+            let satisfied = if typevar.is_inferable(db, inferable) {
+                eprintln!("    inferable");
+                !restricted.is_never_satisfied()
+            } else {
+                eprintln!("    not inferable");
+                restricted == valid_specializations.node
+            };
+            eprintln!("    valid   {}", valid_specializations.display(db));
+            eprintln!("    proj    {}", restricted.display(db));
+            if !satisfied {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -220,10 +315,19 @@ impl<'db> ConstraintSet<'db> {
         self
     }
 
+    /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In Boolean logic, `p → q` is usually translated into `¬p ∨ q`. However, we translate it
+    /// into the equivalent `¬p ∨ (p ∧ q)`. This ensures that the constraints under which `q` is
+    /// true are compatible with the assumptions introduced by `p`.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.negate(db).or(db, || self.and(db, other))
+    }
+
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         let lower = lower.bottom_materialization(db);
@@ -236,7 +340,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negated_range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         Self::range(db, lower, typevar, upper).negate(db)
@@ -258,7 +362,7 @@ impl From<bool> for ConstraintSet<'_> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarIdentity<'db>,
+    typevar: BoundTypeVarInstance<'db>,
     lower: Type<'db>,
     upper: Type<'db>,
 }
@@ -274,7 +378,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
@@ -292,8 +396,11 @@ impl<'db> ConstrainedTypeVar<'db> {
             return Node::AlwaysTrue;
         }
 
+        let lower = lower.normalized(db);
+        let upper = upper.normalized(db);
         Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
     }
+
     fn when_true(self) -> ConstraintAssignment<'db> {
         ConstraintAssignment::Positive(self)
     }
@@ -303,7 +410,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 
     fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db) != other.typevar(db) {
+        if self.typevar(db).identity(db) != other.typevar(db).identity(db) {
             return false;
         }
         self.lower(db).is_subtype_of(db, other.lower(db))
@@ -313,8 +420,9 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
     fn intersect(self, db: &'db dyn Db, other: Self) -> Option<Self> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]);
-        let upper = IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]);
+        let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]).normalized(db);
+        let upper =
+            IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]).normalized(db);
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
@@ -348,7 +456,10 @@ impl<'db> ConstrainedTypeVar<'db> {
                     return write!(
                         f,
                         "({} {} {})",
-                        self.constraint.typevar(self.db).display(self.db),
+                        self.constraint
+                            .typevar(self.db)
+                            .identity(self.db)
+                            .display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
                     );
@@ -361,7 +472,11 @@ impl<'db> ConstrainedTypeVar<'db> {
                 if !lower.is_never() {
                     write!(f, "{} ≤ ", lower.display(self.db))?;
                 }
-                self.constraint.typevar(self.db).display(self.db).fmt(f)?;
+                self.constraint
+                    .typevar(self.db)
+                    .identity(self.db)
+                    .display(self.db)
+                    .fmt(f)?;
                 if !upper.is_object() {
                     write!(f, " ≤ {}", upper.display(self.db))?;
                 }
@@ -541,6 +656,16 @@ impl<'db> Node<'db> {
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
+    }
+
+    /// Returns a new BDD that only considers inputs that constrain a particular typevar. All other
+    /// inputs are allowed to take on any. value.
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.project_typevar(db, typevar),
+        }
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
@@ -875,6 +1000,18 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        if self_constraint.typevar(db).identity(db) == typevar {
+            let if_true = self.if_true(db).project_typevar(db, typevar);
+            let if_false = self.if_false(db).project_typevar(db, typevar);
+            Node::new(db, self_constraint, if_true, if_false)
+        } else {
+            self.if_true(db).or(db, self.if_false(db))
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
         db: &'db dyn Db,
@@ -904,7 +1041,11 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_fn=simplify_cycle_recover,
+        cycle_initial=simplify_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
@@ -936,8 +1077,8 @@ impl<'db> InteriorNode<'db> {
             // If the constraints refer to different typevars, they trivially cannot be compared.
             // TODO: We might need to consider when one constraint's upper or lower bound refers to
             // the other constraint's typevar.
-            let typevar = left_constraint.typevar(db);
-            if typevar != right_constraint.typevar(db) {
+            if left_constraint.typevar(db).identity(db) != right_constraint.typevar(db).identity(db)
+            {
                 continue;
             }
 
@@ -1338,5 +1479,32 @@ impl<'db> SatisfiedClauses<'db> {
             .collect();
         clauses.sort();
         clauses.join(" ∨ ")
+    }
+}
+
+/// Returns a constraint set describing the valid specializations of a typevar.
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => ConstraintSet::from(true),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
+                db,
+                self,
+                Type::Never,
+                bound,
+                TypeRelation::Assignability,
+            ),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().when_any(db, |constraint| {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        self,
+                        *constraint,
+                        *constraint,
+                        TypeRelation::Assignability,
+                    )
+                })
+            }
+        }
     }
 }
