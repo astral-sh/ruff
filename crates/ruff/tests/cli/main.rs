@@ -15,32 +15,13 @@ use std::{
 };
 use tempfile::TempDir;
 
-mod format;
 mod lint;
 
 const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
-/// This filter matches paths with any combination of forward slashes, backslashes,
-/// and JSON-escaped slashes to handle all path formats across platforms and output types.
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
-    let path_str = path.as_ref();
-    // Escape the path components but allow flexible slash matching
-    let path_components: Vec<&str> = path_str.split(['/', '\\']).collect();
-    let escaped_components: Vec<String> = path_components
-        .iter()
-        .map(|component| regex::escape(component))
-        .collect();
-
-    // Create a pattern that matches single slash separators (avoid matching URI schemes like file://)
-    // This handles regular paths, Windows paths, and JSON-escaped paths
-    let slash_pattern = r"(?:\\|/|\\/)";
-    let filter = escaped_components.join(slash_pattern);
-
-    // Match temp directory with optional trailing slash
-    let full_filter = format!("{}({})?", filter, slash_pattern);
-    eprintln!("DEBUG: tempdir_filter = {}", full_filter);
-    full_filter
+    format!(r"{}[\\/]?", regex::escape(path.as_ref()))
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -93,6 +74,7 @@ impl CliTest {
         .to_path_buf();
 
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
+
         settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
