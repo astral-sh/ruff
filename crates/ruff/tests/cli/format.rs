@@ -646,21 +646,21 @@ fn output_format_notebook() -> Result<()> {
         1 | import numpy
           - maths = (numpy.arange(100)**2).sum()
           - stats= numpy.asarray([1,2,3,4]).median()
-        2 +
+        2 + 
         3 + maths = (numpy.arange(100) ** 2).sum()
         4 + stats = numpy.asarray([1, 2, 3, 4]).median()
          ::: cell 3
         1 | # A cell with IPython escape command
         2 | def some_function(foo, bar):
         3 |     pass
-        4 +
-        5 +
+        4 + 
+        5 + 
         6 | %matplotlib inline
           ::: cell 4
         1  | foo = %pwd
            - def some_function(foo,bar,):
-        2  +
-        3  +
+        2  + 
+        3  + 
         4  + def some_function(
         5  +     foo,
         6  +     bar,
@@ -972,7 +972,7 @@ if True:
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 1, column 1
           |
-        1 |
+        1 | 
           | ^
         unknown field `tab-size`
         ");
@@ -2427,7 +2427,6 @@ fn stable_output_format_warning() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    1
 
     ----- stderr -----
     warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
