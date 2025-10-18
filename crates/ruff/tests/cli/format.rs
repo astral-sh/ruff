@@ -180,6 +180,10 @@ fn config_file_and_isolated() -> Result<()> {
     ----- stderr -----
     ruff failed
       Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+
+      tip: You cannot specify a configuration file and also specify `--isolated`,
+           as `--isolated` causes ruff to ignore all configuration files.
+           For more information, try `--help`.
     ");
     Ok(())
 }
