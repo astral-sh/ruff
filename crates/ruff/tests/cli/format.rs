@@ -13,9 +13,10 @@ use super::CliTest;
 const BIN_NAME: &str = "ruff";
 
 #[test]
-fn default_options() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py"])
+fn default_options() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -42,6 +43,7 @@ if condition:
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
@@ -66,9 +68,10 @@ fn default_files() -> Result<()> {
 }
 
 #[test]
-fn format_warn_stdin_filename_with_files() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "foo.py"])
+fn format_warn_stdin_filename_with_files() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "foo.py"])
         .arg("foo.py")
         .pass_stdin("foo =     1"), @r"
     success: true
@@ -79,6 +82,7 @@ fn format_warn_stdin_filename_with_files() {
     ----- stderr -----
     warning: Ignoring file foo.py in favor of standard input.
     ");
+    Ok(())
 }
 
 #[test]
@@ -639,21 +643,21 @@ fn output_format_notebook() {
         1 | import numpy
           - maths = (numpy.arange(100)**2).sum()
           - stats= numpy.asarray([1,2,3,4]).median()
-        2 + 
+        2 +
         3 + maths = (numpy.arange(100) ** 2).sum()
         4 + stats = numpy.asarray([1, 2, 3, 4]).median()
          ::: cell 3
         1 | # A cell with IPython escape command
         2 | def some_function(foo, bar):
         3 |     pass
-        4 + 
-        5 + 
+        4 +
+        5 +
         6 | %matplotlib inline
           ::: cell 4
         1  | foo = %pwd
            - def some_function(foo,bar,):
-        2  + 
-        3  + 
+        2  +
+        3  +
         4  + def some_function(
         5  +     foo,
         6  +     bar,
@@ -964,7 +968,7 @@ if True:
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 1, column 1
           |
-        1 | 
+        1 |
           | ^
         unknown field `tab-size`
         ");
