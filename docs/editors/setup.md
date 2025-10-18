@@ -422,11 +422,7 @@ bundle for TextMate.
 
 ## Zed
 
-Ruff is available as an extension for the Zed editor. To install it:
-
-1. Open the command palette with `Cmd+Shift+P`
-1. Search for "zed: extensions"
-1. Search for "ruff" in the extensions list and click "Install"
+Ruff support is now built into Zed (no separate extension required).
 
 To configure Zed to use the Ruff language server for Python files, add the following
 to your `settings.json` file:
