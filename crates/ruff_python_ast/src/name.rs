@@ -203,30 +203,26 @@ impl PartialEq<Name> for &String {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for Name {
-    fn is_referenceable() -> bool {
-        String::is_referenceable()
-    }
-
-    fn schema_name() -> String {
-        String::schema_name()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        <String as schemars::JsonSchema>::schema_name()
     }
 
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        String::schema_id()
+        <String as schemars::JsonSchema>::schema_id()
     }
 
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        String::json_schema(generator)
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <String as schemars::JsonSchema>::json_schema(generator)
     }
 
     fn _schemars_private_non_optional_json_schema(
-        generator: &mut schemars::r#gen::SchemaGenerator,
-    ) -> schemars::schema::Schema {
-        String::_schemars_private_non_optional_json_schema(generator)
+        generator: &mut schemars::SchemaGenerator,
+    ) -> schemars::Schema {
+        <String as schemars::JsonSchema>::_schemars_private_non_optional_json_schema(generator)
     }
 
     fn _schemars_private_is_option() -> bool {
-        String::_schemars_private_is_option()
+        <String as schemars::JsonSchema>::_schemars_private_is_option()
     }
 }
 
