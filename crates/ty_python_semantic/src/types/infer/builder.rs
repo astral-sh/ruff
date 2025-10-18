@@ -5943,9 +5943,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
             ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
             ast::Expr::Generator(generator) => self.infer_generator_expression(generator),
-            ast::Expr::ListComp(listcomp) => self.infer_list_comprehension_expression(listcomp),
-            ast::Expr::DictComp(dictcomp) => self.infer_dict_comprehension_expression(dictcomp),
-            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp),
+            ast::Expr::ListComp(listcomp) => {
+                self.infer_list_comprehension_expression(listcomp, tcx)
+            }
+            ast::Expr::DictComp(dictcomp) => {
+                self.infer_dict_comprehension_expression(dictcomp, tcx)
+            }
+            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
             ast::Expr::Name(name) => self.infer_name_expression(name),
             ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
@@ -6450,52 +6454,115 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
+    /// Return a specialization of the collection class (list, dict, set) based on the type context and the inferred
+    /// element / key-value types from the comprehension expression.
+    fn infer_comprehension_specialization(
+        &self,
+        collection_class: KnownClass,
+        inferred_element_types: &[Type<'db>],
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        // Remove any union elements of that are unrelated to the collection type.
+        let tcx = tcx.map(|annotation| {
+            annotation.filter_disjoint_elements(
+                self.db(),
+                collection_class.to_instance(self.db()),
+                InferableTypeVars::None,
+            )
+        });
+
+        if let Some(annotated_element_types) = tcx
+            .known_specialization(self.db(), collection_class)
+            .map(|specialization| specialization.types(self.db()))
+            && annotated_element_types
+                .iter()
+                .zip(inferred_element_types.iter())
+                .all(|(annotated, inferred)| inferred.is_assignable_to(self.db(), *annotated))
+        {
+            collection_class
+                .to_specialized_instance(self.db(), annotated_element_types.iter().copied())
+        } else {
+            collection_class.to_specialized_instance(
+                self.db(),
+                inferred_element_types
+                    .iter()
+                    .map(|ty| ty.promote_literals(self.db(), TypeContext::default())),
+            )
+        }
+    }
+
+    fn infer_list_comprehension_expression(
+        &mut self,
+        listcomp: &ast::ExprListComp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprListComp {
             range: _,
             node_index: _,
-            elt: _,
+            elt,
             generators,
         } = listcomp;
 
         self.infer_first_comprehension_iter(generators);
 
-        KnownClass::List
-            .to_specialized_instance(self.db(), [todo_type!("list comprehension element type")])
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::ListComprehension(listcomp));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let element_type = inference.expression_type(elt.as_ref());
+
+        self.infer_comprehension_specialization(KnownClass::List, &[element_type], tcx)
     }
 
-    fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
+    fn infer_dict_comprehension_expression(
+        &mut self,
+        dictcomp: &ast::ExprDictComp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprDictComp {
             range: _,
             node_index: _,
-            key: _,
-            value: _,
+            key,
+            value,
             generators,
         } = dictcomp;
 
         self.infer_first_comprehension_iter(generators);
 
-        KnownClass::Dict.to_specialized_instance(
-            self.db(),
-            [
-                todo_type!("dict comprehension key type"),
-                todo_type!("dict comprehension value type"),
-            ],
-        )
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::DictComprehension(dictcomp));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let key_type = inference.expression_type(key.as_ref());
+        let value_type = inference.expression_type(value.as_ref());
+
+        self.infer_comprehension_specialization(KnownClass::Dict, &[key_type, value_type], tcx)
     }
 
-    fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
+    fn infer_set_comprehension_expression(
+        &mut self,
+        setcomp: &ast::ExprSetComp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprSetComp {
             range: _,
             node_index: _,
-            elt: _,
+            elt,
             generators,
         } = setcomp;
 
         self.infer_first_comprehension_iter(generators);
 
-        KnownClass::Set
-            .to_specialized_instance(self.db(), [todo_type!("set comprehension element type")])
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::SetComprehension(setcomp));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let element_type = inference.expression_type(elt.as_ref());
+
+        self.infer_comprehension_specialization(KnownClass::Set, &[element_type], tcx)
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
