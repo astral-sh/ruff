@@ -6,7 +6,7 @@ use crate::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
         IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
-        TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
@@ -16,7 +16,7 @@ use crate::{
         walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
         walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
         walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
-        walk_typed_dict_type, walk_typeis_type, walk_union,
+        walk_typed_dict_type, walk_typeguard_type, walk_typeis_type, walk_union,
     },
 };
 use std::{
@@ -53,6 +53,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
         walk_typeis_type(db, type_is, self);
+    }
+
+    fn visit_typeguard_type(&self, db: &'db dyn Db, type_is: TypeGuardType<'db>) {
+        walk_typeguard_type(db, type_is, self);
     }
 
     fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
@@ -132,6 +136,7 @@ pub(super) enum NonAtomicType<'db> {
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
+    TypeGuard(TypeGuardType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
@@ -200,6 +205,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
             Type::TypeIs(type_is) => TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is)),
+            Type::TypeGuard(type_guard) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
+            }
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
@@ -238,6 +246,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_property_instance_type(db, property);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
+        NonAtomicType::TypeGuard(type_guard) => visitor.visit_typeguard_type(db, type_guard),
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }
