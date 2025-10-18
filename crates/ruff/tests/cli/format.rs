@@ -86,9 +86,10 @@ fn format_warn_stdin_filename_with_files() -> Result<()> {
 }
 
 #[test]
-fn nonexistent_config_file() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--config", "foo.toml", "."]), @r"
+fn nonexistent_config_file() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--config", "foo.toml", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -105,12 +106,14 @@ fn nonexistent_config_file() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn config_override_rejected_if_invalid_toml() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--config", "foo = bar", "."]), @r"
+fn config_override_rejected_if_invalid_toml() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--config", "foo = bar", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -132,6 +135,7 @@ fn config_override_rejected_if_invalid_toml() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
