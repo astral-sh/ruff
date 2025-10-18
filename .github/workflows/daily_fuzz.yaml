@@ -49,7 +49,7 @@ jobs:
           # shellcheck disable=SC2046
           (
             uv run \
-            --python=3.13 \
+            --python=3.14 \
             --project=./python/py-fuzzer \
             --locked \
             fuzz \

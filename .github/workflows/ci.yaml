@@ -22,7 +22,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci
 
 jobs:
@@ -557,7 +557,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          # TODO: figure out why `ruff-ecosystem` crashes on Python 3.14
+          python-version: "3.13"
 
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         name: Download comparison Ruff binary
@@ -711,7 +712,7 @@ jobs:
             --baseline-executable="${PWD}/ty" \
             --only-new-bugs \
             --bin=ty \
-            0-500
+            0-1000
           )
 
   cargo-shear:
