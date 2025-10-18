@@ -69,7 +69,7 @@ use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, specialization_depth};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -829,6 +829,10 @@ impl<'db> Type<'db> {
 
     pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
         Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
+    }
+
+    pub(crate) const fn is_divergent(&self) -> bool {
+        matches!(self, Type::Dynamic(DynamicType::Divergent(_)))
     }
 
     pub const fn is_unknown(&self) -> bool {

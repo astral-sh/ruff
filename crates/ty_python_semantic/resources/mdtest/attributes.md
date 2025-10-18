@@ -2457,6 +2457,31 @@ class Counter:
 reveal_type(Counter().count)  # revealed: Unknown | int
 ```
 
+We also handle infinitely nested generics:
+
+```py
+class NestedLists:
+    def __init__(self: "NestedLists"):
+        self.x = 1
+
+    def f(self: "NestedLists"):
+        self.x = [self.x]
+
+reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+
+class NestedMixed:
+    def f(self: "NestedMixed"):
+        self.x = [self.x]
+
+    def g(self: "NestedMixed"):
+        self.x = {self.x}
+
+    def h(self: "NestedMixed"):
+        self.x = {"a": self.x}
+
+reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent] | dict[Unknown | str, Divergent]
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
