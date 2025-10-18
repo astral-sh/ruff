@@ -6,7 +6,6 @@ use std::process::Command;
 
 use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use tempfile::TempDir;
 
 use super::CliTest;
 
@@ -888,11 +887,9 @@ if __name__ == '__main__':
 
 #[test]
 fn format_option_inheritance() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    let base_toml = tempdir.path().join("base.toml");
-    fs::write(
-        &ruff_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
         r#"
 extend = "base.toml"
 
@@ -904,17 +901,17 @@ quote-style = "single"
 "#,
     )?;
 
-    fs::write(
-        base_toml,
+    test.write_file(
+        "base.toml",
         r#"
 [format]
 indent-style = "tab"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(test.command()
         .args(["format", "--config"])
-        .arg(&ruff_toml)
+        .arg(test.root().join("ruff.toml"))
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -1381,19 +1378,15 @@ fn test_diff_no_change() -> Result<()> {
 }
 
 #[test]
-fn test_diff_stdin_unformatted() {
-    let args = [
-        "format",
-        "--isolated",
-        "--diff",
-        "-",
-        "--stdin-filename",
-        "unformatted.py",
-    ];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff_stdin_unformatted() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let unformatted = fs::read(fixtures.join("unformatted.py")).unwrap();
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
+        test.format_command()
+            .args(["--diff", "-", "--stdin-filename", "unformatted.py"])
+            .pass_stdin(unformatted),
         @r"
     success: false
     exit_code: 1
@@ -1409,15 +1402,17 @@ fn test_diff_stdin_unformatted() {
 
     ----- stderr -----
     ");
+    Ok(())
 }
 
 #[test]
-fn test_diff_stdin_formatted() {
-    let args = ["format", "--isolated", "--diff", "-"];
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_diff_stdin_formatted() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let unformatted = fs::read(fixtures.join("formatted.py")).unwrap();
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
+        test.format_command().args(["--diff", "-"]).pass_stdin(unformatted),
         @r"
     success: true
     exit_code: 0
@@ -1425,14 +1420,17 @@ fn test_diff_stdin_formatted() {
 
     ----- stderr -----
     ");
+    Ok(())
 }
 
 #[test]
-fn test_notebook_trailing_semicolon() {
-    let fixtures = Path::new("resources").join("test").join("fixtures");
+fn test_notebook_trailing_semicolon() -> Result<()> {
+    let test = CliTest::new()?;
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = project_root.join("resources").join("test").join("fixtures");
     let unformatted = fs::read(fixtures.join("trailing_semicolon.ipynb")).unwrap();
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.ipynb"])
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.ipynb"])
         .arg("-")
         .pass_stdin(unformatted), @r##"
     success: true
@@ -1854,22 +1852,22 @@ fn test_notebook_trailing_semicolon() {
 
     ----- stderr -----
     "##);
+    Ok(())
 }
 
 #[test]
 fn syntax_error_in_notebooks() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    test.write_file(
+        "ruff.toml",
         r#"
 include = ["*.ipy"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.ipy"),
+    test.write_file(
+        "main.ipy",
         r#"
 {
     "cells": [
@@ -1920,11 +1918,10 @@ include = ["*.ipy"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--no-cache")
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
         .arg("."), @r"
     success: false
@@ -1939,18 +1936,17 @@ include = ["*.ipy"]
 
 #[test]
 fn extension() -> Result<()> {
-    let tempdir = TempDir::new()?;
+    let test = CliTest::new()?;
 
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
+    test.write_file(
+        "ruff.toml",
         r#"
 include = ["*.ipy"]
 "#,
     )?;
 
-    fs::write(
-        tempdir.path().join("main.ipy"),
+    test.write_file(
+        "main.ipy",
         r#"
 {
  "cells": [
@@ -1990,11 +1986,10 @@ include = ["*.ipy"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
+    assert_cmd_snapshot!(test.command()
         .arg("format")
         .arg("--no-cache")
-        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
         .arg("."), @r"
     success: true
@@ -2008,9 +2003,10 @@ include = ["*.ipy"]
 }
 
 #[test]
-fn range_formatting() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:8-2:14"])
+fn range_formatting() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=2:8-2:14"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2030,12 +2026,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_formatting_unicode() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:21-3"])
+fn range_formatting_unicode() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=2:21-3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1="👋🏽" ): print("Format this" )
@@ -2049,15 +2047,15 @@ def foo(arg1="👋🏽" ): print("Format this" )
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_formatting_multiple_files() -> std::io::Result<()> {
-    let tempdir = TempDir::new()?;
-    let file1 = tempdir.path().join("file1.py");
+fn range_formatting_multiple_files() -> Result<()> {
+    let test = CliTest::new()?;
 
-    fs::write(
-        &file1,
+    test.write_file(
+        "file1.py",
         r#"
 def file1(arg1, arg2,):
     print("Shouldn't format this" )
@@ -2065,10 +2063,8 @@ def file1(arg1, arg2,):
 "#,
     )?;
 
-    let file2 = tempdir.path().join("file2.py");
-
-    fs::write(
-        &file2,
+    test.write_file(
+        "file2.py",
         r#"
 def file2(arg1, arg2,):
     print("Shouldn't format this" )
@@ -2076,10 +2072,10 @@ def file2(arg1, arg2,):
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--range=1:8-1:15"])
-        .arg(file1)
-        .arg(file2),  @r"
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--range=1:8-1:15"])
+        .arg("file1.py")
+        .arg("file2.py"),  @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2093,9 +2089,10 @@ def file2(arg1, arg2,):
 }
 
 #[test]
-fn range_formatting_out_of_bounds() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=100:40-200:1"])
+fn range_formatting_out_of_bounds() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=100:40-200:1"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2112,12 +2109,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_start_larger_than_end() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=90-50"])
+fn range_start_larger_than_end() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=90-50"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2134,12 +2133,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn range_line_numbers_only() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2-3"])
+fn range_line_numbers_only() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=2-3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2159,12 +2160,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_start_only() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=3"])
+fn range_start_only() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2180,12 +2183,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_end_only() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=-3"])
+fn range_end_only() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=-3"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2204,12 +2209,14 @@ def foo(arg1, arg2,):
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 #[test]
-fn range_missing_line() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=1-:20"])
+fn range_missing_line() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=1-:20"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2226,12 +2233,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn zero_line_number() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:2"])
+fn zero_line_number() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=0:2"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2249,12 +2258,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn column_and_line_zero() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:0"])
+fn column_and_line_zero() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--range=0:0"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -2272,12 +2283,14 @@ def foo(arg1, arg2,):
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn range_formatting_notebook() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--stdin-filename", "main.ipynb", "--range=1-2"])
+fn range_formatting_notebook() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "main.ipynb", "--range=1-2"])
         .arg("-")
         .pass_stdin(r#"
 {
@@ -2323,6 +2336,7 @@ fn range_formatting_notebook() {
     ----- stderr -----
     error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
     ");
+    Ok(())
 }
 
 /// Test that the formatter respects `per-file-target-version`. Context managers can't be
@@ -2330,10 +2344,11 @@ fn range_formatting_notebook() {
 ///
 /// Adapted from <https://github.com/python/cpython/issues/56991#issuecomment-1093555135>
 #[test]
-fn per_file_target_version_formatter() {
+fn per_file_target_version_formatter() -> Result<()> {
+    let test = CliTest::new()?;
     // without `per-file-target-version` this should not be reformatted in the same way
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--target-version=py38"])
         .arg("-")
         .pass_stdin(r#"
 with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
@@ -2350,8 +2365,8 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py", "--target-version=py38"])
         .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
         .arg("-")
         .pass_stdin(r#"
@@ -2370,6 +2385,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
 
     ----- stderr -----
     "#);
+    Ok(())
 }
 
 /// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
@@ -2380,21 +2396,18 @@ fn cookiecutter_globbing() -> Result<()> {
     // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
     // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
     // user's glob does not.
-    let tempdir = TempDir::new()?;
-    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
-    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
-    let tests = cookiecutter.join("tests");
-    fs::create_dir_all(&tests)?;
-    fs::write(
-        cookiecutter_toml,
+    let test = CliTest::new()?;
+    test.write_file(
+        "{{cookiecutter.repo_name}}/pyproject.toml",
         r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
     )?;
-    let maintest = tests.join("maintest.py");
-    fs::write(maintest, "import foo\nimport bar\nimport foo\n")?;
+    test.write_file(
+        "{{cookiecutter.repo_name}}/tests/maintest.py",
+        "import foo\nimport bar\nimport foo\n",
+    )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(["format", "--no-cache", "--diff"])
-            .current_dir(tempdir.path()), @r"
+    assert_cmd_snapshot!(test.command()
+            .args(["format", "--no-cache", "--diff", "."]), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2407,11 +2420,12 @@ fn cookiecutter_globbing() -> Result<()> {
 }
 
 #[test]
-fn stable_output_format_warning() {
+fn stable_output_format_warning() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        test.command()
             .args(["format", "--output-format=full", "-"])
-            .pass_stdin("1"),
+            .pass_stdin(""),
         @r"
     success: true
     exit_code: 0
@@ -2422,4 +2436,5 @@ fn stable_output_format_warning() {
     warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
     ",
     );
+    Ok(())
 }
