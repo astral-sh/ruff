@@ -16,8 +16,8 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
-    UnionType, any_over_type, todo_type,
+    Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
+    UnionBuilder, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -1521,10 +1521,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .top_materialization(self.db()),
                 ),
             },
-            SpecialFormType::TypeGuard => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`TypeGuard[]` special form")
-            }
+            // TODO: deduplicate
+            SpecialFormType::TypeGuard => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.infer_type_expression(arguments_slice);
+
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        let diag = builder.into_diagnostic(format_args!(
+                            "Special form `typing.TypeGuard` expected exactly one type parameter",
+                        ));
+                        diagnostic::add_type_expression_reference_link(diag);
+                    }
+
+                    Type::unknown()
+                }
+                _ => TypeGuardType::unbound(
+                    self.db(),
+                    // Similar to TypeIs, use top materialization
+                    self.infer_type_expression(arguments_slice)
+                        .top_materialization(self.db()),
+                ),
+            },
             SpecialFormType::Concatenate => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts

@@ -1317,7 +1317,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
                     let target = place_expr(arg)?;
                     let place = self.expect_place(&target);
-                    Some(NarrowingConstraints::from_iter([(place, narrowed_ty)]))
+                    Some(InternalConstraints::from_iter([(
+                        place,
+                        NarrowingConstraint::regular(narrowed_ty),
+                    )]))
                 } else {
                     None
                 }
@@ -1433,7 +1436,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             _ => return None,
         };
 
-        Some(InternalConstraints::from_iter([(place, NarrowingConstraint::regular(narrowed_type))]))
+        Some(InternalConstraints::from_iter([(
+            place,
+            NarrowingConstraint::regular(narrowed_type),
+        )]))
     }
 
     fn evaluate_match_pattern_value(
