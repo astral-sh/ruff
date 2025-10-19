@@ -38,14 +38,9 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
                 .bind_pep695(db)
                 .map_or(HoverContent::Type(ty, None), |typevar| {
-                    HoverContent::Type(
-                        Type::NonInferableTypeVar(typevar),
-                        Some(typevar.variance(db)),
-                    )
+                    HoverContent::Type(Type::TypeVar(typevar), Some(typevar.variance(db)))
                 }),
-            Type::TypeVar(typevar) | Type::NonInferableTypeVar(typevar) => {
-                HoverContent::Type(ty, Some(typevar.variance(db)))
-            }
+            Type::TypeVar(typevar) => HoverContent::Type(ty, Some(typevar.variance(db))),
             _ => HoverContent::Type(ty, None),
         });
     }
