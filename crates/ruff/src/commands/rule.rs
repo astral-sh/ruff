@@ -19,9 +19,11 @@ struct Explanation<'a> {
     linter: &'a str,
     summary: &'a str,
     message_formats: &'a [&'a str],
+    fix: String,
+    fix_availability: FixAvailability,
     #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
-    fix: FixAvailability,
+    preview: bool,
     status: RuleGroup,
 }
 
@@ -29,14 +31,17 @@ impl<'a> Explanation<'a> {
     fn from_rule(rule: &'a Rule) -> Self {
         let code = rule.noqa_code().to_string();
         let (linter, _) = Linter::parse_code(&code).unwrap();
+        let fix = rule.fixable().to_string();
         Self {
             name: rule.name().as_str(),
             code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
             message_formats: rule.message_formats(),
+            fix,
+            fix_availability: rule.fixable(),
             explanation: rule.explanation(),
-            fix: rule.fixable(),
+            preview: rule.is_preview(),
             status: rule.group(),
         }
     }
