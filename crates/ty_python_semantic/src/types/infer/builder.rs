@@ -9046,7 +9046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // TODO: TypeGuard
             Type::TypeIs(type_is) => match find_narrowed_place() {
                 Some(place) => type_is.bind(db, scope, place),
-                None => return_ty,
+                None => return_ty, // TODO(ericmarkmartin): ?
             },
             _ => return_ty,
         }
