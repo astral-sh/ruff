@@ -22,7 +22,7 @@ struct Explanation<'a> {
     #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     fix: FixAvailability,
-    group: RuleGroup,
+    status: RuleGroup,
 }
 
 impl<'a> Explanation<'a> {
@@ -37,7 +37,7 @@ impl<'a> Explanation<'a> {
             message_formats: rule.message_formats(),
             explanation: rule.explanation(),
             fix: rule.fixable(),
-            group: rule.group(),
+            status: rule.group(),
         }
     }
 }
