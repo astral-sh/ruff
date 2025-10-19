@@ -4,13 +4,13 @@
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
 use std::fmt::Formatter;
 
+use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
+use strum_macros::EnumIter;
 
 use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
-use ruff_db::diagnostic::SecondaryCode;
-use strum_macros::EnumIter;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoqaCode(&'static str, &'static str);
