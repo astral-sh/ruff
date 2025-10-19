@@ -257,6 +257,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///     return x
     /// ```
     ///
+    /// To keep the calculation deterministic, we use an `FxIndexSet` whose order is determined by the sequence of insertion calls.
+    ///
     /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
     called_functions: FxIndexSet<FunctionType<'db>>,
 
