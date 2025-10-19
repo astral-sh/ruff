@@ -415,6 +415,16 @@
             }
           ]
         },
+        "ignore-comment-unknown-rule": {
+          "title": "detects `ty: ignore` comments that reference unknown rules",
+          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "implicit-concatenated-string-type-annotation": {
           "title": "detects implicit concatenated strings in type annotations",
           "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
@@ -919,16 +929,6 @@
           "title": "detects unknown keyword arguments in calls",
           "description": "## What it does\nChecks for keyword arguments in calls that don't match any parameter of the callable.\n\n## Why is this bad?\nProviding an unknown keyword argument will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(x: int) -> int: ...\n\nf(x=1, y=2)  # Error raised here\n```",
           "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "unknown-rule": {
-          "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
-          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

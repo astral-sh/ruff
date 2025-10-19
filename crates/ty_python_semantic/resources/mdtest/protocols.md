@@ -1114,6 +1114,8 @@ it's a large section).
 
 <!-- snapshot-diagnostics -->
 
+`a.py`:
+
 ```py
 from typing import Protocol
 
@@ -1138,6 +1140,31 @@ class A(Protocol):
     # error: [ambiguous-protocol-member]
     for d in range(42):
         pass
+```
+
+Validation of protocols that had cross-module inheritance used to break, so we test that explicitly
+here too:
+
+`b.py`:
+
+```py
+from typing import Protocol
+
+# Ensure the number of scopes in `b.py` is greater than the number of scopes in `c.py`:
+class SomethingUnrelated: ...
+
+class A(Protocol):
+    x: int
+```
+
+`c.py`:
+
+```py
+from b import A
+from typing import Protocol
+
+class C(A, Protocol):
+    x = 42  # fine, due to declaration in the base class
 ```
 
 ## Equivalence of protocols

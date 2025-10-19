@@ -208,7 +208,7 @@ where
 mod tests {
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::util::subscript::{OutOfBoundsError, StepSizeZeroError};
+    use crate::subscript::{OutOfBoundsError, StepSizeZeroError};
 
     use super::{PyIndex, PySlice};
     use itertools::{Itertools, assert_equal};

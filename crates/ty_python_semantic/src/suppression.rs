@@ -1,7 +1,7 @@
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
 use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Span};
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
@@ -55,7 +55,7 @@ declare_lint! {
     /// ```py
     /// a = 20 / 0  # ty: ignore[division-by-zero]
     /// ```
-    pub(crate) static UNKNOWN_RULE = {
+    pub(crate) static IGNORE_COMMENT_UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
@@ -143,38 +143,12 @@ pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut Type
 
 /// Checks for `ty: ignore` comments that reference unknown rules.
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&UNKNOWN_RULE) {
+    if context.is_lint_disabled(&IGNORE_COMMENT_UNKNOWN_RULE) {
         return;
     }
 
     for unknown in &context.suppressions.unknown {
-        match &unknown.reason {
-            GetLintError::Removed(removed) => {
-                context.report_lint(
-                    &UNKNOWN_RULE,
-                    unknown.range,
-                    format_args!("Removed rule `{removed}`"),
-                );
-            }
-            GetLintError::Unknown(rule) => {
-                context.report_lint(
-                    &UNKNOWN_RULE,
-                    unknown.range,
-                    format_args!("Unknown rule `{rule}`"),
-                );
-            }
-
-            GetLintError::PrefixedWithCategory {
-                prefixed,
-                suggestion,
-            } => {
-                context.report_lint(
-                    &UNKNOWN_RULE,
-                    unknown.range,
-                    format_args!("Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
-                );
-            }
-        }
+        context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range, &unknown.reason);
     }
 }
 
@@ -300,7 +274,7 @@ impl<'a> CheckSuppressionsContext<'a> {
         &mut self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: fmt::Arguments,
+        message: impl IntoDiagnosticMessage,
     ) {
         if let Some(suppression) = self.suppressions.find_suppression(range, LintId::of(lint)) {
             self.diagnostics.mark_used(suppression.id());
@@ -316,7 +290,7 @@ impl<'a> CheckSuppressionsContext<'a> {
         &mut self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: fmt::Arguments,
+        message: impl IntoDiagnosticMessage,
     ) {
         let Some(severity) = self.db.rule_selection(self.file).severity(LintId::of(lint)) else {
             return;

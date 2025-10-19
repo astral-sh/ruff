@@ -22,7 +22,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci
 
 jobs:
@@ -277,7 +277,8 @@ jobs:
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest
-
+      # Dogfood ty on py-fuzzer
+      - run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -333,9 +334,14 @@ jobs:
       - name: "Run tests"
         run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
 
-  cargo-test-windows:
-    name: "cargo test (windows)"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
+  cargo-test-other:
+    strategy:
+      matrix:
+        platform:
+          - ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
+          - macos-latest
+    name: "cargo test (${{ matrix.platform }})"
+    runs-on: ${{ matrix.platform }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -346,37 +352,6 @@ jobs:
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install cargo nextest"
-        uses: taiki-e/install-action@522492a8c115f1b6d4d318581f09638e9442547b # v2.62.21
-        with:
-          tool: cargo-nextest
-      - name: "Install uv"
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
-        with:
-          enable-cache: "true"
-      - name: "Run tests"
-        env:
-          # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
-          RUSTUP_WINDOWS_PATH_ADD_BIN: 1
-        run: |
-          cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
-
-  cargo-test-macos:
-    name: "cargo test (macos)"
-    runs-on: macos-latest
-    needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - name: "Install mold"
-        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@522492a8c115f1b6d4d318581f09638e9442547b # v2.62.21
         with:
@@ -498,9 +473,10 @@ jobs:
           chmod +x "${DOWNLOAD_PATH}/ruff"
 
           (
-            uvx \
+            uv run \
             --python="${PYTHON_VERSION}" \
-            --from=./python/py-fuzzer \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable="${DOWNLOAD_PATH}/ruff" \
             --bin=ruff \
@@ -518,6 +494,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -532,6 +509,11 @@ jobs:
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
+      # Lint/format/type-check py-fuzzer
+      # (dogfooding with ty is done in a separate job)
+      - run: uv run --directory=./python/py-fuzzer mypy
+      - run: uv run --directory=./python/py-fuzzer ruff format --check
+      - run: uv run --directory=./python/py-fuzzer ruff check
 
   ecosystem:
     name: "ecosystem"
@@ -549,7 +531,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          # TODO: figure out why `ruff-ecosystem` crashes on Python 3.14
+          python-version: "3.13"
 
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         name: Download comparison Ruff binary
@@ -666,7 +649,7 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
-    timeout-minutes: 20
+    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 5 || 20 }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -694,15 +677,16 @@ jobs:
           chmod +x "${PWD}/ty" "${NEW_TY}/ty"
 
           (
-            uvx \
+            uv run \
             --python="${PYTHON_VERSION}" \
-            --from=./python/py-fuzzer \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable="${NEW_TY}/ty" \
             --baseline-executable="${PWD}/ty" \
             --only-new-bugs \
             --bin=ty \
-            0-500
+            0-1000
           )
 
   cargo-shear:
