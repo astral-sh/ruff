@@ -258,7 +258,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// ```
     ///
     /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
-    called_functions: FxHashSet<FunctionType<'db>>,
+    called_functions: FxOrderSet<FunctionType<'db>>,
 
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
@@ -312,7 +312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region,
             scope,
             return_types_and_ranges: vec![],
-            called_functions: FxHashSet::default(),
+            called_functions: FxOrderSet::default(),
             deferred_state: DeferredExpressionState::None,
             multi_inference_state: MultiInferenceState::Panic,
             expressions: FxHashMap::default(),
@@ -949,7 +949,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Collect all the unique overloaded function places in this scope. This requires a set
         // because an overloaded function uses the same place for each of the overloads and the
         // implementation.
-        let overloaded_function_places: FxHashSet<_> = self
+        let overloaded_function_places: FxOrderSet<_> = self
             .declarations
             .iter()
             .filter_map(|(definition, ty)| {
@@ -971,7 +971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
 
-        let mut public_functions = FxHashSet::default();
+        let mut public_functions = FxOrderSet::default();
 
         for place in overloaded_function_places {
             if let Place::Defined(Type::FunctionLiteral(function), _, Definedness::AlwaysDefined) =
