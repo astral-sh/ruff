@@ -58,6 +58,16 @@ impl CliTest {
         Self::with_settings(|_, settings| settings)
     }
 
+    pub(crate) fn with_files<'a>(
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> anyhow::Result<Self> {
+        let case = Self::new()?;
+        for file in files {
+            case.write_file(file.0, file.1)?;
+        }
+        Ok(case)
+    }
+
     pub(crate) fn with_settings(
         setup_settings: impl FnOnce(&Path, insta::Settings) -> insta::Settings,
     ) -> Result<Self> {
@@ -178,7 +188,7 @@ impl CliTest {
 
     pub(crate) fn format_command(&self) -> Command {
         let mut command = self.command();
-        command.args(["format", "--no-cache", "--isolated"]);
+        command.args(["format", "--no-cache"]);
         command
     }
 }
