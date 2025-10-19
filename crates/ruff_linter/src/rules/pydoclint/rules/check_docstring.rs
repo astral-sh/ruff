@@ -653,19 +653,29 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
                 if let Some(before_colon) = entry.split(':').next() {
-                    let param = before_colon.trim_end();
-                    let param_name = param.trim_start_matches('*');
-                    if is_identifier(param_name) {
-                        let param_start = line_start + indentation.text_len();
-                        let param_end = param_start + param.text_len();
+                    let param_line = before_colon.trim_end();
 
-                        entries.push(ParameterEntry {
-                            name: param_name,
-                            range: TextRange::new(
-                                content_start + param_start,
-                                content_start + param_end,
-                            ),
-                        });
+                    // Split on commas to handle comma-separated parameters
+                    for param_part in param_line.split(',') {
+                        let param_part_trimmed = param_part.trim();
+                        let param_name = param_part_trimmed.trim_start_matches('*');
+                        if is_identifier(param_name) {
+                            // Calculate the position of this specific parameter part within the line
+                            let param_start_in_line = param_line.find(param_part_trimmed).unwrap_or(0);
+                            let param_start = line_start
+                                + indentation.text_len()
+                                + TextSize::from(u32::try_from(param_start_in_line).unwrap_or(0));
+                            let param_end = param_start
+                                + TextSize::from(u32::try_from(param_part_trimmed.len()).unwrap_or(0));
+
+                            entries.push(ParameterEntry {
+                                name: param_name,
+                                range: TextRange::new(
+                                    content_start + param_start,
+                                    content_start + param_end,
+                                ),
+                            });
+                        }
                     }
                 }
             }
