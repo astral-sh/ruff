@@ -790,6 +790,44 @@ static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
 ```
 
+## TypeGuard
+
+`TypeGuard[T]` is covariant in `T`. The typing spec doesn't explicitly call this out, but it follows
+from similar logic to invariance of `TypeIs` except without the negative case.
+
+Formally, suppose we have types `A` and `B` with `B < A`. Take `x: object` to be the value that all
+subsequent `TypeGuard`s are narrowing.
+
+We can assign `p: TypeGuard[A] = q` where `q: TypeGuard[B]` because
+
+- if `q` is `False`, then no constraints were learned on `x` before and none are now learned, so
+    nothing changes
+- if `q` is `True`, then we know `x: B`. From `B < A`, we conclude `x: A`.
+
+We _cannot_ assign `p: TypeGuard[B] = q` where `q: TypeGuard[A]` because if `q` is `True`, we would
+be concluding `x: B` from `x: A`, which is an unsafe downcast.
+
+```py
+from typing import TypeGuard
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class A:
+    pass
+
+class B(A):
+    pass
+
+class C[T]:
+    def check(x: object) -> TypeGuard[T]:
+        # this is a bad check, but we only care about it type-checking
+        return False
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(is_assignable_to(C[B], C[A]))
+static_assert(not is_assignable_to(C[A], C[B]))
+```
+
 ## Type aliases
 
 The variance of the type alias matches the variance of the value type (RHS type).
