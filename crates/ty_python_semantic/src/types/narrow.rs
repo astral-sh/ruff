@@ -371,7 +371,7 @@ impl<'db> NarrowingConstraint<'db> {
             db,
             self.disjuncts
                 .into_iter()
-                .map(|c| c.evaluate_type_constraint()),
+                .map(Conjunction::evaluate_type_constraint),
         )
     }
 }
@@ -487,8 +487,8 @@ fn merge_constraints_or<'db>(
     _db: &'db dyn Db,
 ) {
     // For places that appear in `into` but not in `from`, widen to object
-    for (_key, value) in into.constraints.iter_mut() {
-        if !from.constraints.contains_key(_key) {
+    for (key, value) in &mut into.constraints {
+        if !from.constraints.contains_key(key) {
             *value = NarrowingConstraint::regular(Type::object());
         }
     }
