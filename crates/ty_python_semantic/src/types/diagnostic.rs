@@ -2269,10 +2269,25 @@ pub(super) fn report_possibly_missing_attribute(
     let Some(builder) = context.report_lint(&POSSIBLY_MISSING_ATTRIBUTE, target) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Attribute `{attribute}` on type `{}` may be missing",
-        object_ty.display(context.db()),
-    ));
+    let db = context.db();
+    match object_ty {
+        Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+            "Member `{attribute}` may be missing on module `{}`",
+            module.module(db).name(db),
+        )),
+        Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+            "Attribute `{attribute}` may be missing on class `{}`",
+            class.name(db),
+        )),
+        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+            "Attribute `{attribute}` may be missing on class `{}`",
+            alias.display(db),
+        )),
+        _ => builder.into_diagnostic(format_args!(
+            "Attribute `{attribute}` may be missing on object of type `{}`",
+            object_ty.display(db),
+        )),
+    };
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {

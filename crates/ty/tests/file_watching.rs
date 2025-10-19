@@ -1112,11 +1112,11 @@ print(sys.last_exc, os.getegid())
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
         diagnostics[0].primary_message(),
-        "Type `<module 'sys'>` has no attribute `last_exc`"
+        "Module `sys` has no member `last_exc`"
     );
     assert_eq!(
         diagnostics[1].primary_message(),
-        "Type `<module 'os'>` has no attribute `getegid`"
+        "Module `os` has no member `getegid`"
     );
 
     // Change the python version

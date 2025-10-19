@@ -7618,25 +7618,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .context
                             .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                         {
-                        if bound_on_instance {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Attribute `{}` can only be accessed on instances, \
-                                     not on the class object `{}` itself.",
-                                    attr.id,
-                                    value_type.display(db)
-                                ),
-                            );
-                        } else {
-                            let diagnostic = builder.into_diagnostic(
-                                format_args!(
-                                    "Type `{}` has no attribute `{}`",
-                                    value_type.display(db),
-                                    attr.id
-                                ),
-                            );
-                            hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
-                        }
+                            if bound_on_instance {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Attribute `{}` can only be accessed on instances, \
+                                        not on the class object `{}` itself.",
+                                        attr.id,
+                                        value_type.display(db)
+                                    ),
+                                );
+                            } else {
+                                let diagnostic = match value_type {
+                                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+                                        "Module `{}` has no member `{}`",
+                                        module.module(db).name(db),
+                                        &attr.id
+                                    )),
+                                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+                                        "Class `{}` has no attribute `{}`",
+                                        class.name(db),
+                                        &attr.id
+                                    )),
+                                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                                        "Class `{}` has no attribute `{}`",
+                                        alias.display(db),
+                                        &attr.id
+                                    )),
+                                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
+                                        "Function `{}` has no attribute `{}`",
+                                        function.name(db),
+                                        &attr.id
+                                    )),
+                                    _ => builder.into_diagnostic(format_args!(
+                                        "Object of type `{}` has no attribute `{}`",
+                                        value_type.display(db),
+                                        &attr.id
+                                    )),
+                                };
+                                hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
+                            }
                         }
                     }
 
