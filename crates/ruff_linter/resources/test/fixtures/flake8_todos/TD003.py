@@ -45,3 +45,19 @@ def foo(x):
 # TODO: Move this part to the other place RFFU-6877
 
 # TODO: PROJ-123 Another Jira-style example
+
+# TODO: Valid Jira-style issue IDs (should pass)
+# TODO: Fix bug ABC-123
+# TODO: Implement feature XYZ-456
+# TODO: Update documentation DEF-789
+# TODO: Refactor code GHI-101112
+
+# TODO: Invalid patterns that should still trigger TD003 (should fail)
+# TODO: Single letter project key A-1
+# TODO: No hyphen pattern ABC123
+# TODO: Lowercase project key abc-123
+# TODO: Mixed case project key AbC-123
+# TODO: Just a random word with hyphen and number random-123
+# TODO: Number before letters 123-ABC
+# TODO: Multiple hyphens ABC-123-456
+# TODO: Empty project key -123

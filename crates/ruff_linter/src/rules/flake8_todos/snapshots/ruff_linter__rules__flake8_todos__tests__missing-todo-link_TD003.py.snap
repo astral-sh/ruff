@@ -64,3 +64,99 @@ TD003 Missing issue link for this TODO
 44 |
 45 | # TODO: Move this part to the other place RFFU-6877
    |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:49:3
+   |
+47 | # TODO: PROJ-123 Another Jira-style example
+48 |
+49 | # TODO: Valid Jira-style issue IDs (should pass)
+   |   ^^^^
+50 | # TODO: Fix bug ABC-123
+51 | # TODO: Implement feature XYZ-456
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:55:3
+   |
+53 | # TODO: Refactor code GHI-101112
+54 |
+55 | # TODO: Invalid patterns that should still trigger TD003 (should fail)
+   |   ^^^^
+56 | # TODO: Single letter project key A-1
+57 | # TODO: No hyphen pattern ABC123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:56:3
+   |
+55 | # TODO: Invalid patterns that should still trigger TD003 (should fail)
+56 | # TODO: Single letter project key A-1
+   |   ^^^^
+57 | # TODO: No hyphen pattern ABC123
+58 | # TODO: Lowercase project key abc-123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:57:3
+   |
+55 | # TODO: Invalid patterns that should still trigger TD003 (should fail)
+56 | # TODO: Single letter project key A-1
+57 | # TODO: No hyphen pattern ABC123
+   |   ^^^^
+58 | # TODO: Lowercase project key abc-123
+59 | # TODO: Mixed case project key AbC-123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:58:3
+   |
+56 | # TODO: Single letter project key A-1
+57 | # TODO: No hyphen pattern ABC123
+58 | # TODO: Lowercase project key abc-123
+   |   ^^^^
+59 | # TODO: Mixed case project key AbC-123
+60 | # TODO: Just a random word with hyphen and number random-123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:59:3
+   |
+57 | # TODO: No hyphen pattern ABC123
+58 | # TODO: Lowercase project key abc-123
+59 | # TODO: Mixed case project key AbC-123
+   |   ^^^^
+60 | # TODO: Just a random word with hyphen and number random-123
+61 | # TODO: Number before letters 123-ABC
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:60:3
+   |
+58 | # TODO: Lowercase project key abc-123
+59 | # TODO: Mixed case project key AbC-123
+60 | # TODO: Just a random word with hyphen and number random-123
+   |   ^^^^
+61 | # TODO: Number before letters 123-ABC
+62 | # TODO: Multiple hyphens ABC-123-456
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:61:3
+   |
+59 | # TODO: Mixed case project key AbC-123
+60 | # TODO: Just a random word with hyphen and number random-123
+61 | # TODO: Number before letters 123-ABC
+   |   ^^^^
+62 | # TODO: Multiple hyphens ABC-123-456
+63 | # TODO: Empty project key -123
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:63:3
+   |
+61 | # TODO: Number before letters 123-ABC
+62 | # TODO: Multiple hyphens ABC-123-456
+63 | # TODO: Empty project key -123
+   |   ^^^^
+   |
