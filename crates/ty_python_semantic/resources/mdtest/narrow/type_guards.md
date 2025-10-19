@@ -19,7 +19,9 @@ def _(
 ):
     reveal_type(a)  # revealed: TypeGuard[str]
     reveal_type(b)  # revealed: TypeIs[str | int]
-    # TODO: Should be `TypeGuard[complex & ~int & ~float]` - intersection not preserved in type expression
+    # not `TypeGuard[complex & ~int & ~float]`: `complex` in argument position
+    # means `complex & int & float` semantically so `Intersection[complex,
+    # Not[int], Not[float]]` means `complex` semantically
     reveal_type(c)  # revealed: TypeGuard[complex]
     reveal_type(d)  # revealed: TypeIs[tuple[<class 'bytes'>]]
     reveal_type(e)  # revealed: Unknown
@@ -213,7 +215,7 @@ class C(Generic[T]):
 
 def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
     if reveal_type(guard_foo(a[1])):  # revealed: TypeGuard[Foo @ a[1]]
-        # TODO: Should be `tuple[Bar, Foo]` - requires narrowing tuple by subscript
+        # TODO: Should be `tuple[Bar, Foo]`
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
         reveal_type(a[1])  # revealed: Foo
 
