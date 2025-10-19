@@ -17,16 +17,15 @@ def _(
     e: TypeGuard,  # error: [invalid-type-form]
     f: TypeIs,  # error: [invalid-type-form]
 ):
-    # TODO: Should be `TypeGuard[str]`
-    reveal_type(a)  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(a)  # revealed: TypeGuard[str]
     reveal_type(b)  # revealed: TypeIs[str | int]
-    # TODO: Should be `TypeGuard[complex & ~int & ~float]`
-    reveal_type(c)  # revealed: @Todo(`TypeGuard[]` special form)
+    # TODO: Should be `TypeGuard[complex & ~int & ~float]` - intersection not preserved in type expression
+    reveal_type(c)  # revealed: TypeGuard[complex]
     reveal_type(d)  # revealed: TypeIs[tuple[<class 'bytes'>]]
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
 
-# TODO: error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
+# error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
 def _(a) -> TypeGuard[str]: ...
 
 # error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
@@ -38,8 +37,7 @@ def g(a) -> TypeIs[str]:
     return True
 
 def _(a: object):
-    # TODO: Should be `TypeGuard[str @ a]`
-    reveal_type(f(a))  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(f(a))  # revealed: TypeGuard[str @ a]
     reveal_type(g(a))  # revealed: TypeIs[str @ a]
 ```
 
@@ -105,15 +103,14 @@ from typing_extensions import TypeGuard, TypeIs
 
 a = 123
 
-# TODO: error: [invalid-type-form]
+# error: [invalid-type-form] "Special form `typing.TypeGuard` expected exactly one type parameter"
 def f(_) -> TypeGuard[int, str]: ...
 
 # error: [invalid-type-form] "Special form `typing.TypeIs` expected exactly one type parameter"
 # error: [invalid-type-form] "Variable of type `Literal[123]` is not allowed in a type expression"
 def g(_) -> TypeIs[a, str]: ...
 
-# TODO: Should be `Unknown`
-reveal_type(f(0))  # revealed: @Todo(`TypeGuard[]` special form)
+reveal_type(f(0))  # revealed: Unknown
 reveal_type(g(0))  # revealed: Unknown
 ```
 
@@ -126,9 +123,10 @@ from typing_extensions import Literal, TypeGuard, TypeIs, assert_never
 
 def _(a: object, flag: bool) -> TypeGuard[str]:
     if flag:
+        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
         return 0
 
-    # TODO: error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `Literal["foo"]`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
     return "foo"
 
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
@@ -193,8 +191,7 @@ def is_bar(a: object) -> TypeIs[Bar]:
 
 def _(a: Foo | Bar):
     if guard_foo(a):
-        # TODO: Should be `Foo`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo
     else:
         reveal_type(a)  # revealed: Foo | Bar
 
@@ -215,23 +212,19 @@ class C(Generic[T]):
     v: T
 
 def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
-    # TODO: Should be `TypeGuard[Foo @ a[1]]`
-    if reveal_type(guard_foo(a[1])):  # revealed: @Todo(`TypeGuard[]` special form)
-        # TODO: Should be `tuple[Bar, Foo]`
+    if reveal_type(guard_foo(a[1])):  # revealed: TypeGuard[Foo @ a[1]]
+        # TODO: Should be `tuple[Bar, Foo]` - requires narrowing tuple by subscript
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
-        # TODO: Should be `Foo`
-        reveal_type(a[1])  # revealed: Bar | Foo
+        reveal_type(a[1])  # revealed: Foo
 
     if reveal_type(is_bar(a[0])):  # revealed: TypeIs[Bar @ a[0]]
         # TODO: Should be `tuple[Bar, Bar & Foo]`
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
         reveal_type(a[0])  # revealed: Bar
 
-    # TODO: Should be `TypeGuard[Foo @ c.v]`
-    if reveal_type(guard_foo(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
+    if reveal_type(guard_foo(c.v)):  # revealed: TypeGuard[Foo @ c.v]
         reveal_type(c)  # revealed: C[Any]
-        # TODO: Should be `Foo`
-        reveal_type(c.v)  # revealed: Any
+        reveal_type(c.v)  # revealed: Any & Foo
 
     if reveal_type(is_bar(c.v)):  # revealed: TypeIs[Bar @ c.v]
         reveal_type(c)  # revealed: C[Any]
@@ -246,8 +239,7 @@ def _(a: Foo | Bar):
     c = is_bar(a)
 
     reveal_type(a)  # revealed: Foo | Bar
-    # TODO: Should be `TypeGuard[Foo @ a]`
-    reveal_type(b)  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(b)  # revealed: TypeGuard[Foo @ a]
     reveal_type(c)  # revealed: TypeIs[Bar @ a]
 
     if b:
@@ -350,20 +342,46 @@ def is_bar(a: object) -> TypeIs[Bar]:
 
 def does_not_narrow_in_negative_case(a: Foo | Bar):
     if not guard_foo(a):
-        # TODO: Should be `Bar`
         reveal_type(a)  # revealed: Foo | Bar
     else:
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo
 
 def narrowed_type_must_be_exact(a: object, b: Baz):
     if guard_foo(b):
-        # TODO: Should be `Foo`
-        reveal_type(b)  # revealed: Baz
+        reveal_type(b)  # revealed: Baz & Foo
 
     if isinstance(a, Baz) and is_bar(a):
         reveal_type(a)  # revealed: Baz
 
     if isinstance(a, Bar) and guard_foo(a):
-        # TODO: Should be `Foo`
-        reveal_type(a)  # revealed: Bar
+        reveal_type(a)  # revealed: Foo
+```
+
+## Complex boolean logic with TypeGuard and TypeIs
+
+TypeGuard constraints need to properly distribute through boolean operations.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+class A: ...
+class B: ...
+class C: ...
+
+def f(x: object) -> TypeIs[A]:
+    return True
+
+def g(x: object) -> TypeGuard[B]:
+    return True
+
+def h(x: object) -> TypeIs[C]:
+    return True
+
+def _(x: object):
+    # g(x) or h(x) should give B | C
+    # Then f(x) and (...) should distribute: (f(x) and g(x)) or (f(x) and h(x))
+    # Which is (Regular(A) & TypeGuard(B)) | (Regular(A) & Regular(C))
+    # TypeGuard clobbers in the first branch, giving: B | (A & C)
+    if f(x) and (g(x) or h(x)):
+        reveal_type(x)  # revealed: B | (A & C)
 ```
