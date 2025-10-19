@@ -188,125 +188,30 @@ DJ001 Avoid using `null=True` on string-based fields such as `URLField`
    |
 
 DJ001 Avoid using `null=True` on string-based fields such as `CharField`
-  --> DJ001.py:52:45
+  --> DJ001.py:52:35
    |
-51 | class IncorrectModelWithAnnotations(models.Model):
-52 |     charfield: models.CharField[str, str] = models.CharField(max_length=255, null=True)
-   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-53 |     textfield: models.TextField[str, str] = models.TextField(max_length=255, null=True)
-54 |     slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=True)
+51 | class IncorrectModelWithSimpleAnnotations(models.Model):
+52 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
+54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
    |
 
 DJ001 Avoid using `null=True` on string-based fields such as `TextField`
-  --> DJ001.py:53:45
+  --> DJ001.py:53:35
    |
-51 | class IncorrectModelWithAnnotations(models.Model):
-52 |     charfield: models.CharField[str, str] = models.CharField(max_length=255, null=True)
-53 |     textfield: models.TextField[str, str] = models.TextField(max_length=255, null=True)
-   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-54 |     slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=True)
-55 |     emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=True)
+51 | class IncorrectModelWithSimpleAnnotations(models.Model):
+52 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
    |
 
 DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
-  --> DJ001.py:54:45
+  --> DJ001.py:54:35
    |
-52 |     charfield: models.CharField[str, str] = models.CharField(max_length=255, null=True)
-53 |     textfield: models.TextField[str, str] = models.TextField(max_length=255, null=True)
-54 |     slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=True)
-   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-55 |     emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=True)
-56 |     filepathfield: models.FilePathField[str, str] = models.FilePathField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `EmailField`
-  --> DJ001.py:55:47
-   |
-53 |     textfield: models.TextField[str, str] = models.TextField(max_length=255, null=True)
-54 |     slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=True)
-55 |     emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=True)
-   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-56 |     filepathfield: models.FilePathField[str, str] = models.FilePathField(max_length=255, null=True)
-57 |     urlfield: models.URLField[str, str] = models.URLField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `FilePathField`
-  --> DJ001.py:56:53
-   |
-54 |     slugfield: models.SlugField[str, str] = models.SlugField(max_length=255, null=True)
-55 |     emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=True)
-56 |     filepathfield: models.FilePathField[str, str] = models.FilePathField(max_length=255, null=True)
-   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-57 |     urlfield: models.URLField[str, str] = models.URLField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `URLField`
-  --> DJ001.py:57:43
-   |
-55 |     emailfield: models.EmailField[str, str] = models.EmailField(max_length=255, null=True)
-56 |     filepathfield: models.FilePathField[str, str] = models.FilePathField(max_length=255, null=True)
-57 |     urlfield: models.URLField[str, str] = models.URLField(max_length=255, null=True)
-   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `CharField`
-  --> DJ001.py:61:35
-   |
-60 | class IncorrectModelWithSimpleAnnotations(models.Model):
-61 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+52 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
+54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-62 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
-63 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `TextField`
-  --> DJ001.py:62:35
-   |
-60 | class IncorrectModelWithSimpleAnnotations(models.Model):
-61 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
-62 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
-   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-63 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
-64 |     emailfield: models.EmailField = models.EmailField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
-  --> DJ001.py:63:35
-   |
-61 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
-62 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
-63 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
-   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-64 |     emailfield: models.EmailField = models.EmailField(max_length=255, null=True)
-65 |     filepathfield: models.FilePathField = models.FilePathField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `EmailField`
-  --> DJ001.py:64:37
-   |
-62 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
-63 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
-64 |     emailfield: models.EmailField = models.EmailField(max_length=255, null=True)
-   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-65 |     filepathfield: models.FilePathField = models.FilePathField(max_length=255, null=True)
-66 |     urlfield: models.URLField = models.URLField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `FilePathField`
-  --> DJ001.py:65:43
-   |
-63 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
-64 |     emailfield: models.EmailField = models.EmailField(max_length=255, null=True)
-65 |     filepathfield: models.FilePathField = models.FilePathField(max_length=255, null=True)
-   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-66 |     urlfield: models.URLField = models.URLField(max_length=255, null=True)
-   |
-
-DJ001 Avoid using `null=True` on string-based fields such as `URLField`
-  --> DJ001.py:66:33
-   |
-64 |     emailfield: models.EmailField = models.EmailField(max_length=255, null=True)
-65 |     filepathfield: models.FilePathField = models.FilePathField(max_length=255, null=True)
-66 |     urlfield: models.URLField = models.URLField(max_length=255, null=True)
-   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

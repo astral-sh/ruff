@@ -60,30 +60,21 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
     }
 
     for statement in body {
-        match statement {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => {
-                if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
-                    checker.report_diagnostic(
-                        DjangoNullableModelStringField {
-                            field_name: field_name.to_string(),
-                        },
-                        value.range(),
-                    );
-                }
-            }
+        let value = match statement {
+            Stmt::Assign(ast::StmtAssign { value, .. }) => value,
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value), ..
-            }) => {
-                if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
-                    checker.report_diagnostic(
-                        DjangoNullableModelStringField {
-                            field_name: field_name.to_string(),
-                        },
-                        value.range(),
-                    );
-                }
-            }
+            }) => value,
             _ => continue,
+        };
+
+        if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
+            checker.report_diagnostic(
+                DjangoNullableModelStringField {
+                    field_name: field_name.to_string(),
+                },
+                value.range(),
+            );
         }
     }
 }
