@@ -1,21 +1,2 @@
-Tanjun  # too many iterations
-altair  # too many iterations (uses packaging)
-arviz  # too many iterations on versions of arviz newer than https://github.com/arviz-devs/arviz/commit/3205b82bb4d6097c31f7334d7ac51a6de37002d0
-cpython  # too many cycle iterations
-graphql-core  # stack overflow
-hydpy  # too many iterations
-ibis  # too many iterations
-jax  # too many iterations
-mypy # too many iterations (self-recursive type alias)
-nox # too many iterations (uses packaging)
-packaging  # too many iterations
-pandera  # too many iterations
-pip  # vendors packaging, see above
-pylint  # cycle panics (self-recursive type alias)
-pyodide  # too many cycle iterations
-scikit-build-core  # too many cycle iterations
-setuptools  # vendors packaging, see above
-spack  # slow, success, but mypy-primer hangs processing the output
-spark  # too many iterations
-steam.py  # hangs (single threaded)
-streamlit  # too many iterations (uses packaging)
+spark  # too many iterations (in `exported_names` query), `should not be able to access instance member `spark` of type variable IndexOpsLike@astype in inferable position`
+steam.py  # dependency graph cycle when querying TypeVarInstance < 'db >::lazy_default_(Id(2e007)), set cycle_fn/cycle_initial to fixpoint iterate.

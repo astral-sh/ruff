@@ -111,6 +111,7 @@ Module(
                                                     quote_style: Double,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),

@@ -14,6 +14,10 @@ impl GlobalSettings {
     pub(crate) fn is_rename_enabled(&self) -> bool {
         self.experimental.rename
     }
+
+    pub(crate) fn is_auto_import_enabled(&self) -> bool {
+        self.experimental.auto_import
+    }
 }
 
 impl GlobalSettings {
@@ -25,6 +29,7 @@ impl GlobalSettings {
 #[derive(Clone, Default, Debug, PartialEq)]
 pub(crate) struct ExperimentalSettings {
     pub(super) rename: bool,
+    pub(super) auto_import: bool,
 }
 
 /// Resolved client settings for a specific workspace.

@@ -484,3 +484,104 @@ help: Combine string literals
 94 | 
 95 | 
 96 | # Mixed literal + non-literal scenarios
+
+ISC001 [*] Implicitly concatenated string literals on one line
+   --> ISC.py:193:1
+    |
+191 | # https://github.com/astral-sh/ruff/issues/20310
+192 | # ISC001
+193 | t"The quick " t"brown fox."
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+194 |
+195 | # ISC002
+    |
+help: Combine string literals
+190 | 
+191 | # https://github.com/astral-sh/ruff/issues/20310
+192 | # ISC001
+    - t"The quick " t"brown fox."
+193 + t"The quick brown fox."
+194 | 
+195 | # ISC002
+196 | t"The quick brown fox jumps over the lazy "\
+
+ISC001 Implicitly concatenated string literals on one line
+   --> ISC.py:206:5
+    |
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+208 | _ = f"b {t"abc" \
+    |
+help: Combine string literals
+
+ISC001 Implicitly concatenated string literals on one line
+   --> ISC.py:206:9
+    |
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+208 | _ = f"b {t"abc" \
+    |
+help: Combine string literals
+
+ISC001 [*] Implicitly concatenated string literals on one line
+   --> ISC.py:206:14
+    |
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+    |              ^^^^^^^^^
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+208 | _ = f"b {t"abc" \
+    |
+help: Combine string literals
+203 | )
+204 | 
+205 | # nested examples with both t and f-strings
+    - _ = "a" f"b {t"c" t"d"} e" "f"
+206 + _ = "a" f"b {t"cd"} e" "f"
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+208 | _ = f"b {t"abc" \
+209 |     t"def"} g"
+
+ISC001 [*] Implicitly concatenated string literals on one line
+   --> ISC.py:207:10
+    |
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+    |          ^^^^^^^^^^^^^^^^^^^^^^^
+208 | _ = f"b {t"abc" \
+209 |     t"def"} g"
+    |
+help: Combine string literals
+204 | 
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+    - _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+207 + _ = t"b {f"cd {t"e" t"f"} g"} h"
+208 | _ = f"b {t"abc" \
+209 |     t"def"} g"
+210 | 
+
+ISC001 [*] Implicitly concatenated string literals on one line
+   --> ISC.py:207:20
+    |
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+    |                    ^^^^^^^^^
+208 | _ = f"b {t"abc" \
+209 |     t"def"} g"
+    |
+help: Combine string literals
+204 | 
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+    - _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+207 + _ = t"b {f"c" f"d {t"ef"} g"} h"
+208 | _ = f"b {t"abc" \
+209 |     t"def"} g"
+210 |

@@ -1,9 +1,11 @@
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_expanduser_enabled;
 use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.path.expanduser`.
@@ -34,7 +36,10 @@ use ruff_python_ast::ExprCall;
 /// especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is always marked as unsafe because the behaviors of
+/// `os.path.expanduser` and `Path.expanduser` differ when a user's home
+/// directory can't be resolved: `os.path.expanduser` returns the
+/// input unchanged, while `Path.expanduser` raises `RuntimeError`.
 ///
 /// ## References
 /// - [Python documentation: `Path.expanduser`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.expanduser)
@@ -62,6 +67,7 @@ pub(crate) fn os_path_expanduser(checker: &Checker, call: &ExprCall, segments: &
     if segments != ["os", "path", "expanduser"] {
         return;
     }
+
     check_os_pathlib_single_arg_calls(
         checker,
         call,
@@ -69,5 +75,6 @@ pub(crate) fn os_path_expanduser(checker: &Checker, call: &ExprCall, segments: &
         "path",
         is_fix_os_path_expanduser_enabled(checker.settings()),
         OsPathExpanduser,
+        Some(Applicability::Unsafe),
     );
 }

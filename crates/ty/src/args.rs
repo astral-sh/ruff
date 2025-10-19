@@ -51,22 +51,15 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
-    /// Path to the Python environment.
+    /// Path to your project's Python environment or interpreter.
     ///
-    /// ty uses the Python environment to resolve type information and third-party dependencies.
+    /// ty uses your Python environment to resolve third-party imports in your code.
     ///
-    /// If not specified, ty will attempt to infer it from the `VIRTUAL_ENV` or `CONDA_PREFIX`
-    /// environment variables, or discover a `.venv` directory in the project root or working
-    /// directory.
+    /// If you're using a project management tool such as uv or you have an activated Conda or virtual
+    /// environment, you should not generally need to specify this option.
     ///
-    /// If a path to a Python interpreter is provided, e.g., `.venv/bin/python3`, ty will attempt to
-    /// find an environment two directories up from the interpreter's path, e.g., `.venv`. At this
-    /// time, ty does not invoke the interpreter to determine the location of the environment. This
-    /// means that ty will not resolve dynamic executables such as a shim.
-    ///
-    /// ty will search in the resolved environment's `site-packages` directories for type
-    /// information and third-party imports.
-    #[arg(long, value_name = "PATH")]
+    /// This option can be used to point to virtual or system Python environments.
+    #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,
 
     /// Custom directory to use for stdlib typeshed stubs.
@@ -74,6 +67,10 @@ pub(crate) struct CheckCommand {
     pub(crate) typeshed: Option<SystemPathBuf>,
 
     /// Additional path to use as a module-resolution source (can be passed multiple times).
+    ///
+    /// This is an advanced option that should usually only be used for first-party or third-party
+    /// modules that are not installed into your Python environment in a conventional way.
+    /// Use `--python` to point ty to your Python environment if it is in an unusual location.
     #[arg(long, value_name = "PATH")]
     pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
 
@@ -88,7 +85,7 @@ pub(crate) struct CheckCommand {
     ///    and use the minimum version from the specified range
     /// 2. Check for an activated or configured Python environment
     ///    and attempt to infer the Python version of that environment
-    /// 3. Fall back to the latest stable Python version supported by ty (currently Python 3.13)
+    /// 3. Fall back to the latest stable Python version supported by ty (see `ty check --help` output)
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 
@@ -306,7 +303,7 @@ impl clap::Args for RulesArg {
 /// The diagnostic output format.
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub enum OutputFormat {
-    /// Print diagnostics verbosely, with context and helpful hints \[default\].
+    /// Print diagnostics verbosely, with context and helpful hints (default).
     ///
     /// Diagnostic messages may include additional context and
     /// annotations on the input to help understand the message.
@@ -321,6 +318,12 @@ pub enum OutputFormat {
     /// dropped.
     #[value(name = "concise")]
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
+    #[value(name = "gitlab")]
+    Gitlab,
+    #[value(name = "github")]
+    /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
+    Github,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -328,6 +331,8 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
         match format {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
         }
     }
 }

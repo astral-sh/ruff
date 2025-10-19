@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::tuple::{Tuple, TupleLength, TupleType};
+use crate::types::tuple::{Tuple, TupleType};
 
 use super::Type;
 
@@ -17,7 +17,7 @@ pub(crate) enum Argument<'a> {
     /// A positional argument.
     Positional,
     /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
-    Variadic(TupleLength),
+    Variadic,
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
@@ -41,29 +41,25 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
-        db: &'db dyn Db,
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(arg, value);
-                        let length = ty
-                            .try_iterate(db)
-                            .map(|tuple| tuple.len())
-                            .unwrap_or(TupleLength::unknown());
-                        (Argument::Variadic(length), Some(ty))
+                        let ty = infer_argument_type(Some(arg), value);
+                        (Argument::Variadic, Some(ty))
                     }
                     _ => (Argument::Positional, None),
                 },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), None)
                     } else {
-                        (Argument::Keywords, None)
+                        let ty = infer_argument_type(None, value);
+                        (Argument::Keywords, Some(ty))
                     }
                 }
             })

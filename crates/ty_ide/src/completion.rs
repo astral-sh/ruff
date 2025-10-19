@@ -2,18 +2,220 @@ use std::cmp::Ordering;
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
+use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
-use ruff_python_parser::{Token, TokenAt, TokenKind};
+use ruff_python_ast::name::Name;
+use ruff_python_codegen::Stylist;
+use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::{Completion, NameKind, SemanticModel};
+use ty_python_semantic::{
+    Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
+    types::{CycleDetector, Type},
+};
 
-use crate::Db;
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
+use crate::importer::{ImportRequest, Importer};
+use crate::symbols::QueryPattern;
+use crate::{Db, all_symbols};
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
+#[derive(Clone, Debug)]
+pub struct Completion<'db> {
+    /// The label shown to the user for this suggestion.
+    pub name: Name,
+    /// The text that should be inserted at the cursor
+    /// when the completion is selected.
+    ///
+    /// When this is not set, `name` is used.
+    pub insert: Option<Box<str>>,
+    /// The type of this completion, if available.
+    ///
+    /// Generally speaking, this is always available
+    /// *unless* this was a completion corresponding to
+    /// an unimported symbol. In that case, computing the
+    /// type of all such symbols could be quite expensive.
+    pub ty: Option<Type<'db>>,
+    /// The "kind" of this completion.
+    ///
+    /// When this is set, it takes priority over any kind
+    /// inferred from `ty`.
+    ///
+    /// Usually this is set when `ty` is `None`, since it
+    /// may be cheaper to compute at scale (e.g., for
+    /// unimported symbol completions).
+    ///
+    /// Callers should use [`Completion::kind`] to get the
+    /// kind, which will take type information into account
+    /// if this kind is not present.
+    pub kind: Option<CompletionKind>,
+    /// The name of the module that this completion comes from.
+    ///
+    /// This is generally only present when this is a completion
+    /// suggestion for an unimported symbol.
+    pub module_name: Option<&'db ModuleName>,
+    /// An import statement to insert (or ensure is already
+    /// present) when this completion is selected.
+    pub import: Option<Edit>,
+    /// Whether this suggestion came from builtins or not.
+    ///
+    /// At time of writing (2025-06-26), this information
+    /// doesn't make it into the LSP response. Instead, we
+    /// use it mainly in tests so that we can write less
+    /// noisy tests.
+    pub builtin: bool,
+    /// The documentation associated with this item, if
+    /// available.
+    pub documentation: Option<Docstring>,
+}
+
+impl<'db> Completion<'db> {
+    fn from_semantic_completion(
+        db: &'db dyn Db,
+        semantic: SemanticCompletion<'db>,
+    ) -> Completion<'db> {
+        let definition = semantic
+            .ty
+            .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
+        let documentation = definition.and_then(|def| def.docstring(db));
+        Completion {
+            name: semantic.name,
+            insert: None,
+            ty: semantic.ty,
+            kind: None,
+            module_name: None,
+            import: None,
+            builtin: semantic.builtin,
+            documentation,
+        }
+    }
+
+    /// Returns the "kind" of this completion.
+    ///
+    /// This is meant to be a very general classification of this completion.
+    /// Typically, this is communicated from the LSP server to a client, and
+    /// the client uses this information to help improve the UX (perhaps by
+    /// assigning an icon of some kind to the completion).
+    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
+        type CompletionKindVisitor<'db> =
+            CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+
+        fn imp<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &CompletionKindVisitor<'db>,
+        ) -> Option<CompletionKind> {
+            Some(match ty {
+                Type::FunctionLiteral(_)
+                | Type::DataclassDecorator(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_) => CompletionKind::Function,
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
+                Type::ModuleLiteral(_) => CompletionKind::Module,
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    CompletionKind::Class
+                }
+                // This is a little weird for "struct." I'm mostly interpreting
+                // "struct" here as a more general "object." ---AG
+                Type::NominalInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::BoundSuper(_)
+                | Type::TypedDict(_) => CompletionKind::Struct,
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::TypeIs(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::EnumLiteral(_) => CompletionKind::Enum,
+                Type::ProtocolInstance(_) => CompletionKind::Interface,
+                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .find_map(|&ty| imp(db, ty, visitor))?,
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .find_map(|ty| imp(db, ty, visitor))?,
+                Type::Dynamic(_)
+                | Type::Never
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy => return None,
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                }
+            })
+        }
+        self.kind.or_else(|| {
+            self.ty
+                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
+        })
+    }
+}
+
+/// The "kind" of a completion.
+///
+/// This is taken directly from the LSP completion specification:
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind>
+///
+/// The idea here is that [`Completion::kind`] defines the mapping to this from
+/// `Type` (and possibly other information), which might be interesting and
+/// contentious. Then the outer edges map this to the LSP types, which is
+/// expected to be mundane and boring.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct CompletionSettings {
+    pub auto_import: bool,
+}
+
+pub fn completion<'db>(
+    db: &'db dyn Db,
+    settings: &CompletionSettings,
+    file: File,
+    offset: TextSize,
+) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
+    if is_in_comment(&parsed, offset) || is_in_string(&parsed, offset) {
+        return vec![];
+    }
+
+    let typed = find_typed_text(db, file, &parsed, offset);
+    let typed_query = typed
+        .as_deref()
+        .map(QueryPattern::new)
+        .unwrap_or_else(QueryPattern::matches_all_symbols);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
         return vec![];
@@ -23,45 +225,122 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedComp
     };
 
     let model = SemanticModel::new(db, file);
-    let mut completions = match target {
-        CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
+    let (semantic_completions, scoped) = match target {
+        CompletionTargetAst::ObjectDot { expr } => (model.attribute_completions(expr), None),
         CompletionTargetAst::ObjectDotInImport { import, name } => {
-            model.import_submodule_completions(import, name)
+            (model.import_submodule_completions(import, name), None)
         }
         CompletionTargetAst::ObjectDotInImportFrom { import } => {
-            model.from_import_submodule_completions(import)
+            (model.from_import_submodule_completions(import), None)
         }
         CompletionTargetAst::ImportFrom { import, name } => {
-            model.from_import_completions(import, name)
+            (model.from_import_completions(import, name), None)
         }
         CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
-            model.import_completions()
+            (model.import_completions(), None)
         }
-        CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
+        CompletionTargetAst::Scoped(scoped) => {
+            (model.scoped_completions(scoped.node), Some(scoped))
+        }
     };
-    completions.sort_by(compare_suggestions);
-    completions.dedup_by(|c1, c2| c1.name == c2.name);
-    completions
+    let mut completions: Vec<Completion<'_>> = semantic_completions
         .into_iter()
-        .map(|completion| {
-            let definition = DefinitionsOrTargets::from_ty(db, completion.ty);
-            let documentation = definition.and_then(|def| def.docstring(db));
-            DetailedCompletion {
-                inner: completion,
-                documentation,
-            }
-        })
-        .collect()
+        .filter(|c| typed_query.is_match_symbol_name(c.name.as_str()))
+        .map(|c| Completion::from_semantic_completion(db, c))
+        .collect();
+
+    if scoped.is_some() {
+        add_keyword_value_completions(db, &typed_query, &mut completions);
+    }
+    if settings.auto_import {
+        if let Some(scoped) = scoped {
+            add_unimported_completions(
+                db,
+                file,
+                &parsed,
+                scoped,
+                typed.as_deref(),
+                &mut completions,
+            );
+        }
+    }
+    completions.sort_by(compare_suggestions);
+    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+    completions
 }
 
-pub struct DetailedCompletion<'db> {
-    pub inner: Completion<'db>,
-    pub documentation: Option<Docstring>,
+/// Adds a subset of completions derived from keywords.
+///
+/// Note that at present, these should only be added to "scoped"
+/// completions. i.e., This will include `None`, `True`, `False`, etc.
+fn add_keyword_value_completions<'db>(
+    db: &'db dyn Db,
+    query: &QueryPattern,
+    completions: &mut Vec<Completion<'db>>,
+) {
+    let keywords = [
+        ("None", Type::none(db)),
+        ("True", Type::BooleanLiteral(true)),
+        ("False", Type::BooleanLiteral(false)),
+    ];
+    for (name, ty) in keywords {
+        if !query.is_match_symbol_name(name) {
+            continue;
+        }
+        completions.push(Completion {
+            name: ast::name::Name::new(name),
+            insert: None,
+            ty: Some(ty),
+            kind: None,
+            module_name: None,
+            import: None,
+            builtin: true,
+            documentation: None,
+        });
+    }
 }
-impl<'db> std::ops::Deref for DetailedCompletion<'db> {
-    type Target = Completion<'db>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+
+/// Adds completions not in scope.
+///
+/// `scoped` should be information about the identified scope
+/// in which the cursor is currently placed.
+///
+/// The completions returned will auto-insert import statements
+/// when selected into `File`.
+fn add_unimported_completions<'db>(
+    db: &'db dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    scoped: ScopedTarget<'_>,
+    typed: Option<&str>,
+    completions: &mut Vec<Completion<'db>>,
+) {
+    let Some(typed) = typed else {
+        return;
+    };
+    let source = source_text(db, file);
+    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
+    let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+    let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
+
+    for symbol in all_symbols(db, typed) {
+        let request =
+            ImportRequest::import_from(symbol.module.name(db).as_str(), &symbol.symbol.name);
+        // FIXME: `all_symbols` doesn't account for wildcard imports.
+        // Since we're looking at every module, this is probably
+        // "fine," but it might mean that we import a symbol from the
+        // "wrong" module.
+        let import_action = importer.import(request, &members);
+        completions.push(Completion {
+            name: ast::name::Name::new(&symbol.symbol.name),
+            insert: Some(import_action.symbol_text().into()),
+            ty: None,
+            kind: symbol.symbol.kind.to_completion_kind(),
+            module_name: Some(symbol.module.name(db)),
+            import: import_action.import().cloned(),
+            builtin: false,
+            documentation: None,
+        });
     }
 }
 
@@ -130,7 +409,7 @@ impl<'t> CompletionTargetTokens<'t> {
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
-        let before = parsed.tokens().before(offset);
+        let before = tokens_start_before(parsed.tokens(), offset);
         Some(
             // Our strategy when it comes to `object.attribute` here is
             // to look for the `.` and then take the token immediately
@@ -258,17 +537,15 @@ impl<'t> CompletionTargetTokens<'t> {
                 }
             }
             CompletionTargetTokens::Generic { token } => {
-                let covering_node = covering_node(parsed.syntax().into(), token.range());
-                Some(CompletionTargetAst::Scoped {
-                    node: covering_node.node(),
-                })
+                let node = covering_node(parsed.syntax().into(), token.range()).node();
+                Some(CompletionTargetAst::Scoped(ScopedTarget { node }))
             }
             CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(offset);
                 let covering_node = covering_node(parsed.syntax().into(), range);
-                Some(CompletionTargetAst::Scoped {
+                Some(CompletionTargetAst::Scoped(ScopedTarget {
                     node: covering_node.node(),
-                })
+                }))
             }
         }
     }
@@ -321,7 +598,33 @@ enum CompletionTargetAst<'t> {
     },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
-    Scoped { node: ast::AnyNodeRef<'t> },
+    Scoped(ScopedTarget<'t>),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ScopedTarget<'t> {
+    /// The node with the smallest range that fully covers
+    /// the token under the cursor.
+    node: ast::AnyNodeRef<'t>,
+}
+
+/// Returns a slice of tokens that all start before or at the given
+/// [`TextSize`] offset.
+///
+/// If the given offset is between two tokens, the returned slice will end just
+/// before the following token. In other words, if the offset is between the
+/// end of previous token and start of next token, the returned slice will end
+/// just before the next token.
+///
+/// Unlike `Tokens::before`, this never panics. If `offset` is within a token's
+/// range (including if it's at the very beginning), then that token will be
+/// included in the slice returned.
+fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
+    let idx = match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
+        Ok(idx) => idx,
+        Err(idx) => idx,
+    };
+    &tokens[..idx]
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
@@ -444,7 +747,7 @@ fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
 /// This also handles cases like `import foo, c<CURSOR>, bar`.
 ///
 /// If found, a token corresponding to the `import` or `from` keyword
-/// and the the closest point of the `<CURSOR>` is returned.
+/// and the closest point of the `<CURSOR>` is returned.
 ///
 /// It is assumed that callers will call `from_import_tokens` first to
 /// try and recognize a `from ... import ...` statement before using
@@ -485,6 +788,57 @@ fn import_tokens(tokens: &[Token]) -> Option<(&Token, &Token)> {
     None
 }
 
+/// Looks for the text typed immediately before the cursor offset
+/// given.
+///
+/// If there isn't any typed text or it could not otherwise be found,
+/// then `None` is returned.
+fn find_typed_text(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+) -> Option<String> {
+    let source = source_text(db, file);
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+    let last = tokens.last()?;
+    if !matches!(last.kind(), TokenKind::Name) {
+        return None;
+    }
+    // This one's weird, but if the cursor is beyond
+    // what is in the closest `Name` token, then it's
+    // likely we can't infer anything about what has
+    // been typed. This likely means there is whitespace
+    // or something that isn't represented in the token
+    // stream. So just give up.
+    if last.end() < offset {
+        return None;
+    }
+    Some(source[last.range()].to_string())
+}
+
+/// Whether the given offset within the parsed module is within
+/// a comment or not.
+fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+    tokens.last().is_some_and(|t| t.kind().is_comment())
+}
+
+/// Returns true when the cursor at `offset` is positioned within
+/// a string token (regular, f-string, t-string, etc).
+///
+/// Note that this will return `false` when positioned within an
+/// interpolation block in an f-string or a t-string.
+fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+    tokens.last().is_some_and(|t| {
+        matches!(
+            t.kind(),
+            TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
+        )
+    })
+}
+
 /// Order completions lexicographically, with these exceptions:
 ///
 /// 1) A `_[^_]` prefix sorts last and
@@ -502,10 +856,10 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
 
-    use crate::completion::{DetailedCompletion, completion};
+    use crate::completion::{Completion, completion};
     use crate::tests::{CursorTest, cursor_test};
 
-    use super::token_suffix_by_kinds;
+    use super::{CompletionKind, CompletionSettings, token_suffix_by_kinds};
 
     #[test]
     fn token_suffixes_match() {
@@ -811,7 +1165,7 @@ g<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"foo");
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found after filtering out completions>");
     }
 
     #[test]
@@ -1249,10 +1603,8 @@ class Foo:
         );
 
         assert_snapshot!(test.completions_without_builtins(), @r"
-        Foo
         bar
         frob
-        quux
         ");
     }
 
@@ -1266,11 +1618,7 @@ class Foo:
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        Foo
-        bar
-        quux
-        ");
+        assert_snapshot!(test.completions_without_builtins(), @"bar");
     }
 
     #[test]
@@ -1411,7 +1759,7 @@ quux.<CURSOR>
         __getstate__ :: bound method Quux.__getstate__() -> object
         __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
+        __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
         __new__ :: bound method Quux.__new__() -> Quux
@@ -1443,29 +1791,8 @@ quux.b<CURSOR>
         assert_snapshot!(test.completions_without_builtins_with_types(), @r"
         bar :: Unknown | Literal[2]
         baz :: Unknown | Literal[3]
-        foo :: Unknown | Literal[1]
-        __annotations__ :: dict[str, Any]
-        __class__ :: type[Quux]
-        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
-        __dict__ :: dict[str, Any]
-        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
-        __doc__ :: str | None
-        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
-        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
-        __getstate__ :: bound method Quux.__getstate__() -> object
-        __hash__ :: bound method Quux.__hash__() -> int
-        __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
-        __module__ :: str
-        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Quux
-        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
-        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
-        __repr__ :: bound method Quux.__repr__() -> str
-        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
-        __sizeof__ :: bound method Quux.__sizeof__() -> int
-        __str__ :: bound method Quux.__str__() -> str
+        __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
         ");
     }
@@ -1488,6 +1815,7 @@ C.<CURSOR>
         assert_snapshot!(test.completions_without_builtins_with_types(), @r"
         meta_attr :: int
         mro :: bound method <class 'C'>.mro() -> list[type]
+        __annotate__ :: @Todo | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -1506,7 +1834,7 @@ C.<CURSOR>
         __getstate__ :: def __getstate__(self) -> object
         __hash__ :: def __hash__(self) -> int
         __init__ :: def __init__(self) -> None
-        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __init_subclass__ :: bound method <class 'C'>.__init_subclass__() -> None
         __instancecheck__ :: bound method <class 'C'>.__instancecheck__(instance: Any, /) -> bool
         __itemsize__ :: int
         __module__ :: str
@@ -1514,13 +1842,13 @@ C.<CURSOR>
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
         __new__ :: def __new__(cls) -> Self@__new__
-        __or__ :: bound method <class 'C'>.__or__(value: Any, /) -> UnionType
+        __or__ :: bound method <class 'C'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'C'>.__ror__(value: Any, /) -> UnionType
+        __ror__ :: bound method <class 'C'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
@@ -1553,7 +1881,7 @@ Meta.<CURSOR>
             // whether we're in release mode or not. These differences
             // aren't really relevant for completion tests AFAIK, so
             // just redact them. ---AG
-            filters => [(r"(?m)\s*__(annotations|new)__.+$", "")]},
+            filters => [(r"(?m)\s*__(annotations|new|annotate)__.+$", "")]},
             {
                 assert_snapshot!(test.completions_without_builtins_with_types(), @r"
                 meta_attr :: property
@@ -1575,20 +1903,20 @@ Meta.<CURSOR>
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]
-                __init_subclass__ :: def __init_subclass__(cls) -> None
+                __init_subclass__ :: bound method <class 'Meta'>.__init_subclass__() -> None
                 __instancecheck__ :: def __instancecheck__(self, instance: Any, /) -> bool
                 __itemsize__ :: int
                 __module__ :: str
                 __mro__ :: tuple[<class 'Meta'>, <class 'type'>, <class 'object'>]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __or__ :: def __or__(self, value: Any, /) -> UnionType
+                __or__ :: def __or__[Self](self: Self@__or__, value: Any, /) -> UnionType | Self@__or__
                 __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __ror__ :: def __ror__(self, value: Any, /) -> UnionType
+                __ror__ :: def __ror__[Self](self: Self@__ror__, value: Any, /) -> UnionType | Self@__ror__
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
@@ -1664,6 +1992,7 @@ Quux.<CURSOR>
         some_method :: def some_method(self) -> int
         some_property :: property
         some_static_method :: def some_static_method(self) -> int
+        __annotate__ :: @Todo | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -1682,7 +2011,7 @@ Quux.<CURSOR>
         __getstate__ :: def __getstate__(self) -> object
         __hash__ :: def __hash__(self) -> int
         __init__ :: def __init__(self) -> Unknown
-        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __init_subclass__ :: bound method <class 'Quux'>.__init_subclass__() -> None
         __instancecheck__ :: bound method <class 'Quux'>.__instancecheck__(instance: Any, /) -> bool
         __itemsize__ :: int
         __module__ :: str
@@ -1690,13 +2019,13 @@ Quux.<CURSOR>
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
         __new__ :: def __new__(cls) -> Self@__new__
-        __or__ :: bound method <class 'Quux'>.__or__(value: Any, /) -> UnionType
+        __or__ :: bound method <class 'Quux'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'Quux'>.__ror__(value: Any, /) -> UnionType
+        __ror__ :: bound method <class 'Quux'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
@@ -1726,7 +2055,7 @@ Answer.<CURSOR>
         insta::with_settings!({
             // See above: filter out some members which contain @Todo types that are
             // rendered differently in release mode.
-            filters => [(r"(?m)\s*__(call|reduce_ex)__.+$", "")]},
+            filters => [(r"(?m)\s*__(call|reduce_ex|annotate|signature)__.+$", "")]},
             {
                 assert_snapshot!(test.completions_without_builtins_with_types(), @r"
                 NO :: Literal[Answer.NO]
@@ -1756,7 +2085,7 @@ Answer.<CURSOR>
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
-                __init_subclass__ :: def __init_subclass__(cls) -> None
+                __init_subclass__ :: bound method <class 'Answer'>.__init_subclass__() -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
                 __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
@@ -1767,16 +2096,15 @@ Answer.<CURSOR>
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
                 __new__ :: def __new__(cls, value: object) -> Self@__new__
-                __or__ :: bound method <class 'Answer'>.__or__(value: Any, /) -> UnionType
+                __or__ :: bound method <class 'Answer'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
                 __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT@__reversed__]
-                __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType
+                __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
-                __signature__ :: bound method <class 'Answer'>.__signature__() -> str
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
@@ -1814,10 +2142,7 @@ bar(o<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        bar
-        foo
-        ");
+        assert_snapshot!(test.completions_without_builtins(), @"foo");
     }
 
     #[test]
@@ -1852,8 +2177,6 @@ class C:
         );
 
         assert_snapshot!(test.completions_without_builtins(), @r"
-        C
-        bar
         foo
         self
         ");
@@ -1888,8 +2211,6 @@ class C:
         // that is only a method that can be called on
         // `self`.
         assert_snapshot!(test.completions_without_builtins(), @r"
-        C
-        bar
         foo
         self
         ");
@@ -1934,7 +2255,7 @@ hidden_<CURSOR>
 
         assert_snapshot!(
             test.completions_without_builtins(),
-            @"<No completions found after filtering out completions>",
+            @"<No completions found>",
         );
     }
 
@@ -1954,7 +2275,10 @@ if sys.platform == \"not-my-current-platform\":
         // TODO: ideally, `only_available_in_this_branch` should be available here, but we
         // currently make no effort to provide a good IDE experience within sections that
         // are unreachable
-        assert_snapshot!(test.completions_without_builtins(), @"sys");
+        assert_snapshot!(
+            test.completions_without_builtins(),
+            @"<No completions found after filtering out completions>",
+        );
     }
 
     #[test]
@@ -2540,17 +2864,7 @@ f = Foo()
 "#,
         );
 
-        // TODO: This should not have any completions suggested for it.
-        // We do correctly avoid giving `object.attr` completions here,
-        // but we instead fall back to scope based completions. Since
-        // we're inside a string, we should avoid giving completions at
-        // all.
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        Foo
-        bar
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions_without_builtins(), @r"<No completions found>");
     }
 
     #[test]
@@ -2567,6 +2881,26 @@ f = Foo()
 
 # F-string, this is an attribute access
 f"{f.<CURSOR>
+"#,
+        );
+
+        test.assert_completions_include("method");
+    }
+
+    #[test]
+    fn string_dot_attr3() {
+        let test = cursor_test(
+            r#"
+foo = 1
+bar = 2
+
+class Foo:
+    def method(self): ...
+
+f = Foo()
+
+# T-string, this is an attribute access
+t"{f.<CURSOR>
 "#,
         );
 
@@ -3014,6 +3348,24 @@ from os.<CURSOR>
     }
 
     #[test]
+    fn auto_import_with_submodule() {
+        let test = CursorTest::builder()
+            .source("main.py", "Abra<CURSOR>")
+            .source("package/__init__.py", "AbraKadabra = 1")
+            .build();
+
+        let settings = CompletionSettings { auto_import: true };
+        let expected = "AbraKadabra";
+        let completions = completion(&test.db, &settings, test.cursor.file, test.cursor.offset);
+        assert!(
+            completions
+                .iter()
+                .any(|completion| completion.name == expected),
+            "Expected completions to include `{expected}`"
+        );
+    }
+
+    #[test]
     fn regression_test_issue_642() {
         // Regression test for https://github.com/astral-sh/ty/issues/642
 
@@ -3031,6 +3383,572 @@ from os.<CURSOR>
         );
     }
 
+    #[test]
+    fn completion_kind_recursive_type_alias() {
+        let test = cursor_test(
+            r#"
+            type T = T | None
+            def f(rec: T):
+                re<CURSOR>
+            "#,
+        );
+
+        let completions = completion(
+            &test.db,
+            &CompletionSettings::default(),
+            test.cursor.file,
+            test.cursor.offset,
+        );
+        let completion = completions.iter().find(|c| c.name == "rec").unwrap();
+
+        assert_eq!(completion.kind(&test.db), Some(CompletionKind::Struct));
+    }
+
+    #[test]
+    fn no_completions_in_comment() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+# zqzq<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"Foo.zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('Foo.zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"\"\"zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"\"\"Foo.zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(\"\"\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(\"\"\"Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('''zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('''Foo.zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_string_incomplete_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print('''zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print('''Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"zqzq<CURSOR>\")
+        ",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"{Foo} and Foo.zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"zqzq<CURSOR>
+        ",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'{Foo} and Foo.zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"\"\"zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"\"\"{Foo} and Foo.zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f\"\"\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f\"\"\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'''zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'''{Foo} and Foo.zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_fstring_incomplete_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(f'''zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(f'''{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"{Foo} and Foo.zqzq<CURSOR>\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_double_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'{Foo} and Foo.zqzq<CURSOR>')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_single_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"\"\"zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"\"\"{Foo} and Foo.zqzq<CURSOR>\"\"\")
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_double_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t\"\"\"zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t\"\"\"{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'''zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'''{Foo} and Foo.zqzq<CURSOR>''')
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn no_completions_in_tstring_incomplete_single_triple_quote() {
+        let test = cursor_test(
+            "\
+zqzqzq = 1
+print(t'''zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+
+        let test = cursor_test(
+            "\
+class Foo:
+    zqzqzq = 1
+print(t'''{Foo} and Foo.zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn typevar_with_upper_bound() {
+        let test = cursor_test(
+            "\
+def f[T: str](msg: T):
+    msg.<CURSOR>
+",
+        );
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+    }
+
+    #[test]
+    fn typevar_with_constraints() {
+        // Test TypeVar with constraints
+        let test = cursor_test(
+            "\
+from typing import TypeVar
+
+class A:
+    only_on_a: int
+    on_a_and_b: str
+
+class B:
+    only_on_b: float
+    on_a_and_b: str
+
+T = TypeVar('T', A, B)
+
+def f(x: T):
+    x.<CURSOR>
+",
+        );
+        test.assert_completions_include("on_a_and_b");
+        test.assert_completions_do_not_include("only_on_a");
+        test.assert_completions_do_not_include("only_on_b");
+    }
+
+    #[test]
+    fn typevar_without_bounds_or_constraints() {
+        let test = cursor_test(
+            "\
+def f[T](x: T):
+    x.<CURSOR>
+",
+        );
+        test.assert_completions_include("__repr__");
+    }
+
+    // NOTE: The methods below are getting somewhat ridiculous.
+    // We should refactor this by converting to using a builder
+    // to set different modes. ---AG
+
     impl CursorTest {
         /// Returns all completions except for builtins.
         fn completions_without_builtins(&self) -> String {
@@ -3040,20 +3958,28 @@ from os.<CURSOR>
         fn completions_without_builtins_with_types(&self) -> String {
             self.completions_if_snapshot(
                 |c| !c.builtin,
-                |c| format!("{} :: {}", c.name, c.ty.display(&self.db)),
+                |c| {
+                    format!(
+                        "{} :: {}",
+                        c.name,
+                        c.ty.map(|ty| ty.display(&self.db).to_string())
+                            .unwrap_or_else(|| "Unavailable".to_string())
+                    )
+                },
             )
         }
 
-        fn completions_if(&self, predicate: impl Fn(&DetailedCompletion) -> bool) -> String {
+        fn completions_if(&self, predicate: impl Fn(&Completion) -> bool) -> String {
             self.completions_if_snapshot(predicate, |c| c.name.as_str().to_string())
         }
 
         fn completions_if_snapshot(
             &self,
-            predicate: impl Fn(&DetailedCompletion) -> bool,
-            snapshot: impl Fn(&DetailedCompletion) -> String,
+            predicate: impl Fn(&Completion) -> bool,
+            snapshot: impl Fn(&Completion) -> String,
         ) -> String {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
             }
@@ -3076,7 +4002,8 @@ from os.<CURSOR>
 
         #[track_caller]
         fn assert_completions_include(&self, expected: &str) {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
@@ -3088,7 +4015,8 @@ from os.<CURSOR>
 
         #[track_caller]
         fn assert_completions_do_not_include(&self, unexpected: &str) {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions

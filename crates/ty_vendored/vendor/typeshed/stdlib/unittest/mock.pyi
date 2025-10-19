@@ -853,7 +853,8 @@ class MagicProxy(Base):
     def create_mock(self) -> Any: ...
     def __get__(self, obj: Any, _type: Any | None = None) -> Any: ...
 
-class _ANY:
+# See https://github.com/python/typeshed/issues/14701
+class _ANY(Any):
     """A helper object that compares equal to everything."""
 
     def __eq__(self, other: object) -> Literal[True]: ...

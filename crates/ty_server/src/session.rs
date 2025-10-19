@@ -790,7 +790,6 @@ impl Session {
         // But while this seemed to work for the project root, it
         // simply wouldn't result in any file notifications for changes
         // to files outside of the project root.
-        #[allow(clippy::if_not_else)] // no! it reads better this way ---AG
         let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
             tracing::warn!(
                 "Your LSP client doesn't support file watching outside of project: \
@@ -826,6 +825,7 @@ impl Session {
             .map_err(DocumentQueryError::InvalidUrl);
         DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
+            global_settings: self.global_settings.clone(),
             workspace_settings: key
                 .as_ref()
                 .ok()
@@ -1000,6 +1000,7 @@ impl Drop for MutIndexGuard<'_> {
 #[derive(Debug)]
 pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
+    global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document_query_result: Result<DocumentQuery, DocumentQueryError>,
@@ -1014,6 +1015,11 @@ impl DocumentSnapshot {
     /// Returns the position encoding that was negotiated during initialization.
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    /// Returns the client settings for all workspaces.
+    pub(crate) fn global_settings(&self) -> &GlobalSettings {
+        &self.global_settings
     }
 
     /// Returns the client settings for the workspace that this document belongs to.

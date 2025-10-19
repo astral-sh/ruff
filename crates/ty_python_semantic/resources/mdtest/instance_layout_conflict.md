@@ -64,6 +64,30 @@ class AB(  # error: [instance-layout-conflict]
 ): ...
 ```
 
+## Synthesized `__slots__` from dataclasses
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class F: ...
+
+@dataclass(slots=True)
+class G: ...
+
+class H(F, G): ...  # fine because both classes have empty `__slots__`
+
+@dataclass(slots=True)
+class I:
+    x: int
+
+@dataclass(slots=True)
+class J:
+    y: int
+
+class K(I, J): ...  # error: [instance-layout-conflict]
+```
+
 ## Invalid `__slots__` definitions
 
 TODO: Emit diagnostics

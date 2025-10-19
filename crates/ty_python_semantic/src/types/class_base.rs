@@ -5,7 +5,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
     MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
-    TypeMapping, todo_type,
+    TypeContext, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -18,7 +18,7 @@ use crate::types::{
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -54,6 +54,7 @@ impl<'db> ClassBase<'db> {
                 | DynamicType::TodoTypeAlias
                 | DynamicType::TodoUnpack,
             ) => "@Todo",
+            ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict => "TypedDict",
@@ -66,6 +67,10 @@ impl<'db> ClassBase<'db> {
             .to_class_literal(db)
             .to_class_type(db)
             .map_or(Self::unknown(), Self::Class)
+    }
+
+    pub(super) const fn is_typed_dict(self) -> bool {
+        matches!(self, ClassBase::TypedDict)
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -81,7 +86,7 @@ impl<'db> ClassBase<'db> {
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class(db).is_known(db, KnownClass::GenericAlias) =>
+                if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
@@ -140,7 +145,7 @@ impl<'db> ClassBase<'db> {
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -150,7 +155,6 @@ impl<'db> ClassBase<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::ModuleLiteral(_)
-            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
@@ -165,7 +169,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
-                | KnownInstanceType::Field(_) => None,
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -271,11 +276,12 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
-                Self::Class(class.apply_type_mapping_impl(db, type_mapping, visitor))
+                Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
@@ -290,6 +296,7 @@ impl<'db> ClassBase<'db> {
             let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
+                TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
             match specialization.materialization_kind(db) {
@@ -302,13 +309,12 @@ impl<'db> ClassBase<'db> {
     }
 
     fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
-        match self {
-            ClassBase::Class(class) => Self::Class(class.materialize(db, kind)),
-            ClassBase::Dynamic(_)
-            | ClassBase::Generic
-            | ClassBase::Protocol
-            | ClassBase::TypedDict => self,
-        }
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Materialize(kind),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {

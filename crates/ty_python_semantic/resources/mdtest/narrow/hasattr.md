@@ -60,7 +60,7 @@ def _(obj: WithSpam):
 ```
 
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
-the attribute exists. Here, no `possibly-unbound-attribute` error is emitted in the `if` branch:
+the attribute exists. Here, no `possibly-missing-attribute` error is emitted in the `if` branch:
 
 ```py
 def returns_bool() -> bool:
@@ -71,7 +71,7 @@ class MaybeWithSpam:
         spam: int = 42
 
 def _(obj: MaybeWithSpam):
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(obj.spam)  # revealed: int
 
     if hasattr(obj, "spam"):
@@ -81,6 +81,20 @@ def _(obj: MaybeWithSpam):
         reveal_type(obj)  # revealed: MaybeWithSpam & ~<Protocol with members 'spam'>
 
         # TODO: Ideally, we would emit `[unresolved-attribute]` and reveal `Unknown` here:
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(obj.spam)  # revealed: int
+```
+
+All attribute available on `object` are still available on these synthesized protocols, but
+attributes that are not present on `object` are not available:
+
+```py
+def f(x: object):
+    if hasattr(x, "__qualname__"):
+        reveal_type(x.__repr__)  # revealed: bound method object.__repr__() -> str
+        reveal_type(x.__str__)  # revealed: bound method object.__str__() -> str
+        reveal_type(x.__dict__)  # revealed: dict[str, Any]
+
+        # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
+        reveal_type(x.foo)  # revealed: Unknown
 ```

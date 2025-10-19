@@ -14,6 +14,8 @@ use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
 
+use crate::completion::CompletionKind;
+
 /// A compiled query pattern used for searching symbols.
 ///
 /// This can be used with the `FlatSymbols::search` API.
@@ -42,17 +44,26 @@ impl QueryPattern {
         }
     }
 
-    fn is_match(&self, symbol: &SymbolInfo<'_>) -> bool {
+    /// Create a new query pattern that matches all symbols.
+    pub fn matches_all_symbols() -> QueryPattern {
+        QueryPattern {
+            re: None,
+            original: String::new(),
+        }
+    }
+
+    fn is_match_symbol(&self, symbol: &SymbolInfo<'_>) -> bool {
         self.is_match_symbol_name(&symbol.name)
     }
 
-    fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+    pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
             re.is_match(symbol_name)
         } else {
             // This is a degenerate case. The only way
             // we should get here is if the query string
             // was thousands (or more) characters long.
+            // ... or, if "typed" text could not be found.
             symbol_name.contains(&self.original)
         }
     }
@@ -106,7 +117,8 @@ impl FlatSymbols {
 
     /// Returns a sequence of symbols that matches the given query.
     pub fn search(&self, query: &QueryPattern) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
-        self.iter().filter(|(_, symbol)| query.is_match(symbol))
+        self.iter()
+            .filter(|(_, symbol)| query.is_match_symbol(symbol))
     }
 
     /// Turns this flat sequence of symbols into a hierarchy of symbols.
@@ -281,6 +293,27 @@ impl SymbolKind {
             SymbolKind::TypeParameter => "TypeParameter",
             SymbolKind::Import => "Import",
         }
+    }
+
+    /// Maps this to a "completion" kind if a sensible mapping exists.
+    pub fn to_completion_kind(self) -> Option<CompletionKind> {
+        Some(match self {
+            SymbolKind::Module => CompletionKind::Module,
+            SymbolKind::Class => CompletionKind::Class,
+            SymbolKind::Method => CompletionKind::Method,
+            SymbolKind::Function => CompletionKind::Function,
+            SymbolKind::Variable => CompletionKind::Variable,
+            SymbolKind::Constant => CompletionKind::Constant,
+            SymbolKind::Property => CompletionKind::Property,
+            SymbolKind::Field => CompletionKind::Field,
+            SymbolKind::Constructor => CompletionKind::Constructor,
+            SymbolKind::Parameter => CompletionKind::Variable,
+            SymbolKind::TypeParameter => CompletionKind::TypeParameter,
+            // Not quite sure what to do with this one. I guess
+            // in theory the import should be "resolved" to its
+            // underlying kind, but that seems expensive.
+            SymbolKind::Import => return None,
+        })
     }
 }
 

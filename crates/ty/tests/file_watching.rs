@@ -240,7 +240,7 @@ impl TestCase {
             .module(parent_module_name)
             .all_submodules(self.db())
             .iter()
-            .map(|name| name.as_str().to_string())
+            .map(|submodule| submodule.name(self.db()).to_string())
             .collect::<Vec<String>>();
         names.sort();
         names
@@ -1112,11 +1112,11 @@ print(sys.last_exc, os.getegid())
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
         diagnostics[0].primary_message(),
-        "Type `<module 'sys'>` has no attribute `last_exc`"
+        "Module `sys` has no member `last_exc`"
     );
     assert_eq!(
         diagnostics[1].primary_message(),
-        "Type `<module 'os'>` has no attribute `getegid`"
+        "Module `os` has no member `getegid`"
     );
 
     // Change the python version
@@ -1912,7 +1912,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
@@ -1922,8 +1922,8 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @r"
-    foo
-    wazoo
+    bar.foo
+    bar.wazoo
     ",
     );
 
@@ -1944,8 +1944,8 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @r"
-    foo
-    wazoo
+    bar.foo
+    bar.wazoo
     ",
     );
 
@@ -1955,7 +1955,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     Ok(())
@@ -1969,7 +1969,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
@@ -1982,7 +1982,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     Ok(())
@@ -1997,7 +1997,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     case.update_options(Options::default())?;
@@ -2009,8 +2009,8 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @r"
-    foo
-    wazoo
+    bar.foo
+    bar.wazoo
     ",
     );
 

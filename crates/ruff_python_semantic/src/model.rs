@@ -859,11 +859,17 @@ impl<'a> SemanticModel<'a> {
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
     pub fn lookup_attribute(&self, value: &Expr) -> Option<BindingId> {
+        self.lookup_attribute_in_scope(value, self.scope_id)
+    }
+
+    /// Lookup a qualified attribute in the certain scope.
+    pub fn lookup_attribute_in_scope(&self, value: &Expr, scope_id: ScopeId) -> Option<BindingId> {
         let unqualified_name = UnqualifiedName::from_expr(value)?;
 
         // Find the symbol in the current scope.
         let (symbol, attribute) = unqualified_name.segments().split_first()?;
-        let mut binding_id = self.lookup_symbol(symbol)?;
+        let mut binding_id =
+            self.lookup_symbol_in_scope(symbol, scope_id, self.in_forward_reference())?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
         let mut tail = attribute;
@@ -2095,7 +2101,7 @@ impl<'a> SemanticModel<'a> {
     /// Finds and returns the [`Scope`] corresponding to a given [`ast::StmtFunctionDef`].
     ///
     /// This method searches all scopes created by a function definition, comparing the
-    /// [`TextRange`] of the provided `function_def` with the the range of the function
+    /// [`TextRange`] of the provided `function_def` with the range of the function
     /// associated with the scope.
     pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
         self.scopes.iter().find(|scope| {

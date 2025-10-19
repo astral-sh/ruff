@@ -98,6 +98,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
         },
         expr.range(),
     );
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!("self.{target}"),
         expr.range(),

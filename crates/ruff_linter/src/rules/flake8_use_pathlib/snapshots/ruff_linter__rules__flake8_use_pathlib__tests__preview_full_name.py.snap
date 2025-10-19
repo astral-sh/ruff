@@ -260,6 +260,7 @@ help: Replace with `Path(...).expanduser()`
 20 | bbb = os.path.isdir(p)
 21 | bbbb = os.path.isfile(p)
 22 | bbbbb = os.path.islink(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH112 [*] `os.path.isdir()` should be replaced by `Path.is_dir()`
   --> full_name.py:19:7
@@ -466,6 +467,7 @@ help: Replace with `Path(...).name`
 30 | os.path.dirname(p)
 31 | os.path.samefile(p)
 32 | os.path.splitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
   --> full_name.py:29:1
@@ -493,6 +495,7 @@ help: Replace with `Path(...).parent`
 31 | os.path.samefile(p)
 32 | os.path.splitext(p)
 33 | with open(p) as fp:
+note: This is an unsafe fix and may change runtime behavior
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
   --> full_name.py:30:1
@@ -517,7 +520,7 @@ PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, an
 33 |     fp.read()
    |
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:32:6
    |
 30 | os.path.samefile(p)
@@ -527,8 +530,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 33 |     fp.read()
 34 | open(p).close()
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+30 | os.path.dirname(p)
+31 | os.path.samefile(p)
+32 | os.path.splitext(p)
+   - with open(p) as fp:
+33 + with pathlib.Path(p).open() as fp:
+34 |     fp.read()
+35 | open(p).close()
+36 | os.getcwdb(p)
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:34:1
    |
 32 | with open(p) as fp:
@@ -538,6 +557,22 @@ PTH123 `open()` should be replaced by `Path.open()`
 35 | os.getcwdb(p)
 36 | os.path.join(p, *q)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+32 | os.path.splitext(p)
+33 | with open(p) as fp:
+34 |     fp.read()
+   - open(p).close()
+35 + pathlib.Path(p).open().close()
+36 | os.getcwdb(p)
+37 | os.path.join(p, *q)
+38 | os.sep.join(p, *q)
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
   --> full_name.py:35:1
@@ -572,7 +607,7 @@ PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
 39 | # https://github.com/astral-sh/ruff/issues/7620
    |
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:46:1
    |
 44 | open(p, closefd=False)
@@ -582,8 +617,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 47 | open(p, 'r', - 1, None, None, None, True, None)
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+44 | 
+45 | open(p, closefd=False)
+46 | open(p, opener=opener)
+   - open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+47 + pathlib.Path(p).open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
+48 | open(p, 'r', - 1, None, None, None, True, None)
+49 | open(p, 'r', - 1, None, None, None, False, opener)
+50 | 
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:47:1
    |
 45 | open(p, opener=opener)
@@ -592,8 +643,24 @@ PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+45 | open(p, closefd=False)
+46 | open(p, opener=opener)
+47 | open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   - open(p, 'r', - 1, None, None, None, True, None)
+48 + pathlib.Path(p).open('r', - 1, None, None, None)
+49 | open(p, 'r', - 1, None, None, None, False, opener)
+50 | 
+51 | # Cannot be upgraded `pathlib.Open` does not support fds
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:65:1
    |
 63 | open(f())
@@ -603,8 +670,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 66 | byte_str = b"bar"
 67 | open(byte_str)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+63 |     return 1
+64 | open(f())
+65 | 
+   - open(b"foo")
+66 + pathlib.Path(b"foo").open()
+67 | byte_str = b"bar"
+68 | open(byte_str)
+69 | 
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:67:1
    |
 65 | open(b"foo")
@@ -614,8 +697,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 68 |
 69 | def bytes_str_func() -> bytes:
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+65 | 
+66 | open(b"foo")
+67 | byte_str = b"bar"
+   - open(byte_str)
+68 + pathlib.Path(byte_str).open()
+69 | 
+70 | def bytes_str_func() -> bytes:
+71 |     return b"foo"
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:71:1
    |
 69 | def bytes_str_func() -> bytes:
@@ -625,6 +724,22 @@ PTH123 `open()` should be replaced by `Path.open()`
 72 |
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+69 | 
+70 | def bytes_str_func() -> bytes:
+71 |     return b"foo"
+   - open(bytes_str_func())
+72 + pathlib.Path(bytes_str_func()).open()
+73 | 
+74 | # https://github.com/astral-sh/ruff/issues/17693
+75 | os.stat(1)
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
    --> full_name.py:108:1
@@ -816,6 +931,7 @@ help: Replace with `Path(...).mkdir(parents=True)`
 126 + pathlib.Path("name").mkdir(mode=0o777, exist_ok=False, parents=True)
 127 | 
 128 | os.makedirs("name", unknown_kwarg=True)
+129 | 
 
 PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    --> full_name.py:127:1
@@ -824,5 +940,102 @@ PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
 126 |
 127 | os.makedirs("name", unknown_kwarg=True)
     | ^^^^^^^^^^^
+128 |
+129 | # https://github.com/astral-sh/ruff/issues/20134
     |
 help: Replace with `Path(...).mkdir(parents=True)`
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:130:1
+    |
+129 | # https://github.com/astral-sh/ruff/issues/20134
+130 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+    | ^^^^^^^^
+131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+128 | os.makedirs("name", unknown_kwarg=True)
+129 | 
+130 | # https://github.com/astral-sh/ruff/issues/20134
+    - os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+131 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=      False)
+132 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+133 | 
+134 | # Only diagnostic
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:131:1
+    |
+129 | # https://github.com/astral-sh/ruff/issues/20134
+130 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+    | ^^^^^^^^
+132 |
+133 | # Only diagnostic
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+129 | 
+130 | # https://github.com/astral-sh/ruff/issues/20134
+131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+    - os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+132 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=True)
+133 | 
+134 | # Only diagnostic
+135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+
+PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:134:1
+    |
+133 | # Only diagnostic
+134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^
+135 |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+    |
+help: Replace with `Path(...).chmod(...)`
+
+PTH104 `os.rename()` should be replaced by `Path.rename()`
+   --> full_name.py:136:1
+    |
+134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+135 |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^^
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+    |
+help: Replace with `Path(...).rename(...)`
+
+PTH105 `os.replace()` should be replaced by `Path.replace()`
+   --> full_name.py:137:1
+    |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^^^
+138 |
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+    |
+help: Replace with `Path(...).replace(...)`
+
+PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+   --> full_name.py:139:1
+    |
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+138 |
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^^^^^^^^^
+    |
+help: Replace with `Path(...).samefile()`

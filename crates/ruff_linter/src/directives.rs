@@ -125,26 +125,27 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
     }
 
     // The capacity allocated here might be more than we need if there are
-    // nested f-strings.
-    let mut fstring_mappings = Vec::with_capacity(indexer.fstring_ranges().len());
+    // nested interpolated strings.
+    let mut interpolated_string_mappings =
+        Vec::with_capacity(indexer.interpolated_string_ranges().len());
 
-    // For nested f-strings, we expect `noqa` directives on the last line of the
-    // outermost f-string. The last f-string range will be used to skip over
-    // the inner f-strings.
-    let mut last_fstring_range: TextRange = TextRange::default();
-    for fstring_range in indexer.fstring_ranges().values() {
-        if !locator.contains_line_break(*fstring_range) {
+    // For nested interpolated strings, we expect `noqa` directives on the last line of the
+    // outermost interpolated string. The last interpolated string range will be used to skip over
+    // the inner interpolated strings.
+    let mut last_interpolated_string_range: TextRange = TextRange::default();
+    for interpolated_string_range in indexer.interpolated_string_ranges().values() {
+        if !locator.contains_line_break(*interpolated_string_range) {
             continue;
         }
-        if last_fstring_range.contains_range(*fstring_range) {
+        if last_interpolated_string_range.contains_range(*interpolated_string_range) {
             continue;
         }
         let new_range = TextRange::new(
-            locator.line_start(fstring_range.start()),
-            fstring_range.end(),
+            locator.line_start(interpolated_string_range.start()),
+            interpolated_string_range.end(),
         );
-        fstring_mappings.push(new_range);
-        last_fstring_range = new_range;
+        interpolated_string_mappings.push(new_range);
+        last_interpolated_string_range = new_range;
     }
 
     let mut continuation_mappings = Vec::new();
@@ -172,11 +173,11 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
 
     // Merge the mappings in sorted order
     let mut mappings = NoqaMapping::with_capacity(
-        continuation_mappings.len() + string_mappings.len() + fstring_mappings.len(),
+        continuation_mappings.len() + string_mappings.len() + interpolated_string_mappings.len(),
     );
 
     let string_mappings = SortedMergeIter {
-        left: fstring_mappings.into_iter().peekable(),
+        left: interpolated_string_mappings.into_iter().peekable(),
         right: string_mappings.into_iter().peekable(),
     };
     let all_mappings = SortedMergeIter {
@@ -498,8 +499,31 @@ end'''
         );
 
         let contents = "x = 1
+y = t'''abc
+def {f'''nested
+interpolated string''' f'another nested'}
+end'''
+";
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(82))])
+        );
+
+        let contents = "x = 1
 y = f'normal'
 z = f'another but {f'nested but {f'still single line'} nested'}'
+";
+        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+
+        let contents = "x = 1
+y = t'normal'
+z = t'another but {t'nested but {t'still single line'} nested'}'
+";
+        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+
+        let contents = "x = 1
+y = f'normal'
+z = f'another but {t'nested but {f'still single line'} nested'}'
 ";
         assert_eq!(noqa_mappings(contents), NoqaMapping::default());
 

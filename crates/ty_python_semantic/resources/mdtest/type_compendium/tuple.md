@@ -36,7 +36,11 @@ reveal_type(tuple[int, *tuple[str, ...]]((1,)))  # revealed: tuple[int, *tuple[s
 reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
+class LiskovUncompliantIterable(Iterable[int]):
+    # TODO we should emit an error here about the Liskov violation
+    __iter__ = None
+
+def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):
     reveal_type(tuple(x))  # revealed: tuple[int, ...]
     reveal_type(tuple(y))  # revealed: tuple[str, ...]
     reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
@@ -44,10 +48,14 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
     # This is correct as the only inhabitants of `list[Never]` can be empty lists
     reveal_type(tuple(aa))  # revealed: tuple[()]
 
+    # `tuple[int, ...] would probably also be fine here since `LiskovUncompliantIterable`
+    # inherits from `Iterable[int]`. Ultimately all bets are off when the Liskov Principle is
+    # violated, though -- this test is really just to make sure we don't crash in this situation.
+    reveal_type(tuple(bb))  # revealed: tuple[Unknown, ...]
+
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-# TODO: should be `tuple[Literal[1], ...]`
-reveal_type(tuple([1]))  # revealed: tuple[@Todo(list literal element type), ...]
+reveal_type(tuple([1]))  # revealed: tuple[Unknown | int, ...]
 
 # error: [invalid-argument-type]
 reveal_type(tuple[int]([1]))  # revealed: tuple[int]
@@ -60,6 +68,10 @@ reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
 
 # error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
+
+def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
+    reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
+    reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
 ```
 
 ## Instantiating tuple subclasses
@@ -517,10 +529,6 @@ from typing import Literal
 reveal_type(list((1, 2, 3)))  # revealed: list[int]
 reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
 
-# TODO: we could bidirectionally infer that the user does not want literals to be promoted here,
-# and avoid this diagnostic
-#
-# error: [invalid-assignment] "`list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
 x: list[Literal[1, 2, 3]] = list((1, 2, 3))
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 ```

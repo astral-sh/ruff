@@ -416,6 +416,7 @@ pub struct CheckCommand {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
         conflicts_with = "fix",
+        conflicts_with = "diff",
     )]
     pub add_noqa: bool,
     /// See the files Ruff will be run against with the current settings.
@@ -537,6 +538,14 @@ pub struct FormatCommand {
     /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
     #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
     pub exit_non_zero_on_format: bool,
+
+    /// Output serialization format for violations, when used with `--check`.
+    /// The default serialization format is "full".
+    ///
+    /// Note that this option is currently only respected in preview mode. A warning will be emitted
+    /// if this flag is used on stable.
+    #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
+    pub output_format: Option<OutputFormat>,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
@@ -784,6 +793,7 @@ impl FormatCommand {
             target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
+            output_format: self.output_format,
             ..ExplicitConfigOverrides::default()
         };
 

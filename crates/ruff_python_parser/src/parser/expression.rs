@@ -1526,7 +1526,7 @@ impl<'src> Parser<'src> {
         kind: InterpolatedStringKind,
     ) -> InterpolatedStringData {
         let start = self.node_start();
-        let flags = self.tokens.current_flags().as_any_string_flags();
+        let mut flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(kind.start_token());
         let elements = self.parse_interpolated_string_elements(
@@ -1535,7 +1535,9 @@ impl<'src> Parser<'src> {
             kind,
         );
 
-        self.expect(kind.end_token());
+        if !self.expect(kind.end_token()) {
+            flags = flags.with_unclosed(true);
+        }
 
         // test_ok pep701_f_string_py312
         // # parse_options: {"target-version": "3.12"}
@@ -1569,6 +1571,8 @@ impl<'src> Parser<'src> {
         // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
         // f"escape outside of \t {expr}\n"
         // f"test\"abcd"
+        // f"{1:\x64}"  # escapes are valid in the format spec
+        // f"{1:\"d\"}"  # this also means that escaped outer quotes are valid
 
         // test_err pep701_f_string_py311
         // # parse_options: {"target-version": "3.11"}
@@ -1584,6 +1588,13 @@ impl<'src> Parser<'src> {
         // f"""{f"""{x}"""}"""                # mark the whole triple quote
         // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
 
+        // test_err nested_quote_in_format_spec_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f"{1:""}"  # this is a ParseError on all versions
+
+        // test_ok non_nested_quote_in_format_spec_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"{1:''}"  # but this is okay on all versions
         let range = self.node_range(start);
 
         if !self.options.target_version.supports_pep_701()
@@ -1592,22 +1603,29 @@ impl<'src> Parser<'src> {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.interpolations() {
-                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
-                {
+                // We need to check the whole expression range, including any leading or trailing
+                // debug text, but exclude the format spec, where escapes and escaped, reused quotes
+                // are allowed.
+                let range = expr
+                    .format_spec
+                    .as_ref()
+                    .map(|format_spec| TextRange::new(expr.start(), format_spec.start()))
+                    .unwrap_or(expr.range);
+                for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
                     let slash_position = TextSize::try_from(slash_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
+                        TextRange::at(range.start() + slash_position, '\\'.text_len()),
                     );
                 }
 
                 if let Some(quote_position) =
-                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
+                    memchr::memmem::find(self.source[range].as_bytes(), quote_bytes)
                 {
                     let quote_position = TextSize::try_from(quote_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(expr.range.start() + quote_position, quote_len),
+                        TextRange::at(range.start() + quote_position, quote_len),
                     );
                 }
             }
@@ -1719,6 +1737,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
+
         // test_err f_string_empty_expression
         // f"{}"
         // f"{  }"
@@ -1740,6 +1761,7 @@ impl<'src> Parser<'src> {
         // t"{*}"
         // t"{*x and y}"
         // t"{*yield x}"
+
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
@@ -1773,6 +1795,10 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
+            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // in `f{abc!r"` (note the missing `}`).
+            self.tokens.re_lex_raw_string_in_format_spec();
+
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
                 // test_err f_string_conversion_follows_exclamation
@@ -1851,6 +1877,9 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
+
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
 
         // We're using `eat` here instead of `expect` to use the f-string specific error type.
         if !self.eat(TokenKind::Rbrace) {

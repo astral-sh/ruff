@@ -264,8 +264,10 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Some(key) = args.first() else {
         return;
     };
-    if !(key.is_literal_expr() || key.is_name_expr()) {
-        return;
+    if !crate::preview::is_sim910_expanded_key_support_enabled(checker.settings()) {
+        if !(key.is_literal_expr() || key.is_name_expr()) {
+            return;
+        }
     }
     let Some(default) = args.get(1) else {
         return;

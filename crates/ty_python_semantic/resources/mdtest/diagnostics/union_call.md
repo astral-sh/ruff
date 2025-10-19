@@ -112,11 +112,11 @@ def _(n: int):
     # error: [too-many-positional-arguments]
     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [missing-argument]
-    # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`"
     # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [no-matching-overload] "No overload of function `f6` matches arguments"
     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
     x = f(3)
 ```
 
@@ -137,4 +137,28 @@ def _(n: int):
     # error: [parameter-already-assigned]
     # error: [unknown-argument]
     y = f("foo", name="bar", unknown="quux")
+```
+
+### Truncation for long unions and literals
+
+This test demonstrates a call where the expected type is a large mixed union. The diagnostic must
+therefore truncate the long expected union type to avoid overwhelming output.
+
+```py
+from typing import Literal, Union
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
+    return 0
+
+def _(n: int):
+    x = n
+    # error: [invalid-argument-type]
+    f1(x)
 ```

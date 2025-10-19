@@ -187,12 +187,9 @@ impl Index {
             anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
         })?;
 
-        self.settings.remove(&workspace_path).ok_or_else(|| {
-            anyhow!(
-                "Tried to remove non-existent workspace URI {}",
-                workspace_url
-            )
-        })?;
+        self.settings
+            .remove(&workspace_path)
+            .ok_or_else(|| anyhow!("Tried to remove non-existent workspace URI {workspace_url}"))?;
 
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
@@ -330,7 +327,7 @@ impl Index {
         };
 
         let Some(_) = self.documents.remove(&url) else {
-            anyhow::bail!("tried to close document that didn't exist at {}", url)
+            anyhow::bail!("tried to close document that didn't exist at {url}")
         };
         Ok(())
     }
@@ -351,7 +348,7 @@ impl Index {
             anyhow::bail!("Tried to open unavailable document `{key}`");
         };
         let Some(controller) = self.documents.get_mut(&url) else {
-            anyhow::bail!("Document controller not available at `{}`", url);
+            anyhow::bail!("Document controller not available at `{url}`");
         };
         Ok(controller)
     }

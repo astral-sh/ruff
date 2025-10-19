@@ -1,0 +1,49 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly missing `__iter__` and bad `__getitem__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool):
+ 2 |     class Iterator:
+ 3 |         def __next__(self) -> int:
+ 4 |             return 42
+ 5 | 
+ 6 |     class Iterable:
+ 7 |         if flag:
+ 8 |             def __iter__(self) -> Iterator:
+ 9 |                 return Iterator()
+10 |         # invalid signature because it only accepts a `str`,
+11 |         # but the old-style iteration protocol will pass it an `int`
+12 |         def __getitem__(self, key: str) -> bytes:
+13 |             return bytes()
+14 | 
+15 |     # error: [not-iterable]
+16 |     for x in Iterable():
+17 |         reveal_type(x)  # revealed: int | bytes
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+15 |     # error: [not-iterable]
+16 |     for x in Iterable():
+   |              ^^^^^^^^^^
+17 |         reveal_type(x)  # revealed: int | bytes
+   |
+info: It may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
+info: rule `not-iterable` is enabled by default
+
+```

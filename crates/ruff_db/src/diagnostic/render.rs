@@ -15,7 +15,6 @@ use crate::{
     Db,
     files::File,
     source::{SourceText, line_index, source_text},
-    system::SystemPath,
 };
 
 use super::{
@@ -25,11 +24,13 @@ use super::{
 
 use azure::AzureRenderer;
 use concise::ConciseRenderer;
+use github::GithubRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod concise;
 mod full;
+pub mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
 #[cfg(feature = "serde")]
@@ -142,6 +143,9 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             DiagnosticFormat::Gitlab => {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
+            DiagnosticFormat::Github => {
+                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
+            }
         }
 
         Ok(())
@@ -204,6 +208,7 @@ struct ResolvedDiagnostic<'a> {
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
+    header_offset: usize,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
@@ -254,7 +259,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             id,
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag.has_applicable_fix(config),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            header_offset: diag.inner.header_offset,
         }
     }
 
@@ -284,6 +290,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: false,
+            header_offset: 0,
         }
     }
 
@@ -381,6 +388,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
+            header_offset: self.header_offset,
         }
     }
 }
@@ -400,7 +408,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
-    is_file_level: bool,
+    hide_snippet: bool,
     notebook_index: Option<NotebookIndex>,
 }
 
@@ -448,7 +456,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
             notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
@@ -488,6 +496,11 @@ struct RenderableDiagnostic<'r> {
     ///
     /// This is rendered as a `[*]` indicator after the diagnostic ID.
     is_fixable: bool,
+    /// Offset to align the header sigil (`-->`) with the subsequent line number separators.
+    ///
+    /// This is only needed for formatter diagnostics where we don't render a snippet via
+    /// `annotate-snippets` and thus the alignment isn't computed automatically.
+    header_offset: usize,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -500,7 +513,11 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
+        let mut message = self
+            .level
+            .title(self.message)
+            .is_fixable(self.is_fixable)
+            .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -705,8 +722,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
-    /// Whether this annotation applies to an entire file, rather than a snippet within it.
-    is_file_level: bool,
+    /// Whether the snippet for this annotation should be hidden instead of rendered.
+    hide_snippet: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -728,7 +745,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
         }
     }
 
@@ -754,7 +771,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann.is_file_level(self.is_file_level)
+        ann.hide_snippet(self.hide_snippet)
     }
 }
 
@@ -795,7 +812,7 @@ where
     T: Db,
 {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(self).as_str())
+        file.path(self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -831,7 +848,7 @@ where
 
 impl FileResolver for &dyn Db {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+        file.path(*self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -948,14 +965,6 @@ fn context_after(
     }
 
     line
-}
-
-/// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
-    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
-        return path.as_str();
-    }
-    path
 }
 
 /// Given some source code and annotation ranges, this routine replaces
@@ -1159,6 +1168,31 @@ pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
         .map(TextSize::from)
         .find(|offset| text.is_char_boundary(offset.to_usize()))
         .unwrap_or_else(|| TextSize::from(upper_bound))
+}
+
+/// A stub implementation of [`FileResolver`] intended for testing.
+pub struct DummyFileResolver;
+
+impl FileResolver for DummyFileResolver {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!()
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!()
+    }
+
+    fn notebook_index(&self, _file: &UnifiedFile) -> Option<NotebookIndex> {
+        None
+    }
+
+    fn is_notebook(&self, _file: &UnifiedFile) -> bool {
+        false
+    }
+
+    fn current_directory(&self) -> &Path {
+        Path::new(".")
+    }
 }
 
 #[cfg(test)]
@@ -2622,7 +2656,7 @@ watermelon
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_status(yes);
+            config = config.with_show_fix_status(yes);
             self.config = config;
         }
 
@@ -2636,7 +2670,7 @@ watermelon
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.fix_applicability(applicability);
+            config = config.with_fix_applicability(applicability);
             self.config = config;
         }
 

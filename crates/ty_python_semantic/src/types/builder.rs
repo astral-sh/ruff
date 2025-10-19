@@ -242,8 +242,7 @@ impl<'db> UnionBuilder<'db> {
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
         self.elements.clear();
-        self.elements
-            .push(UnionElement::Type(Type::object(self.db)));
+        self.elements.push(UnionElement::Type(Type::object()));
     }
 
     /// Adds a type to this union.
@@ -422,16 +421,15 @@ impl<'db> UnionBuilder<'db> {
                     .elements
                     .iter()
                     .filter_map(UnionElement::to_type_element)
-                    .filter_map(Type::into_enum_literal)
+                    .filter_map(Type::as_enum_literal)
                     .map(|literal| literal.name(self.db).clone())
                     .chain(std::iter::once(enum_member_to_add.name(self.db).clone()))
                     .collect::<FxOrderSet<_>>();
 
                 let all_members_are_in_union = metadata
                     .members
-                    .difference(&enum_members_in_union)
-                    .next()
-                    .is_none();
+                    .keys()
+                    .all(|name| enum_members_in_union.contains(name));
 
                 if all_members_are_in_union {
                     self.add_in_place_impl(
@@ -444,92 +442,93 @@ impl<'db> UnionBuilder<'db> {
                     .filter_map(UnionElement::to_type_element)
                     .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
                 {
-                    self.elements
-                        .push(UnionElement::Type(Type::EnumLiteral(enum_member_to_add)));
+                    self.push_type(Type::EnumLiteral(enum_member_to_add), seen_aliases);
                 }
             }
             // Adding `object` to a union results in `object`.
-            ty if ty.is_object(self.db) => {
+            ty if ty.is_object() => {
                 self.collapse_to_object();
             }
             _ => {
-                let bool_pair = if let Type::BooleanLiteral(b) = ty {
-                    Some(Type::BooleanLiteral(!b))
-                } else {
-                    None
-                };
+                self.push_type(ty, seen_aliases);
+            }
+        }
+    }
 
-                // If an alias gets here, it means we aren't unpacking aliases, and we also
-                // shouldn't try to simplify aliases out of the union, because that will require
-                // unpacking them.
-                let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
+    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        let bool_pair = if let Type::BooleanLiteral(b) = ty {
+            Some(Type::BooleanLiteral(!b))
+        } else {
+            None
+        };
 
-                let mut to_remove = SmallVec::<[usize; 2]>::new();
-                let ty_negated = if should_simplify_full {
-                    ty.negate(self.db)
-                } else {
-                    Type::Never // won't be used
-                };
+        // If an alias gets here, it means we aren't unpacking aliases, and we also
+        // shouldn't try to simplify aliases out of the union, because that will require
+        // unpacking them.
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
 
-                for (index, element) in self.elements.iter_mut().enumerate() {
-                    let element_type = match element.try_reduce(self.db, ty) {
-                        ReduceResult::KeepIf(keep) => {
-                            if !keep {
-                                to_remove.push(index);
-                            }
-                            continue;
-                        }
-                        ReduceResult::Type(ty) => ty,
-                        ReduceResult::CollapseToObject => {
-                            self.collapse_to_object();
-                            return;
-                        }
-                        ReduceResult::Ignore => {
-                            return;
-                        }
-                    };
+        let mut to_remove = SmallVec::<[usize; 2]>::new();
+        let ty_negated = if should_simplify_full {
+            ty.negate(self.db)
+        } else {
+            Type::Never // won't be used
+        };
 
-                    if ty == element_type {
-                        return;
+        for (index, element) in self.elements.iter_mut().enumerate() {
+            let element_type = match element.try_reduce(self.db, ty) {
+                ReduceResult::KeepIf(keep) => {
+                    if !keep {
+                        to_remove.push(index);
                     }
-
-                    if Some(element_type) == bool_pair {
-                        self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
-                        return;
-                    }
-
-                    if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
-                        if ty.is_equivalent_to(self.db, element_type)
-                            || ty.is_subtype_of(self.db, element_type)
-                        {
-                            return;
-                        } else if element_type.is_subtype_of(self.db, ty) {
-                            to_remove.push(index);
-                        } else if ty_negated.is_subtype_of(self.db, element_type) {
-                            // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                            // existing `element`. This also means that `~ty | ty` is a subtype of
-                            // `element | ty`, because both elements in the first union are subtypes of
-                            // the corresponding elements in the second union. But `~ty | ty` is just
-                            // `object`. Since `object` is a subtype of `element | ty`, we can only
-                            // conclude that `element | ty` must be `object` (object has no other
-                            // supertypes). This means we can simplify the whole union to just
-                            // `object`, since all other potential elements would also be subtypes of
-                            // `object`.
-                            self.collapse_to_object();
-                            return;
-                        }
-                    }
+                    continue;
                 }
-                if let Some((&first, rest)) = to_remove.split_first() {
-                    self.elements[first] = UnionElement::Type(ty);
-                    // We iterate in descending order to keep remaining indices valid after `swap_remove`.
-                    for &index in rest.iter().rev() {
-                        self.elements.swap_remove(index);
-                    }
-                } else {
-                    self.elements.push(UnionElement::Type(ty));
+                ReduceResult::Type(ty) => ty,
+                ReduceResult::CollapseToObject => {
+                    self.collapse_to_object();
+                    return;
+                }
+                ReduceResult::Ignore => {
+                    return;
+                }
+            };
+
+            if ty == element_type {
+                return;
+            }
+
+            if Some(element_type) == bool_pair {
+                self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
+                return;
+            }
+
+            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+                if ty.is_redundant_with(self.db, element_type) {
+                    return;
+                } else if element_type.is_redundant_with(self.db, ty) {
+                    to_remove.push(index);
+                } else if ty_negated.is_subtype_of(self.db, element_type) {
+                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                    // existing `element`. This also means that `~ty | ty` is a subtype of
+                    // `element | ty`, because both elements in the first union are subtypes of
+                    // the corresponding elements in the second union. But `~ty | ty` is just
+                    // `object`. Since `object` is a subtype of `element | ty`, we can only
+                    // conclude that `element | ty` must be `object` (object has no other
+                    // supertypes). This means we can simplify the whole union to just
+                    // `object`, since all other potential elements would also be subtypes of
+                    // `object`.
+                    self.collapse_to_object();
+                    return;
                 }
             }
+        }
+        if let Some((&first, rest)) = to_remove.split_first() {
+            self.elements[first] = UnionElement::Type(ty);
+            // We iterate in descending order to keep remaining indices valid after `swap_remove`.
+            for &index in rest.iter().rev() {
+                self.elements.swap_remove(index);
+            }
+        } else {
+            self.elements.push(UnionElement::Type(ty));
         }
     }
 
@@ -645,14 +644,13 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class(self.db).class_literal(self.db).0)
-                    .is_some() =>
+                if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
                     if intersection.negative.iter().any(|negative| {
                         negative
-                            .into_enum_literal()
+                            .as_enum_literal()
                             .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
                     }) {
                         contains_enum_literal_as_negative_element = true;
@@ -671,7 +669,7 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
+                            enum_member_literals(db, instance.class_literal(db), None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .collect::<Box<[_]>>(),
                         )),
@@ -802,17 +800,6 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
-    pub(crate) fn negative_elements<I, T>(mut self, elements: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        for element in elements {
-            self = self.add_negative(element.into());
-        }
-        self
-    }
-
     pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
@@ -868,7 +855,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
-                    .and_then(|instance| instance.class(db).known(db));
+                    .and_then(|instance| instance.known_class(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -888,7 +875,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::NominalInstance(instance)
-                            if instance.class(db).is_known(db, KnownClass::Bool) =>
+                            if instance.has_known_class(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -934,13 +921,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
-                    if existing_positive.is_subtype_of(db, new_positive)
-                        || existing_positive.is_equivalent_to(db, new_positive)
-                    {
+                    if existing_positive.is_redundant_with(db, new_positive) {
                         return;
                     }
                     // same rule, reverse order
-                    if new_positive.is_subtype_of(db, *existing_positive) {
+                    if new_positive.is_redundant_with(db, *existing_positive) {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
@@ -982,7 +967,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_nominal_instance())
-                .filter_map(|instance| instance.class(db).known(db))
+                .filter_map(|instance| instance.known_class(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -998,7 +983,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::NominalInstance(instance) if instance.is_object(db) => {
+            Type::NominalInstance(instance) if instance.is_object() => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
@@ -1031,9 +1016,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
-                    if existing_negative.is_subtype_of(db, new_negative)
-                        || existing_negative.is_equivalent_to(db, new_negative)
-                    {
+                    if existing_negative.is_redundant_with(db, new_negative) {
                         to_remove.push(index);
                     }
                     // same rule, reverse order
@@ -1079,8 +1062,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let (Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar)) = ty
-            else {
+            let Type::TypeVar(bound_typevar) = ty else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
@@ -1094,7 +1076,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // don't need to worry about finding any particular constraint more than once.
             let constraints = constraints.elements(db);
             let mut positive_constraint_count = 0;
-            for positive in &self.positive {
+            for (i, positive) in self.positive.iter().enumerate() {
+                if i == typevar_index {
+                    continue;
+                }
+
                 // This linear search should be fine as long as we don't encounter typevars with
                 // thousands of constraints.
                 positive_constraint_count += constraints
@@ -1160,7 +1146,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_constrained_typevars(db);
         match (self.positive.len(), self.negative.len()) {
-            (0, 0) => Type::object(db),
+            (0, 0) => Type::object(),
             (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
@@ -1216,7 +1202,7 @@ mod tests {
         let db = setup_db();
 
         let intersection = IntersectionBuilder::new(&db).build();
-        assert_eq!(intersection, Type::object(&db));
+        assert_eq!(intersection, Type::object());
     }
 
     #[test_case(Type::BooleanLiteral(true))]
@@ -1230,7 +1216,7 @@ mod tests {
         // We add t_object in various orders (in first or second position) in
         // the tests below to ensure that the boolean simplification eliminates
         // everything from the intersection, not just `bool`.
-        let t_object = Type::object(&db);
+        let t_object = Type::object();
         let t_bool = KnownClass::Bool.to_instance(&db);
 
         let ty = IntersectionBuilder::new(&db)
@@ -1268,7 +1254,7 @@ mod tests {
 
         let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap();
 
         let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)

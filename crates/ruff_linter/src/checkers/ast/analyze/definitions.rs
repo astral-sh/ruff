@@ -81,6 +81,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicPackage,
     ]);
     let enforce_pydoclint = checker.any_rule_enabled(&[
+        Rule::DocstringExtraneousParameter,
         Rule::DocstringMissingReturns,
         Rule::DocstringExtraneousReturns,
         Rule::DocstringMissingYields,
@@ -145,9 +146,6 @@ pub(crate) fn definitions(checker: &mut Checker) {
         }
 
         // flake8-pyi
-        if enforce_stubs {
-            flake8_pyi::rules::docstring_in_stubs(checker, definition, docstring);
-        }
         if enforce_stubs_and_runtime {
             flake8_pyi::rules::iter_method_return_iterable(checker, definition);
         }
