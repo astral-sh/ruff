@@ -5,14 +5,15 @@ use crate::{
         IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
         TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        bound_super::walk_bound_super_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         subclass_of::walk_subclass_of_type,
-        walk_bound_method_type, walk_bound_super_type, walk_bound_type_var_type,
-        walk_callable_type, walk_intersection_type, walk_known_instance_type,
-        walk_method_wrapper_type, walk_property_instance_type, walk_type_alias_type,
-        walk_type_var_type, walk_typed_dict_type, walk_typeis_type, walk_union,
+        walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
+        walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
+        walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
+        walk_typed_dict_type, walk_typeis_type, walk_union,
     },
 };
 use std::cell::{Cell, RefCell};
@@ -121,7 +122,6 @@ pub(super) enum NonAtomicType<'db> {
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
-    NonInferableTypeVar(BoundTypeVarInstance<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
@@ -185,9 +185,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
-            Type::NonInferableTypeVar(bound_typevar) => {
-                TypeKind::NonAtomic(NonAtomicType::NonInferableTypeVar(bound_typevar))
-            }
             Type::TypeVar(bound_typevar) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
@@ -227,9 +224,6 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_property_instance_type(db, property);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
-        NonAtomicType::NonInferableTypeVar(bound_typevar) => {
-            visitor.visit_bound_type_var_type(db, bound_typevar);
-        }
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }

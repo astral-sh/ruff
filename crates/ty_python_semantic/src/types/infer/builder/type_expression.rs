@@ -1157,7 +1157,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type.into_callable(db) else {
+                let Some(callable_type) = argument_type.try_upcast_to_callable(db) else {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_TYPE_FORM, arguments_slice)
@@ -1429,7 +1429,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let ty = value_ty
                         .member(self.db(), &attr.id)
                         .place
-                        .ignore_possibly_unbound()
+                        .ignore_possibly_undefined()
                         .unwrap_or(Type::unknown());
                     self.store_expression_type(parameters, ty);
                     ty

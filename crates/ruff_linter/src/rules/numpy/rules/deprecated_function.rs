@@ -80,6 +80,7 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
             },
             expr.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("numpy", replacement),

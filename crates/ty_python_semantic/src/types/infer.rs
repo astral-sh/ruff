@@ -391,7 +391,7 @@ impl<'db> TypeContext<'db> {
             .and_then(|ty| ty.known_specialization(db, known_class))
     }
 
-    pub(crate) fn map_annotation(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
         }
@@ -490,7 +490,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
             infer_definition_types(db, definition)
                 .declaration_type(definition)
                 .inner_type()
-                .into_class_literal()
+                .as_class_literal()
         })
 }
 
@@ -514,7 +514,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
             inference
                 .undecorated_type()
                 .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
-                .into_function_literal()
+                .as_function_literal()
         })
 }
 
@@ -751,7 +751,7 @@ impl<'db> DefinitionInference<'db> {
                     None
                 }
             })
-            .or_else(|| self.fallback_type().map(Into::into))
+            .or_else(|| self.fallback_type().map(TypeAndQualifiers::declared))
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",

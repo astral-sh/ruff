@@ -26,34 +26,39 @@ fn config_override_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Type `<module 'sys'>` has no attribute `last_exc`
+    error[unresolved-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
     4 | # Access `sys.last_exc` that was only added in Python 3.12
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
+    info: Python 3.11 was assumed when accessing `last_exc`
+     --> pyproject.toml:3:18
+      |
+    2 | [tool.ty.environment]
+    3 | python-version = "3.11"
+      |                  ^^^^^^ Python 3.11 assumed due to this configuration setting
+      |
     info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -80,7 +85,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -96,10 +101,9 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
-    assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -115,8 +119,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -139,7 +142,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -162,10 +165,9 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -182,8 +184,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -201,7 +202,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     // If `./src` didn't take priority over `.` here, we would report
     // "Module `src.package` has no member `nonexistent_submodule`"
     // instead of "Module `package` has no member `nonexistent_submodule`".
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -216,8 +217,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -242,7 +242,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @r"
+    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -261,8 +261,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     let pypy_case = CliTest::with_files([
         ("pythons/pypy3.8/bin/python", ""),
@@ -270,7 +269,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @r"
+    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -289,8 +288,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     let free_threaded_case = CliTest::with_files([
         ("pythons/Python3.13t/bin/python", ""),
@@ -301,7 +299,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
         ("test.py", "import string.templatelib"),
     ])?;
 
-    assert_cmd_snapshot!(free_threaded_case.command().arg("--python").arg("pythons/Python3.13t/bin/python"), @r"
+    assert_cmd_snapshot!(free_threaded_case.command().arg("--python").arg("pythons/Python3.13t/bin/python"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -320,8 +318,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -356,7 +353,7 @@ import bar",
         "strange-venv-location/bin/python",
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--python").arg("strange-venv-location/bin/python"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("strange-venv-location/bin/python"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -377,8 +374,7 @@ import bar",
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -406,7 +402,7 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
         ("test.py", "import foo, bar, baz"),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--python").arg(".venv"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(".venv"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -427,9 +423,96 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn many_search_paths() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("extra1/foo1.py", ""),
+        ("extra2/foo2.py", ""),
+        ("extra3/foo3.py", ""),
+        ("extra4/foo4.py", ""),
+        ("extra5/foo5.py", ""),
+        ("extra6/foo6.py", ""),
+        ("test.py", "import foo1, baz"),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-platform").arg("linux")
+            .arg("--extra-search-path").arg("extra1")
+            .arg("--extra-search-path").arg("extra2")
+            .arg("--extra-search-path").arg("extra3")
+            .arg("--extra-search-path").arg("extra4")
+            .arg("--extra-search-path").arg("extra5")
+            .arg("--extra-search-path").arg("extra6"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:14
+      |
+    1 | import foo1, baz
+      |              ^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
+    info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
+    info:   3. <temp_dir>/extra3 (extra search path specified on the CLI or in your config file)
+    info:   4. <temp_dir>/extra4 (extra search path specified on the CLI or in your config file)
+    info:   5. <temp_dir>/extra5 (extra search path specified on the CLI or in your config file)
+    info:   ... and 3 more paths. Run with `-v` to see all paths.
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
     ");
 
+    // Shows all with `-v`
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-platform").arg("linux")
+            .arg("--extra-search-path").arg("extra1")
+            .arg("--extra-search-path").arg("extra2")
+            .arg("--extra-search-path").arg("extra3")
+            .arg("--extra-search-path").arg("extra4")
+            .arg("--extra-search-path").arg("extra5")
+            .arg("--extra-search-path").arg("extra6")
+            .arg("-v"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:14
+      |
+    1 | import foo1, baz
+      |              ^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
+    info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
+    info:   3. <temp_dir>/extra3 (extra search path specified on the CLI or in your config file)
+    info:   4. <temp_dir>/extra4 (extra search path specified on the CLI or in your config file)
+    info:   5. <temp_dir>/extra5 (extra search path specified on the CLI or in your config file)
+    info:   6. <temp_dir>/extra6 (extra search path specified on the CLI or in your config file)
+    info:   7. <temp_dir>/ (first-party code)
+    info:   8. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 7 file(s) in 0.000s
+    ");
     Ok(())
 }
 
@@ -463,7 +546,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -487,8 +570,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -523,7 +605,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -546,8 +628,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -578,11 +659,11 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
      --> test.py:2:1
       |
     2 | match object():
-      | ^^^^^ Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
+      | ^^^^^
     3 |     case int():
     4 |         pass
       |
@@ -597,18 +678,17 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
      --> test.py:2:1
       |
     2 | match object():
-      | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+      | ^^^^^
     3 |     case int():
     4 |         pass
       |
@@ -617,7 +697,6 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -648,51 +727,47 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ])?;
 
     // Passing a path to the installation works
-    assert_cmd_snapshot!(case.command().arg("--python").arg("my-venv"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("my-venv"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // And so does passing a path to the executable inside the installation
-    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // But random other paths inside the installation are rejected
-    assert_cmd_snapshot!(case.command().arg("--python").arg(other_venv_path), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(other_venv_path), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
-    ");
+    "###);
 
     // And so are paths that do not exist on disk
-    assert_cmd_snapshot!(case.command().arg("--python").arg("not-a-directory-or-executable"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("not-a-directory-or-executable"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
       Cause: No such file or directory (os error 2)
-    ");
+    "###);
 
     Ok(())
 }
@@ -719,26 +794,24 @@ fn python_cli_argument_system_installation() -> anyhow::Result<()> {
     ])?;
 
     // Passing a path to the installation works
-    assert_cmd_snapshot!(case.command().arg("--python").arg("Python3.11"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("Python3.11"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // And so does passing a path to the executable inside the installation
-    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -764,13 +837,12 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid `environment.python` setting
 
@@ -783,7 +855,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
        |
 
       Cause: No such file or directory (os error 2)
-    "#);
+    "###);
 
     Ok(())
 }
@@ -802,13 +874,12 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Failed to discover the site-packages directory
       Cause: Invalid `environment.python` setting
@@ -820,7 +891,7 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not find a `site-packages` directory for this Python installation/executable
       |
-    "#);
+    "###);
 
     Ok(())
 }
@@ -841,13 +912,12 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Failed to discover the site-packages directory
       Cause: Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation
@@ -859,7 +929,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
-    "#);
+    "###);
 
     Ok(())
 }
@@ -888,11 +958,11 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Type `<module 'os'>` has no attribute `grantpt`
+    error[unresolved-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
     2 | import os
@@ -900,13 +970,20 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
       |
+    info: Python 3.10 was assumed when accessing `grantpt`
+     --> ty.toml:3:18
+      |
+    2 | [environment]
+    3 | python-version = "3.10"
+      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+    4 | python-platform = "linux"
+      |
     info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "#);
 
     // Use default (which should be latest supported)
     let case = CliTest::with_files([
@@ -927,15 +1004,14 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1089,7 +1165,7 @@ home = ./
 
     // Run with nothing set, should find the working venv
     assert_cmd_snapshot!(case.command()
-        .current_dir(case.root().join("project")), @r"
+        .current_dir(case.root().join("project")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1107,13 +1183,12 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // Run with VIRTUAL_ENV set, should find the active venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1130,13 +1205,12 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX set, should find the child conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @r"
+        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1154,14 +1228,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV set (unequal), should find working venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("CONDA_DEFAULT_ENV", "base"), @r"
+        .env("CONDA_DEFAULT_ENV", "base"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1179,8 +1252,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal) and VIRTUAL_ENV set,
     // should find child active venv
@@ -1188,7 +1260,7 @@ home = ./
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
         .env("CONDA_DEFAULT_ENV", "base")
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1205,14 +1277,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("CONDA_DEFAULT_ENV", "conda-env"), @r"
+        .env("CONDA_DEFAULT_ENV", "conda-env"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1230,14 +1301,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with _CONDA_ROOT and CONDA_PREFIX (unequal!) set, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @r"
+        .env("_CONDA_ROOT", "conda"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1255,14 +1325,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @r"
+        .env("_CONDA_ROOT", "conda"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1279,8 +1348,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1353,7 +1421,7 @@ home = ./
 
     // Run with nothing set, should fail to find anything
     assert_cmd_snapshot!(case.command()
-        .current_dir(case.root().join("project")), @r"
+        .current_dir(case.root().join("project")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1418,13 +1486,12 @@ home = ./
     Found 4 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // Run with VIRTUAL_ENV set, should find the active venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1441,13 +1508,12 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX set, should find the child conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @r"
+        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1465,14 +1531,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV set (unequal), should find base conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("CONDA_DEFAULT_ENV", "base"), @r"
+        .env("CONDA_DEFAULT_ENV", "base"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1489,8 +1554,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal) and VIRTUAL_ENV set,
     // should find child active venv
@@ -1498,7 +1562,7 @@ home = ./
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
         .env("CONDA_DEFAULT_ENV", "base")
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1515,14 +1579,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal!) set, should find base conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("CONDA_DEFAULT_ENV", "base"), @r"
+        .env("CONDA_DEFAULT_ENV", "base"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1539,14 +1602,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with _CONDA_ROOT and CONDA_PREFIX (unequal!) set, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @r"
+        .env("_CONDA_ROOT", "conda"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1564,14 +1626,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @r"
+        .env("_CONDA_ROOT", "conda"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1588,8 +1649,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1607,7 +1667,7 @@ fn src_root_deprecation_warning() -> anyhow::Result<()> {
         ("src/test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1622,8 +1682,7 @@ fn src_root_deprecation_warning() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -1644,7 +1703,7 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
         ("app/test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1662,8 +1721,7 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -1690,7 +1748,7 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
 
     // The test should pass because environment.root points to ./app where my_module.py exists
     // If src.root took precedence, it would fail because my_module.py doesn't exist in ./src
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1708,8 +1766,7 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -1730,15 +1787,14 @@ fn default_root_src_layout() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1766,15 +1822,14 @@ fn default_root_project_name_folder() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1795,15 +1850,14 @@ fn default_root_flat_layout() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1824,15 +1878,14 @@ fn default_root_tests_folder() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1855,7 +1908,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1878,8 +1931,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -1900,15 +1952,14 @@ fn default_root_python_folder() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1931,7 +1982,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1954,8 +2005,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -1978,7 +2028,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2001,8 +2051,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -2021,7 +2070,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r#"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2042,20 +2091,18 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     assert_cmd_snapshot!(case.command()
         .env("PYTHONPATH", case.root().join("baz-dir")),
-        @r#"
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -2078,7 +2125,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r#"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2115,22 +2162,20 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     let pythonpath =
         std::env::join_paths([case.root().join("baz-dir"), case.root().join("foo-dir")])?;
     assert_cmd_snapshot!(case.command()
         .env("PYTHONPATH", pythonpath),
-        @r#"
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }

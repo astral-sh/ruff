@@ -1963,6 +1963,15 @@ def _type_repr(obj: object) -> str:
     """
 
 if sys.version_info >= (3, 12):
+    _TypeParameter: typing_extensions.TypeAlias = (
+        TypeVar
+        | typing_extensions.TypeVar
+        | ParamSpec
+        | typing_extensions.ParamSpec
+        | TypeVarTuple
+        | typing_extensions.TypeVarTuple
+    )
+
     def override(method: _F, /) -> _F:
         """Indicate that a method is intended to override a method in a base class.
 
@@ -2015,11 +2024,11 @@ if sys.version_info >= (3, 12):
         See PEP 695 for more information.
         """
 
-        def __new__(cls, name: str, value: Any, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()) -> Self: ...
+        def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
         @property
         def __value__(self) -> Any: ...  # AnnotationForm
         @property
-        def __type_params__(self) -> tuple[TypeVar | ParamSpec | TypeVarTuple, ...]: ...
+        def __type_params__(self) -> tuple[_TypeParameter, ...]: ...
         @property
         def __parameters__(self) -> tuple[Any, ...]: ...  # AnnotationForm
         @property

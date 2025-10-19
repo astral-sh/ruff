@@ -50,9 +50,9 @@ dependencies = [
 
 [[package]]
 name = "anstream"
-version = "0.6.20"
+version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ae563653d1938f79b1ab1b5e668c87c76a9930414574a6583a7b7e11a8e6192"
+checksum = "43d5b281e737544384e969a5ccad3f1cdd24b48086a0fc1b2a5262a26b8f4f4a"
 dependencies = [
  "anstyle",
  "anstyle-parse",
@@ -65,9 +65,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.11"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "862ed96ca487e809f1c8e5a8447f6ee2cf102f846893800b20cebdf541fc6bbd"
+checksum = "5192cca8006f1fd4f7237516f40fa183bb07f8fbdfedaa0036de5ea9b0b45e78"
 
 [[package]]
 name = "anstyle-lossy"
@@ -243,7 +243,7 @@ dependencies = [
  "bitflags 2.9.4",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -327,9 +327,9 @@ dependencies = [
 
 [[package]]
 name = "camino"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1de8bc0aa9e9385ceb3bf0c152e3a9b9544f6c4a912c8ae504e80c1f0368603"
+checksum = "276a59bf2b2c967788139340c9f0c5b12d7fd6630315c15c217e559de85d2609"
 dependencies = [
  "serde_core",
 ]
@@ -1563,7 +1563,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b0f83760fb341a774ed326568e19f5a863af4a952def8c39f9ab92fd95b88e5"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.15.5",
  "serde",
  "serde_core",
 ]
@@ -1837,15 +1837,15 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.175"
+version = "0.2.177"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
+checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 
 [[package]]
 name = "libcst"
-version = "1.8.4"
+version = "1.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "052ef5d9fc958a51aeebdf3713573b36c6fd6eed0bf0e60e204d2c0f8cf19b9f"
+checksum = "9d56bcd52d9b5e5f43e7fba20eb1f423ccb18c84cdf1cb506b8c1b95776b0b49"
 dependencies = [
  "annotate-snippets",
  "libcst_derive",
@@ -1858,9 +1858,9 @@ dependencies = [
 
 [[package]]
 name = "libcst_derive"
-version = "1.8.4"
+version = "1.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a91a751afee92cbdd59d4bc6754c7672712eec2d30a308f23de4e3287b2929cb"
+checksum = "3fcf5a725c4db703660124fe0edb98285f1605d0b87b7ee8684b699764a4f01a"
 dependencies = [
  "quote",
  "syn",
@@ -2017,9 +2017,9 @@ checksum = "2f926ade0c4e170215ae43342bf13b9310a437609c81f29f86c5df6657582ef9"
 
 [[package]]
 name = "memchr"
-version = "2.7.5"
+version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
+checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "memoffset"
@@ -2569,9 +2569,9 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.13.6"
+version = "0.13.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec768e063102b426e8962989758115e8659485124de9207bc365fab524125d65"
+checksum = "f6d755483ad14b49e76713b52285235461a5b4f73f17612353e11a5de36a5fd2"
 dependencies = [
  "indexmap",
  "pep440_rs",
@@ -2815,7 +2815,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3072,7 +3072,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3426,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3540,8 +3540,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=29ab321b45d00daa4315fa2a06f7207759a8c87e#29ab321b45d00daa4315fa2a06f7207759a8c87e"
+version = "0.24.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=ef9f9329be6923acd050c8dddd172e3bc93e8051#ef9f9329be6923acd050c8dddd172e3bc93e8051"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3564,13 +3564,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=29ab321b45d00daa4315fa2a06f7207759a8c87e#29ab321b45d00daa4315fa2a06f7207759a8c87e"
+version = "0.24.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=ef9f9329be6923acd050c8dddd172e3bc93e8051#ef9f9329be6923acd050c8dddd172e3bc93e8051"
 
 [[package]]
 name = "salsa-macros"
-version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=29ab321b45d00daa4315fa2a06f7207759a8c87e#29ab321b45d00daa4315fa2a06f7207759a8c87e"
+version = "0.24.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=ef9f9329be6923acd050c8dddd172e3bc93e8051#ef9f9329be6923acd050c8dddd172e3bc93e8051"
 dependencies = [
  "proc-macro2",
  "quote",

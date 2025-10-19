@@ -421,7 +421,7 @@ impl<'db> UnionBuilder<'db> {
                     .elements
                     .iter()
                     .filter_map(UnionElement::to_type_element)
-                    .filter_map(Type::into_enum_literal)
+                    .filter_map(Type::as_enum_literal)
                     .map(|literal| literal.name(self.db).clone())
                     .chain(std::iter::once(enum_member_to_add.name(self.db).clone()))
                     .collect::<FxOrderSet<_>>();
@@ -650,7 +650,7 @@ impl<'db> IntersectionBuilder<'db> {
                 for intersection in &self.intersections {
                     if intersection.negative.iter().any(|negative| {
                         negative
-                            .into_enum_literal()
+                            .as_enum_literal()
                             .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
                     }) {
                         contains_enum_literal_as_negative_element = true;
@@ -1062,8 +1062,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let (Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar)) = ty
-            else {
+            let Type::TypeVar(bound_typevar) = ty else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
@@ -1255,7 +1254,7 @@ mod tests {
 
         let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap();
 
         let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
