@@ -6791,7 +6791,20 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, || alias.value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.
+                // In the case of recursive type aliases, this leads to infinite recursion.
+                // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
+                let value_type = visitor.visit(self, || alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                if let Some(generic_context) = alias.generic_context(db) {
+                    let specialization = alias
+                        .specialization(db)
+                        .unwrap_or_else(|| generic_context.default_specialization(db, None));
+
+                    value_type.apply_specialization(db, specialization)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                } else {
+                    value_type
+                }
             }
 
             Type::ModuleLiteral(_)
@@ -11820,6 +11833,9 @@ type CovariantAlias[T] = Covariant[T]
 type ContravariantAlias[T] = Contravariant[T]
 type InvariantAlias[T] = Invariant[T]
 type BivariantAlias[T] = Bivariant[T]
+
+type RecursiveAlias[T] = None | list[RecursiveAlias[T]]
+type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
 "#,
         )
         .unwrap();
@@ -11849,6 +11865,20 @@ type BivariantAlias[T] = Bivariant[T]
             KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
                 .variance_of(&db, get_bound_typevar(&db, bivariant)),
             TypeVarVariance::Bivariant
+        );
+
+        let recursive = get_type_alias(&db, "RecursiveAlias");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
+                .variance_of(&db, get_bound_typevar(&db, recursive)),
+            TypeVarVariance::Bivariant
+        );
+
+        let recursive2 = get_type_alias(&db, "RecursiveAlias2");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
+                .variance_of(&db, get_bound_typevar(&db, recursive2)),
+            TypeVarVariance::Invariant
         );
     }
 }

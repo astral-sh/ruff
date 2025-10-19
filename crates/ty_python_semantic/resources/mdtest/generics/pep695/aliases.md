@@ -170,3 +170,16 @@ type X[T: X] = T
 def _(x: X):
     assert x
 ```
+
+## Recursive generic type aliases
+
+```py
+type RecursiveList[T] = T | list[RecursiveList[T]]
+
+r1: RecursiveList[int] = 1
+r2: RecursiveList[int] = [1, [1, 2, 3]]
+# error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `RecursiveList[int]`"
+r3: RecursiveList[int] = "a"
+# TODO: this should be an error
+r4: RecursiveList[int] = [1, ["a"]]
+```
