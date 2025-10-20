@@ -145,8 +145,12 @@ impl<'a> Importer<'a> {
         let request = request.avoid_conflicts(self.db, self.file, members);
         let mut symbol_text: Box<str> = request.member.into();
         let Some(response) = self.find(&request, members.at) else {
-            let import = Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist)
-                .into_edit(&request.to_string());
+            let insertion = if let Some(future) = self.find_last_future_import() {
+                Insertion::end_of_statement(future.stmt, self.source, self.stylist)
+            } else {
+                Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist)
+            };
+            let import = insertion.into_edit(&request.to_string());
             if matches!(request.style, ImportStyle::Import) {
                 symbol_text = format!("{}.{}", request.module, request.member).into();
             }
@@ -240,6 +244,19 @@ impl<'a> Importer<'a> {
             }
         }
         choice
+    }
+
+    /// Find the last `from __future__` import statement in the AST.
+    fn find_last_future_import(&self) -> Option<&'a AstImport> {
+        self.imports
+            .iter()
+            .take_while(|import| {
+                import
+                    .stmt
+                    .as_import_from_stmt()
+                    .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+            })
+            .last()
     }
 }
 
@@ -1290,6 +1307,24 @@ def foo():
 
         def foo():
             defaultdict
+        ");
+    }
+
+    #[test]
+    fn from_future_import() {
+        let test = cursor_test(
+            "\
+from __future__ import annotations
+
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.import("typing", "TypeVar"), @r"
+        from __future__ import annotations
+        import typing
+
+        typing.TypeVar
         ");
     }
 
