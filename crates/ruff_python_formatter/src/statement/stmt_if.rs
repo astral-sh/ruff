@@ -28,12 +28,12 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
             f,
             [clause(
                 ClauseHeader::If(item),
-                trailing_colon_comment,
                 &format_args![
                     token("if"),
                     space(),
                     maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                 ],
+                trailing_colon_comment,
                 body,
                 SuiteKind::other(elif_else_clauses.is_empty()),
             )]
@@ -78,7 +78,6 @@ pub(crate) fn format_elif_else_clause(
         [
             clause(
                 ClauseHeader::ElifElse(item),
-                trailing_colon_comment,
                 &format_with(|f: &mut PyFormatter| {
                     f.options()
                         .source_map_generation()
@@ -98,6 +97,7 @@ pub(crate) fn format_elif_else_clause(
                         token("else").fmt(f)
                     }
                 }),
+                trailing_colon_comment,
                 body,
                 suite_kind,
             )

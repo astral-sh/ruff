@@ -57,7 +57,6 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
             f,
             [clause(
                 ClauseHeader::ExceptHandler(item),
-                dangling_comments,
                 &format_with(|f: &mut PyFormatter| {
                     write!(
                         f,
@@ -114,6 +113,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
 
                     Ok(())
                 }),
+                dangling_comments,
                 body,
                 SuiteKind::other(self.last_suite_in_statement),
             )]

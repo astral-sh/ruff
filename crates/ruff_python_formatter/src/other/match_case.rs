@@ -48,13 +48,13 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
             f,
             [clause(
                 ClauseHeader::MatchCase(item),
-                dangling_item_comments,
                 &format_args![
                     token("case"),
                     space(),
                     maybe_parenthesize_pattern(pattern, item),
                     format_guard
                 ],
+                dangling_item_comments,
                 body,
                 SuiteKind::other(self.last_suite_in_statement),
             )]
