@@ -135,22 +135,7 @@ finally: cleanup()  # fmt: skip
 # trailing
 ```
 
-## Outputs
-### Output 1
-```
-indent-style               = space
-line-width                 = 88
-indent-width               = 4
-quote-style                = Double
-line-ending                = LineFeed
-magic-trailing-comma       = Respect
-docstring-code             = Disabled
-docstring-code-line-width  = "dynamic"
-preview                    = Enabled
-target_version             = 3.10
-source_type                = Python
-```
-
+## Output
 ```python
 # Test cases for fmt: skip on compound statements that fit on one line
 
