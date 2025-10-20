@@ -616,10 +616,10 @@ impl<'db> FunctionLiteral<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let (overloads, implementation) = self.overloads_and_implementation(db);
-        if let Some(implementation) = implementation {
-            if overloads.is_empty() {
-                return CallableSignature::single(implementation.signature(db));
-            }
+        if let Some(implementation) = implementation
+            && overloads.is_empty()
+        {
+            return CallableSignature::single(implementation.signature(db));
         }
 
         CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
@@ -1048,8 +1048,8 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        if let Type::NominalInstance(instance) = ty {
-            if instance
+        if let Type::NominalInstance(instance) = ty
+            && instance
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
@@ -1057,9 +1057,8 @@ fn is_instance_truthiness<'db>(
                     ClassType::Generic(c) => c.origin(db) == class,
                     ClassType::NonGeneric(c) => c == class,
                 })
-            {
-                return true;
-            }
+        {
+            return true;
         }
         false
     };
@@ -1642,15 +1641,15 @@ impl KnownFunction {
 
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if let Some(protocol_class) = class.into_protocol_class(db) {
-                            if !protocol_class.is_runtime_checkable(db) {
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    context,
-                                    call_expression,
-                                    protocol_class,
-                                    self,
-                                );
-                            }
+                        if let Some(protocol_class) = class.into_protocol_class(db)
+                            && !protocol_class.is_runtime_checkable(db)
+                        {
+                            report_runtime_check_against_non_runtime_checkable_protocol(
+                                context,
+                                call_expression,
+                                protocol_class,
+                                self,
+                            );
                         }
 
                         if self == KnownFunction::IsInstance {
