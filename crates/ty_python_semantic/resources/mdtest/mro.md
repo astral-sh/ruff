@@ -165,9 +165,7 @@ from does_not_exist import DoesNotExist  # error: [unresolved-import]
 reveal_type(DoesNotExist)  # revealed: Unknown
 
 if hasattr(DoesNotExist, "__mro__"):
-    # TODO: this should be `Unknown & <Protocol with members '__mro__'>` or similar
-    # (The second part of the intersection is incorrectly simplified to `object` due to https://github.com/astral-sh/ty/issues/986)
-    reveal_type(DoesNotExist)  # revealed: Unknown
+    reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
 
     class Foo(DoesNotExist): ...  # no error!
     reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
@@ -534,19 +532,19 @@ T = TypeVar("T")
 
 class peekable(Generic[T], Iterator[T]): ...
 
-# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[T@peekable]'>, <class 'Iterable[T@peekable]'>, typing.Protocol, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[Unknown]'>, <class 'Iterable[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(peekable.__mro__)
 
 class peekable2(Iterator[T], Generic[T]): ...
 
-# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T@peekable2]'>, <class 'Iterable[T@peekable2]'>, typing.Protocol, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[Unknown]'>, <class 'Iterable[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(peekable2.__mro__)
 
 class Base: ...
 class Intermediate(Base, Generic[T]): ...
 class Sub(Intermediate[T], Base): ...
 
-# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T@Sub]'>, <class 'Base'>, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[Unknown]'>, <class 'Base'>, typing.Generic, <class 'object'>]
 reveal_type(Sub.__mro__)
 ```
 
