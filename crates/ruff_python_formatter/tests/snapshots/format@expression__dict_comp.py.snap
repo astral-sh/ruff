@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/dict_comp.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -403,4 +402,69 @@ query = {
     ): [clause for kf_pair in queries for clause in kf_pair["fragment"]]
     for key, queries in self._filters.items()
 }
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -20,9 +20,10 @@
+     # above c
+     c  # c
+     # above in
+-    in  # in
+-    # above e
+-    e  # e
++    in (  # in
++        # above e
++        e  # e
++    )
+     # above if
+     if  # if
+     # above f
+@@ -43,7 +44,9 @@
+     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
+         eeeeeeeeeeeeeeeeeeeeee,
+         fffffffffffffffffffffffff,
+-    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
++    ] in (
++        eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
++    )
+     if fffffffffffffffffffffffffffffffffffffffffff
+     < gggggggggggggggggggggggggggggggggggggggggggggg
+     < hhhhhhhhhhhhhhhhhhhhhhhhhh
+@@ -74,7 +77,9 @@
+         a,
+         a,
+         a,
+-    ] in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    ] in (
++        this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    )
+ }
+ {
+     k: v
+@@ -99,7 +104,9 @@
+         a,
+         a,
+         a,
+-    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    ) in (
++        this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    )
+ }
+ 
+ # Leading
+@@ -126,7 +133,9 @@
+         a,
+         a,
+         a,  # Trailing
+-    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension  # Trailing
++    ) in (
++        this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    )  # Trailing
+ }  # Trailing
+ # Trailing
+ 
 ```

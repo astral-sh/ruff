@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/list_comp.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -378,4 +377,84 @@ y = [
     # comment
     x
 ]
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -20,9 +20,10 @@
+     # above c
+     c  # c
+     # above in
+-    in  # in
+-    # above e
+-    e  # e
++    in (  # in
++        # above e
++        e  # e
++    )
+     # above if
+     if  # if
+     # above f
+@@ -40,7 +41,9 @@
+     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
+         eeeeeeeeeeeeeeeeeeeeee,
+         fffffffffffffffffffffffff,
+-    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
++    ] in (
++        eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
++    )
+     if fffffffffffffffffffffffffffffffffffffffffff
+     < gggggggggggggggggggggggggggggggggggggggggggggg
+     < hhhhhhhhhhhhhhhhhhhhhhhhhh
+@@ -112,9 +115,11 @@
+ 
+ [
+     f(x, y)
+-    for head_name in f(
+-        x,
+-        y,
++    for head_name in (
++        f(
++            x,
++            y,
++        )
+     )
+     if head_name
+ ]
+@@ -130,13 +135,15 @@
+ 
+ [
+     1
+-    for components in b  # pylint: disable=undefined-loop-variable  # integer 1 may only have decimal 01-09
+-    + c  # negative decimal
++    for components in (  # pylint: disable=undefined-loop-variable
++        b  # integer 1 may only have decimal 01-09
++        + c
++    )  # negative decimal
+ ]
+ 
+ # Parenthesized targets and iterators.
+ [x for (x) in y]
+-[x for x in (y)]
++[x for x in y]
+ 
+ 
+ # Leading expression comments:
+@@ -186,9 +193,10 @@
+     a
+     for
+     # comment
+-    a in
+-    # comment
+-    x
++    a in (
++        # comment
++        x
++    )
+     if
+     # asdasd
+     "askldaklsdnmklasmdlkasmdlkasmdlkasmdasd" != "as,mdnaskldmlkasdmlaksdmlkasdlkasdm"
 ```

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/set_comp.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -123,4 +122,36 @@ selected_choices = {
     for vvvvvvvvvvvvvvvvvvvvvvv in value
     if str(v) not in self.choices.field.empty_values
 }
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -20,9 +20,10 @@
+     # above c
+     c  # c
+     # above in
+-    in  # in
+-    # above e
+-    e  # e
++    in (  # in
++        # above e
++        e  # e
++    )
+     # above if
+     if  # if
+     # above f
+@@ -40,7 +41,9 @@
+     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
+         eeeeeeeeeeeeeeeeeeeeee,
+         fffffffffffffffffffffffff,
+-    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
++    ] in (
++        eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
++    )
+     if fffffffffffffffffffffffffffffffffffffffffff
+     < gggggggggggggggggggggggggggggggggggggggggggggg
+     < hhhhhhhhhhhhhhhhhhhhhhhhhh
 ```
