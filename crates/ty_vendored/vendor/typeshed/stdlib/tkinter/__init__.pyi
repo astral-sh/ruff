@@ -5210,7 +5210,6 @@ class Scrollbar(Widget):
         lower ends as value between 0 and 1).
         """
 
-_TextIndex: TypeAlias = _tkinter.Tcl_Obj | str | float | Misc
 _WhatToCount: TypeAlias = Literal[
     "chars", "displaychars", "displayindices", "displaylines", "indices", "lines", "xpixels", "ypixels"
 ]
@@ -5358,18 +5357,29 @@ class Text(Widget, XView, YView):
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
-    def bbox(self, index: _TextIndex) -> tuple[int, int, int, int] | None:  # type: ignore[override]
+    def bbox(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> tuple[int, int, int, int] | None:  # type: ignore[override]
         """Return a tuple of (x,y,width,height) which gives the bounding
         box of the visible part of the character at the given index.
         """
 
-    def compare(self, index1: _TextIndex, op: Literal["<", "<=", "==", ">=", ">", "!="], index2: _TextIndex) -> bool:
+    def compare(
+        self,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        op: Literal["<", "<=", "==", ">=", ">", "!="],
+        index2: str | float | _tkinter.Tcl_Obj | Widget,
+    ) -> bool:
         """Return whether between index INDEX1 and index INDEX2 the
         relation OP is satisfied. OP is one of <, <=, ==, >=, >, or !=.
         """
     if sys.version_info >= (3, 13):
         @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, *, return_ints: Literal[True]) -> int:
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            *,
+            return_ints: Literal[True],
+        ) -> int:
             """Counts the number of relevant things between the two indices.
 
             If INDEX1 is after INDEX2, the result will be a negative number
@@ -5389,13 +5399,19 @@ class Text(Widget, XView, YView):
 
         @overload
         def count(
-            self, index1: _TextIndex, index2: _TextIndex, arg: _WhatToCount | Literal["update"], /, *, return_ints: Literal[True]
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg: _WhatToCount | Literal["update"],
+            /,
+            *,
+            return_ints: Literal[True],
         ) -> int: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: Literal["update"],
             arg2: _WhatToCount,
             /,
@@ -5405,8 +5421,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount,
             arg2: Literal["update"],
             /,
@@ -5415,13 +5431,20 @@ class Text(Widget, XView, YView):
         ) -> int: ...
         @overload
         def count(
-            self, index1: _TextIndex, index2: _TextIndex, arg1: _WhatToCount, arg2: _WhatToCount, /, *, return_ints: Literal[True]
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: _WhatToCount,
+            arg2: _WhatToCount,
+            /,
+            *,
+            return_ints: Literal[True],
         ) -> tuple[int, int]: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount | Literal["update"],
             arg2: _WhatToCount | Literal["update"],
             arg3: _WhatToCount | Literal["update"],
@@ -5430,12 +5453,18 @@ class Text(Widget, XView, YView):
             return_ints: Literal[True],
         ) -> tuple[int, ...]: ...
         @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, *, return_ints: Literal[False] = False) -> tuple[int] | None: ...
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            *,
+            return_ints: Literal[False] = False,
+        ) -> tuple[int] | None: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg: _WhatToCount | Literal["update"],
             /,
             *,
@@ -5444,8 +5473,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: Literal["update"],
             arg2: _WhatToCount,
             /,
@@ -5455,8 +5484,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount,
             arg2: Literal["update"],
             /,
@@ -5466,8 +5495,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount,
             arg2: _WhatToCount,
             /,
@@ -5477,8 +5506,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount | Literal["update"],
             arg2: _WhatToCount | Literal["update"],
             arg3: _WhatToCount | Literal["update"],
@@ -5488,7 +5517,9 @@ class Text(Widget, XView, YView):
         ) -> tuple[int, ...]: ...
     else:
         @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex) -> tuple[int] | None:
+        def count(
+            self, index1: str | float | _tkinter.Tcl_Obj | Widget, index2: str | float | _tkinter.Tcl_Obj | Widget
+        ) -> tuple[int] | None:
             """Counts the number of relevant things between the two indices.
             If index1 is after index2, the result will be a negative number
             (and this holds for each of the possible options).
@@ -5504,19 +5535,44 @@ class Text(Widget, XView, YView):
 
         @overload
         def count(
-            self, index1: _TextIndex, index2: _TextIndex, arg: _WhatToCount | Literal["update"], /
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg: _WhatToCount | Literal["update"],
+            /,
         ) -> tuple[int] | None: ...
-        @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, arg1: Literal["update"], arg2: _WhatToCount, /) -> int | None: ...
-        @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, arg1: _WhatToCount, arg2: Literal["update"], /) -> int | None: ...
-        @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, arg1: _WhatToCount, arg2: _WhatToCount, /) -> tuple[int, int]: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: Literal["update"],
+            arg2: _WhatToCount,
+            /,
+        ) -> int | None: ...
+        @overload
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: _WhatToCount,
+            arg2: Literal["update"],
+            /,
+        ) -> int | None: ...
+        @overload
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: _WhatToCount,
+            arg2: _WhatToCount,
+            /,
+        ) -> tuple[int, int]: ...
+        @overload
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount | Literal["update"],
             arg2: _WhatToCount | Literal["update"],
             arg3: _WhatToCount | Literal["update"],
@@ -5532,10 +5588,12 @@ class Text(Widget, XView, YView):
 
     @overload
     def debug(self, boolean: bool) -> None: ...
-    def delete(self, index1: _TextIndex, index2: _TextIndex | None = None) -> None:
+    def delete(
+        self, index1: str | float | _tkinter.Tcl_Obj | Widget, index2: str | float | _tkinter.Tcl_Obj | Widget | None = None
+    ) -> None:
         """Delete the characters between INDEX1 and INDEX2 (not included)."""
 
-    def dlineinfo(self, index: _TextIndex) -> tuple[int, int, int, int, int] | None:
+    def dlineinfo(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> tuple[int, int, int, int, int] | None:
         """Return tuple (x,y,width,height,baseline) giving the bounding box
         and baseline position of the visible part of the line containing
         the character at INDEX.
@@ -5544,8 +5602,8 @@ class Text(Widget, XView, YView):
     @overload
     def dump(
         self,
-        index1: _TextIndex,
-        index2: _TextIndex | None = None,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
         command: None = None,
         *,
         all: bool = ...,
@@ -5571,8 +5629,8 @@ class Text(Widget, XView, YView):
     @overload
     def dump(
         self,
-        index1: _TextIndex,
-        index2: _TextIndex | None,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None,
         command: Callable[[str, str, str], object] | str,
         *,
         all: bool = ...,
@@ -5585,8 +5643,8 @@ class Text(Widget, XView, YView):
     @overload
     def dump(
         self,
-        index1: _TextIndex,
-        index2: _TextIndex | None = None,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
         *,
         command: Callable[[str, str, str], object] | str,
         all: bool = ...,
@@ -5651,27 +5709,31 @@ class Text(Widget, XView, YView):
         when the undo option is false
         """
 
-    def get(self, index1: _TextIndex, index2: _TextIndex | None = None) -> str:
+    def get(
+        self, index1: str | float | _tkinter.Tcl_Obj | Widget, index2: str | float | _tkinter.Tcl_Obj | Widget | None = None
+    ) -> str:
         """Return the text from INDEX1 to INDEX2 (not included)."""
 
     @overload
-    def image_cget(self, index: _TextIndex, option: Literal["image", "name"]) -> str:
+    def image_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["image", "name"]) -> str:
         """Return the value of OPTION of an embedded image at INDEX."""
 
     @overload
-    def image_cget(self, index: _TextIndex, option: Literal["padx", "pady"]) -> int: ...
+    def image_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["padx", "pady"]) -> int: ...
     @overload
-    def image_cget(self, index: _TextIndex, option: Literal["align"]) -> Literal["baseline", "bottom", "center", "top"]: ...
+    def image_cget(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["align"]
+    ) -> Literal["baseline", "bottom", "center", "top"]: ...
     @overload
-    def image_cget(self, index: _TextIndex, option: str) -> Any: ...
+    def image_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: str) -> Any: ...
     @overload
-    def image_configure(self, index: _TextIndex, cnf: str) -> tuple[str, str, str, str, str | int]:
+    def image_configure(self, index: str | float | _tkinter.Tcl_Obj | Widget, cnf: str) -> tuple[str, str, str, str, str | int]:
         """Configure an embedded image at INDEX."""
 
     @overload
     def image_configure(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = None,
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5682,7 +5744,7 @@ class Text(Widget, XView, YView):
     ) -> dict[str, tuple[str, str, str, str, str | int]] | None: ...
     def image_create(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = {},
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5696,10 +5758,12 @@ class Text(Widget, XView, YView):
     def image_names(self) -> tuple[str, ...]:
         """Return all names of embedded images in this widget."""
 
-    def index(self, index: _TextIndex) -> str:
+    def index(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str:
         """Return the index in the form line.char for INDEX."""
 
-    def insert(self, index: _TextIndex, chars: str, *args: str | list[str] | tuple[str, ...]) -> None:
+    def insert(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, chars: str, *args: str | list[str] | tuple[str, ...]
+    ) -> None:
         """Insert CHARS before the characters at INDEX. An additional
         tag can be given in ARGS. Additional CHARS and tags can follow in ARGS.
         """
@@ -5715,16 +5779,16 @@ class Text(Widget, XView, YView):
     def mark_names(self) -> tuple[str, ...]:
         """Return all mark names."""
 
-    def mark_set(self, markName: str, index: _TextIndex) -> None:
+    def mark_set(self, markName: str, index: str | float | _tkinter.Tcl_Obj | Widget) -> None:
         """Set mark MARKNAME before the character at INDEX."""
 
     def mark_unset(self, *markNames: str) -> None:
         """Delete all marks in MARKNAMES."""
 
-    def mark_next(self, index: _TextIndex) -> str | None:
+    def mark_next(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str | None:
         """Return the name of the next mark after INDEX."""
 
-    def mark_previous(self, index: _TextIndex) -> str | None:
+    def mark_previous(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str | None:
         """Return the name of the previous mark before INDEX."""
     # **kw of peer_create is same as the kwargs of Text.__init__
     def peer_create(self, newPathName: str | Text, cnf: dict[str, Any] = {}, **kw) -> None:
@@ -5739,7 +5803,13 @@ class Text(Widget, XView, YView):
         the widget itself).
         """
 
-    def replace(self, index1: _TextIndex, index2: _TextIndex, chars: str, *args: str | list[str] | tuple[str, ...]) -> None:
+    def replace(
+        self,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget,
+        chars: str,
+        *args: str | list[str] | tuple[str, ...],
+    ) -> None:
         """Replaces the range of characters between index1 and index2 with
         the given characters and tags specified by args.
 
@@ -5759,8 +5829,8 @@ class Text(Widget, XView, YView):
     def search(
         self,
         pattern: str,
-        index: _TextIndex,
-        stopindex: _TextIndex | None = None,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
+        stopindex: str | float | _tkinter.Tcl_Obj | Widget | None = None,
         forwards: bool | None = None,
         backwards: bool | None = None,
         exact: bool | None = None,
@@ -5774,10 +5844,12 @@ class Text(Widget, XView, YView):
         empty string.
         """
 
-    def see(self, index: _TextIndex) -> None:
+    def see(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> None:
         """Scroll such that the character at INDEX is visible."""
 
-    def tag_add(self, tagName: str, index1: _TextIndex, *args: _TextIndex) -> None:
+    def tag_add(
+        self, tagName: str, index1: str | float | _tkinter.Tcl_Obj | Widget, *args: str | float | _tkinter.Tcl_Obj | Widget
+    ) -> None:
         """Add tag TAGNAME to all characters between INDEX1 and index2 in ARGS.
         Additional pairs of indices may follow in ARGS.
         """
@@ -5855,16 +5927,26 @@ class Text(Widget, XView, YView):
         than the priority of BELOWTHIS.
         """
 
-    def tag_names(self, index: _TextIndex | None = None) -> tuple[str, ...]:
+    def tag_names(self, index: str | float | _tkinter.Tcl_Obj | Widget | None = None) -> tuple[str, ...]:
         """Return a list of all tag names."""
 
-    def tag_nextrange(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> tuple[str, str] | tuple[()]:
+    def tag_nextrange(
+        self,
+        tagName: str,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+    ) -> tuple[str, str] | tuple[()]:
         """Return a list of start and end index for the first sequence of
         characters between INDEX1 and INDEX2 which all have tag TAGNAME.
         The text is searched forward from INDEX1.
         """
 
-    def tag_prevrange(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> tuple[str, str] | tuple[()]:
+    def tag_prevrange(
+        self,
+        tagName: str,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+    ) -> tuple[str, str] | tuple[()]:
         """Return a list of start and end index for the first sequence of
         characters between INDEX1 and INDEX2 which all have tag TAGNAME.
         The text is searched backwards from INDEX1.
@@ -5878,29 +5960,38 @@ class Text(Widget, XView, YView):
     def tag_ranges(self, tagName: str) -> tuple[_tkinter.Tcl_Obj, ...]:
         """Return a list of ranges of text which have tag TAGNAME."""
     # tag_remove and tag_delete are different
-    def tag_remove(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> None:
+    def tag_remove(
+        self,
+        tagName: str,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+    ) -> None:
         """Remove tag TAGNAME from all characters between INDEX1 and INDEX2."""
 
     @overload
-    def window_cget(self, index: _TextIndex, option: Literal["padx", "pady"]) -> int:
+    def window_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["padx", "pady"]) -> int:
         """Return the value of OPTION of an embedded window at INDEX."""
 
     @overload
-    def window_cget(self, index: _TextIndex, option: Literal["stretch"]) -> bool: ...  # actually returns Literal[0, 1]
+    def window_cget(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["stretch"]
+    ) -> bool: ...  # actually returns Literal[0, 1]
     @overload
-    def window_cget(self, index: _TextIndex, option: Literal["align"]) -> Literal["baseline", "bottom", "center", "top"]: ...
+    def window_cget(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["align"]
+    ) -> Literal["baseline", "bottom", "center", "top"]: ...
     @overload  # window is set to a widget, but read as the string name.
-    def window_cget(self, index: _TextIndex, option: Literal["create", "window"]) -> str: ...
+    def window_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["create", "window"]) -> str: ...
     @overload
-    def window_cget(self, index: _TextIndex, option: str) -> Any: ...
+    def window_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: str) -> Any: ...
     @overload
-    def window_configure(self, index: _TextIndex, cnf: str) -> tuple[str, str, str, str, str | int]:
+    def window_configure(self, index: str | float | _tkinter.Tcl_Obj | Widget, cnf: str) -> tuple[str, str, str, str, str | int]:
         """Configure an embedded window at INDEX."""
 
     @overload
     def window_configure(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = None,
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5913,7 +6004,7 @@ class Text(Widget, XView, YView):
     window_config = window_configure
     def window_create(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = {},
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,

@@ -37,7 +37,7 @@ class Data:
     content: list[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now, init=False)
 
-# revealed: (self: Data, content: list[int] = list[Unknown]) -> None
+# revealed: (self: Data, content: list[int] = Unknown) -> None
 reveal_type(Data.__init__)
 
 data = Data([1, 2, 3])
@@ -63,6 +63,7 @@ class Person:
     age: int | None = field(default=None, kw_only=True)
     role: str = field(default="user", kw_only=True)
 
+# TODO: this would ideally show a default value of `None` for `age`
 # revealed: (self: Person, name: str, *, age: int | None = None, role: str = Literal["user"]) -> None
 reveal_type(Person.__init__)
 
@@ -82,7 +83,8 @@ def get_default() -> str:
 
 reveal_type(field(default=1))  # revealed: dataclasses.Field[Literal[1]]
 reveal_type(field(default=None))  # revealed: dataclasses.Field[None]
-reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[str]
+# TODO: this could ideally be `dataclasses.Field[str]` with a better generics solver
+reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[Unknown]
 ```
 
 ## dataclass_transform field_specifiers
@@ -108,7 +110,7 @@ class A:
     name: str = field(init=False)
 
 # field(init=False) should be ignored for dataclass_transform without explicit field_specifiers
-reveal_type(A.__init__)  # revealed: (self: A, name: str = Unknown) -> None
+reveal_type(A.__init__)  # revealed: (self: A, name: str) -> None
 
 @dataclass
 class B:

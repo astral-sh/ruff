@@ -26,45 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/function
 # Diagnostics
 
 ```
-info[revealed-type]: Revealed type
- --> src/mdtest_snippet.py:6:13
-  |
-4 |     return x
-5 |
-6 | reveal_type(f(1))  # revealed: Literal[1]
-  |             ^^^^ `Literal[1]`
-7 | reveal_type(f(True))  # revealed: Literal[True]
-8 | # error: [invalid-argument-type]
-  |
-
-```
-
-```
-info[revealed-type]: Revealed type
- --> src/mdtest_snippet.py:7:13
-  |
-6 | reveal_type(f(1))  # revealed: Literal[1]
-7 | reveal_type(f(True))  # revealed: Literal[True]
-  |             ^^^^^^^ `Literal[True]`
-8 | # error: [invalid-argument-type]
-9 | reveal_type(f("string"))  # revealed: Unknown
-  |
-
-```
-
-```
-info[revealed-type]: Revealed type
- --> src/mdtest_snippet.py:9:13
-  |
-7 | reveal_type(f(True))  # revealed: Literal[True]
-8 | # error: [invalid-argument-type]
-9 | reveal_type(f("string"))  # revealed: Unknown
-  |             ^^^^^^^^^^^ `Unknown`
-  |
-
-```
-
-```
 error[invalid-argument-type]: Argument to function `f` is incorrect
  --> src/mdtest_snippet.py:9:15
   |

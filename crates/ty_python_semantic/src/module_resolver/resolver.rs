@@ -19,7 +19,10 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::{PySourceType, PythonVersion};
+use ruff_python_ast::{
+    self as ast, PySourceType, PythonVersion,
+    visitor::{Visitor, walk_body},
+};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -348,9 +351,15 @@ impl SearchPaths {
         })
     }
 
+    /// Registers the file roots for all non-dynamically discovered search paths that aren't first-party.
     pub(crate) fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
-        for path in self.static_paths.iter().chain(self.site_packages.iter()) {
+        for path in self
+            .static_paths
+            .iter()
+            .chain(self.site_packages.iter())
+            .chain(&self.stdlib_path)
+        {
             if let Some(system_path) = path.as_system_path() {
                 if !path.is_first_party() {
                     files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
@@ -451,9 +460,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             continue;
         }
 
-        let site_packages_root = files
-            .root(db, &site_packages_dir)
-            .expect("Site-package root to have been created");
+        let site_packages_root = files.expect_root(db, &site_packages_dir);
 
         // This query needs to be re-executed each time a `.pth` file
         // is added, modified or removed from the `site-packages` directory.
@@ -500,6 +507,23 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                             "Adding editable installation to module resolution path {path}",
                             path = installation
                         );
+
+                        // Register a file root for editable installs that are outside any other root
+                        // (Most importantly, don't register a root for editable installations from the project
+                        // directory as that would change the durability of files within those folders).
+                        // Not having an exact file root for editable installs just means that
+                        // some queries (like `list_modules_in`) will run slightly more frequently
+                        // than they would otherwise.
+                        if let Some(dynamic_path) = search_path.as_system_path() {
+                            if files.root(db, dynamic_path).is_none() {
+                                files.try_add_root(
+                                    db,
+                                    dynamic_path,
+                                    FileRootKind::LibrarySearchPath,
+                                );
+                            }
+                        }
+
                         dynamic_paths.push(search_path);
                     }
 
@@ -981,7 +1005,12 @@ where
         let is_regular_package = package_path.is_regular_package(resolver_state);
 
         if is_regular_package {
-            in_namespace_package = false;
+            // This is the only place where we need to consider the existence of legacy namespace
+            // packages, as we are explicitly searching for the *parent* package of the module
+            // we actually want. Here, such a package should be treated as a PEP-420 ("modern")
+            // namespace package. In all other contexts it acts like a normal package and needs
+            // no special handling.
+            in_namespace_package = is_legacy_namespace_package(&package_path, resolver_state);
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
             && resolve_file_module(&package_path, resolver_state).is_none()
@@ -1016,6 +1045,62 @@ where
         path: package_path,
         typed,
     })
+}
+
+/// Determines whether a package is a legacy namespace package.
+///
+/// Before PEP 420 introduced implicit namespace packages, the ecosystem developed
+/// its own form of namespace packages. These legacy namespace packages continue to persist
+/// in modern codebases because they work with ancient Pythons and if it ain't broke, don't fix it.
+///
+/// A legacy namespace package is distinguished by having an `__init__.py` that contains an
+/// expression to the effect of:
+///
+/// ```python
+/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
+/// ```
+///
+/// The resulting package simultaneously has properties of both regular packages and namespace ones:
+///
+/// * Like regular packages, `__init__.py` is defined and can contain items other than submodules
+/// * Like implicit namespace packages, multiple copies of the package may exist with different
+///   submodules, and they will be merged into one namespace at runtime by the interpreter
+///
+/// Now, you may rightly wonder: "What if the `__init__.py` files have different contents?"
+/// The apparent official answer is: "Don't do that!"
+/// And the reality is: "Of course people do that!"
+///
+/// In practice we think it's fine to, just like with regular packages, use the first one
+/// we find on the search paths. To the extent that the different copies "need" to have the same
+/// contents, they all "need" to have the legacy namespace idiom (we do nothing to enforce that,
+/// we will just get confused if you mess it up).
+fn is_legacy_namespace_package(
+    package_path: &ModulePath,
+    resolver_state: &ResolverContext,
+) -> bool {
+    // Just an optimization, the stdlib and typeshed are never legacy namespace packages
+    if package_path.search_path().is_standard_library() {
+        return false;
+    }
+
+    let mut package_path = package_path.clone();
+    package_path.push("__init__");
+    let Some(init) = resolve_file_module(&package_path, resolver_state) else {
+        return false;
+    };
+
+    // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
+    //
+    // The benefit of being syntax-only is speed and avoiding circular dependencies
+    // between module resolution and semantic analysis.
+    //
+    // The downside is if you write slightly different syntax we will fail to detect the idiom,
+    // but hey, this is better than nothing!
+    let parsed = ruff_db::parsed::parsed_module(resolver_state.db, init);
+    let mut visitor = LegacyNamespacePackageVisitor::default();
+    visitor.visit_body(parsed.load(resolver_state.db).suite());
+
+    visitor.is_legacy_namespace_package
 }
 
 #[derive(Debug)]
@@ -1124,6 +1209,124 @@ impl RelaxedModuleName {
 impl fmt::Display for RelaxedModuleName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+/// Detects if a module contains a statement of the form:
+/// ```python
+/// __path__ = pkgutil.extend_path(__path__, __name__)
+/// ```
+/// or
+/// ```python
+/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
+/// ```
+#[derive(Default)]
+struct LegacyNamespacePackageVisitor {
+    is_legacy_namespace_package: bool,
+    in_body: bool,
+}
+
+impl Visitor<'_> for LegacyNamespacePackageVisitor {
+    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+        if self.is_legacy_namespace_package {
+            return;
+        }
+
+        // Don't traverse into nested bodies.
+        if self.in_body {
+            return;
+        }
+
+        self.in_body = true;
+
+        walk_body(self, body);
+    }
+
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        if self.is_legacy_namespace_package {
+            return;
+        }
+
+        let ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) = stmt else {
+            return;
+        };
+
+        let [ast::Expr::Name(maybe_path)] = &**targets else {
+            return;
+        };
+
+        if &*maybe_path.id != "__path__" {
+            return;
+        }
+
+        let ast::Expr::Call(ast::ExprCall {
+            func: extend_func,
+            arguments: extend_arguments,
+            ..
+        }) = &**value
+        else {
+            return;
+        };
+
+        let ast::Expr::Attribute(ast::ExprAttribute {
+            value: maybe_pkg_util,
+            attr: maybe_extend_path,
+            ..
+        }) = &**extend_func
+        else {
+            return;
+        };
+
+        // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
+        match &**maybe_pkg_util {
+            // __import__("pkgutil").extend_path(__path__, __name__)
+            ast::Expr::Call(ruff_python_ast::ExprCall {
+                func: maybe_import,
+                arguments: import_arguments,
+                ..
+            }) => {
+                let ast::Expr::Name(maybe_import) = &**maybe_import else {
+                    return;
+                };
+
+                if maybe_import.id() != "__import__" {
+                    return;
+                }
+
+                let Some(ast::Expr::StringLiteral(name)) =
+                    import_arguments.find_argument_value("name", 0)
+                else {
+                    return;
+                };
+
+                if name.value.to_str() != "pkgutil" {
+                    return;
+                }
+            }
+            // "pkgutil.extend_path(__path__, __name__)"
+            ast::Expr::Name(name) => {
+                if name.id() != "pkgutil" {
+                    return;
+                }
+            }
+            _ => {
+                return;
+            }
+        }
+
+        // Test that this is an `extend_path(__path__, __name__)` call
+        if maybe_extend_path != "extend_path" {
+            return;
+        }
+
+        let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
+            return;
+        };
+        let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
+            return;
+        };
+
+        self.is_legacy_namespace_package = path.id() == "__path__" && name.id() == "__name__";
     }
 }
 

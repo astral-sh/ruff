@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum, command};
 
 use ruff_formatter::SourceCode;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -42,13 +42,19 @@ pub struct Cli {
     pub print_comments: bool,
     #[clap(long, short = 'C')]
     pub skip_magic_trailing_comma: bool,
+    #[clap(long)]
+    pub target_version: PythonVersion,
 }
 
 pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Result<String> {
     let source_type = PySourceType::from(source_path);
 
     // Parse the AST.
-    let parsed = parse(source, ParseOptions::from(source_type)).context("Syntax error in input")?;
+    let parsed = parse(
+        source,
+        ParseOptions::from(source_type).with_target_version(cli.target_version),
+    )
+    .context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_path)
         .with_preview(if cli.preview {
@@ -60,7 +66,8 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
             MagicTrailingComma::Ignore
         } else {
             MagicTrailingComma::Respect
-        });
+        })
+        .with_target_version(cli.target_version);
 
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());

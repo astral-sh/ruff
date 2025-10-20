@@ -113,6 +113,9 @@ pub struct Project {
     /// the project including the virtual files that might exists in the editor.
     #[default]
     check_mode: CheckMode,
+
+    #[default]
+    verbose_flag: bool,
 }
 
 /// A progress reporter.
@@ -366,6 +369,16 @@ impl Project {
 
         self.set_included_paths_list(db).to(paths);
         self.reload_files(db);
+    }
+
+    pub fn set_verbose(self, db: &mut dyn Db, verbose: bool) {
+        if self.verbose_flag(db) != verbose {
+            self.set_verbose_flag(db).to(verbose);
+        }
+    }
+
+    pub fn verbose(self, db: &dyn Db) -> bool {
+        self.verbose_flag(db)
     }
 
     /// Returns the paths that should be checked.

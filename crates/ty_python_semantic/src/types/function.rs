@@ -59,7 +59,7 @@ use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
-use crate::place::{Boundness, Place, place_from_bindings};
+use crate::place::{Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
@@ -73,7 +73,7 @@ use crate::types::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, InferableTypeVars};
 use crate::types::ide_support::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -81,9 +81,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
-    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    NormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext,
+    TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -152,23 +152,35 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-    pub struct DataclassTransformerParams: u8 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
-        const FIELD_SPECIFIERS= 1 << 4;
     }
 }
 
-impl get_size2::GetSize for DataclassTransformerParams {}
+impl get_size2::GetSize for DataclassTransformerFlags {}
 
-impl Default for DataclassTransformerParams {
+impl Default for DataclassTransformerFlags {
     fn default() -> Self {
         Self::EQ_DEFAULT
     }
 }
+
+/// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
+/// instance that we use as the return type for `dataclass_transform(…)` calls.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DataclassTransformerParams<'db> {
+    pub flags: DataclassTransformerFlags,
+
+    #[returns(deref)]
+    pub field_specifiers: Box<[Type<'db>]>,
+}
+
+impl get_size2::GetSize for DataclassTransformerParams<'_> {}
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
@@ -201,7 +213,7 @@ pub struct OverloadLiteral<'db> {
 
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
-    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -212,7 +224,7 @@ impl<'db> OverloadLiteral<'db> {
     fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -314,7 +326,7 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, scope);
 
-        let Place::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
+        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
             place_from_bindings(db, use_def.bindings_at_use(use_id))
         else {
             return None;
@@ -353,28 +365,12 @@ impl<'db> OverloadLiteral<'db> {
         if function_node.is_async && !is_generator {
             signature = signature.wrap_coroutine_return_type(db);
         }
-        signature = signature.mark_typevars_inferable(db);
-
-        let pep695_ctx = function_node.type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(db, index, self.definition(db), type_params)
-        });
-        let legacy_ctx = GenericContext::from_function_params(
-            db,
-            self.definition(db),
-            signature.parameters(),
-            signature.return_ty,
-        );
-        // We need to update `signature.generic_context` here,
-        // because type variables in `GenericContext::variables` are still non-inferable.
-        signature.generic_context =
-            GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
 
         signature
     }
 
     /// Typed internally-visible "raw" signature for this function.
-    /// That is, type variables in parameter types and the return type remain non-inferable,
-    /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
+    /// That is, the return types of async functions are not wrapped in `CoroutineType[...]`.
     ///
     /// ## Warning
     ///
@@ -740,7 +736,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
@@ -943,7 +939,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signature(db), false)
+        CallableType::new(db, self.signature(db), true)
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].
@@ -959,46 +955,42 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        match relation {
-            TypeRelation::Subtyping | TypeRelation::Redundancy => {
-                ConstraintSet::from(self.is_subtype_of(db, other))
-            }
-            TypeRelation::Assignability => ConstraintSet::from(self.is_assignable_to(db, other)),
-        }
-    }
-
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // A function type is the subtype of itself, and not of any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if self.normalized(db) == other.normalized(db) {
-            return true;
+        if matches!(relation, TypeRelation::Subtyping | TypeRelation::Redundancy)
+            && self.normalized(db) == other.normalized(db)
+        {
+            return ConstraintSet::from(true);
         }
+
         if self.literal(db) != other.literal(db) {
-            return false;
+            return ConstraintSet::from(false);
         }
+
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_subtype_of(db, other_signature)
-    }
-
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        // A function type is assignable to itself, and not to any other function type. However,
-        // our representation of a function type includes any specialization that should be applied
-        // to the signature. Different specializations of the same function type are only
-        // assignable to each other if they result in assignable signatures.
-        self.literal(db) == other.literal(db)
-            && self.signature(db).is_assignable_to(db, other.signature(db))
+        self_signature.has_relation_to_impl(
+            db,
+            other_signature,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
     }
 
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
@@ -1009,7 +1001,7 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_equivalent_to_impl(db, other_signature, visitor)
+        self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1125,7 +1117,6 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::NonInferableTypeVar(..)
         | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
@@ -1145,7 +1136,7 @@ fn is_instance_truthiness<'db>(
 fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) -> bool {
     // Return true for any mode that doesn't match typeshed's
     // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
-    mode.into_string_literal().is_none_or(|mode| {
+    mode.as_string_literal().is_none_or(|mode| {
         !matches!(
             mode.value(db),
             "r+" | "+r"
@@ -1557,7 +1548,7 @@ impl KnownFunction {
                         return;
                     }
                     let mut diagnostic = if let Some(message) = message
-                        .and_then(Type::into_string_literal)
+                        .and_then(Type::as_string_literal)
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
@@ -1721,16 +1712,12 @@ impl KnownFunction {
             }
 
             KnownFunction::RangeConstraint => {
-                let [
-                    Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
-                    Some(upper),
-                ] = parameter_types
+                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
                 else {
                     return;
                 };
 
-                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1738,16 +1725,13 @@ impl KnownFunction {
             }
 
             KnownFunction::NegatedRangeConstraint => {
-                let [
-                    Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
-                    Some(upper),
-                ] = parameter_types
+                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
                 else {
                     return;
                 };
 
-                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
+                let constraints =
+                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,

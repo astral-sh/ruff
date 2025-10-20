@@ -469,6 +469,7 @@ pub struct Options {
     deny_unknown_fields,
     rename_all = "kebab-case"
 )]
+#[cfg_attr(feature = "schemars", schemars(!from))]
 pub struct LintOptions {
     #[serde(flatten)]
     pub common: LintCommonOptions,
@@ -563,8 +564,8 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
-    fn schema_name() -> String {
-        "DeprecatedTopLevelLintOptions".to_owned()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("DeprecatedTopLevelLintOptions")
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed(concat!(
@@ -573,28 +574,25 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        use schemars::schema::Schema;
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        use serde_json::Value;
 
-        let common_schema = LintCommonOptions::json_schema(generator);
-        let mut schema_obj = common_schema.into_object();
-
-        if let Some(object) = schema_obj.object.as_mut() {
-            for property in object.properties.values_mut() {
-                if let Schema::Object(property_object) = property {
-                    if let Some(metadata) = &mut property_object.metadata {
-                        metadata.deprecated = true;
-                    } else {
-                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
-                            deprecated: true,
-                            ..schemars::schema::Metadata::default()
-                        }));
-                    }
+        let mut schema = LintCommonOptions::json_schema(generator);
+        if let Some(properties) = schema
+            .ensure_object()
+            .get_mut("properties")
+            .and_then(|value| value.as_object_mut())
+        {
+            for property in properties.values_mut() {
+                if let Ok(property_schema) = <&mut schemars::Schema>::try_from(property) {
+                    property_schema
+                        .ensure_object()
+                        .insert("deprecated".to_string(), Value::Bool(true));
                 }
             }
         }
 
-        Schema::Object(schema_obj)
+        schema
     }
 }
 
@@ -2168,7 +2166,8 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Note that this setting has no effect when `from __future__ import annotations`
     /// is present, as `__future__` annotations are always treated equivalently
-    /// to quoted annotations.
+    /// to quoted annotations. Similarly, this setting has no effect on Python
+    /// versions after 3.14 because these annotations are also deferred.
     #[option(
         default = "false",
         value_type = "bool",

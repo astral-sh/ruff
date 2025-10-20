@@ -18,3 +18,20 @@ def print_third_word(word: Hello.Text) -> None:
 
 def print_fourth_word(word: Goodbye) -> None:
     print(word)
+    
+
+import typing_extensions
+import typing_extensions as TypingExt
+from typing_extensions import Text as TextAlias
+
+
+def print_fifth_word(word: typing_extensions.Text) -> None:
+    print(word)
+
+
+def print_sixth_word(word: TypingExt.Text) -> None:
+    print(word)
+
+
+def print_seventh_word(word: TextAlias) -> None:
+    print(word)

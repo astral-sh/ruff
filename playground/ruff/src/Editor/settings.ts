@@ -79,6 +79,15 @@ export function persistLocal({
   settingsSource: string;
   pythonSource: string;
 }) {
+  const totalLength = settingsSource.length + pythonSource.length;
+
+  // Don't persist large files to local storage because they can exceed the local storage quota
+  // The number here is picked rarely arbitrarily. Also note, JS uses UTF 16:
+  // that means the limit here is strings larger than 1MB (because UTf 16 uses 2 bytes per character)
+  if (totalLength > 500_000) {
+    return;
+  }
+
   localStorage.setItem(
     "source",
     JSON.stringify([settingsSource, pythonSource]),

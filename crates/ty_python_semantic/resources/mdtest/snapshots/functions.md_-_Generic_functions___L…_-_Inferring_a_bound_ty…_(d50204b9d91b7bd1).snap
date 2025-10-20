@@ -13,78 +13,38 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/function
 
 ```
  1 | from typing import TypeVar
- 2 | from typing_extensions import reveal_type
- 3 | 
- 4 | T = TypeVar("T", bound=int)
- 5 | 
- 6 | def f(x: T) -> T:
- 7 |     return x
- 8 | 
- 9 | reveal_type(f(1))  # revealed: Literal[1]
-10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type]
-12 | reveal_type(f("string"))  # revealed: Unknown
+ 2 | 
+ 3 | T = TypeVar("T", bound=int)
+ 4 | 
+ 5 | def f(x: T) -> T:
+ 6 |     return x
+ 7 | 
+ 8 | reveal_type(f(1))  # revealed: Literal[1]
+ 9 | reveal_type(f(True))  # revealed: Literal[True]
+10 | # error: [invalid-argument-type]
+11 | reveal_type(f("string"))  # revealed: Unknown
 ```
 
 # Diagnostics
 
 ```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:9:13
-   |
- 7 |     return x
- 8 |
- 9 | reveal_type(f(1))  # revealed: Literal[1]
-   |             ^^^^ `Literal[1]`
-10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type]
-   |
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:10:13
-   |
- 9 | reveal_type(f(1))  # revealed: Literal[1]
-10 | reveal_type(f(True))  # revealed: Literal[True]
-   |             ^^^^^^^ `Literal[True]`
-11 | # error: [invalid-argument-type]
-12 | reveal_type(f("string"))  # revealed: Unknown
-   |
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:12:13
-   |
-10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type]
-12 | reveal_type(f("string"))  # revealed: Unknown
-   |             ^^^^^^^^^^^ `Unknown`
-   |
-
-```
-
-```
 error[invalid-argument-type]: Argument to function `f` is incorrect
-  --> src/mdtest_snippet.py:12:15
+  --> src/mdtest_snippet.py:11:15
    |
-10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type]
-12 | reveal_type(f("string"))  # revealed: Unknown
+ 9 | reveal_type(f(True))  # revealed: Literal[True]
+10 | # error: [invalid-argument-type]
+11 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
    |
 info: Type variable defined here
- --> src/mdtest_snippet.py:4:1
+ --> src/mdtest_snippet.py:3:1
   |
-2 | from typing_extensions import reveal_type
-3 |
-4 | T = TypeVar("T", bound=int)
+1 | from typing import TypeVar
+2 |
+3 | T = TypeVar("T", bound=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-5 |
-6 | def f(x: T) -> T:
+4 |
+5 | def f(x: T) -> T:
   |
 info: rule `invalid-argument-type` is enabled by default
 

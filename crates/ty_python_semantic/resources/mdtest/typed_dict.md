@@ -233,10 +233,12 @@ Person({"name": "Alice"})
 
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 accepts_person({"name": "Alice"})
+
 # TODO: this should be an error, similar to the above
 house.owner = {"name": "Alice"}
+
 a_person: Person
-# TODO: this should be an error, similar to the above
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 a_person = {"name": "Alice"}
 ```
 
@@ -254,9 +256,12 @@ Person({"name": None, "age": 30})
 accepts_person({"name": None, "age": 30})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": None, "age": 30}
+
 a_person: Person
-# TODO: this should be an error, similar to the above
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 a_person = {"name": None, "age": 30}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+(a_person := {"name": None, "age": 30})
 ```
 
 All of these have an extra field that is not defined in the `TypedDict`:
@@ -273,9 +278,12 @@ Person({"name": "Alice", "age": 30, "extra": True})
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 # TODO: this should be an error
 house.owner = {"name": "Alice", "age": 30, "extra": True}
-# TODO: this should be an error
+
 a_person: Person
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 a_person = {"name": "Alice", "age": 30, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+(a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
 ## Type ignore compatibility issues
@@ -664,18 +672,18 @@ Also, the "attributes" on the class definition can not be accessed. Neither on t
 on inhabitants of the type defined by the class:
 
 ```py
-# error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
+# error: [unresolved-attribute] "Class `Person` has no attribute `name`"
 Person.name
 
 def _(P: type[Person]):
-    # error: [unresolved-attribute] "Type `type[Person]` has no attribute `name`"
+    # error: [unresolved-attribute] "Object of type `type[Person]` has no attribute `name`"
     P.name
 
 def _(p: Person) -> None:
-    # error: [unresolved-attribute] "Type `Person` has no attribute `name`"
+    # error: [unresolved-attribute] "Object of type `Person` has no attribute `name`"
     p.name
 
-    type(p).name  # error: [unresolved-attribute] "Type `<class 'dict[str, object]'>` has no attribute `name`"
+    type(p).name  # error: [unresolved-attribute] "Class `dict[str, object]` has no attribute `name`"
 ```
 
 ## Special properties
@@ -907,7 +915,7 @@ grandchild: Node = {"name": "grandchild", "parent": child}
 
 nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", "parent": None}}}
 
-# TODO: this should be an error (invalid type for `name` in innermost node)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
 ```
 

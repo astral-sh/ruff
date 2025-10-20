@@ -952,8 +952,46 @@ fn rule_f401() {
 }
 
 #[test]
+fn rule_f401_output_json() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "json"]));
+}
+
+#[test]
+fn rule_f401_output_text() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "text"]));
+}
+
+#[test]
 fn rule_invalid_rule_name() {
     assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]'
+
+    For more information, try '--help'.
+    ");
+}
+
+#[test]
+fn rule_invalid_rule_name_output_json() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "json"]), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]'
+
+    For more information, try '--help'.
+    ");
+}
+
+#[test]
+fn rule_invalid_rule_name_output_text() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "text"]), @r"
     success: false
     exit_code: 2
     ----- stdout -----

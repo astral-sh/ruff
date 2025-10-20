@@ -360,3 +360,14 @@ type X = tuple[X, int]
 def _(x: X):
     reveal_type(x is x)  # revealed: bool
 ```
+
+### Recursive invariant
+
+```py
+type X = dict[str, X]
+type Y = X | str | dict[str, Y]
+
+def _(y: Y):
+    if isinstance(y, dict):
+        reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
+```

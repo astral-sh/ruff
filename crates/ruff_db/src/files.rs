@@ -193,6 +193,17 @@ impl Files {
         roots.at(&absolute)
     }
 
+    /// The same as [`Self::root`] but panics if no root is found.
+    #[track_caller]
+    pub fn expect_root(&self, db: &dyn Db, path: &SystemPath) -> FileRoot {
+        if let Some(root) = self.root(db, path) {
+            return root;
+        }
+
+        let roots = self.inner.roots.read().unwrap();
+        panic!("No root found for path '{path}'. Known roots: {roots:#?}");
+    }
+
     /// Adds a new root for `path` and returns the root.
     ///
     /// The root isn't added nor is the file root's kind updated if a root for `path` already exists.

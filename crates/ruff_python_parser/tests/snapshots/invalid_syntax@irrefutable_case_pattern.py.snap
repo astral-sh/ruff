@@ -427,3 +427,12 @@ Module(
    |                         ^^^ Syntax Error: name capture `var` makes remaining patterns unreachable
 12 |     case 2: ...
    |
+
+
+   |
+ 9 |     case 2: ...
+10 | match x:
+11 |     case enum.variant | var: ...  # or pattern with irrefutable part
+   |          ^^^^^^^^^^^^^^^^^^ Syntax Error: alternative patterns bind different names
+12 |     case 2: ...
+   |

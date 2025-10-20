@@ -14,7 +14,7 @@ use anyhow::Result;
 use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
-use crate::logging::setup_tracing;
+use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
@@ -73,11 +73,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let printer = Printer::default().with_verbosity(verbosity);
 
-    tracing::warn!(
-        "ty is pre-release software and not ready for production use. \
-            Expect to encounter bugs, missing features, and fatal errors.",
-    );
-
     tracing::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.
@@ -133,6 +128,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
+    db.project()
+        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     if !check_paths.is_empty() {
         db.project().set_included_paths(&mut db, check_paths);
     }

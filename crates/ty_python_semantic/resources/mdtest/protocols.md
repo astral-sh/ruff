@@ -347,7 +347,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing_extensions import Protocol, reveal_type
+from typing_extensions import Protocol
 
 # error: [call-non-callable]
 reveal_type(Protocol())  # revealed: Unknown
@@ -381,9 +381,7 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    # TODO: add a `reveal_type` call here once it's no longer a `Todo` type
-    # (which doesn't work well with snapshots)
-    x()
+    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
 ```
 
 ## Members of a protocol
@@ -534,7 +532,7 @@ python-version = "3.9"
 
 ```py
 import sys
-from typing_extensions import Protocol, get_protocol_members, reveal_type
+from typing_extensions import Protocol, get_protocol_members
 
 class Foo(Protocol):
     if sys.version_info >= (3, 10):
@@ -1116,6 +1114,8 @@ it's a large section).
 
 <!-- snapshot-diagnostics -->
 
+`a.py`:
+
 ```py
 from typing import Protocol
 
@@ -1140,6 +1140,31 @@ class A(Protocol):
     # error: [ambiguous-protocol-member]
     for d in range(42):
         pass
+```
+
+Validation of protocols that had cross-module inheritance used to break, so we test that explicitly
+here too:
+
+`b.py`:
+
+```py
+from typing import Protocol
+
+# Ensure the number of scopes in `b.py` is greater than the number of scopes in `c.py`:
+class SomethingUnrelated: ...
+
+class A(Protocol):
+    x: int
+```
+
+`c.py`:
+
+```py
+from b import A
+from typing import Protocol
+
+class C(A, Protocol):
+    x = 42  # fine, due to declaration in the base class
 ```
 
 ## Equivalence of protocols
@@ -2393,7 +2418,7 @@ By default, a protocol class cannot be used as the second argument to `isinstanc
 type inside these branches (this matches the behavior of other type checkers):
 
 ```py
-from typing_extensions import Protocol, reveal_type
+from typing_extensions import Protocol
 
 class HasX(Protocol):
     x: int

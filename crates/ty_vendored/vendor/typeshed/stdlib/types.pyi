@@ -69,7 +69,7 @@ if sys.version_info >= (3, 13):
 
 _T1 = TypeVar("_T1")
 _T2 = TypeVar("_T2")
-_KT = TypeVar("_KT")
+_KT_co = TypeVar("_KT_co", covariant=True)
 _VT_co = TypeVar("_VT_co", covariant=True)
 
 # Make sure this class definition stays roughly in line with `builtins.function`
@@ -337,51 +337,51 @@ class CodeType:
         __replace__ = replace
 
 @final
-class MappingProxyType(Mapping[_KT, _VT_co]):
+class MappingProxyType(Mapping[_KT_co, _VT_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
     """Read-only proxy of a mapping."""
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
-    def __new__(cls, mapping: SupportsKeysAndGetItem[_KT, _VT_co]) -> Self: ...
-    def __getitem__(self, key: _KT, /) -> _VT_co:
+    def __new__(cls, mapping: SupportsKeysAndGetItem[_KT_co, _VT_co]) -> Self: ...
+    def __getitem__(self, key: _KT_co, /) -> _VT_co:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
         """Return self[key]."""
 
-    def __iter__(self) -> Iterator[_KT]:
+    def __iter__(self) -> Iterator[_KT_co]:
         """Implement iter(self)."""
 
     def __len__(self) -> int:
         """Return len(self)."""
 
     def __eq__(self, value: object, /) -> bool: ...
-    def copy(self) -> dict[_KT, _VT_co]:
+    def copy(self) -> dict[_KT_co, _VT_co]:
         """D.copy() -> a shallow copy of D"""
 
-    def keys(self) -> KeysView[_KT]:
+    def keys(self) -> KeysView[_KT_co]:
         """D.keys() -> a set-like object providing a view on D's keys"""
 
     def values(self) -> ValuesView[_VT_co]:
         """D.values() -> an object providing a view on D's values"""
 
-    def items(self) -> ItemsView[_KT, _VT_co]:
+    def items(self) -> ItemsView[_KT_co, _VT_co]:
         """D.items() -> a set-like object providing a view on D's items"""
 
     @overload
-    def get(self, key: _KT, /) -> _VT_co | None:
+    def get(self, key: _KT_co, /) -> _VT_co | None:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
         """Return the value for key if key is in the mapping, else default."""
 
     @overload
-    def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: _KT_co, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
-    def get(self, key: _KT, default: _T2, /) -> _VT_co | _T2: ...
+    def get(self, key: _KT_co, default: _T2, /) -> _VT_co | _T2: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
-    def __reversed__(self) -> Iterator[_KT]:
+    def __reversed__(self) -> Iterator[_KT_co]:
         """D.__reversed__() -> reverse iterator"""
 
-    def __or__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
+    def __or__(self, value: Mapping[_T1, _T2], /) -> dict[_KT_co | _T1, _VT_co | _T2]:
         """Return self|value."""
 
-    def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
+    def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT_co | _T1, _VT_co | _T2]:
         """Return value|self."""
 
 if sys.version_info >= (3, 12):

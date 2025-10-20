@@ -854,7 +854,7 @@ impl ReachabilityConstraints {
                 }
 
                 let overloads_iterator =
-                    if let Some(Type::Callable(callable)) = ty.into_callable(db) {
+                    if let Some(Type::Callable(callable)) = ty.try_upcast_to_callable(db) {
                         callable.signatures(db).overloads.iter()
                     } else {
                         return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
@@ -917,13 +917,17 @@ impl ReachabilityConstraints {
                 )
                 .place
                 {
-                    crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
-                        Truthiness::AlwaysTrue
-                    }
-                    crate::place::Place::Type(_, crate::place::Boundness::PossiblyUnbound) => {
-                        Truthiness::Ambiguous
-                    }
-                    crate::place::Place::Unbound => Truthiness::AlwaysFalse,
+                    crate::place::Place::Defined(
+                        _,
+                        _,
+                        crate::place::Definedness::AlwaysDefined,
+                    ) => Truthiness::AlwaysTrue,
+                    crate::place::Place::Defined(
+                        _,
+                        _,
+                        crate::place::Definedness::PossiblyUndefined,
+                    ) => Truthiness::Ambiguous,
+                    crate::place::Place::Undefined => Truthiness::AlwaysFalse,
                 }
             }
         }

@@ -188,16 +188,10 @@ fn move_initialization(
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
     if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        let annotation = if let Some(ann) = parameter.annotation() {
-            format!(": {}", locator.slice(ann))
-        } else {
-            String::new()
-        };
         let _ = write!(
             &mut content,
-            "{}{} = {}",
+            "{} = {}",
             parameter.parameter.name(),
-            annotation,
             locator.slice(
                 parenthesized_range(
                     default.into(),

@@ -13,6 +13,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::str_prefix::{AnyStringPrefix, StringLiteralPrefix};
 use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -24,6 +25,7 @@ use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoin
 use crate::lexer::interpolated_string::{
     InterpolatedStringContext, InterpolatedStrings, InterpolatedStringsCheckpoint,
 };
+use crate::string::InterpolatedStringKind;
 use crate::token::{TokenFlags, TokenKind, TokenValue};
 
 mod cursor;
@@ -782,6 +784,7 @@ impl<'src> Lexer<'src> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
         let interpolated_string = self.interpolated_strings.current().unwrap();
         let string_kind = interpolated_string.kind();
+        let interpolated_flags = interpolated_string.flags();
 
         // Check if we're at the end of the f-string.
         if interpolated_string.is_triple_quoted() {
@@ -819,15 +822,19 @@ impl<'src> Lexer<'src> {
                     } else {
                         InterpolatedStringErrorType::UnterminatedString
                     };
+
+                    self.nesting = interpolated_string.nesting();
                     self.interpolated_strings.pop();
-                    return Some(self.push_error(LexicalError::new(
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
+                    self.push_error(LexicalError::new(
                         LexicalErrorType::from_interpolated_string_error(error, string_kind),
                         self.token_range(),
-                    )));
+                    ));
+
+                    break;
                 }
                 '\n' | '\r' if !interpolated_string.is_triple_quoted() => {
                     // https://github.com/astral-sh/ruff/issues/18632
-                    self.interpolated_strings.pop();
 
                     let error_type = if in_format_spec {
                         InterpolatedStringErrorType::NewlineInFormatSpec
@@ -835,10 +842,16 @@ impl<'src> Lexer<'src> {
                         InterpolatedStringErrorType::UnterminatedString
                     };
 
-                    return Some(self.push_error(LexicalError::new(
+                    self.nesting = interpolated_string.nesting();
+                    self.interpolated_strings.pop();
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
+
+                    self.push_error(LexicalError::new(
                         LexicalErrorType::from_interpolated_string_error(error_type, string_kind),
                         self.token_range(),
-                    )));
+                    ));
+
+                    break;
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
@@ -913,7 +926,7 @@ impl<'src> Lexer<'src> {
 
         self.current_value = TokenValue::InterpolatedStringMiddle(value.into_boxed_str());
 
-        self.current_flags = interpolated_string.flags();
+        self.current_flags = interpolated_flags;
         Some(string_kind.middle_token())
     }
 
@@ -942,10 +955,12 @@ impl<'src> Lexer<'src> {
                 let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
                     self.cursor.skip_to_end();
 
-                    return self.push_error(LexicalError::new(
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
+                    self.push_error(LexicalError::new(
                         LexicalErrorType::UnclosedStringError,
                         self.token_range(),
                     ));
+                    break self.offset();
                 };
 
                 // Rare case: if there are an odd number of backslashes before the quote, then
@@ -977,11 +992,14 @@ impl<'src> Lexer<'src> {
                     memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
                 else {
                     self.cursor.skip_to_end();
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
 
-                    return self.push_error(LexicalError::new(
-                        LexicalErrorType::StringError,
+                    self.push_error(LexicalError::new(
+                        LexicalErrorType::UnclosedStringError,
                         self.token_range(),
                     ));
+
+                    break self.offset();
                 };
 
                 // Rare case: if there are an odd number of backslashes before the quote, then
@@ -1009,10 +1027,12 @@ impl<'src> Lexer<'src> {
 
                 match quote_or_newline {
                     '\r' | '\n' => {
-                        return self.push_error(LexicalError::new(
+                        self.current_flags |= TokenFlags::UNCLOSED_STRING;
+                        self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
                             self.token_range(),
                         ));
+                        break self.offset();
                     }
                     ch if ch == quote => {
                         let value_end = self.offset();
@@ -1331,7 +1351,20 @@ impl<'src> Lexer<'src> {
 
     fn consume_end(&mut self) -> TokenKind {
         // We reached end of file.
-        // First of all, we need all nestings to be finished.
+
+        // First, finish any unterminated interpolated-strings.
+        while let Some(interpolated_string) = self.interpolated_strings.pop() {
+            self.nesting = interpolated_string.nesting();
+            self.push_error(LexicalError::new(
+                LexicalErrorType::from_interpolated_string_error(
+                    InterpolatedStringErrorType::UnterminatedString,
+                    interpolated_string.kind(),
+                ),
+                self.token_range(),
+            ));
+        }
+
+        // Second, finish all nestings.
         // For Mode::ParenthesizedExpression we start with nesting level 1.
         // So we check if we end with that level.
         let init_nesting = u32::from(self.mode == Mode::ParenthesizedExpression);
@@ -1457,6 +1490,107 @@ impl<'src> Lexer<'src> {
         self.state = State::Other;
         self.next_token();
         true
+    }
+
+    /// Re-lexes an unclosed string token in the context of an interpolated string element.
+    ///
+    /// ```py
+    /// f'{a'
+    /// ```
+    ///
+    /// This method re-lexes the trailing `'` as the end of the f-string rather than the
+    /// start of a new string token for better error recovery.
+    pub(crate) fn re_lex_string_token_in_interpolation_element(
+        &mut self,
+        kind: InterpolatedStringKind,
+    ) {
+        let Some(interpolated_string) = self.interpolated_strings.current() else {
+            return;
+        };
+
+        let current_string_flags = self.current_flags().as_any_string_flags();
+
+        // Only unclosed strings, that have the same quote character
+        if !matches!(self.current_kind, TokenKind::String)
+            || !self.current_flags.is_unclosed()
+            || current_string_flags.prefix() != AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
+            || current_string_flags.quote_style().as_char() != interpolated_string.quote_char()
+            || current_string_flags.is_triple_quoted() != interpolated_string.is_triple_quoted()
+        {
+            return;
+        }
+
+        // Only if the string's first line only contains whitespace,
+        // or ends in a comment (not `f"{"abc`)
+        let first_line = &self.source
+            [(self.current_range.start() + current_string_flags.quote_len()).to_usize()..];
+
+        for c in first_line.chars() {
+            if matches!(c, '\n' | '\r' | '#') {
+                break;
+            }
+
+            // `f'{'ab`, we want to parse `ab` as a normal string and not the closing element of the f-string
+            if !is_python_whitespace(c) {
+                return;
+            }
+        }
+
+        if self.errors.last().is_some_and(|error| {
+            error.location() == self.current_range
+                && matches!(error.error(), LexicalErrorType::UnclosedStringError)
+        }) {
+            self.errors.pop();
+        }
+
+        self.current_range =
+            TextRange::at(self.current_range.start(), self.current_flags.quote_len());
+        self.current_kind = kind.end_token();
+        self.current_value = TokenValue::None;
+        self.current_flags = TokenFlags::empty();
+
+        self.nesting = interpolated_string.nesting();
+        self.interpolated_strings.pop();
+
+        self.cursor = Cursor::new(self.source);
+        self.cursor.skip_bytes(self.current_range.end().to_usize());
+    }
+
+    /// Re-lex `r"` in a format specifier position.
+    ///
+    /// `r"` in a format specifier position is unlikely to be the start of a raw string.
+    /// Instead, it's the format specifier `!r` followed by the closing quote of the f-string,
+    /// when the `}` is missing.
+    ///
+    /// ```py
+    /// f"{test!r"
+    /// ```
+    ///
+    /// This function re-lexes the `r"` as `r` (a name token). The next `next_token` call will
+    /// return a unclosed string token for `"`, which [`Self::re_lex_string_token_in_interpolation_element`]
+    /// can then re-lex as the end of the f-string.
+    pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
+        // Re-lex `r"` as `NAME r` followed by an unclosed string
+        // `f"{test!r"` -> `f"{test!`, `r`, `"`
+        if matches!(self.current_kind, TokenKind::String)
+            && self.current_flags.is_unclosed()
+            && self.current_flags.prefix()
+                == AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
+        {
+            if self.errors.last().is_some_and(|error| {
+                error.location() == self.current_range
+                    && matches!(error.error(), LexicalErrorType::UnclosedStringError)
+            }) {
+                self.errors.pop();
+            }
+
+            self.current_range = TextRange::at(self.current_range.start(), 'r'.text_len());
+            self.current_kind = TokenKind::Name;
+            self.current_value = TokenValue::Name(Name::new_static("r"));
+            self.current_flags = TokenFlags::empty();
+            self.cursor = Cursor::new(self.source);
+            self.cursor.skip_bytes(self.current_range.end().to_usize());
+        }
     }
 
     #[inline]
@@ -2737,6 +2871,164 @@ t"{(lambda x:{x})}"
             LexicalErrorType::TStringError(error) => error,
             err => panic!("Expected TStringError: {err:?}"),
         }
+    }
+
+    #[test]
+    fn lex_fstring_unclosed() {
+        let source = r#"f"hello"#;
+
+        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        ## Tokens
+        ```
+        [
+            (
+                FStringStart,
+                0..2,
+                TokenFlags(
+                    DOUBLE_QUOTES | F_STRING,
+                ),
+            ),
+            (
+                InterpolatedStringMiddle(
+                    "hello",
+                ),
+                2..7,
+                TokenFlags(
+                    DOUBLE_QUOTES | F_STRING,
+                ),
+            ),
+            (
+                Newline,
+                7..7,
+            ),
+        ]
+        ```
+        ## Errors
+        ```
+        [
+            LexicalError {
+                error: FStringError(
+                    UnterminatedString,
+                ),
+                location: 2..7,
+            },
+        ]
+        ```
+        "#);
+    }
+
+    #[test]
+    fn lex_fstring_missing_brace() {
+        let source = "f'{'";
+
+        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        ## Tokens
+        ```
+        [
+            (
+                FStringStart,
+                0..2,
+                TokenFlags(
+                    F_STRING,
+                ),
+            ),
+            (
+                Lbrace,
+                2..3,
+            ),
+            (
+                String(
+                    "",
+                ),
+                3..4,
+                TokenFlags(
+                    UNCLOSED_STRING,
+                ),
+            ),
+            (
+                Newline,
+                4..4,
+            ),
+        ]
+        ```
+        ## Errors
+        ```
+        [
+            LexicalError {
+                error: UnclosedStringError,
+                location: 3..4,
+            },
+            LexicalError {
+                error: FStringError(
+                    UnterminatedString,
+                ),
+                location: 4..4,
+            },
+        ]
+        ```
+        "#);
+    }
+
+    #[test]
+    fn lex_fstring_missing_brace_after_format_spec() {
+        let source = r#"f"{foo!r""#;
+
+        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        ## Tokens
+        ```
+        [
+            (
+                FStringStart,
+                0..2,
+                TokenFlags(
+                    DOUBLE_QUOTES | F_STRING,
+                ),
+            ),
+            (
+                Lbrace,
+                2..3,
+            ),
+            (
+                Name(
+                    Name("foo"),
+                ),
+                3..6,
+            ),
+            (
+                Exclamation,
+                6..7,
+            ),
+            (
+                String(
+                    "",
+                ),
+                7..9,
+                TokenFlags(
+                    DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING,
+                ),
+            ),
+            (
+                Newline,
+                9..9,
+            ),
+        ]
+        ```
+        ## Errors
+        ```
+        [
+            LexicalError {
+                error: UnclosedStringError,
+                location: 7..9,
+            },
+            LexicalError {
+                error: FStringError(
+                    UnterminatedString,
+                ),
+                location: 9..9,
+            },
+        ]
+        ```
+        "#);
     }
 
     #[test]

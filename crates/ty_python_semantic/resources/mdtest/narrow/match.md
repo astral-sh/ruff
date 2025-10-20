@@ -71,98 +71,140 @@ reveal_type(x)  # revealed: object
 
 ## Value patterns
 
+Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
+one can only give us information where we know how the subject type implements equality.
+
+Consider the following example.
+
 ```py
-def get_object() -> object:
-    return object()
+from typing import Literal
 
-x = get_object()
+def _(x: Literal["foo"] | int):
+    match x:
+        case "foo":
+            reveal_type(x)  # revealed: Literal["foo"] | int
 
-reveal_type(x)  # revealed: object
+    match x:
+        case "bar":
+            reveal_type(x)  # revealed: int
+```
 
-match x:
-    case "foo":
-        reveal_type(x)  # revealed: Literal["foo"]
-    case 42:
-        reveal_type(x)  # revealed: Literal[42]
-    case 6.0:
-        reveal_type(x)  # revealed: float
-    case 1j:
-        reveal_type(x)  # revealed: complex
-    case b"foo":
-        reveal_type(x)  # revealed: Literal[b"foo"]
+In the first `match`'s `case "foo"` all we know is `x == "foo"`. `x` could be an instance of an
+arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow to
+`Literal["foo"]`.
 
-reveal_type(x)  # revealed: object
+In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
+rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
+
+More examples follow.
+
+```py
+from typing import Literal
+
+class C:
+    pass
+
+def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
+    match x:
+        case "foo":
+            reveal_type(x)  # revealed: Literal["foo"] | int | float | complex
+        case 42:
+            reveal_type(x)  # revealed: int | float | complex
+        case 6.0:
+            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
+        case 1j:
+            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
+        case b"foo":
+            reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
+        case _:
+            reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
 ```
 
 ## Value patterns with guard
 
 ```py
-def get_object() -> object:
-    return object()
+from typing import Literal
 
-x = get_object()
+class C:
+    pass
 
-reveal_type(x)  # revealed: object
-
-match x:
-    case "foo" if reveal_type(x):  # revealed: Literal["foo"]
-        pass
-    case 42 if reveal_type(x):  # revealed: Literal[42]
-        pass
-    case 6.0 if reveal_type(x):  # revealed: float
-        pass
-    case 1j if reveal_type(x):  # revealed: complex
-        pass
-    case b"foo" if reveal_type(x):  # revealed: Literal[b"foo"]
-        pass
-
-reveal_type(x)  # revealed: object
+def _(x: Literal["foo", b"bar"] | int):
+    match x:
+        case "foo" if reveal_type(x):  # revealed: Literal["foo"] | int
+            pass
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
+            pass
+        case 42 if reveal_type(x):  # revealed: int
+            pass
 ```
 
 ## Or patterns
 
 ```py
-def get_object() -> object:
-    return object()
+from typing import Literal
+from enum import Enum
 
-x = get_object()
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
 
-reveal_type(x)  # revealed: object
+def _(color: Color):
+    match color:
+        case Color.RED | Color.GREEN:
+            reveal_type(color)  # revealed: Literal[Color.RED, Color.GREEN]
+        case Color.BLUE:
+            reveal_type(color)  # revealed: Literal[Color.BLUE]
 
-match x:
-    case "foo" | 42 | None:
-        reveal_type(x)  # revealed: Literal["foo", 42] | None
-    case "foo" | tuple():
-        reveal_type(x)  # revealed: tuple[Unknown, ...]
-    case True | False:
-        reveal_type(x)  # revealed: bool
-    case 3.14 | 2.718 | 1.414:
-        reveal_type(x)  # revealed: float
+    match color:
+        case Color.RED | Color.GREEN | Color.BLUE:
+            reveal_type(color)  # revealed: Color
 
-reveal_type(x)  # revealed: object
+    match color:
+        case Color.RED:
+            reveal_type(color)  # revealed: Literal[Color.RED]
+        case _:
+            reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
+    match x:
+        case A() | B():
+            reveal_type(x)  # revealed: A | B
+        case C():
+            reveal_type(x)  # revealed: C & ~A & ~B
+        case _:
+            reveal_type(x)  # revealed: Never
+
+    match x:
+        case A() | B() | C():
+            reveal_type(x)  # revealed: A | B | C
+        case _:
+            reveal_type(x)  # revealed: Never
+
+    match x:
+        case A():
+            reveal_type(x)  # revealed: A
+        case _:
+            reveal_type(x)  # revealed: (B & ~A) | (C & ~A)
 ```
 
 ## Or patterns with guard
 
 ```py
-def get_object() -> object:
-    return object()
+from typing import Literal
 
-x = get_object()
-
-reveal_type(x)  # revealed: object
-
-match x:
-    case "foo" | 42 | None if reveal_type(x):  # revealed: Literal["foo", 42] | None
-        pass
-    case "foo" | tuple() if reveal_type(x):  # revealed: Literal["foo"] | tuple[Unknown, ...]
-        pass
-    case True | False if reveal_type(x):  # revealed: bool
-        pass
-    case 3.14 | 2.718 | 1.414 if reveal_type(x):  # revealed: float
-        pass
-
-reveal_type(x)  # revealed: object
+def _(x: Literal["foo", b"bar"] | int):
+    match x:
+        case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo"] | int
+            pass
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
+            pass
+        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
+            pass
 ```
 
 ## Narrowing due to guard
@@ -179,7 +221,7 @@ match x:
     case str() | float() if type(x) is str:
         reveal_type(x)  #  revealed: str
     case "foo" | 42 | None if isinstance(x, int):
-        reveal_type(x)  #  revealed: Literal[42]
+        reveal_type(x)  #  revealed: int
     case False if x:
         reveal_type(x)  #  revealed: Never
     case "foo" if x := "bar":
@@ -201,7 +243,7 @@ reveal_type(x)  # revealed: object
 match x:
     case str() | float() if type(x) is str and reveal_type(x):  # revealed: str
         pass
-    case "foo" | 42 | None if isinstance(x, int) and reveal_type(x):  #  revealed: Literal[42]
+    case "foo" | 42 | None if isinstance(x, int) and reveal_type(x):  #  revealed: int
         pass
     case False if x and reveal_type(x):  #  revealed: Never
         pass

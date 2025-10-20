@@ -99,8 +99,6 @@ If the arity check only matches a single overload, it should be evaluated as a r
 call should be reported directly and not as a `no-matching-overload` error.
 
 ```py
-from typing_extensions import reveal_type
-
 from overloaded import f
 
 reveal_type(f())  # revealed: None

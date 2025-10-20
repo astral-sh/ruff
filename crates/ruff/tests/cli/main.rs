@@ -15,6 +15,7 @@ use std::{
 };
 use tempfile::TempDir;
 
+mod format;
 mod lint;
 
 const BIN_NAME: &str = "ruff";
@@ -55,6 +56,16 @@ impl CliTest {
     /// - Environment isolation for consistent test behavior
     pub(crate) fn new() -> Result<Self> {
         Self::with_settings(|_, settings| settings)
+    }
+
+    pub(crate) fn with_files<'a>(
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> anyhow::Result<Self> {
+        let case = Self::new()?;
+        for file in files {
+            case.write_file(file.0, file.1)?;
+        }
+        Ok(case)
     }
 
     pub(crate) fn with_settings(
@@ -172,6 +183,12 @@ impl CliTest {
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
 
+        command
+    }
+
+    pub(crate) fn format_command(&self) -> Command {
+        let mut command = self.command();
+        command.args(["format", "--no-cache"]);
         command
     }
 }

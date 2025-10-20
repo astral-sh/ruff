@@ -224,6 +224,16 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
+            Stmt::Break(ast::StmtBreak { range, .. }) => {
+                if !ctx.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
+                }
+            }
+            Stmt::Continue(ast::StmtContinue { range, .. }) => {
+                if !ctx.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
+                }
+            }
             _ => {}
         }
 
@@ -1125,6 +1135,11 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
+            SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
+            SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
+                write!(f, "alternative patterns bind different names")
+            }
         }
     }
 }
@@ -1498,6 +1513,26 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `__future__` feature that is not defined.
     FutureFeatureNotDefined(String),
+
+    /// Represents the use of a `break` statement outside of a loop.
+    BreakOutsideLoop,
+
+    /// Represents the use of a `continue` statement outside of a loop.
+    ContinueOutsideLoop,
+
+    /// Represents the use of alternative patterns in a `match` statement that bind different names.
+    ///
+    /// Python requires all alternatives in an OR pattern (`|`) to bind the same set of names.
+    /// Using different names results in a `SyntaxError`.
+    ///
+    /// ## Example:
+    ///
+    /// ```python
+    /// match 5:
+    ///     case [x] | [y]:  # error
+    ///         ...
+    /// ```
+    DifferentMatchPatternBindings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1740,7 +1775,9 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                     self.insert(name);
                 }
             }
-            Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+            Pattern::MatchOr(ast::PatternMatchOr {
+                patterns, range, ..
+            }) => {
                 // each of these patterns should be visited separately because patterns can only be
                 // duplicated within a single arm of the or pattern. For example, the case below is
                 // a valid pattern.
@@ -1748,12 +1785,48 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // test_ok multiple_assignment_in_case_pattern
                 // match 2:
                 //     case Class(x) | [x] | x: ...
+
+                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
+                    let Some(prev) = &previous_names else {
+                        previous_names = Some(visitor.names);
+                        continue;
+                    };
+                    if prev.symmetric_difference(&visitor.names).next().is_some() {
+                        // test_err different_match_pattern_bindings
+                        // match x:
+                        //     case [a] | [b]: ...
+                        //     case [a] | []: ...
+                        //     case (x, y) | (x,): ...
+                        //     case [a, _] | [a, b]: ...
+                        //     case (x, (y | z)): ...
+                        //     case [a] | [b] | [c]: ...
+                        //     case [] | [a]: ...
+                        //     case [a] | [C(x)]: ...
+                        //     case [[a] | [b]]: ...
+                        //     case [C(a)] | [C(b)]: ...
+                        //     case [C(D(a))] | [C(D(b))]: ...
+                        //     case [(a, b)] | [(c, d)]: ...
+
+                        // test_ok different_match_pattern_bindings
+                        // match x:
+                        //     case [a] | [a]: ...
+                        //     case (x, y) | (x, y): ...
+                        //     case (x, (y | y)): ...
+                        //     case [a, _] | [a, _]: ...
+                        //     case [a] | [C(a)]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
+                            *range,
+                        );
+                        break;
+                    }
                 }
             }
         }
@@ -1979,6 +2052,8 @@ pub trait SemanticSyntaxContext {
     fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
+
+    fn in_loop_context(&self) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

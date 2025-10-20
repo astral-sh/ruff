@@ -9,7 +9,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
-use crate::types::generics::walk_specialization;
+use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
@@ -121,6 +121,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -129,6 +130,7 @@ impl<'db> Type<'db> {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
                 protocol.interface(db),
+                inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
@@ -142,6 +144,7 @@ impl<'db> Type<'db> {
                     member.is_satisfied_by(
                         db,
                         self,
+                        inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
@@ -156,31 +159,28 @@ impl<'db> Type<'db> {
         // This matches the behaviour of other type checkers, and is required for us to
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
-            if let Protocol::FromClass(class) = protocol.inner {
-                // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
-                // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
-                // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
-                // `Q`'s members in a Liskov-incompatible way.
-                let type_to_test = if let Type::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::FromClass(class),
-                    ..
-                }) = self
-                {
-                    Type::non_tuple_instance(db, class)
-                } else {
-                    self
-                };
+            let Some(nominal_instance) = protocol.as_nominal_type() else {
+                return ConstraintSet::from(false);
+            };
 
-                type_to_test.has_relation_to_impl(
-                    db,
-                    Type::non_tuple_instance(db, class),
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            } else {
-                ConstraintSet::from(false)
-            }
+            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+            // `Q`'s members in a Liskov-incompatible way.
+            let type_to_test = self
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::as_nominal_type)
+                .map(Type::NominalInstance)
+                .unwrap_or(self);
+
+            type_to_test.has_relation_to_impl(
+                db,
+                Type::NominalInstance(nominal_instance),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
         })
     }
 }
@@ -364,6 +364,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -376,6 +377,7 @@ impl<'db> NominalInstanceType<'db> {
             ) => tuple1.has_relation_to_impl(
                 db,
                 tuple2,
+                inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
@@ -383,6 +385,7 @@ impl<'db> NominalInstanceType<'db> {
             _ => self.class(db).has_relation_to_impl(
                 db,
                 other.class(db),
+                inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
@@ -394,18 +397,19 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
+            ) => tuple1.is_equivalent_to_impl(db, tuple2, inferable, visitor),
             (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
                 ConstraintSet::from(true)
             }
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to_impl(db, class2, visitor)
+                class1.is_equivalent_to_impl(db, class2, inferable, visitor)
             }
             _ => ConstraintSet::from(false),
         }
@@ -415,6 +419,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -427,6 +432,7 @@ impl<'db> NominalInstanceType<'db> {
                 let compatible = self_spec.is_disjoint_from_impl(
                     db,
                     &other_spec,
+                    inferable,
                     disjointness_visitor,
                     relation_visitor,
                 );
@@ -605,6 +611,20 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// If this is a class-based protocol, convert the protocol-instance into a nominal instance.
+    ///
+    /// If this is a synthesized protocol that does not correspond to a class definition
+    /// in source code, return `None`. These are "pure" abstract types, that cannot be
+    /// treated in a nominal way.
+    pub(super) fn as_nominal_type(self) -> Option<NominalInstanceType<'db>> {
+        match self.inner {
+            Protocol::FromClass(class) => {
+                Some(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+            }
+            Protocol::Synthesized(_) => None,
+        }
+    }
+
     /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
@@ -640,6 +660,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 .satisfies_protocol(
                     db,
                     protocol,
+                    InferableTypeVars::None,
                     TypeRelation::Subtyping,
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),
@@ -698,6 +719,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -719,6 +741,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
+        _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         ConstraintSet::from(false)

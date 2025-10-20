@@ -473,4 +473,18 @@ class C:
 reveal_type(generic_context(C.f))  # revealed: None
 ```
 
+## Non-positional first parameters
+
+This makes sure that we don't bind `self` if it's not a positional parameter:
+
+```py
+from ty_extensions import CallableTypeOf
+
+class C:
+    def method(*args, **kwargs) -> None: ...
+
+def _(c: CallableTypeOf[C().method]):
+    reveal_type(c)  # revealed: (...) -> None
+```
+
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

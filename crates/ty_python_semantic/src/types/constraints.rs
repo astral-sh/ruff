@@ -60,7 +60,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use crate::Db;
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
+use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, UnionType};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -223,7 +223,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Self {
         let lower = lower.bottom_materialization(db);
@@ -236,7 +236,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negated_range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Self {
         Self::range(db, lower, typevar, upper).negate(db)
@@ -258,7 +258,7 @@ impl From<bool> for ConstraintSet<'_> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarInstance<'db>,
+    typevar: BoundTypeVarIdentity<'db>,
     lower: Type<'db>,
     upper: Type<'db>,
 }
@@ -274,7 +274,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));

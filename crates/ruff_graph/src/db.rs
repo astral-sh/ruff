@@ -98,6 +98,10 @@ impl Db for ModuleDb {
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
     }
+
+    fn verbose(&self) -> bool {
+        false
+    }
 }
 
 #[salsa::db]

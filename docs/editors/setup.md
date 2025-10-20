@@ -464,59 +464,46 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
 }
 ```
 
-!!! note
-
-    Support for multiple formatters for a given language is only available in Zed version
-    `0.146.0` and later.
-
 You can configure Ruff to format Python code on-save by registering the Ruff formatter
 and enabling the [`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) setting:
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "language_server": {
-                "name": "ruff"
-              }
-            }
-          ]
+```json
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff"],
+      "format_on_save": "on",
+      "formatter": [
+        {
+          "language_server": {
+            "name": "ruff"
+          }
         }
-      }
+      ]
     }
-    ```
+  }
+}
+```
 
 You can configure Ruff to fix lint violations and/or organize imports on-save by enabling the
 `source.fixAll.ruff` and `source.organizeImports.ruff` code actions respectively:
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "code_actions": {
-                // Fix all auto-fixable lint violations
-                "source.fixAll.ruff": true,
-                // Organize imports
-                "source.organizeImports.ruff": true
-              }
-            }
-          ]
-        }
-      }
+```json
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff"],
+      "format_on_save": "on",
+      "formatter": [
+        // Fix all auto-fixable lint violations
+        { "code_action": "source.fixAll.ruff" },
+        // Organize imports
+        { "code_action": "source.organizeImports.ruff" }
+      ]
     }
-    ```
+  }
+}
+```
 
 Taken together, you can configure Ruff to format, fix, and organize imports on-save via the
 following `settings.json`:
@@ -528,28 +515,18 @@ following `settings.json`:
     ensure that the formatter takes care of any remaining style issues after the code actions have
     been applied.
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "code_actions": {
-                "source.organizeImports.ruff": true,
-                "source.fixAll.ruff": true
-              }
-            },
-            {
-              "language_server": {
-                "name": "ruff"
-              }
-            }
-          ]
-        }
-      }
+```json
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff"],
+      "format_on_save": "on",
+      "formatter": [
+        { "code_action": "source.fixAll.ruff" },
+        { "code_action": "source.organizeImports.ruff" },
+        { "language_server": { "name": "ruff" } }
+      ]
     }
-    ```
+  }
+}
+```

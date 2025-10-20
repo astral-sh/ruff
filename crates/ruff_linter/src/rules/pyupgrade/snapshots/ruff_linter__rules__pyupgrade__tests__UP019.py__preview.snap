@@ -1,0 +1,119 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP019 [*] `typing.Text` is deprecated, use `str`
+ --> UP019.py:7:22
+  |
+7 | def print_word(word: Text) -> None:
+  |                      ^^^^
+8 |     print(word)
+  |
+help: Replace with `str`
+4  | from typing import Text as Goodbye
+5  | 
+6  | 
+   - def print_word(word: Text) -> None:
+7  + def print_word(word: str) -> None:
+8  |     print(word)
+9  | 
+10 | 
+
+UP019 [*] `typing.Text` is deprecated, use `str`
+  --> UP019.py:11:29
+   |
+11 | def print_second_word(word: typing.Text) -> None:
+   |                             ^^^^^^^^^^^
+12 |     print(word)
+   |
+help: Replace with `str`
+8  |     print(word)
+9  | 
+10 | 
+   - def print_second_word(word: typing.Text) -> None:
+11 + def print_second_word(word: str) -> None:
+12 |     print(word)
+13 | 
+14 | 
+
+UP019 [*] `typing.Text` is deprecated, use `str`
+  --> UP019.py:15:28
+   |
+15 | def print_third_word(word: Hello.Text) -> None:
+   |                            ^^^^^^^^^^
+16 |     print(word)
+   |
+help: Replace with `str`
+12 |     print(word)
+13 | 
+14 | 
+   - def print_third_word(word: Hello.Text) -> None:
+15 + def print_third_word(word: str) -> None:
+16 |     print(word)
+17 | 
+18 | 
+
+UP019 [*] `typing.Text` is deprecated, use `str`
+  --> UP019.py:19:29
+   |
+19 | def print_fourth_word(word: Goodbye) -> None:
+   |                             ^^^^^^^
+20 |     print(word)
+   |
+help: Replace with `str`
+16 |     print(word)
+17 | 
+18 | 
+   - def print_fourth_word(word: Goodbye) -> None:
+19 + def print_fourth_word(word: str) -> None:
+20 |     print(word)
+21 |     
+22 | 
+
+UP019 [*] `typing_extensions.Text` is deprecated, use `str`
+  --> UP019.py:28:28
+   |
+28 | def print_fifth_word(word: typing_extensions.Text) -> None:
+   |                            ^^^^^^^^^^^^^^^^^^^^^^
+29 |     print(word)
+   |
+help: Replace with `str`
+25 | from typing_extensions import Text as TextAlias
+26 | 
+27 | 
+   - def print_fifth_word(word: typing_extensions.Text) -> None:
+28 + def print_fifth_word(word: str) -> None:
+29 |     print(word)
+30 | 
+31 | 
+
+UP019 [*] `typing_extensions.Text` is deprecated, use `str`
+  --> UP019.py:32:28
+   |
+32 | def print_sixth_word(word: TypingExt.Text) -> None:
+   |                            ^^^^^^^^^^^^^^
+33 |     print(word)
+   |
+help: Replace with `str`
+29 |     print(word)
+30 | 
+31 | 
+   - def print_sixth_word(word: TypingExt.Text) -> None:
+32 + def print_sixth_word(word: str) -> None:
+33 |     print(word)
+34 | 
+35 | 
+
+UP019 [*] `typing_extensions.Text` is deprecated, use `str`
+  --> UP019.py:36:30
+   |
+36 | def print_seventh_word(word: TextAlias) -> None:
+   |                              ^^^^^^^^^
+37 |     print(word)
+   |
+help: Replace with `str`
+33 |     print(word)
+34 | 
+35 | 
+   - def print_seventh_word(word: TextAlias) -> None:
+36 + def print_seventh_word(word: str) -> None:
+37 |     print(word)

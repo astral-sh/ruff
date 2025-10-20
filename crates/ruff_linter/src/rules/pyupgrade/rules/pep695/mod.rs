@@ -14,12 +14,13 @@ use ruff_python_ast::{
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::checkers::ast::Checker;
+use crate::preview::is_type_var_default_enabled;
+
 pub(crate) use non_pep695_generic_class::*;
 pub(crate) use non_pep695_generic_function::*;
 pub(crate) use non_pep695_type_alias::*;
 pub(crate) use private_type_parameter::*;
-
-use crate::checkers::ast::Checker;
 
 mod non_pep695_generic_class;
 mod non_pep695_generic_function;
@@ -122,6 +123,10 @@ impl Display for DisplayTypeVar<'_> {
                 }
             }
         }
+        if let Some(default) = self.type_var.default {
+            f.write_str(" = ")?;
+            f.write_str(&self.source[default.range()])?;
+        }
 
         Ok(())
     }
@@ -133,66 +138,63 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             name,
             restriction,
             kind,
-            default: _, // TODO(brent) see below
+            default,
         }: &'a TypeVar<'a>,
     ) -> Self {
+        let default = default.map(|expr| Box::new(expr.clone()));
         match kind {
-            TypeParamKind::TypeVar => {
-                TypeParam::TypeVar(TypeParamTypeVar {
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    name: Identifier::new(*name, TextRange::default()),
-                    bound: match restriction {
-                        Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
-                        Some(TypeVarRestriction::Constraint(constraints)) => {
-                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
-                                ctx: ast::ExprContext::Load,
-                                parenthesized: true,
-                            })))
-                        }
-                        Some(TypeVarRestriction::AnyStr) => {
-                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                elts: vec![
-                                    Expr::Name(ExprName {
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        id: Name::from("str"),
-                                        ctx: ast::ExprContext::Load,
-                                    }),
-                                    Expr::Name(ExprName {
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        id: Name::from("bytes"),
-                                        ctx: ast::ExprContext::Load,
-                                    }),
-                                ],
-                                ctx: ast::ExprContext::Load,
-                                parenthesized: true,
-                            })))
-                        }
-                        None => None,
-                    },
-                    // We don't handle defaults here yet. Should perhaps be a different rule since
-                    // defaults are only valid in 3.13+.
-                    default: None,
-                })
-            }
+            TypeParamKind::TypeVar => TypeParam::TypeVar(TypeParamTypeVar {
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                name: Identifier::new(*name, TextRange::default()),
+                bound: match restriction {
+                    Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
+                    Some(TypeVarRestriction::Constraint(constraints)) => {
+                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                            range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
+                            ctx: ast::ExprContext::Load,
+                            parenthesized: true,
+                        })))
+                    }
+                    Some(TypeVarRestriction::AnyStr) => {
+                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                            range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            elts: vec![
+                                Expr::Name(ExprName {
+                                    range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                    id: Name::from("str"),
+                                    ctx: ast::ExprContext::Load,
+                                }),
+                                Expr::Name(ExprName {
+                                    range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                    id: Name::from("bytes"),
+                                    ctx: ast::ExprContext::Load,
+                                }),
+                            ],
+                            ctx: ast::ExprContext::Load,
+                            parenthesized: true,
+                        })))
+                    }
+                    None => None,
+                },
+                default,
+            }),
             TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 name: Identifier::new(*name, TextRange::default()),
-                default: None,
+                default,
             }),
             TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 name: Identifier::new(*name, TextRange::default()),
-                default: None,
+                default,
             }),
         }
     }
@@ -318,8 +320,8 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 .first()
                 .is_some_and(Expr::is_string_literal_expr)
             {
-                // TODO(brent) `default` was added in PEP 696 and Python 3.13 but can't be used in
-                // generic type parameters before that
+                // `default` was added in PEP 696 and Python 3.13. We now support converting
+                // TypeVars with defaults to PEP 695 type parameters.
                 //
                 // ```python
                 // T = TypeVar("T", default=Any, bound=str)
@@ -367,21 +369,22 @@ fn in_nested_context(checker: &Checker) -> bool {
 }
 
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
-fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
+/// Also returns `None` if any `TypeVar` has a default value and preview mode is not enabled.
+fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<TypeVar<'a>>> {
     if vars.is_empty() {
         return None;
     }
 
+    // If any type variables have defaults and preview mode is not enabled, skip the rule
+    if vars.iter().any(|tv| tv.default.is_some())
+        && !is_type_var_default_enabled(checker.settings())
+    {
+        return None;
+    }
+
     // If any type variables were not unique, just bail out here. this is a runtime error and we
-    // can't predict what the user wanted. also bail out if any Python 3.13+ default values are
-    // found on the type parameters
-    (vars
-        .iter()
-        .unique_by(|tvar| tvar.name)
-        .filter(|tvar| tvar.default.is_none())
-        .count()
-        == vars.len())
-    .then_some(vars)
+    // can't predict what the user wanted.
+    (vars.iter().unique_by(|tvar| tvar.name).count() == vars.len()).then_some(vars)
 }
 
 /// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if

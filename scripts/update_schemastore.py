@@ -117,11 +117,11 @@ def update_schemastore(
             f"This updates ruff's JSON schema to [{current_sha}]({commit_url})"
         )
         # https://stackoverflow.com/a/22909204/3549270
+        check_call(["git", "add", (src / RUFF_JSON).as_posix()], cwd=schemastore_path)
         check_call(
             [
                 "git",
                 "commit",
-                "-a",
                 "-m",
                 "Update ruff's JSON schema",
                 "-m",
