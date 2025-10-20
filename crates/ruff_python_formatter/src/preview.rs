@@ -36,3 +36,9 @@ pub(crate) const fn is_remove_parens_around_except_types_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`wrap_comprehension_in`](https://github.com/astral-sh/ruff/pull/TODO)
+/// preview style is enabled.
+pub(crate) const fn is_wrap_comprehension_in_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
