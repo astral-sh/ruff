@@ -601,7 +601,6 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
 // Don't add any new options to this struct. Add them to [`LintOptions`] directly to avoid exposing them in the
 // global settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(inline))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
@@ -3890,7 +3889,6 @@ pub struct AnalyzeOptions {
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
 /// far better error messages when deserializing.
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LintOptionsWire {
