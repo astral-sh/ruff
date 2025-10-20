@@ -1311,7 +1311,7 @@ def foo():
     }
 
     #[test]
-    fn from_future_import() {
+    fn existing_future_import() {
         let test = cursor_test(
             "\
 from __future__ import annotations
@@ -1326,6 +1326,26 @@ from __future__ import annotations
 
         typing.TypeVar
         ");
+    }
+
+    #[test]
+    fn existing_future_import_after_docstring() {
+        let test = cursor_test(
+            r#"
+"This is a module level docstring"
+from __future__ import annotations
+
+<CURSOR>
+        "#,
+        );
+        assert_snapshot!(
+            test.import("typing", "TypeVar"), @r#"
+        "This is a module level docstring"
+        from __future__ import annotations
+        import typing
+
+        typing.TypeVar
+        "#);
     }
 
     #[test]
