@@ -67,7 +67,8 @@ pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
-use crate::types::variance::{TypeVarVariance, VarianceInferable};
+pub use crate::types::variance::TypeVarVariance;
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
@@ -8394,6 +8395,21 @@ impl<'db> TypeVarInstance<'db> {
             _ => None,
         }
     }
+
+    pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+        if self.identity(db).kind(db) != TypeVarKind::Pep695 {
+            return None;
+        }
+        let typevar_definition = self.definition(db)?;
+        let index = semantic_index(db, typevar_definition.file(db));
+        let (_, child) = index
+            .child_scopes(typevar_definition.file_scope(db))
+            .next()?;
+        child
+            .node()
+            .generic_context(db, index)?
+            .binds_typevar(db, self)
+    }
 }
 
 #[allow(clippy::ref_option)]
@@ -8544,7 +8560,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
+    pub fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
         self.variance_with_polarity(db, TypeVarVariance::Covariant)
     }
 }
