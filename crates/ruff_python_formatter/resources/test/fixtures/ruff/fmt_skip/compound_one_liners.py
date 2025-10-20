@@ -17,7 +17,7 @@ if True:
 # Multiple statements in body (should not apply - multiline)
 if True:
     x = 1
-    y = 2  # fmt: skip
+    y   =   2  # fmt: skip
 
 # With decorators - decorated function on one line
 @overload
