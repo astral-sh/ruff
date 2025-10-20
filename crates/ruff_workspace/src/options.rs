@@ -3938,8 +3938,8 @@ pub struct LintOptionsWire {
     pyflakes: Option<PyflakesOptions>,
     pylint: Option<PylintOptions>,
     pyupgrade: Option<PyUpgradeOptions>,
-    per_file_ignores: Option<BTreeMap<String, Vec<RuleSelector>>>,
-    extend_per_file_ignores: Option<BTreeMap<String, Vec<RuleSelector>>>,
+    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 
     exclude: Option<Vec<String>>,
     pydoclint: Option<PydoclintOptions>,
@@ -4004,11 +4004,6 @@ impl From<LintOptionsWire> for LintOptions {
             typing_extensions,
             future_annotations,
         } = value;
-
-        let per_file_ignores =
-            per_file_ignores.map(|map| map.into_iter().collect::<FxHashMap<_, _>>());
-        let extend_per_file_ignores =
-            extend_per_file_ignores.map(|map| map.into_iter().collect::<FxHashMap<_, _>>());
 
         LintOptions {
             #[expect(deprecated)]

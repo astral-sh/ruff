@@ -197,13 +197,13 @@ mod schemars {
         }
 
         fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
-            let string_with_pattern = schemars::json_schema!({
-                "type": "string",
-                "pattern": r"^\\d+\\.\\d+$",
-            });
-
-            let mut any_of: Vec<Value> = Vec::new();
-            any_of.push(string_with_pattern.into());
+            let mut any_of: Vec<Value> = vec![
+                schemars::json_schema!({
+                    "type": "string",
+                    "pattern": r"^\d+\.\d+$",
+                })
+                .into(),
+            ];
 
             for version in Self::iter() {
                 let mut schema = schemars::json_schema!({

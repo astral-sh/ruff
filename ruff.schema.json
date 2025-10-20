@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Options",
   "type": "object",
   "properties": {
@@ -20,7 +20,7 @@
       "description": "Options to configure import map generation.",
       "anyOf": [
         {
-          "$ref": "#/$defs/AnalyzeOptions"
+          "$ref": "#/definitions/AnalyzeOptions"
         },
         {
           "type": "null"
@@ -95,7 +95,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-ignore": {
@@ -106,7 +106,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-include": {
@@ -128,7 +128,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/$defs/RuleSelector"
+          "$ref": "#/definitions/RuleSelector"
         }
       },
       "deprecated": true
@@ -141,7 +141,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-select": {
@@ -152,7 +152,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-unfixable": {
@@ -163,7 +163,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-unsafe-fixes": {
@@ -174,7 +174,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "external": {
@@ -210,14 +210,14 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "flake8-annotations": {
       "description": "Options for the `flake8-annotations` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8AnnotationsOptions"
+          "$ref": "#/definitions/Flake8AnnotationsOptions"
         },
         {
           "type": "null"
@@ -229,7 +229,7 @@
       "description": "Options for the `flake8-bandit` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8BanditOptions"
+          "$ref": "#/definitions/Flake8BanditOptions"
         },
         {
           "type": "null"
@@ -241,7 +241,7 @@
       "description": "Options for the `flake8-boolean-trap` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8BooleanTrapOptions"
+          "$ref": "#/definitions/Flake8BooleanTrapOptions"
         },
         {
           "type": "null"
@@ -253,7 +253,7 @@
       "description": "Options for the `flake8-bugbear` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8BugbearOptions"
+          "$ref": "#/definitions/Flake8BugbearOptions"
         },
         {
           "type": "null"
@@ -265,7 +265,7 @@
       "description": "Options for the `flake8-builtins` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8BuiltinsOptions"
+          "$ref": "#/definitions/Flake8BuiltinsOptions"
         },
         {
           "type": "null"
@@ -277,7 +277,7 @@
       "description": "Options for the `flake8-comprehensions` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8ComprehensionsOptions"
+          "$ref": "#/definitions/Flake8ComprehensionsOptions"
         },
         {
           "type": "null"
@@ -289,7 +289,7 @@
       "description": "Options for the `flake8-copyright` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8CopyrightOptions"
+          "$ref": "#/definitions/Flake8CopyrightOptions"
         },
         {
           "type": "null"
@@ -301,7 +301,7 @@
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8ErrMsgOptions"
+          "$ref": "#/definitions/Flake8ErrMsgOptions"
         },
         {
           "type": "null"
@@ -313,7 +313,7 @@
       "description": "Options for the `flake8-gettext` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8GetTextOptions"
+          "$ref": "#/definitions/Flake8GetTextOptions"
         },
         {
           "type": "null"
@@ -325,7 +325,7 @@
       "description": "Options for the `flake8-implicit-str-concat` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8ImplicitStrConcatOptions"
+          "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
         },
         {
           "type": "null"
@@ -337,7 +337,7 @@
       "description": "Options for the `flake8-import-conventions` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8ImportConventionsOptions"
+          "$ref": "#/definitions/Flake8ImportConventionsOptions"
         },
         {
           "type": "null"
@@ -349,7 +349,7 @@
       "description": "Options for the `flake8-pytest-style` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8PytestStyleOptions"
+          "$ref": "#/definitions/Flake8PytestStyleOptions"
         },
         {
           "type": "null"
@@ -361,7 +361,7 @@
       "description": "Options for the `flake8-quotes` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8QuotesOptions"
+          "$ref": "#/definitions/Flake8QuotesOptions"
         },
         {
           "type": "null"
@@ -373,7 +373,7 @@
       "description": "Options for the `flake8_self` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8SelfOptions"
+          "$ref": "#/definitions/Flake8SelfOptions"
         },
         {
           "type": "null"
@@ -385,7 +385,7 @@
       "description": "Options for the `flake8-tidy-imports` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8TidyImportsOptions"
+          "$ref": "#/definitions/Flake8TidyImportsOptions"
         },
         {
           "type": "null"
@@ -397,7 +397,7 @@
       "description": "Options for the `flake8-type-checking` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8TypeCheckingOptions"
+          "$ref": "#/definitions/Flake8TypeCheckingOptions"
         },
         {
           "type": "null"
@@ -409,7 +409,7 @@
       "description": "Options for the `flake8-unused-arguments` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Flake8UnusedArgumentsOptions"
+          "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
         },
         {
           "type": "null"
@@ -428,7 +428,7 @@
       "description": "Options to configure code formatting.",
       "anyOf": [
         {
-          "$ref": "#/$defs/FormatOptions"
+          "$ref": "#/definitions/FormatOptions"
         },
         {
           "type": "null"
@@ -443,7 +443,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "ignore-init-module-imports": {
@@ -468,7 +468,7 @@
       "description": "The number of spaces per indentation level (tab).\n\nUsed by the formatter and when enforcing long-line violations (like `E501`) to determine the visual\nwidth of a tab.\n\nThis option changes the number of spaces the formatter inserts when\nusing soft-tabs (`indent-style = space`).\n\nPEP 8 recommends using 4 spaces per [indentation level](https://peps.python.org/pep-0008/#indentation).",
       "anyOf": [
         {
-          "$ref": "#/$defs/IndentWidth"
+          "$ref": "#/definitions/IndentWidth"
         },
         {
           "type": "null"
@@ -479,7 +479,7 @@
       "description": "Options for the `isort` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/IsortOptions"
+          "$ref": "#/definitions/IsortOptions"
         },
         {
           "type": "null"
@@ -491,7 +491,7 @@
       "description": "The line length to use when enforcing long-lines violations (like `E501`)\nand at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain\nwithin the `line-length`, it isn't a hard upper bound, and formatted lines may\nexceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
       "anyOf": [
         {
-          "$ref": "#/$defs/LineLength"
+          "$ref": "#/definitions/LineLength"
         },
         {
           "type": "null"
@@ -501,7 +501,7 @@
     "lint": {
       "anyOf": [
         {
-          "$ref": "#/$defs/LintOptions"
+          "$ref": "#/definitions/LintOptions"
         },
         {
           "type": "null"
@@ -523,7 +523,7 @@
       "description": "Options for the `mccabe` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/McCabeOptions"
+          "$ref": "#/definitions/McCabeOptions"
         },
         {
           "type": "null"
@@ -545,7 +545,7 @@
       "description": "The style in which violation messages should be formatted: `\"full\"` (default)\n(shows source), `\"concise\"`, `\"grouped\"` (group messages by file), `\"json\"`\n(machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub\nActions annotations), `\"gitlab\"` (GitLab CI code quality report),\n`\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
-          "$ref": "#/$defs/OutputFormat"
+          "$ref": "#/definitions/OutputFormat"
         },
         {
           "type": "null"
@@ -556,7 +556,7 @@
       "description": "Options for the `pep8-naming` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/Pep8NamingOptions"
+          "$ref": "#/definitions/Pep8NamingOptions"
         },
         {
           "type": "null"
@@ -573,7 +573,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/$defs/RuleSelector"
+          "$ref": "#/definitions/RuleSelector"
         }
       },
       "deprecated": true
@@ -585,7 +585,7 @@
         "null"
       ],
       "additionalProperties": {
-        "$ref": "#/$defs/PythonVersion"
+        "$ref": "#/definitions/PythonVersion"
       }
     },
     "preview": {
@@ -599,7 +599,7 @@
       "description": "Options for the `pycodestyle` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/PycodestyleOptions"
+          "$ref": "#/definitions/PycodestyleOptions"
         },
         {
           "type": "null"
@@ -611,7 +611,7 @@
       "description": "Options for the `pydocstyle` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/PydocstyleOptions"
+          "$ref": "#/definitions/PydocstyleOptions"
         },
         {
           "type": "null"
@@ -623,7 +623,7 @@
       "description": "Options for the `pyflakes` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/PyflakesOptions"
+          "$ref": "#/definitions/PyflakesOptions"
         },
         {
           "type": "null"
@@ -635,7 +635,7 @@
       "description": "Options for the `pylint` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/PylintOptions"
+          "$ref": "#/definitions/PylintOptions"
         },
         {
           "type": "null"
@@ -647,7 +647,7 @@
       "description": "Options for the `pyupgrade` plugin.",
       "anyOf": [
         {
-          "$ref": "#/$defs/PyUpgradeOptions"
+          "$ref": "#/definitions/PyUpgradeOptions"
         },
         {
           "type": "null"
@@ -659,7 +659,7 @@
       "description": "Enforce a requirement on the version of Ruff, to enforce at runtime.\nIf the version of Ruff does not meet the requirement, Ruff will exit\nwith an error.\n\nUseful for unifying results across many environments, e.g., with a\n`pyproject.toml` file.\n\nAccepts a [PEP 440](https://peps.python.org/pep-0440/) specifier, like `==0.3.1` or `>=0.3.1`.",
       "anyOf": [
         {
-          "$ref": "#/$defs/RequiredVersion"
+          "$ref": "#/definitions/RequiredVersion"
         },
         {
           "type": "null"
@@ -681,7 +681,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "show-fixes": {
@@ -705,7 +705,7 @@
       "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.11 or ==3.11\nspecify `target-version = \"py311\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
       "anyOf": [
         {
-          "$ref": "#/$defs/PythonVersion"
+          "$ref": "#/definitions/PythonVersion"
         },
         {
           "type": "null"
@@ -742,7 +742,7 @@
       ],
       "deprecated": true,
       "items": {
-        "$ref": "#/$defs/RuleSelector"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "unsafe-fixes": {
@@ -754,7 +754,7 @@
     }
   },
   "additionalProperties": false,
-  "$defs": {
+  "definitions": {
     "Alias": {
       "type": "string"
     },
@@ -773,7 +773,7 @@
           "description": "Whether to generate a map from file to files that it depends on (dependencies) or files that\ndepend on it (dependents).",
           "anyOf": [
             {
-              "$ref": "#/$defs/Direction"
+              "$ref": "#/definitions/Direction"
             },
             {
               "type": "null"
@@ -890,7 +890,7 @@
           "description": "Wrap docstring code examples at a fixed line width.",
           "oneOf": [
             {
-              "$ref": "#/$defs/LineWidth"
+              "$ref": "#/definitions/LineWidth"
             }
           ]
         },
@@ -1165,7 +1165,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "type": "string"
           }
         },
         "function-names": {
@@ -1175,7 +1175,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "type": "string"
           }
         }
       },
@@ -1206,7 +1206,7 @@
             "null"
           ],
           "additionalProperties": {
-            "$ref": "#/$defs/Alias"
+            "$ref": "#/definitions/Alias"
           }
         },
         "banned-aliases": {
@@ -1216,7 +1216,7 @@
             "null"
           ],
           "additionalProperties": {
-            "$ref": "#/$defs/BannedAliases"
+            "$ref": "#/definitions/BannedAliases"
           }
         },
         "banned-from": {
@@ -1237,7 +1237,7 @@
             "null"
           ],
           "additionalProperties": {
-            "$ref": "#/$defs/Alias"
+            "$ref": "#/definitions/Alias"
           }
         }
       },
@@ -1265,7 +1265,7 @@
           "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`.\nThe following values are supported:\n\n- `csv` — a comma-separated list, e.g.\n  `@pytest.mark.parametrize(\"name1,name2\", ...)`\n- `tuple` (default) — e.g.\n  `@pytest.mark.parametrize((\"name1\", \"name2\"), ...)`\n- `list` — e.g. `@pytest.mark.parametrize([\"name1\", \"name2\"], ...)`",
           "anyOf": [
             {
-              "$ref": "#/$defs/ParametrizeNameType"
+              "$ref": "#/definitions/ParametrizeNameType"
             },
             {
               "type": "null"
@@ -1276,7 +1276,7 @@
           "description": "Expected type for each row of values in `@pytest.mark.parametrize` in\ncase of multiple parameters. The following values are supported:\n\n- `tuple` (default) — e.g.\n  `@pytest.mark.parametrize((\"name1\", \"name2\"), [(1, 2), (3, 4)])`\n- `list` — e.g.\n  `@pytest.mark.parametrize((\"name1\", \"name2\"), [[1, 2], [3, 4]])`",
           "anyOf": [
             {
-              "$ref": "#/$defs/ParametrizeValuesRowType"
+              "$ref": "#/definitions/ParametrizeValuesRowType"
             },
             {
               "type": "null"
@@ -1287,7 +1287,7 @@
           "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`.\nThe following values are supported:\n\n- `tuple` — e.g. `@pytest.mark.parametrize(\"name\", (1, 2, 3))`\n- `list` (default) — e.g. `@pytest.mark.parametrize(\"name\", [1, 2, 3])`",
           "anyOf": [
             {
-              "$ref": "#/$defs/ParametrizeValuesType"
+              "$ref": "#/definitions/ParametrizeValuesType"
             },
             {
               "type": "null"
@@ -1352,7 +1352,7 @@
           "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").\n\nWhen using the formatter, only \"double\" is compatible, as the formatter\nenforces double quotes for docstrings strings.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Quote"
+              "$ref": "#/definitions/Quote"
             },
             {
               "type": "null"
@@ -1363,7 +1363,7 @@
           "description": "Quote style to prefer for inline strings (either \"single\" or\n\"double\").\n\nWhen using the formatter, ensure that [`format.quote-style`](#format_quote-style) is set to\nthe same preferred quote style.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Quote"
+              "$ref": "#/definitions/Quote"
             },
             {
               "type": "null"
@@ -1374,7 +1374,7 @@
           "description": "Quote style to prefer for multiline strings (either \"single\" or\n\"double\").\n\nWhen using the formatter, only \"double\" is compatible, as the formatter\nenforces double quotes for multiline strings.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Quote"
+              "$ref": "#/definitions/Quote"
             },
             {
               "type": "null"
@@ -1395,7 +1395,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "type": "string"
           }
         },
         "ignore-names": {
@@ -1405,7 +1405,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "type": "string"
           }
         }
       },
@@ -1419,7 +1419,7 @@
           "description": "Whether to ban all relative imports (`\"all\"`), or only those imports\nthat extend into the parent module or beyond (`\"parents\"`).",
           "anyOf": [
             {
-              "$ref": "#/$defs/Strictness"
+              "$ref": "#/definitions/Strictness"
             },
             {
               "type": "null"
@@ -1433,7 +1433,7 @@
             "null"
           ],
           "additionalProperties": {
-            "$ref": "#/$defs/ApiBan"
+            "$ref": "#/definitions/ApiBan"
           }
         },
         "banned-module-level-imports": {
@@ -1529,7 +1529,7 @@
           "description": "Set the line length used when formatting code snippets in docstrings.\n\nThis only has an effect when the `docstring-code-format` setting is\nenabled.\n\nThe default value for this setting is `\"dynamic\"`, which has the effect\nof ensuring that any reformatted code examples in docstrings adhere to\nthe global line length configuration that is used for the surrounding\nPython code. The point of this setting is that it takes the indentation\nof the docstring into account when reformatting code examples.\n\nAlternatively, this can be set to a fixed integer, which will result\nin the same line length limit being applied to all reformatted code\nexamples in docstrings. When set to a fixed integer, the indent of the\ndocstring is not taken into account. That is, this may result in lines\nin the reformatted code example that exceed the globally configured\nline length limit.\n\nFor example, when this is set to `20` and [`docstring-code-format`](#docstring-code-format)\nis enabled, then this code:\n\n```python\ndef f(x):\n    '''\n    Something about `f`. And an example:\n\n    .. code-block:: python\n\n        foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)\n    '''\n    pass\n```\n\n... will be reformatted (assuming the rest of the options are set\nto their defaults) as:\n\n```python\ndef f(x):\n    \"\"\"\n    Something about `f`. And an example:\n\n    .. code-block:: python\n\n        (\n            foo,\n            bar,\n            quux,\n        ) = this_is_a_long_line(\n            lion,\n            hippo,\n            lemur,\n            bear,\n        )\n    \"\"\"\n    pass\n```",
           "anyOf": [
             {
-              "$ref": "#/$defs/DocstringCodeLineWidth"
+              "$ref": "#/definitions/DocstringCodeLineWidth"
             },
             {
               "type": "null"
@@ -1550,7 +1550,7 @@
           "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python\ndef f():\n    print(\"Hello\") #  Spaces indent the `print` statement.\n```\n\n`indent-style = \"tab\"`:\n\n```python\ndef f():\n    print(\"Hello\") #  A tab `\\t` indents the `print` statement.\n```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation).\nWe care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
           "anyOf": [
             {
-              "$ref": "#/$defs/IndentStyle"
+              "$ref": "#/definitions/IndentStyle"
             },
             {
               "type": "null"
@@ -1561,7 +1561,7 @@
           "description": "The character Ruff uses at the end of a line.\n\n* `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings.\n* `lf`: Line endings will be converted to `\\n`. The default line ending on Unix.\n* `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows.\n* `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
           "anyOf": [
             {
-              "$ref": "#/$defs/LineEnding"
+              "$ref": "#/definitions/LineEnding"
             },
             {
               "type": "null"
@@ -1579,7 +1579,7 @@
           "description": "Configures the preferred quote character for strings. The recommended options are\n\n* `double` (default): Use double quotes `\"`\n* `single`: Use single quotes `'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/),\nRuff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = \"single\"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for\nescaping quote characters inside the string:\n\n```python\na = \"a string without any quotes\"\nb = \"It's monday morning\"\n```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = \"single\"`.\nHowever, Ruff uses double quotes for the string assigned to `b` because using single quotes would require escaping the `'`,\nwhich leads to the less readable code: `'It\\'s monday morning'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use\na mixture of single and double quotes and can't migrate to the `double` or `single` style.\nThe quote style `preserve` leaves the quotes of all strings unchanged.",
           "anyOf": [
             {
-              "$ref": "#/$defs/QuoteStyle"
+              "$ref": "#/definitions/QuoteStyle"
             },
             {
               "type": "null"
@@ -1599,7 +1599,7 @@
     "ImportSection": {
       "anyOf": [
         {
-          "$ref": "#/$defs/ImportType"
+          "$ref": "#/definitions/ImportType"
         },
         {
           "type": "string"
@@ -1679,7 +1679,7 @@
           "description": "Define a default section for any imports that don't fit into the specified [`section-order`](#lint_isort_section-order).",
           "anyOf": [
             {
-              "$ref": "#/$defs/ImportSection"
+              "$ref": "#/definitions/ImportSection"
             },
             {
               "type": "null"
@@ -1819,7 +1819,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/ImportSection"
+            "$ref": "#/definitions/ImportSection"
           }
         },
         "no-sections": {
@@ -1840,7 +1840,7 @@
           "description": "Whether to place \"closer\" imports (fewer `.` characters, most local)\nbefore \"further\" imports (more `.` characters, least local), or vice\nversa.\n\nThe default (\"furthest-to-closest\") is equivalent to isort's\n[`reverse-relative`](https://pycqa.github.io/isort/docs/configuration/options.html#reverse-relative) default (`reverse-relative = false`); setting\nthis to \"closest-to-furthest\" is equivalent to isort's\n`reverse-relative = true`.",
           "anyOf": [
             {
-              "$ref": "#/$defs/RelativeImportsOrder"
+              "$ref": "#/definitions/RelativeImportsOrder"
             },
             {
               "type": "null"
@@ -1854,7 +1854,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/NameImports"
+            "$ref": "#/definitions/NameImports"
           }
         },
         "section-order": {
@@ -1864,7 +1864,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/ImportSection"
+            "$ref": "#/definitions/ImportSection"
           }
         },
         "sections": {
@@ -1995,7 +1995,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "extend-ignore": {
@@ -2006,7 +2006,7 @@
           ],
           "deprecated": true,
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "extend-per-file-ignores": {
@@ -2018,7 +2018,7 @@
           "additionalProperties": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/RuleSelector"
+              "$ref": "#/definitions/RuleSelector"
             }
           }
         },
@@ -2029,7 +2029,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "extend-select": {
@@ -2039,7 +2039,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "extend-unfixable": {
@@ -2050,7 +2050,7 @@
           ],
           "deprecated": true,
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "extend-unsafe-fixes": {
@@ -2060,7 +2060,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "external": {
@@ -2080,14 +2080,14 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "flake8-annotations": {
           "description": "Options for the `flake8-annotations` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8AnnotationsOptions"
+              "$ref": "#/definitions/Flake8AnnotationsOptions"
             },
             {
               "type": "null"
@@ -2098,7 +2098,7 @@
           "description": "Options for the `flake8-bandit` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8BanditOptions"
+              "$ref": "#/definitions/Flake8BanditOptions"
             },
             {
               "type": "null"
@@ -2109,7 +2109,7 @@
           "description": "Options for the `flake8-boolean-trap` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8BooleanTrapOptions"
+              "$ref": "#/definitions/Flake8BooleanTrapOptions"
             },
             {
               "type": "null"
@@ -2120,7 +2120,7 @@
           "description": "Options for the `flake8-bugbear` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8BugbearOptions"
+              "$ref": "#/definitions/Flake8BugbearOptions"
             },
             {
               "type": "null"
@@ -2131,7 +2131,7 @@
           "description": "Options for the `flake8-builtins` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8BuiltinsOptions"
+              "$ref": "#/definitions/Flake8BuiltinsOptions"
             },
             {
               "type": "null"
@@ -2142,7 +2142,7 @@
           "description": "Options for the `flake8-comprehensions` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8ComprehensionsOptions"
+              "$ref": "#/definitions/Flake8ComprehensionsOptions"
             },
             {
               "type": "null"
@@ -2153,7 +2153,7 @@
           "description": "Options for the `flake8-copyright` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8CopyrightOptions"
+              "$ref": "#/definitions/Flake8CopyrightOptions"
             },
             {
               "type": "null"
@@ -2164,7 +2164,7 @@
           "description": "Options for the `flake8-errmsg` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8ErrMsgOptions"
+              "$ref": "#/definitions/Flake8ErrMsgOptions"
             },
             {
               "type": "null"
@@ -2175,7 +2175,7 @@
           "description": "Options for the `flake8-gettext` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8GetTextOptions"
+              "$ref": "#/definitions/Flake8GetTextOptions"
             },
             {
               "type": "null"
@@ -2186,7 +2186,7 @@
           "description": "Options for the `flake8-implicit-str-concat` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8ImplicitStrConcatOptions"
+              "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
             },
             {
               "type": "null"
@@ -2197,7 +2197,7 @@
           "description": "Options for the `flake8-import-conventions` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8ImportConventionsOptions"
+              "$ref": "#/definitions/Flake8ImportConventionsOptions"
             },
             {
               "type": "null"
@@ -2208,7 +2208,7 @@
           "description": "Options for the `flake8-pytest-style` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8PytestStyleOptions"
+              "$ref": "#/definitions/Flake8PytestStyleOptions"
             },
             {
               "type": "null"
@@ -2219,7 +2219,7 @@
           "description": "Options for the `flake8-quotes` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8QuotesOptions"
+              "$ref": "#/definitions/Flake8QuotesOptions"
             },
             {
               "type": "null"
@@ -2230,7 +2230,7 @@
           "description": "Options for the `flake8_self` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8SelfOptions"
+              "$ref": "#/definitions/Flake8SelfOptions"
             },
             {
               "type": "null"
@@ -2241,7 +2241,7 @@
           "description": "Options for the `flake8-tidy-imports` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8TidyImportsOptions"
+              "$ref": "#/definitions/Flake8TidyImportsOptions"
             },
             {
               "type": "null"
@@ -2252,7 +2252,7 @@
           "description": "Options for the `flake8-type-checking` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8TypeCheckingOptions"
+              "$ref": "#/definitions/Flake8TypeCheckingOptions"
             },
             {
               "type": "null"
@@ -2263,7 +2263,7 @@
           "description": "Options for the `flake8-unused-arguments` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Flake8UnusedArgumentsOptions"
+              "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
             },
             {
               "type": "null"
@@ -2284,7 +2284,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "ignore-init-module-imports": {
@@ -2299,7 +2299,7 @@
           "description": "Options for the `isort` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/IsortOptions"
+              "$ref": "#/definitions/IsortOptions"
             },
             {
               "type": "null"
@@ -2320,7 +2320,7 @@
           "description": "Options for the `mccabe` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/McCabeOptions"
+              "$ref": "#/definitions/McCabeOptions"
             },
             {
               "type": "null"
@@ -2331,7 +2331,7 @@
           "description": "Options for the `pep8-naming` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/Pep8NamingOptions"
+              "$ref": "#/definitions/Pep8NamingOptions"
             },
             {
               "type": "null"
@@ -2347,7 +2347,7 @@
           "additionalProperties": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/RuleSelector"
+              "$ref": "#/definitions/RuleSelector"
             }
           }
         },
@@ -2362,7 +2362,7 @@
           "description": "Options for the `pycodestyle` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PycodestyleOptions"
+              "$ref": "#/definitions/PycodestyleOptions"
             },
             {
               "type": "null"
@@ -2373,7 +2373,7 @@
           "description": "Options for the `pydoclint` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PydoclintOptions"
+              "$ref": "#/definitions/PydoclintOptions"
             },
             {
               "type": "null"
@@ -2384,7 +2384,7 @@
           "description": "Options for the `pydocstyle` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PydocstyleOptions"
+              "$ref": "#/definitions/PydocstyleOptions"
             },
             {
               "type": "null"
@@ -2395,7 +2395,7 @@
           "description": "Options for the `pyflakes` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PyflakesOptions"
+              "$ref": "#/definitions/PyflakesOptions"
             },
             {
               "type": "null"
@@ -2406,7 +2406,7 @@
           "description": "Options for the `pylint` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PylintOptions"
+              "$ref": "#/definitions/PylintOptions"
             },
             {
               "type": "null"
@@ -2417,7 +2417,7 @@
           "description": "Options for the `pyupgrade` plugin.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PyUpgradeOptions"
+              "$ref": "#/definitions/PyUpgradeOptions"
             },
             {
               "type": "null"
@@ -2428,7 +2428,7 @@
           "description": "Options for the `ruff` plugin",
           "anyOf": [
             {
-              "$ref": "#/$defs/RuffOptions"
+              "$ref": "#/definitions/RuffOptions"
             },
             {
               "type": "null"
@@ -2442,7 +2442,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         },
         "task-tags": {
@@ -2479,7 +2479,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/RuleSelector"
+            "$ref": "#/definitions/RuleSelector"
           }
         }
       },
@@ -2619,7 +2619,7 @@
           "description": "The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within\ndocumentation (`W505`), including standalone comments. By default,\nthis is set to `null` which disables reporting violations.\n\nThe length is determined by the number of characters per line, except for lines containing Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
           "anyOf": [
             {
-              "$ref": "#/$defs/LineLength"
+              "$ref": "#/definitions/LineLength"
             },
             {
               "type": "null"
@@ -2630,7 +2630,7 @@
           "description": "The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default,\nthis is set to the value of the [`line-length`](#line-length) option.\n\nUse this option when you want to detect extra-long lines that the formatter can't automatically split by setting\n`pycodestyle.line-length` to a value larger than [`line-length`](#line-length).\n\n```toml\n# The formatter wraps lines at a length of 88.\nline-length = 88\n\n[pycodestyle]\n# E501 reports lines that exceed the length of 100.\nmax-line-length = 100\n```\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
           "anyOf": [
             {
-              "$ref": "#/$defs/LineLength"
+              "$ref": "#/definitions/LineLength"
             },
             {
               "type": "null"
@@ -2662,7 +2662,7 @@
           "description": "Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)\ndefaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in\nthe specified convention. As such, the intended workflow is to enable a\nconvention and then selectively enable or disable any additional rules\non top of it.\n\nFor example, to use Google-style conventions but avoid requiring\ndocumentation for every function parameter:\n\n```toml\n[tool.ruff.lint]\n# Enable all `pydocstyle` rules, limiting to those that adhere to the\n# Google convention via `convention = \"google\"`, below.\nselect = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires\n# documentation for every function parameter.\nignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```\n\nTo enable an additional rule that's excluded from the convention,\nselect the desired rule via its fully qualified rule code (e.g.,\n`D400` instead of `D4` or `D40`):\n\n```toml\n[tool.ruff.lint]\n# Enable D400 on top of the Google convention.\nextend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```",
           "anyOf": [
             {
-              "$ref": "#/$defs/Convention"
+              "$ref": "#/definitions/Convention"
             },
             {
               "type": "null"
@@ -2748,7 +2748,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/ConstantType"
+            "$ref": "#/definitions/ConstantType"
           }
         },
         "max-args": {
@@ -4348,9 +4348,6 @@
           "const": "all"
         }
       ]
-    },
-    "string": {
-      "type": "string"
     }
   }
 }
