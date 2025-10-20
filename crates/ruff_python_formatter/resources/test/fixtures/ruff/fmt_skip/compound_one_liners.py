@@ -114,3 +114,16 @@ else: print("this") # fmt: skip
 
 # multiple statements in body
 if True: print("this"); print("that") # fmt: skip
+
+# Examples with more comments
+
+try: risky_operation()  # fmt: skip
+# leading 1
+except ValueError: handle_error()  # fmt: skip
+# leading 2
+except: handle_any_error()  # fmt: skip
+# leading 3
+else: success_case()  # fmt: skip
+# leading 4
+finally: cleanup()  # fmt: skip
+# trailing
