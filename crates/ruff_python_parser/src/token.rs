@@ -501,7 +501,7 @@ impl TokenKind {
     ///
     /// [`as_unary_arithmetic_operator`]: TokenKind::as_unary_arithmetic_operator
     #[inline]
-    pub(crate) const fn as_unary_operator(self) -> Option<UnaryOp> {
+    pub const fn as_unary_operator(self) -> Option<UnaryOp> {
         Some(match self {
             TokenKind::Plus => UnaryOp::UAdd,
             TokenKind::Minus => UnaryOp::USub,
@@ -528,7 +528,7 @@ impl TokenKind {
     /// Use [`as_augmented_assign_operator`] to match against an augmented assignment token.
     ///
     /// [`as_augmented_assign_operator`]: TokenKind::as_augmented_assign_operator
-    pub(crate) const fn as_binary_operator(self) -> Option<Operator> {
+    pub const fn as_binary_operator(self) -> Option<Operator> {
         Some(match self {
             TokenKind::Plus => Operator::Add,
             TokenKind::Minus => Operator::Sub,

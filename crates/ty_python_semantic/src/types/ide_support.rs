@@ -13,7 +13,7 @@ use crate::semantic_index::{
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{
-    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
+    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
@@ -908,18 +908,19 @@ pub fn call_signature_details<'db>(
             .into_iter()
             .flat_map(std::iter::IntoIterator::into_iter)
             .map(|binding| {
-                let signature = &binding.signature;
+                let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+                let signature = binding.signature;
                 let display_details = signature.display(db).to_string_parts();
-                let parameter_label_offsets = display_details.parameter_ranges.clone();
-                let parameter_names = display_details.parameter_names.clone();
+                let parameter_label_offsets = display_details.parameter_ranges;
+                let parameter_names = display_details.parameter_names;
 
                 CallSignatureDetails {
-                    signature: signature.clone(),
+                    definition: signature.definition(),
+                    signature,
                     label: display_details.label,
                     parameter_label_offsets,
                     parameter_names,
-                    definition: signature.definition(),
-                    argument_to_parameter_mapping: binding.argument_matches().to_vec(),
+                    argument_to_parameter_mapping,
                 }
             })
             .collect()
@@ -927,6 +928,72 @@ pub fn call_signature_details<'db>(
         // Type is not callable, return empty signatures
         vec![]
     }
+}
+
+/// Returns the definitions of the binary operation along with its callable type.
+pub fn definitions_for_bin_op<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    binary_op: &ast::ExprBinOp,
+) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
+    let left_ty = binary_op.left.inferred_type(model);
+    let right_ty = binary_op.right.inferred_type(model);
+
+    let Ok(bindings) = Type::try_call_bin_op(db, left_ty, binary_op.op, right_ty) else {
+        return None;
+    };
+
+    let callable_type = bindings.callable_type();
+    let definitions: Vec<_> = bindings
+        .into_iter()
+        .flat_map(std::iter::IntoIterator::into_iter)
+        .filter_map(|binding| {
+            Some(ResolvedDefinition::Definition(
+                binding.signature.definition?,
+            ))
+        })
+        .collect();
+
+    Some((definitions, callable_type))
+}
+
+/// Returns the definitions for an unary operator along with their callable types.
+pub fn definitions_for_unary_op<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    unary_op: &ast::ExprUnaryOp,
+) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
+    let operand_ty = unary_op.operand.inferred_type(model);
+
+    let unary_dunder_method = match unary_op.op {
+        ast::UnaryOp::Invert => "__invert__",
+        ast::UnaryOp::UAdd => "__pos__",
+        ast::UnaryOp::USub => "__neg__",
+        ast::UnaryOp::Not => "__bool__",
+    };
+
+    let Ok(bindings) = operand_ty.try_call_dunder(
+        db,
+        unary_dunder_method,
+        CallArguments::none(),
+        TypeContext::default(),
+    ) else {
+        return None;
+    };
+
+    let callable_type = bindings.callable_type();
+
+    let definitions = bindings
+        .into_iter()
+        .flat_map(std::iter::IntoIterator::into_iter)
+        .filter_map(|binding| {
+            Some(ResolvedDefinition::Definition(
+                binding.signature.definition?,
+            ))
+        })
+        .collect();
+
+    Some((definitions, callable_type))
 }
 
 /// Find the active signature index from `CallSignatureDetails`.
