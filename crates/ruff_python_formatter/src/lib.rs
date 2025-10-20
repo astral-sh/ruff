@@ -1,3 +1,4 @@
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -115,6 +116,24 @@ pub enum FormatModuleError {
     FormatError(#[from] FormatError),
     #[error(transparent)]
     PrintError(#[from] PrintError),
+}
+
+impl From<&FormatModuleError> for Diagnostic {
+    fn from(error: &FormatModuleError) -> Self {
+        match error {
+            FormatModuleError::ParseError(parse_error) => Diagnostic::new(
+                DiagnosticId::InternalError,
+                Severity::Error,
+                &parse_error.error,
+            ),
+            FormatModuleError::FormatError(format_error) => {
+                Diagnostic::new(DiagnosticId::InternalError, Severity::Error, format_error)
+            }
+            FormatModuleError::PrintError(print_error) => {
+                Diagnostic::new(DiagnosticId::InternalError, Severity::Error, print_error)
+            }
+        }
+    }
 }
 
 #[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
