@@ -72,6 +72,16 @@ class C:
         reveal_type(inner_d)
 ```
 
+We do, however, still check assignability of the default value to the parameter type:
+
+```py
+class D:
+    def f(self: "D"):
+        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = Unknown | (def inner_a(a: int = Unknown) -> Unknown)) -> Unknown)` is not assignable to annotated parameter type `int`"
+        def inner_a(a: int = self.a): ...
+        self.a = inner_a
+```
+
 ### Lambdas
 
 ```py
