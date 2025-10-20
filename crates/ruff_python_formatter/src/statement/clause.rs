@@ -59,9 +59,11 @@ impl<'a> ClauseHeader<'a> {
             | ClauseHeader::While(StmtWhile { body, .. })
             | ClauseHeader::With(StmtWith { body, .. })
             | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
-            | ClauseHeader::OrElse(ElseClause::Try(StmtTry { orelse: body, .. }))
-            | ClauseHeader::OrElse(ElseClause::For(StmtFor { orelse: body, .. }))
-            | ClauseHeader::OrElse(ElseClause::While(StmtWhile { orelse: body, .. }))
+            | ClauseHeader::OrElse(
+                ElseClause::Try(StmtTry { orelse: body, .. })
+                | ElseClause::For(StmtFor { orelse: body, .. })
+                | ElseClause::While(StmtWhile { orelse: body, .. }),
+            )
             | ClauseHeader::TryFinally(StmtTry {
                 finalbody: body, ..
             }) => body.last().map(AnyNodeRef::from),
