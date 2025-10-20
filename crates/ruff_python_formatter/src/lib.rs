@@ -11,7 +11,7 @@ use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, fo
 use ruff_python_ast::{AnyNodeRef, Mod};
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, parse};
 use ruff_python_trivia::CommentRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
     Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
@@ -116,6 +116,15 @@ pub enum FormatModuleError {
     FormatError(#[from] FormatError),
     #[error(transparent)]
     PrintError(#[from] PrintError),
+}
+
+impl FormatModuleError {
+    pub fn range(&self) -> Option<TextRange> {
+        match self {
+            FormatModuleError::ParseError(parse_error) => Some(parse_error.range()),
+            FormatModuleError::FormatError(_) | FormatModuleError::PrintError(_) => None,
+        }
+    }
 }
 
 impl From<&FormatModuleError> for Diagnostic {
