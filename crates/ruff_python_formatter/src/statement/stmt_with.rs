@@ -142,7 +142,6 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                 }),
                 &with_stmt.body,
                 SuiteKind::other(true),
-                colon_comments
             )]
         )
     }

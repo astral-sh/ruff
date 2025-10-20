@@ -134,7 +134,6 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     }),
                     body,
                     SuiteKind::Class,
-                    trailing_definition_comments
                 ),
             ]
         )?;

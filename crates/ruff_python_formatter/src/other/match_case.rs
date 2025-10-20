@@ -57,7 +57,6 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                 ],
                 body,
                 SuiteKind::other(self.last_suite_in_statement),
-                dangling_item_comments
             )]
         )
     }

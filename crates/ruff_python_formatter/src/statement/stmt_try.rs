@@ -160,7 +160,6 @@ fn format_case<'a>(
                 &token(kind.keyword()),
                 body,
                 SuiteKind::other(last_suite_in_statement),
-                trailing_case_comments
             )
             .with_leading_comments(leading_case_comments, previous_node),]
         )?;

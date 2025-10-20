@@ -36,7 +36,6 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 ],
                 body,
                 SuiteKind::other(elif_else_clauses.is_empty()),
-                trailing_colon_comment
             )]
         )?;
 
@@ -101,7 +100,6 @@ pub(crate) fn format_elif_else_clause(
                 }),
                 body,
                 suite_kind,
-                trailing_colon_comment
             )
             .with_leading_comments(leading_comments, last_node),
             f.options()

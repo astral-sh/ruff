@@ -66,7 +66,6 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                     &format_with(|f| format_function_header(f, item)),
                     body,
                     SuiteKind::Function,
-                    trailing_definition_comments
                 ),
             ]
         )?;
