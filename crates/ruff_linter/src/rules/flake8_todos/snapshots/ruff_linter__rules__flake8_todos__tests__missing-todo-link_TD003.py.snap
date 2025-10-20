@@ -62,35 +62,13 @@ TD003 Missing issue link for this TODO
 43 | # TODO: here's a TODO on the last line with no link
    |   ^^^^
 44 |
-45 | # TODO: Move this part to the other place RFFU-6877
-   |
-
-TD003 Missing issue link for this TODO
-  --> TD003.py:49:3
-   |
-47 | # TODO: PROJ-123 Another Jira-style example
-48 |
-49 | # TODO: Valid Jira-style issue IDs (should pass)
-   |   ^^^^
-50 | # TODO: Fix bug ABC-123
-51 | # TODO: Implement feature XYZ-456
-   |
-
-TD003 Missing issue link for this TODO
-  --> TD003.py:55:3
-   |
-53 | # TODO: Refactor code GHI-101112
-54 |
-55 | # TODO: Invalid patterns that should still trigger TD003 (should fail)
-   |   ^^^^
-56 | # TODO: Single letter project key A-1
-57 | # TODO: No hyphen pattern ABC123
+45 | # Valid Jira-style patterns (should pass)
    |
 
 TD003 Missing issue link for this TODO
   --> TD003.py:56:3
    |
-55 | # TODO: Invalid patterns that should still trigger TD003 (should fail)
+55 | # Invalid patterns that should still trigger TD003 (should fail)
 56 | # TODO: Single letter project key A-1
    |   ^^^^
 57 | # TODO: No hyphen pattern ABC123
@@ -100,7 +78,7 @@ TD003 Missing issue link for this TODO
 TD003 Missing issue link for this TODO
   --> TD003.py:57:3
    |
-55 | # TODO: Invalid patterns that should still trigger TD003 (should fail)
+55 | # Invalid patterns that should still trigger TD003 (should fail)
 56 | # TODO: Single letter project key A-1
 57 | # TODO: No hyphen pattern ABC123
    |   ^^^^
@@ -153,10 +131,23 @@ TD003 Missing issue link for this TODO
    |
 
 TD003 Missing issue link for this TODO
+  --> TD003.py:62:3
+   |
+60 | # TODO: Just a random word with hyphen and number random-123
+61 | # TODO: Number before letters 123-ABC
+62 | # TODO: Multiple hyphens ABC-123-456
+   |   ^^^^
+63 | # TODO: Empty project key -123
+64 | # TODO: This is about PROJ-123 server config (ID in middle of sentence)
+   |
+
+TD003 Missing issue link for this TODO
   --> TD003.py:63:3
    |
 61 | # TODO: Number before letters 123-ABC
 62 | # TODO: Multiple hyphens ABC-123-456
 63 | # TODO: Empty project key -123
    |   ^^^^
+64 | # TODO: This is about PROJ-123 server config (ID in middle of sentence)
+65 | # TODO: Working on PROJ-123 and PROJ-456 (multiple IDs)
    |

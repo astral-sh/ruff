@@ -248,7 +248,9 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"\s*(http|https)://.*", // issue link
         r"\s*#\d+.*",            // issue code - like "#003"
-        r"\s*[A-Z]{2,}-\d+.*",   // Jira-style issue code - like "RFFU-6877"
+        r"\s*[A-Z]{2,}-\d+\s*$", // Jira-style issue code at end of line - like "RFFU-6877"
+        r"\s*[A-Z]{2,}-\d+\s",   // Jira-style issue code followed by space - like "RFFU-6877 "
+        r"\s*\([A-Z]{2,}-\d+\)", // Jira-style issue code in parentheses - like "(RFFU-6877)"
     ])
     .unwrap()
 });

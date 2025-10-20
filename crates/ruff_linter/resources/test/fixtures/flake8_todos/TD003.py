@@ -42,17 +42,17 @@ def foo(x):
 
 # TODO: here's a TODO on the last line with no link
 
+# Valid Jira-style patterns (should pass)
 # TODO: Move this part to the other place RFFU-6877
-
 # TODO: PROJ-123 Another Jira-style example
-
-# TODO: Valid Jira-style issue IDs (should pass)
 # TODO: Fix bug ABC-123
 # TODO: Implement feature XYZ-456
 # TODO: Update documentation DEF-789
 # TODO: Refactor code GHI-101112
+# TODO: Fix this (AIRFLOW-123)
+# TODO: Update config (SUPERSET-456)
 
-# TODO: Invalid patterns that should still trigger TD003 (should fail)
+# Invalid patterns that should still trigger TD003 (should fail)
 # TODO: Single letter project key A-1
 # TODO: No hyphen pattern ABC123
 # TODO: Lowercase project key abc-123
@@ -61,3 +61,5 @@ def foo(x):
 # TODO: Number before letters 123-ABC
 # TODO: Multiple hyphens ABC-123-456
 # TODO: Empty project key -123
+# TODO: This is about PROJ-123 server config (ID in middle of sentence)
+# TODO: Working on PROJ-123 and PROJ-456 (multiple IDs)
