@@ -467,13 +467,6 @@ impl<'db> SemanticTokenVisitor<'db> {
         self.classify_from_type_and_name_str(ty, local_name.id.as_str())
     }
 
-    fn visit_type_annotation(&mut self, annotation: &ast::Expr) {
-        let prev_in_type_annotation = self.in_type_annotation;
-        self.in_type_annotation = true;
-        self.visit_expr(annotation);
-        self.in_type_annotation = prev_in_type_annotation;
-    }
-
     // Visit parameters for a function or lambda expression and classify
     // them as parameters, selfParameter, or clsParameter as appropriate.
     fn visit_parameters(
@@ -515,7 +508,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
             // Handle parameter type annotations
             if let Some(annotation) = &parameter.annotation {
-                self.visit_type_annotation(annotation);
+                self.visit_annotation(annotation);
             }
         }
     }
@@ -567,7 +560,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Handle return type annotation
                 if let Some(returns) = &func.returns {
-                    self.visit_type_annotation(returns);
+                    self.visit_annotation(returns);
                 }
 
                 // Clear the in_class_scope flag so inner functions
@@ -613,21 +606,6 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.in_class_scope = true;
                 self.visit_body(&class.body);
                 self.in_class_scope = prev_in_class;
-            }
-            ast::Stmt::AnnAssign(assign) => {
-                // Handle annotated assignments (e.g., x: int = 5)
-                if let ast::Expr::Name(name) = assign.target.as_ref() {
-                    let (token_type, modifiers) = self.classify_name(name);
-                    self.add_token(name, token_type, modifiers);
-                }
-
-                // Handle the type annotation
-                self.visit_type_annotation(&assign.annotation);
-
-                // Handle the value if present
-                if let Some(value) = &assign.value {
-                    self.visit_expr(value);
-                }
             }
             ast::Stmt::Import(import) => {
                 for alias in &import.names {
@@ -688,6 +666,13 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 walk_stmt(self, stmt);
             }
         }
+    }
+
+    fn visit_annotation(&mut self, expr: &'_ Expr) {
+        let prev_in_type_annotation = self.in_type_annotation;
+        self.in_type_annotation = true;
+        self.visit_expr(expr);
+        self.in_type_annotation = prev_in_type_annotation;
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
@@ -829,23 +814,25 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
         );
 
         // Visit bound expression (for TypeVar)
+        // TODO: We don't call `walk_type_param` here, because, as of today (20th Oct 2025),
+        // `walk_type_param` calls `visit_expr` instead of `visit_annotation`.
         match type_param {
             TypeParam::TypeVar(type_var) => {
                 if let Some(bound) = &type_var.bound {
-                    self.visit_type_annotation(bound);
+                    self.visit_annotation(bound);
                 }
                 if let Some(default) = &type_var.default {
-                    self.visit_type_annotation(default);
+                    self.visit_annotation(default);
                 }
             }
             TypeParam::ParamSpec(param_spec) => {
                 if let Some(default) = &param_spec.default {
-                    self.visit_type_annotation(default);
+                    self.visit_annotation(default);
                 }
             }
             TypeParam::TypeVarTuple(type_var_tuple) => {
                 if let Some(default) = &type_var_tuple.default {
-                    self.visit_type_annotation(default);
+                    self.visit_annotation(default);
                 }
             }
         }
@@ -1793,8 +1780,12 @@ class BoundedContainer[T: int, U = str]:
         "T" @ 554..555: TypeParameter
         "value2" @ 557..563: Parameter
         "U" @ 565..566: TypeParameter
+        "self" @ 577..581: Variable
+        "value1" @ 582..588: Variable
         "T" @ 590..591: TypeParameter
         "value1" @ 594..600: Parameter
+        "self" @ 609..613: Variable
+        "value2" @ 614..620: Variable
         "U" @ 622..623: TypeParameter
         "value2" @ 626..632: Parameter
         "get_first" @ 642..651: Method [definition]
@@ -2220,6 +2211,48 @@ finally:
         "e" @ 133..134: Variable
         "print" @ 140..145: Function
         "e" @ 146..147: Variable
+        "#);
+    }
+
+    #[test]
+    fn test_self_attribute_expression() {
+        let test = cursor_test(
+            r#"
+from typing import Self
+
+
+class C:
+    def __init__(self: Self):
+        self.annotated: int = 1
+        self.non_annotated = 1
+        self.x.test()
+        self.x()<CURSOR>
+
+
+"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Self" @ 20..24: Variable
+        "C" @ 33..34: Class [definition]
+        "__init__" @ 44..52: Method [definition]
+        "self" @ 53..57: SelfParameter
+        "Self" @ 59..63: TypeParameter
+        "self" @ 74..78: Parameter
+        "annotated" @ 79..88: Variable
+        "int" @ 90..93: Class
+        "1" @ 96..97: Number
+        "self" @ 106..110: Parameter
+        "non_annotated" @ 111..124: Variable
+        "1" @ 127..128: Number
+        "self" @ 137..141: Parameter
+        "x" @ 142..143: Variable
+        "test" @ 144..148: Variable
+        "self" @ 159..163: Parameter
+        "x" @ 164..165: Variable
         "#);
     }
 }
