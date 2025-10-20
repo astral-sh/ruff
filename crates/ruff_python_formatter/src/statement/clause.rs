@@ -753,8 +753,19 @@ fn write_suppressed_clause(
     f: &mut Formatter<PyFormatContext<'_>>,
 ) -> FormatResult<()> {
     let header = clause.format_header.header;
-
     let clause_start = header.first_keyword_range(f.context().source())?.start();
+
+    if let Some((leading_comments, _)) = clause.format_header.leading_comments
+        && let Some(first) = leading_comments.first()
+    {
+        source_position(first.start()).fmt(f)?;
+        verbatim_text(TextRange::new(first.start(), clause_start)).fmt(f)?;
+        for comment in leading_comments {
+            comment.mark_formatted();
+        }
+    } else {
+        source_position(clause_start).fmt(f)?;
+    }
 
     let comments = f.context().comments().clone();
 
@@ -767,7 +778,6 @@ fn write_suppressed_clause(
     write!(
         f,
         [
-            source_position(clause_start),
             verbatim_text(TextRange::new(clause_start, clause_end)),
             source_position(clause_end),
             trailing_comments(comments.trailing(last_child)),
