@@ -67,7 +67,6 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                 },
                 clause(
                     ClauseHeader::Class(item),
-                    trailing_definition_comments,
                     &format_with(|f| {
                         write!(f, [token("class"), space(), name.format()])?;
 
@@ -132,6 +131,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
                         Ok(())
                     }),
+                    trailing_definition_comments,
                     body,
                     SuiteKind::Class,
                 ),

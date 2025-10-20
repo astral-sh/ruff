@@ -156,8 +156,8 @@ fn format_case<'a>(
             f,
             [clause(
                 header,
-                trailing_case_comments,
                 &token(kind.keyword()),
+                trailing_case_comments,
                 body,
                 SuiteKind::other(last_suite_in_statement),
             )

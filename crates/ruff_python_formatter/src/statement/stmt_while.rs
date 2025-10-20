@@ -35,12 +35,12 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
             f,
             [clause(
                 ClauseHeader::While(item),
-                trailing_condition_comments,
                 &format_args![
                     token("while"),
                     space(),
                     maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                 ],
+                trailing_condition_comments,
                 body,
                 SuiteKind::other(orelse.is_empty()),
             )]
@@ -57,8 +57,8 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
                 f,
                 [clause(
                     ClauseHeader::OrElse(ElseClause::While(item)),
-                    trailing,
                     &token("else"),
+                    trailing,
                     orelse,
                     SuiteKind::other(true),
                 )

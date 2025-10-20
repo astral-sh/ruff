@@ -567,8 +567,8 @@ impl<'a> FormatClause<'a, '_> {
 /// should be suppressed.
 pub(crate) fn clause<'a, 'ast, Content>(
     header: ClauseHeader<'a>,
-    trailing_colon_comment: &'a [SourceComment],
     header_formatter: &'a Content,
+    trailing_colon_comment: &'a [SourceComment],
     body: &'a Suite,
     kind: SuiteKind,
 ) -> FormatClause<'a, 'ast>

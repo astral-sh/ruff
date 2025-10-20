@@ -48,7 +48,6 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
             f,
             [clause(
                 ClauseHeader::With(with_stmt),
-                colon_comments,
                 &format_with(|f| {
                     write!(
                         f,
@@ -140,6 +139,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                         .fmt(f),
                     }
                 }),
+                colon_comments,
                 &with_stmt.body,
                 SuiteKind::other(true),
             )]
