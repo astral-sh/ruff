@@ -620,10 +620,9 @@ struct ScopedTarget<'t> {
 /// range (including if it's at the very beginning), then that token will be
 /// included in the slice returned.
 fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
-    let idx = match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
-        Ok(idx) => idx,
-        Err(idx) => idx,
-    };
+    let idx = tokens
+        .binary_search_by_start(offset)
+        .unwrap_or_else(|idx| idx);
     &tokens[..idx]
 }
 
@@ -1450,6 +1449,26 @@ def frob(): ...
         assert_snapshot!(test.completions_without_builtins(), @r"
         foo
         frob
+        ");
+    }
+
+    #[test]
+    fn completion_at_eof() {
+        let test = cursor_test(
+            "
+from typing import Protocol
+
+class Test(Protocol):
+    def x(self: Self): ...
+    def y(self: Self): ...
+
+def f(msg: Test):
+    msg.<CURSOR>",
+        );
+
+        assert_snapshot!(test.completions_if(|completion| matches!(&*completion.name, "x" | "y")), @r"
+        x
+        y
         ");
     }
 

@@ -489,6 +489,59 @@ impl Tokens {
         TokenIterWithContext::new(&self.raw)
     }
 
+    /// Performs a binary search to find the index of the **first** token that starts at the given `offset`.
+    ///
+    /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens start at the same offset,
+    /// it returns the index of the first one. Multiple tokens can start at the same offset in cases where
+    /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
+    pub fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
+        match self.binary_search_by_key(&offset, Ranged::start) {
+            Ok(mut idx) => {
+                // Some tokens have an empty range (e.g. `Newline` at the end of the file or `Dedent`).
+                // For those, we want to get the first token starting at the given offset.
+                while let Some(previous) = idx.checked_sub(1).map(|idx| self[idx]) {
+                    if previous.start() == offset {
+                        idx -= 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                Ok(idx)
+            }
+            Err(idx) => Err(idx),
+        }
+    }
+
+    /// Performs a binary search to find the index of the **last** token that ends at the given `offset`.
+    ///
+    /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens end at the same offset,
+    /// it returns the index of the last one. Multiple tokens can emd at the same offset in cases where
+    /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
+    pub fn binary_search_by_end(&self, offset: TextSize) -> Result<usize, usize> {
+        Self::binary_search_by_end_impl(self, offset)
+    }
+
+    fn binary_search_by_end_impl(me: &[Token], offset: TextSize) -> Result<usize, usize> {
+        match me.binary_search_by_key(&offset, Ranged::end) {
+            Ok(mut idx) => {
+                // Some tokens have an empty range (e.g. `Newline` at the end of the file or `Dedent`).
+                // For those, we want to return the last token that ends at the given offset. That's why
+                // we need to walk backwards.
+                while let Some(next) = me.get(idx + 1) {
+                    if next.end() == offset {
+                        idx += 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                Ok(idx)
+            }
+            Err(idx) => Err(idx),
+        }
+    }
+
     /// Returns a slice of [`Token`] that are within the given `range`.
     ///
     /// The start and end offset of the given range should be either:
@@ -532,7 +585,7 @@ impl Tokens {
     pub fn in_range(&self, range: TextRange) -> &[Token] {
         let tokens_after_start = self.after(range.start());
 
-        match tokens_after_start.binary_search_by_key(&range.end(), Ranged::end) {
+        match Self::binary_search_by_end_impl(tokens_after_start, range.end()) {
             Ok(idx) => {
                 // If we found the token with the end offset, that token should be included in the
                 // return slice.
@@ -597,7 +650,7 @@ impl Tokens {
     /// assert_eq!(collect_tokens(TextSize::new(57)), vec! []);
     /// ```
     pub fn at_offset(&self, offset: TextSize) -> TokenAt {
-        match self.binary_search_by_key(&offset, ruff_text_size::Ranged::start) {
+        match self.binary_search_by_start(offset) {
             // The token at `index` starts exactly at `offset.
             // ```python
             // object.attribute
@@ -605,6 +658,7 @@ impl Tokens {
             // ```
             Ok(index) => {
                 let token = self[index];
+
                 // `token` starts exactly at `offset`. Test if the offset is right between
                 // `token` and the previous token (if there's any)
                 if let Some(previous) = index.checked_sub(1).map(|idx| self[idx]) {
@@ -649,7 +703,7 @@ impl Tokens {
     /// If the given offset is inside a token range at any point
     /// other than the start of the range.
     pub fn before(&self, offset: TextSize) -> &[Token] {
-        match self.binary_search_by(|token| token.start().cmp(&offset)) {
+        match self.binary_search_by_start(offset) {
             Ok(idx) => &self[..idx],
             Err(idx) => {
                 // We can't use `saturating_sub` here because a file could contain a BOM header, in
@@ -684,7 +738,7 @@ impl Tokens {
     /// If the given offset is inside a token range at any point
     /// other than the start of the range.
     pub fn after(&self, offset: TextSize) -> &[Token] {
-        match self.binary_search_by(|token| token.start().cmp(&offset)) {
+        match self.binary_search_by_start(offset) {
             Ok(idx) => &self[idx..],
             Err(idx) => {
                 // We can't use `saturating_sub` here because a file could contain a BOM header, in
