@@ -9,7 +9,6 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
-use crate::preview::is_fix_fmt_skip_in_one_liners_enabled;
 use crate::statement::suite::{SuiteKind, contains_only_an_ellipsis};
 use crate::verbatim::{verbatim_text, write_suppressed_clause_header};
 use crate::{has_skip_comment, prelude::*};
@@ -720,11 +719,6 @@ fn should_suppress_clause(
     clause: &FormatClause<'_, '_>,
     f: &mut Formatter<PyFormatContext<'_>>,
 ) -> FormatResult<bool> {
-    // Check if preview behavior is enabled
-    if !is_fix_fmt_skip_in_one_liners_enabled(f.context()) {
-        return Ok(false);
-    }
-
     let source = f.context().source();
     let Some(last_child_in_clause) = clause.format_header.header.last_child_in_clause() else {
         return Ok(false);
