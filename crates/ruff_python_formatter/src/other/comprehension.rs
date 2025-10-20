@@ -5,8 +5,10 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::is_expression_parenthesized;
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{Parenthesize, is_expression_parenthesized};
 use crate::prelude::*;
+use crate::preview::is_wrap_comprehension_in_enabled;
 
 #[derive(Default)]
 pub struct FormatComprehension;
@@ -104,13 +106,33 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 leading_comments(before_in_comments),
                 token("in"),
                 trailing_comments(trailing_in_comments),
-                Spacer {
-                    expression: iter,
-                    preserve_parentheses: true
-                },
-                iter.format(),
             ]
         )?;
+
+        if is_wrap_comprehension_in_enabled(f.context()) {
+            write!(
+                f,
+                [
+                    space(),
+                    maybe_parenthesize_expression(
+                        iter,
+                        item,
+                        Parenthesize::IfBreaksParenthesizedNested
+                    )
+                ]
+            )?;
+        } else {
+            write!(
+                f,
+                [
+                    Spacer {
+                        expression: iter,
+                        preserve_parentheses: true
+                    },
+                    iter.format(),
+                ]
+            )?;
+        }
 
         if !ifs.is_empty() {
             let joined = format_with(|f| {
