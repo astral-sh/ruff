@@ -65,7 +65,6 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                 ],
                 body,
                 SuiteKind::other(orelse.is_empty()),
-                trailing_condition_comments
             ),]
         )?;
 
@@ -86,7 +85,6 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                     &token("else"),
                     orelse,
                     SuiteKind::other(true),
-                    trailing
                 )
                 .with_leading_comments(leading, body.last())]
             )?;

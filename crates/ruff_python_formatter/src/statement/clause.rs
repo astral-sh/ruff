@@ -533,14 +533,13 @@ pub(crate) fn clause<'a, 'ast, Content>(
     header_formatter: &'a Content,
     body: &'a Suite,
     kind: SuiteKind,
-    trailing_comments: &'a [SourceComment],
 ) -> FormatClause<'a, 'ast>
 where
     Content: Format<PyFormatContext<'ast>>,
 {
     FormatClause {
         format_header: clause_header(header, trailing_colon_comment, header_formatter),
-        format_body: clause_body(body, kind, trailing_comments),
+        format_body: clause_body(body, kind, trailing_colon_comment),
     }
 }
 

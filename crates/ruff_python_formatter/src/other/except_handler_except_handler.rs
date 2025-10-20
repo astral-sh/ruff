@@ -116,7 +116,6 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                 }),
                 body,
                 SuiteKind::other(self.last_suite_in_statement),
-                dangling_comments
             )]
         )
     }
