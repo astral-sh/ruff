@@ -4741,8 +4741,9 @@ impl<'db> StaticClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-                    self.apply_slots_constraints(db, name, result)
+                    let result =
+                        Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+                    self.apply_slots_constraints(db, name, result.inner)
                 }
             }
         } else {
@@ -4750,7 +4751,7 @@ impl<'db> StaticClassLiteral<'db> {
             // It could still be implicitly defined in a method.
 
             let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-            self.apply_slots_constraints(db, name, result)
+            self.apply_slots_constraints(db, name, result.inner)
         }
     }
 
@@ -8327,14 +8328,15 @@ impl<'db> ClassLiteral<'db> {
     /// Extract the names of attributes defined in __slots__ as a set of strings.
     /// Returns None if __slots__ is not defined, empty, or dynamic.
     pub(super) fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
-        let Place::Type(slots_ty, bound) = self
+        let Place::Defined(slots_ty, _, definedness) = self
             .own_class_member(db, self.generic_context(db), None, "__slots__")
+            .inner
             .place
         else {
             return None;
         };
 
-        if matches!(bound, Boundness::PossiblyUnbound) {
+        if matches!(definedness, Definedness::PossiblyUndefined) {
             return None;
         }
 
@@ -8379,24 +8381,31 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
         result: PlaceAndQualifiers<'db>,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> Member<'db> {
         // TODO: This function will be extended to support:
         // - Inheritance: Check slots across the MRO chain
         // - `__dict__` special case: Allow dynamic attributes when `__dict__` is in slots
-        
+
         if let Some(slots) = self.slots_members(db) {
             if slots.contains(name) {
                 // Attribute is in __slots__, so it's allowed even if not found elsewhere
-                if result.place.is_unbound() {
+                if result.place.is_undefined() {
                     // Return as possibly unbound since it's declared but not necessarily initialized
-                    return Place::Type(Type::unknown(), Boundness::PossiblyUnbound).into();
+                    return Member {
+                        inner: Place::Defined(
+                            Type::unknown(),
+                            TypeOrigin::Inferred,
+                            Definedness::PossiblyUndefined,
+                        )
+                        .into(),
+                    };
                 }
-                return result;
+                return Member { inner: result };
             }
             // Attribute is not in __slots__
-            return Place::Unbound.into();
+            return Member::unbound();
         }
-        result
+        Member { inner: result }
     }
 }
 
