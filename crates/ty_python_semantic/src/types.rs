@@ -10731,7 +10731,6 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let value_type = self.raw_value_type(db);
 
@@ -10747,15 +10746,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the type alias. This means that if the
-    /// calling query is not in the same file as this type alias is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
-    /// This method also calls the type inference functions, and since type aliases can have recursive structures,
-    /// we should be careful not to create infinite recursions in this method (or make it tracked if necessary).
+    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
