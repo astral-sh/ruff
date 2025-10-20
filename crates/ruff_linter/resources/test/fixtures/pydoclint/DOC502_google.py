@@ -81,3 +81,33 @@ def calculate_speed(distance: float, time: float) -> float:
     except TypeError:
         print("Not a number? Shame on you!")
         raise
+
+# DOC502 regression for Sphinx directive after Raises (issue #18959)
+def foo():
+    """First line.
+
+    Raises:
+        ValueError:
+            some text
+
+    .. versionadded:: 0.7.0
+        The ``init_kwargs`` argument.
+    """
+    raise ValueError
+
+
+# DOC502 regression for following section with colons
+def example_with_following_section():
+    """Summary.
+    
+    Returns:
+        str: The resulting expression.
+    
+    Raises:
+        ValueError: If the unit is not valid.
+    
+    Relation to `time_range_lookup`:
+        - Handles the "start of" modifier.
+        - Example: "start of month" → `DATETRUNC()`.
+    """
+    raise ValueError
