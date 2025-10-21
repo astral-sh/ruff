@@ -461,7 +461,7 @@ impl ast::Parameters {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for parameter in self.into_iter() {
+        for parameter in self {
             match parameter {
                 AnyParameterRef::NonVariadic(parameter_with_default) => {
                     visitor.visit_parameter_with_default(parameter_with_default);
