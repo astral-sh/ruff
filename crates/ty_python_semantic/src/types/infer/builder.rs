@@ -6508,7 +6508,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6521,7 +6522,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6538,7 +6540,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::keyword_only(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
