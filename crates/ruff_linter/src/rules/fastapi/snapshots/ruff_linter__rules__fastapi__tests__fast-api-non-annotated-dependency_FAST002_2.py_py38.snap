@@ -240,7 +240,7 @@ FAST002 [*] FastAPI dependency without `Annotated`
 80 |     # First param should be fixed with default preserved  
 81 |     optional_param: str = Query("default", description="Optional"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-82 |     # Second param should be fixed
+82 |     # Second param should not be fixed because of the preceding default
 83 |     required_param: str = Query(..., description="Required"),
    |
 help: Replace with `typing_extensions.Annotated`
@@ -257,7 +257,7 @@ help: Replace with `typing_extensions.Annotated`
 81 |     # First param should be fixed with default preserved  
    -     optional_param: str = Query("default", description="Optional"),
 82 +     optional_param: Annotated[str, Query(description="Optional")] = "default",
-83 |     # Second param should be fixed
+83 |     # Second param should not be fixed because of the preceding default
 84 |     required_param: str = Query(..., description="Required"),
 85 |     # Third param should be fixed with default preserved
 note: This is an unsafe fix and may change runtime behavior
@@ -266,7 +266,7 @@ FAST002 FastAPI dependency without `Annotated`
   --> FAST002_2.py:83:5
    |
 81 |     optional_param: str = Query("default", description="Optional"),
-82 |     # Second param should be fixed
+82 |     # Second param should not be fixed because of the preceding default
 83 |     required_param: str = Query(..., description="Required"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 84 |     # Third param should be fixed with default preserved
@@ -293,7 +293,7 @@ help: Replace with `typing_extensions.Annotated`
 6  | app = FastAPI()
 7  | 
 --------------------------------------------------------------------------------
-83 |     # Second param should be fixed
+83 |     # Second param should not be fixed because of the preceding default
 84 |     required_param: str = Query(..., description="Required"),
 85 |     # Third param should be fixed with default preserved
    -     another_optional_param: int = Query(42, description="Another optional"),
