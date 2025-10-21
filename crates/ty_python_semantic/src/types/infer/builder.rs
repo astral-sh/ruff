@@ -9045,27 +9045,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-
         if left != right && right.is_subtype_of(db, left) {
-            let first_call = call_dunder(op.reflect(), right, left);
-
-            match first_call {
-                Ok(ty) => Ok(ty),
-                Err(e) => match call_dunder(op, left, right) {
-                    Ok(ty) => Ok(ty),
-                    Err(_) => Err(e),
-                },
-            }
+            call_dunder(op.reflect(), right, left)
+                .or_else(|e| call_dunder(op, left, right)
+                    .map_err(|_| e))
         } else {
-            let first_call = call_dunder(op, left, right);
-
-            match first_call {
-                Ok(ty) => Ok(ty),
-                Err(e) => match call_dunder(op.reflect(), right, left) {
-                    Ok(ty) => Ok(ty),
-                    Err(_) => Err(e),
-                },
-            }
+            call_dunder(op, left, right)
+                .or_else(|e| call_dunder(op.reflect(), right, left)
+                    .map_err(|_| e))
         }
         .or_else(|e| {
             // When no appropriate method returns any value other than NotImplemented,
