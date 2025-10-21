@@ -172,7 +172,7 @@ impl<'db> BoundSuperError<'db> {
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum SuperOwnerKind<'db> {
-    Dynamic(DynamicType<'db>),
+    Dynamic(DynamicType),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
 }

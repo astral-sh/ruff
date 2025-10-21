@@ -2482,6 +2482,23 @@ class NestedMixed:
 reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent] | dict[Unknown | str, Divergent]
 ```
 
+And cases where the types originate from annotations:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def make_list(value: T) -> list[T]:
+    return [value]
+
+class NestedLists2:
+    def f(self: "NestedLists2"):
+        self.x = make_list(self.x)
+
+reveal_type(NestedLists2().x)  # revealed: Unknown | list[Divergent]
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet

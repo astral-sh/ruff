@@ -717,7 +717,7 @@ impl<'db> DataclassParams<'db> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
-    Dynamic(DynamicType<'db>),
+    Dynamic(DynamicType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -827,12 +827,12 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
-        Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
+    pub(crate) fn divergent() -> Self {
+        Self::Dynamic(DynamicType::Divergent)
     }
 
     pub(crate) const fn is_divergent(&self) -> bool {
-        matches!(self, Type::Dynamic(DynamicType::Divergent(_)))
+        matches!(self, Type::Dynamic(DynamicType::Divergent))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -1044,7 +1044,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
+    pub(crate) const fn as_dynamic(self) -> Option<DynamicType> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
             _ => None,
@@ -1058,7 +1058,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
+    pub(crate) const fn expect_dynamic(self) -> DynamicType {
         self.as_dynamic().expect("Expected a Type::Dynamic variant")
     }
 
@@ -1639,8 +1639,8 @@ impl<'db> Type<'db> {
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
-            (Type::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
+            (Type::Dynamic(DynamicType::Divergent), _)
+            | (_, Type::Dynamic(DynamicType::Divergent)) => {
                 ConstraintSet::from(relation.is_assignability())
             }
 
@@ -2457,8 +2457,8 @@ impl<'db> Type<'db> {
         match (self, other) {
             // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
             // which prevents `Divergent` from being eliminated during union reduction.
-            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
-            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => {
+            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent))
+            | (Type::Dynamic(DynamicType::Divergent), Type::Dynamic(_)) => {
                 ConstraintSet::from(false)
             }
             (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::from(true),
@@ -6656,7 +6656,13 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
-                    specialization.get(db, bound_typevar).unwrap_or(self)
+                    let ty = specialization.get(db, bound_typevar).unwrap_or(self);
+
+                    if specialization_depth(db, ty) > 10 {
+                        Type::divergent()
+                    } else {
+                        ty
+                    }
                 }
                 TypeMapping::PartialSpecialization(partial) => {
                     partial.get(db, bound_typevar).unwrap_or(self)
@@ -7214,10 +7220,6 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
-
-    pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
-        any_over_type(db, self, &|ty| ty == div, false)
-    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -7655,19 +7657,8 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
-/// A type that is determined to be divergent during recursive type inference.
-/// This type must never be eliminated by dynamic type reduction
-/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
-/// Otherwise, type inference cannot converge properly.
-/// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub struct DivergentType<'db> {
-    /// The scope where this divergence was detected.
-    scope: ScopeId<'db>,
-}
-
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub enum DynamicType<'db> {
+pub enum DynamicType {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
@@ -7691,12 +7682,16 @@ pub enum DynamicType<'db> {
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
     /// A type that is determined to be divergent during type inference for a recursive function.
-    Divergent(DivergentType<'db>),
+    /// This type must never be eliminated by dynamic type reduction
+    /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
+    /// Otherwise, type inference cannot converge properly.
+    /// For detailed properties of this type, see the unit test at the end of the file.
+    Divergent,
 }
 
-impl DynamicType<'_> {
+impl DynamicType {
     fn normalized(self) -> Self {
-        if matches!(self, Self::Divergent(_)) {
+        if matches!(self, Self::Divergent) {
             self
         } else {
             Self::Any
@@ -7704,7 +7699,7 @@ impl DynamicType<'_> {
     }
 }
 
-impl std::fmt::Display for DynamicType<'_> {
+impl std::fmt::Display for DynamicType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
@@ -7733,7 +7728,7 @@ impl std::fmt::Display for DynamicType<'_> {
                     f.write_str("@Todo")
                 }
             }
-            DynamicType::Divergent(_) => f.write_str("Divergent"),
+            DynamicType::Divergent => f.write_str("Divergent"),
         }
     }
 }
@@ -11776,7 +11771,7 @@ pub(crate) mod tests {
         let file_scope_id = FileScopeId::global();
         let scope = file_scope_id.to_scope_id(&db, file);
 
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope }));
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope: Some(scope) }));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.
