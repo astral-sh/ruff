@@ -188,8 +188,46 @@ r5: RecursiveList[int] = [1, ["a"]]
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
         # TODO: should be `list[RecursiveList[int]]
-        reveal_type(x[0])  # revealed: list[int | list[Any]]
+        reveal_type(x[0])  # revealed: int | list[Any]
     if isinstance(x, list) and isinstance(x[0], list):
         # TODO: should be `list[RecursiveList[int]]`
         reveal_type(x[0])  # revealed: list[Any]
+```
+
+Assignment checks respect structural subtyping, i.e. type aliases with the same structure are
+assignable to each other.
+
+```py
+# This is structurally equivalent to RecursiveList[T].
+type RecursiveList2[T] = T | list[T | list[RecursiveList[T]]]
+# This is not structurally equivalent to RecursiveList[T].
+type RecursiveList3[T] = T | list[list[RecursiveList[T]]]
+
+def _(x: RecursiveList[int], y: RecursiveList2[int]):
+    r1: RecursiveList2[int] = x
+    # error: [invalid-assignment]
+    r2: RecursiveList3[int] = x
+
+    r3: RecursiveList[int] = y
+    # error: [invalid-assignment]
+    r4: RecursiveList3[int] = y
+```
+
+It is also possible to handle divergent type aliases that are not actually have instances.
+
+```py
+# The type variable `T` has no meaning here, it's just to make sure it works correctly.
+type DivergentList[T] = list[DivergentList[T]]
+
+d1: DivergentList[int] = []
+# error: [invalid-assignment]
+d2: DivergentList[int] = [1]
+# error: [invalid-assignment]
+d3: DivergentList[int] = ["a"]
+# TODO: this should be an error
+d4: DivergentList[int] = [[1]]
+
+def _(x: DivergentList[int]):
+    d1: DivergentList[int] = [x]
+    d2: DivergentList[int] = x[0]
 ```
