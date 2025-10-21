@@ -9045,47 +9045,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
+
         if left != right && right.is_subtype_of(db, left) {
-                                let first_call = call_dunder(op.reflect(), right, left);
-                    match first_call {
-                        Ok(ty) => Ok(ty),
-                        Err(e) => match call_dunder(op, left, right) {
-                            Ok(ty) => Ok(ty),
-                            Err(_) => Err(e),
-                        },
-                    }
-                } else {
-                    let first_call = call_dunder(op, left, right);
-                    match first_call {
-                        Ok(ty) => Ok(ty),
-                        Err(e) => match call_dunder(op.reflect(), right, left) {
-                            Ok(ty) => Ok(ty),
-                            Err(_) => Err(e),
-                        },
-                    }
-                }
-                .or_else(|e| {
-                    // When no appropriate method returns any value other than NotImplemented,
-                    // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
-                    // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-                    if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
-                        // This branch implements specific behavior of the `__eq__` and `__ne__` methods
-                        // on `object`, so it does not apply if we skip looking up attributes on `object`.
-                        && !policy.mro_no_object_fallback() && matches!(e, CallDunderError::MethodNotAvailable)
-                    {
-                        Ok(KnownClass::Bool.to_instance(db))
-                    } else {
-                        Err(e)
-                    }
-                })
-                .map_err(|e| {
-                    let mut error = CompareUnsupportedError::new(
-                  op.into(),
-                  left,
-                  right,
-                );
-                    error.set_reason(db, &e);
-                    error})
+            let first_call = call_dunder(op.reflect(), right, left);
+
+            match first_call {
+                Ok(ty) => Ok(ty),
+                Err(e) => match call_dunder(op, left, right) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Err(e),
+                },
+            }
+        } else {
+            let first_call = call_dunder(op, left, right);
+
+            match first_call {
+                Ok(ty) => Ok(ty),
+                Err(e) => match call_dunder(op.reflect(), right, left) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Err(e),
+                },
+            }
+        }
+        .or_else(|e| {
+            // When no appropriate method returns any value other than NotImplemented,
+            // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
+            // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
+            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
+            // This branch implements specific behavior of the `__eq__` and `__ne__` methods
+            // on `object`, so it does not apply if we skip looking up attributes on `object`.
+            && !policy.mro_no_object_fallback() && matches!(e, CallDunderError::MethodNotAvailable)
+            {
+                Ok(KnownClass::Bool.to_instance(db))
+            } else {
+                Err(e)
+            }
+        })
+        .map_err(|e| {
+            let mut error = CompareUnsupportedError::new(op.into(), left, right);
+            error.set_reason(db, &e);
+            error
+        })
     }
 
     /// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type, or `None` if the test is unsupported.
