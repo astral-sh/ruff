@@ -793,7 +793,7 @@ impl<'db> Node<'db> {
     }
 
     // Keep this around for debugging purposes
-    #[expect(unused)]
+    #[expect(dead_code)]
     fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         struct DisplayNode<'a, 'db> {
             db: &'db dyn Db,
