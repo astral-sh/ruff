@@ -793,12 +793,18 @@ impl<'db> Node<'db> {
     }
 
     // Keep this around for debugging purposes
-    #[expect(dead_code)]
+    #[expect(unused)]
     fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         struct DisplayNode<'a, 'db> {
-            node: Node<'db>,
             db: &'db dyn Db,
+            node: Node<'db>,
             prefix: &'a dyn Display,
+        }
+
+        impl<'a, 'db> DisplayNode<'a, 'db> {
+            fn new(db: &'db dyn Db, node: Node<'db>, prefix: &'a dyn Display) -> Self {
+                Self { db, node, prefix }
+            }
         }
 
         impl Display for DisplayNode<'_, '_> {
@@ -808,21 +814,27 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => write!(f, "never"),
                     Node::Interior(interior) => {
                         interior.constraint(self.db).display(self.db).fmt(f)?;
+                        // Calling display_graph recursively here causes rustc to claim that the
+                        // expect(unused) up above is unfulfilled!
                         write!(
                             f,
                             "\n{}┡━₁ {}",
                             self.prefix,
-                            interior
-                                .if_true(self.db)
-                                .display_graph(self.db, &format_args!("{}│   ", self.prefix))
+                            DisplayNode::new(
+                                self.db,
+                                interior.if_true(self.db),
+                                &format_args!("{}│   ", self.prefix)
+                            ),
                         )?;
                         write!(
                             f,
                             "\n{}└─₀ {}",
                             self.prefix,
-                            interior
-                                .if_false(self.db)
-                                .display_graph(self.db, &format_args!("{}    ", self.prefix))
+                            DisplayNode::new(
+                                self.db,
+                                interior.if_false(self.db),
+                                &format_args!("{}    ", self.prefix)
+                            ),
                         )?;
                         Ok(())
                     }
@@ -830,11 +842,7 @@ impl<'db> Node<'db> {
             }
         }
 
-        DisplayNode {
-            node: self,
-            db,
-            prefix,
-        }
+        DisplayNode::new(db, self, prefix)
     }
 }
 
@@ -1403,7 +1411,7 @@ impl<'db> SatisfiedClauses<'db> {
     /// function. (This is used when displaying a BDD, to make sure that the representation that we
     /// show is as simple as possible while still producing the same results.)
     fn simplify(&mut self, db: &'db dyn Db) {
-        while self.simplify_one_round(db) {
+        while self.simplify_one_round() {
             // Keep going
         }
 
@@ -1414,7 +1422,7 @@ impl<'db> SatisfiedClauses<'db> {
         }
     }
 
-    fn simplify_one_round(&mut self, db: &'db dyn Db) -> bool {
+    fn simplify_one_round(&mut self) -> bool {
         let mut changes_made = false;
 
         // First remove any duplicate clauses. (The clause list will start out with no duplicates
