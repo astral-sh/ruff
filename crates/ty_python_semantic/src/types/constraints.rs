@@ -64,7 +64,8 @@ use rustc_hash::FxHashSet;
 use salsa::plumbing::AsId;
 
 use crate::Db;
-use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, UnionType};
+use crate::types::generics::InferableTypeVars;
+use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, TypeRelation, UnionType};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -183,6 +184,22 @@ impl<'db> ConstraintSet<'db> {
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db)
+    }
+
+    fn type_implies(
+        self,
+        db: &'db dyn Db,
+        lhs: Type<'db>,
+        rhs: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        lhs.has_relation_to(
+            db,
+            rhs,
+            inferable,
+            TypeRelation::ConstraintImplication(self),
+        )
+        .is_always_satisfied()
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -337,12 +354,26 @@ impl<'db> ConstrainedTypeVar<'db> {
     ///
     /// This is used (among other places) to simplify how we display constraint sets, by removing
     /// redundant constraints from a clause.
-    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
-        other.contains(db, self)
+    fn implies(self, db: &'db dyn Db, other: Self, constraints: ConstraintSet<'db>) -> bool {
+        if self.typevar(db) != other.typevar(db) {
+            return false;
+        }
+        constraints.type_implies(db, other.lower(db), self.lower(db), InferableTypeVars::None)
+            && constraints.type_implies(
+                db,
+                self.upper(db),
+                other.upper(db),
+                InferableTypeVars::None,
+            )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
-    fn intersect(self, db: &'db dyn Db, other: Self) -> Option<Self> {
+    fn intersect(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: ConstraintSet<'db>,
+    ) -> Option<Self> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]).normalized(db);
         let upper =
@@ -350,7 +381,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !constraints.type_implies(db, lower, upper, InferableTypeVars::None) {
             return None;
         }
 
@@ -748,7 +779,7 @@ impl<'db> Node<'db> {
     }
 
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
-    fn simplify(self, db: &'db dyn Db) -> Self {
+    fn simplify(self, db: &'db dyn Db, constraints: ConstraintSet<'db>) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => {
@@ -803,7 +834,7 @@ impl<'db> Node<'db> {
         searcher.clauses
     }
 
-    fn display(self, db: &'db dyn Db) -> impl Display {
+    fn display(self, db: &'db dyn Db, constraints: ConstraintSet<'db>) -> impl Display {
         // To render a BDD in DNF form, you perform a depth-first search of the BDD tree, looking
         // for any path that leads to the AlwaysTrue terminal. Each such path represents one of the
         // intersection clauses in the DNF form. The path traverses zero or more interior nodes,
@@ -811,6 +842,7 @@ impl<'db> Node<'db> {
         // negative individual constraints in the path's clause.
         struct DisplayNode<'db> {
             node: Node<'db>,
+            constraints: ConstraintSet<'db>,
             db: &'db dyn Db,
         }
 
@@ -821,7 +853,7 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => f.write_str("never"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
-                        clauses.simplify(self.db);
+                        clauses.simplify(self.db, self.constraints);
                         clauses.display(self.db).fmt(f)
                     }
                 }
@@ -1137,7 +1169,7 @@ impl<'db> InteriorNode<'db> {
             // There are some simplifications we can make when the intersection of the two
             // constraints is empty, and others that we can make when the intersection is
             // non-empty.
-            match left_constraint.intersect(db, right_constraint) {
+            match left_constraint.intersect(db, right_constraint, constraints) {
                 Some(intersection_constraint) => {
                     // If the intersection is non-empty, we need to create a new constraint to
                     // represent that intersection. We also need to add the new constraint to our
@@ -1315,7 +1347,7 @@ impl<'db> ConstraintAssignment<'db> {
     ///
     /// This is used (among other places) to simplify how we display constraint sets, by removing
     /// redundant constraints from a clause.
-    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
+    fn implies(self, db: &'db dyn Db, other: Self, constraints: ConstraintSet<'db>) -> bool {
         match (self, other) {
             // For two positive constraints, one range has to fully contain the other; the smaller
             // constraint implies the larger.
@@ -1325,7 +1357,7 @@ impl<'db> ConstraintAssignment<'db> {
             (
                 ConstraintAssignment::Positive(self_constraint),
                 ConstraintAssignment::Positive(other_constraint),
-            ) => self_constraint.implies(db, other_constraint),
+            ) => self_constraint.implies(db, other_constraint, constraints),
 
             // For two negative constraints, one range has to fully contain the other; the ranges
             // represent "holes", though, so the constraint with the larger range implies the one
@@ -1336,7 +1368,7 @@ impl<'db> ConstraintAssignment<'db> {
             (
                 ConstraintAssignment::Negative(self_constraint),
                 ConstraintAssignment::Negative(other_constraint),
-            ) => other_constraint.implies(db, self_constraint),
+            ) => other_constraint.implies(db, self_constraint, constraints),
 
             // For a positive and negative constraint, the ranges have to be disjoint, and the
             // positive range implies the negative range.
@@ -1346,7 +1378,9 @@ impl<'db> ConstraintAssignment<'db> {
             (
                 ConstraintAssignment::Positive(self_constraint),
                 ConstraintAssignment::Negative(other_constraint),
-            ) => self_constraint.intersect(db, other_constraint).is_none(),
+            ) => self_constraint
+                .intersect(db, other_constraint, constraints)
+                .is_none(),
 
             // It's theoretically possible for a negative constraint to imply a positive constraint
             // if the positive constraint is always satisfied (`Never ≤ T ≤ object`). But we never
@@ -1432,7 +1466,7 @@ impl<'db> SatisfiedClause<'db> {
     /// want to remove the larger one and keep the smaller one.)
     ///
     /// Returns a boolean that indicates whether any simplifications were made.
-    fn simplify(&mut self, db: &'db dyn Db) -> bool {
+    fn simplify(&mut self, db: &'db dyn Db, constraints: ConstraintSet<'db>) -> bool {
         let mut changes_made = false;
         let mut i = 0;
         // Loop through each constraint, comparing it with any constraints that appear later in the
@@ -1440,7 +1474,7 @@ impl<'db> SatisfiedClause<'db> {
         'outer: while i < self.constraints.len() {
             let mut j = i + 1;
             while j < self.constraints.len() {
-                if self.constraints[j].implies(db, self.constraints[i]) {
+                if self.constraints[j].implies(db, self.constraints[i], constraints) {
                     // If constraint `i` is removed, then we don't need to compare it with any
                     // later constraints in the list. Note that we continue the outer loop, instead
                     // of breaking from the inner loop, so that we don't bump index `i` below.
@@ -1449,7 +1483,7 @@ impl<'db> SatisfiedClause<'db> {
                     self.constraints.swap_remove(i);
                     changes_made = true;
                     continue 'outer;
-                } else if self.constraints[i].implies(db, self.constraints[j]) {
+                } else if self.constraints[i].implies(db, self.constraints[j], constraints) {
                     // If constraint `j` is removed, then we can continue the inner loop. We will
                     // swap a new element into place at index `j`, and will continue comparing the
                     // constraint at index `i` with later constraints.
@@ -1513,11 +1547,11 @@ impl<'db> SatisfiedClauses<'db> {
     /// Simplifies the DNF representation, removing redundancies that do not change the underlying
     /// function. (This is used when displaying a BDD, to make sure that the representation that we
     /// show is as simple as possible while still producing the same results.)
-    fn simplify(&mut self, db: &'db dyn Db) {
+    fn simplify(&mut self, db: &'db dyn Db, constraints: ConstraintSet<'db>) {
         // First simplify each clause individually, by removing constraints that are implied by
         // other constraints in the clause.
         for clause in &mut self.clauses {
-            clause.simplify(db);
+            clause.simplify(db, constraints);
         }
 
         while self.simplify_one_round() {
