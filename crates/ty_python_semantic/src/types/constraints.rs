@@ -1329,6 +1329,8 @@ impl<'db> SatisfiedClause<'db> {
     /// Simplifies this clause by removing constraints that are implied by other constraints in the
     /// clause. (Clauses are the intersection of constraints, so if two clauses are redundant, we
     /// want to remove the larger one and keep the smaller one.)
+    ///
+    /// Returns a boolean that indicates whether any simplifications were made.
     fn simplify(&mut self, db: &'db dyn Db) -> bool {
         let mut changes_made = false;
         let mut i = 0;
