@@ -2514,6 +2514,125 @@ def ab(a: int, *, c: int):
         ");
     }
 
+    #[test]
+    fn hover_binary_operator_literal() {
+        let test = cursor_test(
+            r#"
+        result = 5 <CURSOR>+ 3
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        bound method int.__add__(value: int, /) -> int
+        ---------------------------------------------
+        Return self+value.
+
+        ---------------------------------------------
+        ```python
+        bound method int.__add__(value: int, /) -> int
+        ```
+        ---
+        ```text
+        Return self+value.
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:12
+          |
+        2 | result = 5 + 3
+          |            -
+          |            |
+          |            source
+          |            Cursor offset
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_binary_operator_overload() {
+        let test = cursor_test(
+            r#"
+            from __future__ import annotations
+            from typing import overload
+
+            class Test:
+                @overload
+                def __add__(self, other: Test, /) -> Test:  ...
+                @overload
+                def __add__(self, other: Other, /) -> Test: ...
+                def __add__(self, other: Test | Other, /) -> Test:
+                    return self
+
+            class Other: ...
+
+            Test() <CURSOR>+ Test()
+        "#,
+        );
+
+        // TODO: We should only show the matching overload here.
+        // https://github.com/astral-sh/ty/issues/73
+        assert_snapshot!(test.hover(), @r"
+        (other: Test, /) -> Test
+        (other: Other, /) -> Test
+        ---------------------------------------------
+        ```python
+        (other: Test, /) -> Test
+        (other: Other, /) -> Test
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:15:8
+           |
+        13 | class Other: ...
+        14 |
+        15 | Test() + Test()
+           |        -
+           |        |
+           |        source
+           |        Cursor offset
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_binary_operator_union() {
+        let test = cursor_test(
+            r#"
+            from __future__ import annotations
+
+            class Test:
+                def __add__(self, other: Other, /) -> Other:
+                    return other
+
+            class Other:
+                def __add__(self, other: Other, /) -> Other:
+                    return self
+
+            def _(a: Test | Other):
+                a +<CURSOR> Other()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        (bound method Test.__add__(other: Other, /) -> Other) | (bound method Other.__add__(other: Other, /) -> Other)
+        ---------------------------------------------
+        ```python
+        (bound method Test.__add__(other: Other, /) -> Other) | (bound method Other.__add__(other: Other, /) -> Other)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:13:7
+           |
+        12 | def _(a: Test | Other):
+        13 |     a + Other()
+           |       ^- Cursor offset
+           |       |
+           |       source
+           |
+        ");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;

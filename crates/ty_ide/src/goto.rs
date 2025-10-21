@@ -8,19 +8,18 @@ use std::borrow::Cow;
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::ExprCall;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_parser::TokenKind;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::HasDefinition;
-use ty_python_semantic::ImportAliasResolution;
+
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
-    HasType, SemanticModel, definitions_for_imported_symbol, definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
+    definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -29,6 +28,28 @@ pub(crate) enum GotoTarget<'a> {
     FunctionDef(&'a ast::StmtFunctionDef),
     ClassDef(&'a ast::StmtClassDef),
     Parameter(&'a ast::Parameter),
+
+    /// Go to on the operator of a binary operation.
+    ///
+    /// ```py
+    /// a + b
+    ///   ^
+    /// ```
+    BinOp {
+        expression: &'a ast::ExprBinOp,
+        operator_range: TextRange,
+    },
+
+    /// Go to where the operator of a unary operation is defined.
+    ///
+    /// ```py
+    /// -a
+    /// ^
+    /// ```
+    UnaryOp {
+        expression: &'a ast::ExprUnaryOp,
+        operator_range: TextRange,
+    },
 
     /// Multi-part module names
     /// Handles both `import foo.bar` and `from foo.bar import baz` cases
@@ -166,7 +187,7 @@ pub(crate) enum GotoTarget<'a> {
         /// The callable that can actually be selected by a cursor
         callable: ast::ExprRef<'a>,
         /// The call of the callable
-        call: &'a ExprCall,
+        call: &'a ast::ExprCall,
     },
 }
 
@@ -295,6 +316,16 @@ impl GotoTarget<'_> {
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
             | GotoTarget::Globals { .. } => return None,
+            GotoTarget::BinOp { expression, .. } => {
+                let (_, ty) =
+                    ty_python_semantic::definitions_for_bin_op(model.db(), model, expression)?;
+                ty
+            }
+            GotoTarget::UnaryOp { expression, .. } => {
+                let (_, ty) =
+                    ty_python_semantic::definitions_for_unary_op(model.db(), model, expression)?;
+                ty
+            }
         };
 
         Some(ty)
@@ -451,6 +482,23 @@ impl GotoTarget<'_> {
                 }
             }
 
+            GotoTarget::BinOp { expression, .. } => {
+                let model = SemanticModel::new(db, file);
+
+                let (definitions, _) =
+                    ty_python_semantic::definitions_for_bin_op(db, &model, expression)?;
+
+                Some(DefinitionsOrTargets::Definitions(definitions))
+            }
+
+            GotoTarget::UnaryOp { expression, .. } => {
+                let model = SemanticModel::new(db, file);
+                let (definitions, _) =
+                    ty_python_semantic::definitions_for_unary_op(db, &model, expression)?;
+
+                Some(DefinitionsOrTargets::Definitions(definitions))
+            }
+
             _ => None,
         }
     }
@@ -524,6 +572,7 @@ impl GotoTarget<'_> {
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
+            GotoTarget::BinOp { .. } | GotoTarget::UnaryOp { .. } => None,
         }
     }
 
@@ -531,6 +580,7 @@ impl GotoTarget<'_> {
     pub(crate) fn from_covering_node<'a>(
         covering_node: &crate::find_node::CoveringNode<'a>,
         offset: TextSize,
+        tokens: &Tokens,
     ) -> Option<GotoTarget<'a>> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
@@ -690,6 +740,44 @@ impl GotoTarget<'_> {
                 }
             },
 
+            AnyNodeRef::ExprBinOp(binary) => {
+                if offset >= binary.left.end() && offset < binary.right.start() {
+                    let between_operands =
+                        tokens.in_range(TextRange::new(binary.left.end(), binary.right.start()));
+                    if let Some(operator_token) = between_operands
+                        .iter()
+                        .find(|token| token.kind().as_binary_operator().is_some())
+                        && operator_token.range().contains_inclusive(offset)
+                    {
+                        return Some(GotoTarget::BinOp {
+                            expression: binary,
+                            operator_range: operator_token.range(),
+                        });
+                    }
+                }
+
+                Some(GotoTarget::Expression(binary.into()))
+            }
+
+            AnyNodeRef::ExprUnaryOp(unary) => {
+                if offset >= unary.start() && offset < unary.operand.start() {
+                    let before_operand =
+                        tokens.in_range(TextRange::new(unary.start(), unary.operand.start()));
+
+                    if let Some(operator_token) = before_operand
+                        .iter()
+                        .find(|token| token.kind().as_unary_operator().is_some())
+                        && operator_token.range().contains_inclusive(offset)
+                    {
+                        return Some(GotoTarget::UnaryOp {
+                            expression: unary,
+                            operator_range: operator_token.range(),
+                        });
+                    }
+                }
+                Some(GotoTarget::Expression(unary.into()))
+            }
+
             node => {
                 // Check if this is seemingly a callable being invoked (the `x` in `x(...)`)
                 let parent = covering_node.parent();
@@ -737,6 +825,8 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::TypeParamTypeVarTupleName(tuple) => tuple.name.range,
             GotoTarget::NonLocal { identifier, .. } => identifier.range,
             GotoTarget::Globals { identifier, .. } => identifier.range,
+            GotoTarget::BinOp { operator_range, .. }
+            | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
         }
     }
 }
@@ -794,7 +884,7 @@ fn definitions_for_expression<'db>(
 fn definitions_for_callable<'db>(
     db: &'db dyn crate::Db,
     file: ruff_db::files::File,
-    call: &ExprCall,
+    call: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
     let model = SemanticModel::new(db, file);
     // Attempt to refine to a specific call
@@ -835,14 +925,24 @@ pub(crate) fn find_goto_target(
             | TokenKind::Complex
             | TokenKind::Float
             | TokenKind::Int => 1,
+
+            TokenKind::Comment => -1,
+
+            // if we have a<CURSOR>+b`, prefer the `+` token (by respecting the token ordering)
+            // This matches VS Code's behavior where it sends the start of the clicked token as offset.
+            kind if kind.as_binary_operator().is_some() || kind.as_unary_operator().is_some() => 1,
             _ => 0,
         })?;
+
+    if token.kind().is_comment() {
+        return None;
+    }
 
     let covering_node = covering_node(parsed.syntax().into(), token.range())
         .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
-    GotoTarget::from_covering_node(&covering_node, offset)
+    GotoTarget::from_covering_node(&covering_node, offset, parsed.tokens())
 }
 
 /// Helper function to resolve a module name and create a navigation target.
