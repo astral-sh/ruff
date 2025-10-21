@@ -322,6 +322,11 @@ impl<'db> ConstrainedTypeVar<'db> {
             && other.upper(db).is_subtype_of(db, self.upper(db))
     }
 
+    /// Returns whether this constraint implies contains another — i.e., whether every type that
+    /// satisfies this constraint also satisfies `other`.
+    ///
+    /// This is used (among other places) to simplify how we display constraint sets, by removing
+    /// redundant constraints from a clause.
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
         other.contains(db, self)
     }
