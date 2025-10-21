@@ -7389,8 +7389,6 @@ impl<'db> TypeMapping<'_, 'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TrackedConstraintSet<'db> {
-    // XXX: no ref!
-    #[returns(ref)]
     constraints: ConstraintSet<'db>,
 
     should_simplify: bool,

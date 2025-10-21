@@ -8175,7 +8175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let left = left_tracked.constraints(self.db());
                 let right = right_tracked.constraints(self.db());
-                let result = left.and(self.db(), || *right);
+                let result = left.and(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(
                         self.db(),
@@ -8193,7 +8193,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let left = left_tracked.constraints(self.db());
                 let right = right_tracked.constraints(self.db());
-                let result = left.or(self.db(), || *right);
+                let result = left.or(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(
                         self.db(),
