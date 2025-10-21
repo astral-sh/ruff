@@ -86,8 +86,9 @@ def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
     Two types are disjoint if they have no inhabitants in common.
     """
 
-def implies_given_constraints(constraints: bool | ConstraintSet, type_a: Any, type_b: Any) -> bool:
-    ...
+def implies_given_constraints(
+    constraints: bool | ConstraintSet, type_a: Any, type_b: Any
+) -> bool: ...
 
 def is_singleton(ty: Any) -> bool:
     """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""

@@ -10,9 +10,9 @@ constraint set, which expresses the conditions under which one of the other rela
 
 ## Concrete types
 
-For concrete types, all of the typing relationships (including this one) produce the same
-result. (A concrete type is any fully static type that is not a typevar. It can _contain_ a
-typevar, though — `list[T]` is considered concrete.)
+For concrete types, all of the typing relationships (including this one) produce the same result. (A
+concrete type is any fully static type that is not a typevar. It can _contain_ a typevar, though —
+`list[T]` is considered concrete.)
 
 ```py
 from ty_extensions import implies_given_constraints, is_assignable_to, is_subtype_of, static_assert
