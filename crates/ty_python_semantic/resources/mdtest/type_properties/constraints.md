@@ -611,6 +611,7 @@ before rendering it.
 
 ```py
 from ty_extensions import range_constraint
+
 def _[T, U]():
     t1 = range_constraint(str, T, str)
     t2 = range_constraint(bool, T, bool)
