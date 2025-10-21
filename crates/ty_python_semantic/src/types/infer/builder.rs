@@ -9072,9 +9072,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
             // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
             if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
-            // This branch implements specific behavior of the `__eq__` and `__ne__` methods
-            // on `object`, so it does not apply if we skip looking up attributes on `object`.
-            && !policy.mro_no_object_fallback() && matches!(e, CallDunderError::MethodNotAvailable)
+                // This branch implements specific behavior of the `__eq__` and `__ne__` methods
+                // on `object`, so it does not apply if we skip looking up attributes on `object`.
+                && !policy.mro_no_object_fallback() && matches!(e, CallDunderError::MethodNotAvailable)
             {
                 Ok(KnownClass::Bool.to_instance(db))
             } else {
