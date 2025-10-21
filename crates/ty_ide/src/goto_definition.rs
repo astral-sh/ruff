@@ -1284,25 +1284,7 @@ class Test:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __add__(self, other):
-          |         ^^^^^^^
-        4 |         return Test()
-          |
-        info: Source
-          --> main.py:8:5
-           |
-         7 |   (
-         8 | /     Test()  # comment
-         9 | |     + Test()
-           | |____________^
-        10 |   )
-           |
-        ");
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     #[test]

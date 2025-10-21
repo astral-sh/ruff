@@ -943,7 +943,8 @@ pub fn definitions_for_bin_op<'db>(
         return None;
     };
 
-    let callable_type = bindings.callable_type();
+    let callable_type = promote_literals_for_self(db, bindings.callable_type());
+
     let definitions: Vec<_> = bindings
         .into_iter()
         .flat_map(std::iter::IntoIterator::into_iter)
@@ -981,7 +982,7 @@ pub fn definitions_for_unary_op<'db>(
         return None;
     };
 
-    let callable_type = bindings.callable_type();
+    let callable_type = promote_literals_for_self(db, bindings.callable_type());
 
     let definitions = bindings
         .into_iter()
@@ -994,6 +995,24 @@ pub fn definitions_for_unary_op<'db>(
         .collect();
 
     Some((definitions, callable_type))
+}
+
+/// Promotes literal types in `self` positions to their fallback instance types.
+///
+/// This is so that we show `int.__add__` instead of `IntLiteral.__add__`.
+fn promote_literals_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
+            self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+        })),
+        Type::Union(elements) => elements.map(db, |ty| match ty {
+            Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
+                self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+            })),
+            _ => *ty,
+        }),
+        ty => ty,
+    }
 }
 
 /// Find the active signature index from `CallSignatureDetails`.

@@ -895,6 +895,8 @@ pub(crate) fn find_goto_target(
             | TokenKind::Float
             | TokenKind::Int => 1,
 
+            TokenKind::Comment => -1,
+
             // if we have a<CURSOR>+b`, prefer the `+` token (by respecting the token ordering)
             // This matches VS Code's behavior where it sends the start of the clicked token as offset.
             kind if kind.as_binary_operator().is_some() || kind.as_unary_operator().is_some() => 1,

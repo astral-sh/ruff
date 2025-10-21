@@ -2522,15 +2522,14 @@ def ab(a: int, *, c: int):
         "#,
         );
 
-        // TODO: It would be ncie to show `int.__add__(...)` instead of `Literal[5].__add__(...)` here.
         assert_snapshot!(test.hover(), @r"
-        bound method Literal[5].__add__(value: int, /) -> int
+        bound method int.__add__(value: int, /) -> int
         ---------------------------------------------
         Return self+value.
 
         ---------------------------------------------
         ```python
-        bound method Literal[5].__add__(value: int, /) -> int
+        bound method int.__add__(value: int, /) -> int
         ```
         ---
         ```text
