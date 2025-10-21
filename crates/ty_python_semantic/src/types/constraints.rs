@@ -315,15 +315,15 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 
     fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        other.implies(db, self)
-    }
-
-    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
         if self.typevar(db) != other.typevar(db) {
             return false;
         }
-        other.lower(db).is_subtype_of(db, self.lower(db))
-            && self.upper(db).is_subtype_of(db, other.upper(db))
+        self.lower(db).is_subtype_of(db, other.lower(db))
+            && other.upper(db).is_subtype_of(db, self.upper(db))
+    }
+
+    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
+        other.contains(db, self)
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
