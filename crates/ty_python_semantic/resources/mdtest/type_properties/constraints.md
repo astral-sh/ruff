@@ -624,3 +624,16 @@ def _[T, U]():
     # revealed: ty_extensions.ConstraintSet[((T@_ = bool) ∧ (U@_ = bool)) ∨ ((T@_ = bool) ∧ (U@_ = str)) ∨ ((T@_ = str) ∧ (U@_ = bool)) ∨ ((T@_ = str) ∧ (U@_ = str))]
     reveal_type((t1 | t2) & (u1 | u2))
 ```
+
+The lower and upper bounds of a constraint are normalized, so that we equate unions and
+intersections whose elements appear in different orders.
+
+```py
+from typing import Never
+
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ int | str)]
+    reveal_type(range_constraint(Never, T, str | int))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ int | str)]
+    reveal_type(range_constraint(Never, T, int | str))
+```
