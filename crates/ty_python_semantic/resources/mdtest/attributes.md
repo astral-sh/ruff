@@ -2583,6 +2583,23 @@ class C:
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
+That also works if the tuple is not constructed directly:
+
+```py
+# from typing import TypeVar, Literal
+#
+# T = TypeVar("T")
+#
+# def make_tuple(a: T) -> tuple[T, Literal[1]]:
+#     return (a, 1)
+#
+# class D:
+#     def f(self, other: "D"):
+#         self.x = make_tuple(other.x)
+#
+# reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
 ## Attributes of standard library modules that aren't yet defined
 
 For attributes of stdlib modules that exist in future versions, we can give better diagnostics.

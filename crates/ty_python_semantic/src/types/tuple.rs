@@ -26,10 +26,11 @@ use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroErro
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
+use crate::types::visitor::MAX_SPECIALIZATION_DEPTH;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    UnionBuilder, UnionType, specialization_depth,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -178,7 +179,16 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, &TupleSpec::heterogeneous(types))
+        TupleType::new(
+            db,
+            &TupleSpec::heterogeneous(types.into_iter().map(|ty| {
+                if specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH {
+                    Type::divergent(None)
+                } else {
+                    ty
+                }
+            })),
+        )
     }
 
     #[cfg(test)]

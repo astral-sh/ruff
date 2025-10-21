@@ -73,13 +73,7 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements.into_iter().map(Into::into).map(|ty| {
-                if specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH {
-                    Type::divergent(None)
-                } else {
-                    ty
-                }
-            }),
+            elements.into_iter().map(Into::into),
         ))
     }
 

@@ -301,7 +301,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                                 }
                             })
                             .multi_cartesian_product()
-                            .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
+                            .map(|types| Type::heterogeneous_tuple(db, types))
                             .collect::<Vec<_>>();
 
                         if expanded.len() == 1 {
