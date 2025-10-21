@@ -3,7 +3,7 @@ use std::iter::FusedIterator;
 pub use list::{all_modules, list_modules};
 pub(crate) use module::KnownModule;
 pub use module::Module;
-pub use path::{SearchPath, SearchPathValidationError};
+pub use path::{SearchPath, SearchPathValidationError, vendored_path_for_cache};
 pub use resolver::SearchPaths;
 pub(crate) use resolver::file_to_module;
 pub use resolver::{resolve_module, resolve_real_module};

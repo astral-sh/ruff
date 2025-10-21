@@ -607,7 +607,11 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn relativize_system_path(&self, path: &SystemPath) -> Option<ModulePath> {
+    pub(crate) fn relativize_system_path(
+        &self,
+        db: &dyn Db,
+        path: &SystemPath,
+    ) -> Option<ModulePath> {
         if path
             .extension()
             .is_some_and(|extension| !self.is_valid_extension(extension))
@@ -629,7 +633,15 @@ impl SearchPath {
                         relative_path: relative_path.as_utf8_path().to_path_buf(),
                     })
             }
-            SearchPathInner::StandardLibraryVendored(_) => None,
+            // Check if this system path is actually a cached vendored path
+            SearchPathInner::StandardLibraryVendored(search_path) => path
+                .as_utf8_path()
+                .strip_prefix(cached_vendored_path(db, search_path)?.as_utf8_path())
+                .ok()
+                .map(|relative_path| ModulePath {
+                    search_path: self.clone(),
+                    relative_path: relative_path.to_path_buf(),
+                }),
         }
     }
 
@@ -718,6 +730,38 @@ impl SearchPath {
             SearchPathInner::Editable(_) => "editable install",
             SearchPathInner::StandardLibraryVendored(_) => "stdlib typeshed stubs vendored by ty",
         }
+    }
+}
+
+/// Get the cache-relative `SystemPath` that a `VendoredPath` refers to
+pub fn vendored_path_for_cache(path: &VendoredPath) -> SystemPathBuf {
+    SystemPathBuf::from(format!(
+        "vendored/typeshed/{}/{}",
+        // The vendored files are uniquely identified by the source commit.
+        ty_vendored::SOURCE_COMMIT,
+        path.as_str()
+    ))
+}
+
+/// Get the full `SystemPath` in the cache that a `VendoredPath` refers to
+pub(crate) fn cached_vendored_path(db: &dyn Db, path: &VendoredPath) -> Option<SystemPathBuf> {
+    let writable = db.system().as_writable()?;
+    let system_path = vendored_path_for_cache(path);
+    Some(writable.cache_dir()?.join(system_path))
+}
+
+/// `==` but with support for treating vendored paths as equivalent to their cached system paths.
+pub(crate) fn path_is_equivalent(db: &dyn Db, path1: &FilePath, path2: &FilePath) -> bool {
+    if path1 == path2 {
+        true
+    } else if let (FilePath::System(system), FilePath::Vendored(vendored))
+    | (FilePath::Vendored(vendored), FilePath::System(system)) = (path1, path2)
+    {
+        cached_vendored_path(db, vendored)
+            .map(|cached| &cached == system)
+            .unwrap_or(false)
+    } else {
+        false
     }
 }
 
@@ -1060,13 +1104,19 @@ mod tests {
 
         // Must have a `.pyi` extension or no extension:
         let bad_absolute_path = SystemPath::new("foo/stdlib/x.py");
-        assert_eq!(root.relativize_system_path(bad_absolute_path), None);
+        assert_eq!(root.relativize_system_path(&db, bad_absolute_path), None);
         let second_bad_absolute_path = SystemPath::new("foo/stdlib/x.rs");
-        assert_eq!(root.relativize_system_path(second_bad_absolute_path), None);
+        assert_eq!(
+            root.relativize_system_path(&db, second_bad_absolute_path),
+            None
+        );
 
         // Must be a path that is a child of `root`:
         let third_bad_absolute_path = SystemPath::new("bar/stdlib/x.pyi");
-        assert_eq!(root.relativize_system_path(third_bad_absolute_path), None);
+        assert_eq!(
+            root.relativize_system_path(&db, third_bad_absolute_path),
+            None
+        );
     }
 
     #[test]
@@ -1076,10 +1126,13 @@ mod tests {
         let root = SearchPath::extra(db.system(), src.clone()).unwrap();
         // Must have a `.py` extension, a `.pyi` extension, or no extension:
         let bad_absolute_path = src.join("x.rs");
-        assert_eq!(root.relativize_system_path(&bad_absolute_path), None);
+        assert_eq!(root.relativize_system_path(&db, &bad_absolute_path), None);
         // Must be a path that is a child of `root`:
         let second_bad_absolute_path = SystemPath::new("bar/src/x.pyi");
-        assert_eq!(root.relativize_system_path(second_bad_absolute_path), None);
+        assert_eq!(
+            root.relativize_system_path(&db, second_bad_absolute_path),
+            None
+        );
     }
 
     #[test]
@@ -1088,7 +1141,7 @@ mod tests {
         let src_search_path = SearchPath::first_party(db.system(), src.clone()).unwrap();
         let eggs_package = src.join("eggs/__init__.pyi");
         let module_path = src_search_path
-            .relativize_system_path(&eggs_package)
+            .relativize_system_path(&db, &eggs_package)
             .unwrap();
         assert_eq!(
             &module_path.relative_path,

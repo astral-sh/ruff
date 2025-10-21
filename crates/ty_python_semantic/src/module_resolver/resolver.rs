@@ -26,6 +26,7 @@ use ruff_python_ast::{
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
+use crate::module_resolver::path::path_is_equivalent;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{Program, SearchPathSettings};
 
@@ -141,10 +142,9 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
-
     let module_name = search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|candidate| {
         let relative_path = match path {
-            SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
+            SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(db, path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
         }?;
         relative_path.to_module_name()
@@ -157,7 +157,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let module = resolve_module(db, &module_name)?;
     let module_file = module.file(db)?;
 
-    if file.path(db) == module_file.path(db) {
+    if path_is_equivalent(db, file.path(db), module_file.path(db)) {
         return Some(module);
     } else if file.source_type(db) == PySourceType::Python
         && module_file.source_type(db) == PySourceType::Stub

@@ -24,6 +24,7 @@ ruff_text_size = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ty_static = { workspace = true }
+ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
@@ -58,7 +59,6 @@ ruff_python_parser = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["testing"] }
 ty_static = { workspace = true }
 ty_test = { workspace = true }
-ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 dir-test = { workspace = true }

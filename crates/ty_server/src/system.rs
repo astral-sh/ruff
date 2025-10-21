@@ -13,7 +13,7 @@ use ruff_db::system::{
     SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
-use ty_python_semantic::Db;
+use ty_python_semantic::{Db, vendored_path_for_cache};
 
 use crate::DocumentQuery;
 use crate::document::DocumentKey;
@@ -26,21 +26,15 @@ pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
         FilePath::SystemVirtual(path) => Url::parse(path.as_str()).ok(),
         FilePath::Vendored(path) => {
             let writable = db.system().as_writable()?;
-
-            let system_path = SystemPathBuf::from(format!(
-                "vendored/typeshed/{}/{}",
-                // The vendored files are uniquely identified by the source commit.
-                ty_vendored::SOURCE_COMMIT,
-                path.as_str()
-            ));
+            let system_path = vendored_path_for_cache(path);
 
             // Extract the vendored file onto the system.
-            let system_path = writable
+            let path = writable
                 .get_or_cache(&system_path, &|| db.vendored().read_to_string(path))
                 .ok()
                 .flatten()?;
 
-            Url::from_file_path(system_path.as_std_path()).ok()
+            Url::from_file_path(path.as_std_path()).ok()
         }
     }
 }
