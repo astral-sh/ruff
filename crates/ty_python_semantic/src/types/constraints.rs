@@ -407,33 +407,25 @@ impl<'db> ConstrainedTypeVar<'db> {
 #[derive(Clone, Copy)]
 struct ConstraintOrdering<'db>(&'db dyn Db, ConstrainedTypeVar<'db>);
 
-impl PartialEq for ConstraintOrdering<'_> {
-    fn eq(&self, other: &Self) -> bool {
+impl<'db> PartialEq<ConstrainedTypeVar<'db>> for ConstraintOrdering<'db> {
+    fn eq(&self, other_constraint: &ConstrainedTypeVar<'db>) -> bool {
         let ConstraintOrdering(_, self_constraint) = *self;
-        let ConstraintOrdering(_, other_constraint) = *other;
-        self_constraint == other_constraint
+        self_constraint == *other_constraint
     }
 }
 
-impl Eq for ConstraintOrdering<'_> {}
-
-impl Ord for ConstraintOrdering<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
+impl<'db> PartialOrd<ConstrainedTypeVar<'db>> for ConstraintOrdering<'db> {
+    fn partial_cmp(&self, other_constraint: &ConstrainedTypeVar<'db>) -> Option<Ordering> {
         let ConstraintOrdering(db, self_constraint) = *self;
-        let ConstraintOrdering(_, other_constraint) = *other;
-        if self_constraint == other_constraint {
-            return Ordering::Equal;
+        if self_constraint == *other_constraint {
+            return Some(Ordering::Equal);
         }
-        self_constraint
-            .typevar(db)
-            .cmp(&other_constraint.typevar(db))
-            .then_with(|| self_constraint.as_id().cmp(&other_constraint.as_id()))
-    }
-}
-
-impl PartialOrd for ConstraintOrdering<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        Some(
+            self_constraint
+                .typevar(db)
+                .cmp(&other_constraint.typevar(db))
+                .then_with(|| self_constraint.as_id().cmp(&other_constraint.as_id())),
+        )
     }
 }
 
@@ -468,11 +460,11 @@ impl<'db> Node<'db> {
         if_false: Node<'db>,
     ) -> Self {
         debug_assert!((if_true.root_constraint(db)).is_none_or(|root_constraint| {
-            ConstraintOrdering(db, root_constraint) > ConstraintOrdering(db, constraint)
+            ConstraintOrdering(db, root_constraint) > constraint
         }));
         debug_assert!(
             (if_false.root_constraint(db)).is_none_or(|root_constraint| {
-                ConstraintOrdering(db, root_constraint) > ConstraintOrdering(db, constraint)
+                ConstraintOrdering(db, root_constraint) > constraint
             })
         );
         if if_true == if_false {
@@ -933,26 +925,26 @@ impl<'db> InteriorNode<'db> {
     fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match ConstraintOrdering(db, self_constraint).cmp(&ConstraintOrdering(db, other_constraint))
-        {
-            Ordering::Equal => Node::new(
+        match ConstraintOrdering(db, self_constraint).partial_cmp(&other_constraint) {
+            Some(Ordering::Equal) => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db).or(db, other.if_true(db)),
                 self.if_false(db).or(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            Some(Ordering::Less) => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db).or(db, Node::Interior(other)),
                 self.if_false(db).or(db, Node::Interior(other)),
             ),
-            Ordering::Greater => Node::new(
+            Some(Ordering::Greater) => Node::new(
                 db,
                 other_constraint,
                 Node::Interior(self).or(db, other.if_true(db)),
                 Node::Interior(self).or(db, other.if_false(db)),
             ),
+            None => unreachable!("constraints should always be comparable"),
         }
     }
 
@@ -960,26 +952,26 @@ impl<'db> InteriorNode<'db> {
     fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match ConstraintOrdering(db, self_constraint).cmp(&ConstraintOrdering(db, other_constraint))
-        {
-            Ordering::Equal => Node::new(
+        match ConstraintOrdering(db, self_constraint).partial_cmp(&other_constraint) {
+            Some(Ordering::Equal) => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db).and(db, other.if_true(db)),
                 self.if_false(db).and(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            Some(Ordering::Less) => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db).and(db, Node::Interior(other)),
                 self.if_false(db).and(db, Node::Interior(other)),
             ),
-            Ordering::Greater => Node::new(
+            Some(Ordering::Greater) => Node::new(
                 db,
                 other_constraint,
                 Node::Interior(self).and(db, other.if_true(db)),
                 Node::Interior(self).and(db, other.if_false(db)),
             ),
+            None => unreachable!("constraints should always be comparable"),
         }
     }
 
@@ -987,26 +979,26 @@ impl<'db> InteriorNode<'db> {
     fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match ConstraintOrdering(db, self_constraint).cmp(&ConstraintOrdering(db, other_constraint))
-        {
-            Ordering::Equal => Node::new(
+        match ConstraintOrdering(db, self_constraint).partial_cmp(&other_constraint) {
+            Some(Ordering::Equal) => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db).iff(db, other.if_true(db)),
                 self.if_false(db).iff(db, other.if_false(db)),
             ),
-            Ordering::Less => Node::new(
+            Some(Ordering::Less) => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db).iff(db, Node::Interior(other)),
                 self.if_false(db).iff(db, Node::Interior(other)),
             ),
-            Ordering::Greater => Node::new(
+            Some(Ordering::Greater) => Node::new(
                 db,
                 other_constraint,
                 Node::Interior(self).iff(db, other.if_true(db)),
                 Node::Interior(self).iff(db, other.if_false(db)),
             ),
+            None => unreachable!("constraints should always be comparable"),
         }
     }
 
@@ -1020,8 +1012,7 @@ impl<'db> InteriorNode<'db> {
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_constraint = self.constraint(db);
-        if ConstraintOrdering(db, assignment.constraint()) < ConstraintOrdering(db, self_constraint)
-        {
+        if ConstraintOrdering(db, assignment.constraint()) < self_constraint {
             return (Node::Interior(self), false);
         }
 
