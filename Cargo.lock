@@ -4376,6 +4376,7 @@ dependencies = [
  "tracing",
  "ty_project",
  "ty_python_semantic",
+ "ty_vendored",
 ]
 
 [[package]]
@@ -4504,7 +4505,6 @@ dependencies = [
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
- "ty_vendored",
 ]
 
 [[package]]
