@@ -395,7 +395,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
 /// Defines the ordering of the variables in a constraint set BDD.
 ///
-/// If we only care about _correstness_, we can choose any ordering that we want, as long as it's
+/// If we only care about _correctness_, we can choose any ordering that we want, as long as it's
 /// consistent. However, different orderings can have very different _performance_ characteristics.
 /// Many BDD libraries attempt to reorder variables on the fly while building and working with
 /// BDDs. We don't do that, but we have tried to make some simple choices that have clear wins.
