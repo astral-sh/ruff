@@ -15,7 +15,7 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    TypeMapping, TypeRelation, VarianceInferable, exceeds_max_specialization_depth,
 };
 use crate::{Db, FxOrderSet};
 
@@ -72,7 +72,13 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements.into_iter().map(Into::into),
+            elements.into_iter().map(Into::into).map(|ty| {
+                if exceeds_max_specialization_depth(db, ty) {
+                    Type::divergent()
+                } else {
+                    ty
+                }
+            }),
         ))
     }
 

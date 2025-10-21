@@ -283,7 +283,7 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl<'db> From<DynamicType> for SubclassOfInner<'db> {
+impl From<DynamicType> for SubclassOfInner<'_> {
     fn from(value: DynamicType) -> Self {
         SubclassOfInner::Dynamic(value)
     }

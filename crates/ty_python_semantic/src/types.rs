@@ -69,7 +69,7 @@ use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_type, specialization_depth};
+use crate::types::visitor::{any_over_type, exceeds_max_specialization_depth};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -6658,7 +6658,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Specialization(specialization) => {
                     let ty = specialization.get(db, bound_typevar).unwrap_or(self);
 
-                    if specialization_depth(db, ty) > 10 {
+                    if exceeds_max_specialization_depth(db, ty) {
                         Type::divergent()
                     } else {
                         ty
@@ -11676,8 +11676,6 @@ pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
     use crate::place::{typing_extensions_symbol, typing_symbol};
-    use crate::semantic_index::FileScopeId;
-    use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
@@ -11764,14 +11762,9 @@ pub(crate) mod tests {
 
     #[test]
     fn divergent_type() {
-        let mut db = setup_db();
+        let db = setup_db();
 
-        db.write_dedented("src/foo.py", "").unwrap();
-        let file = system_path_to_file(&db, "src/foo.py").unwrap();
-        let file_scope_id = FileScopeId::global();
-        let scope = file_scope_id.to_scope_id(&db, file);
-
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope: Some(scope) }));
+        let div = Type::divergent();
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.

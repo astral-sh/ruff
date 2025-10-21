@@ -306,7 +306,7 @@ pub(super) fn any_over_type<'db>(
 /// For example, `int` has a depth of `0`, `list[int]` has a depth of `1`, and `list[set[int]]`
 /// has a depth of `2`. A set-theoretic type like `list[int] | list[list[int]]` has a maximum
 /// depth of `2`.
-pub(super) fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
+fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
     struct SpecializationDepthVisitor<'db> {
         seen_types: RefCell<FxHashMap<NonAtomicType<'db>, Option<usize>>>,
         max_depth: Cell<usize>,
@@ -360,6 +360,23 @@ pub(super) fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
     };
     visitor.visit_type(db, ty);
     visitor.max_depth.get()
+}
+
+pub(super) fn exceeds_max_specialization_depth(db: &dyn Db, ty: Type<'_>) -> bool {
+    // To prevent infinite recursion during type inference for infinite types, we fall back to
+    // `C[Divergent]` once a certain amount of levels of specialization have occurred. For
+    // example:
+    //
+    // ```py
+    // x = 1
+    // while random_bool():
+    //     x = [x]
+    //
+    // reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
+    // ```
+    const MAX_SPECIALIZATION_DEPTH: usize = 10;
+
+    specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH
 }
 
 #[cfg(test)]

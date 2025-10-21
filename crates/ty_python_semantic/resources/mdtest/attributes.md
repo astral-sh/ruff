@@ -2593,13 +2593,28 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ## Divergent inferred implicit instance attribute types
 
 ```py
-# TODO: This test currently panics, see https://github.com/astral-sh/ty/issues/837
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x, 1)
 
-# class C:
-#    def f(self, other: "C"):
-#        self.x = (other.x, 1)
-#
-# reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+This also works if the tuple is not constructed directly:
+
+```py
+from typing import TypeVar, Literal
+
+T = TypeVar("T")
+
+def make_tuple(x: T) -> tuple[T, Literal[1]]:
+    return (x, 1)
+
+class D:
+    def f(self, other: "D"):
+        self.x = make_tuple(other.x)
+
+reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

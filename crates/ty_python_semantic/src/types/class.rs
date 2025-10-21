@@ -37,7 +37,8 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
     TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, infer_definition_types, specialization_depth,
+    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1609,26 +1610,13 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> ClassType<'db> {
-        // To prevent infinite recursion during type inference for infinite types, we fall back to
-        // `C[Divergent]` once a certain amount of levels of specialization have occurred. For
-        // example:
-        //
-        // ```py
-        // x = 1
-        // while random_bool():
-        //     x = [x]
-        //
-        // reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
-        // ```
-        const MAX_SPECIALIZATION_DEPTH: usize = 10;
-
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
                 let mut specialization = f(generic_context);
 
                 for (idx, ty) in specialization.types(db).iter().enumerate() {
-                    if specialization_depth(db, *ty) > MAX_SPECIALIZATION_DEPTH {
+                    if exceeds_max_specialization_depth(db, *ty) {
                         specialization =
                             specialization.with_replaced_type(db, idx, Type::divergent());
                     }
