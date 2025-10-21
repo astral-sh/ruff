@@ -797,8 +797,25 @@ impl<'db> Node<'db> {
         }
     }
 
-    // Keep this around for debugging purposes
-    #[expect(dead_code)]
+    /// Displays the full graph structure of this BDD. `prefix` will be output before each line
+    /// other than the first. Produces output like the following:
+    ///
+    /// ```text
+    /// (T@_ = str)
+    /// ┡━₁ (U@_ = str)
+    /// │   ┡━₁ always
+    /// │   └─₀ (U@_ = bool)
+    /// │       ┡━₁ always
+    /// │       └─₀ never
+    /// └─₀ (T@_ = bool)
+    ///     ┡━₁ (U@_ = str)
+    ///     │   ┡━₁ always
+    ///     │   └─₀ (U@_ = bool)
+    ///     │       ┡━₁ always
+    ///     │       └─₀ never
+    ///     └─₀ never
+    /// ```
+    #[expect(dead_code)] // Keep this around for debugging purposes
     fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         struct DisplayNode<'a, 'db> {
             db: &'db dyn Db,
