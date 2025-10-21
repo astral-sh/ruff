@@ -2274,7 +2274,7 @@ class C:
         "#);
     }
 
-    /// Regression test for https://github.com/astral-sh/ty/issues/1406
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1406>
     #[test]
     fn test_invalid_kwargs() {
         let test = cursor_test(
