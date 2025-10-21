@@ -612,17 +612,17 @@ before rendering it.
 ```py
 from ty_extensions import range_constraint
 
-def _[T, U]():
+def f[T, U]():
     t1 = range_constraint(str, T, str)
     t2 = range_constraint(bool, T, bool)
     u1 = range_constraint(str, U, str)
     u2 = range_constraint(bool, U, bool)
 
-    # revealed: ty_extensions.ConstraintSet[(T@_ = bool) ∨ (T@_ = str)]
+    # revealed: ty_extensions.ConstraintSet[(T@f = bool) ∨ (T@f = str)]
     reveal_type(t1 | t2)
-    # revealed: ty_extensions.ConstraintSet[(U@_ = bool) ∨ (U@_ = str)]
+    # revealed: ty_extensions.ConstraintSet[(U@f = bool) ∨ (U@f = str)]
     reveal_type(u1 | u2)
-    # revealed: ty_extensions.ConstraintSet[((T@_ = bool) ∧ (U@_ = bool)) ∨ ((T@_ = bool) ∧ (U@_ = str)) ∨ ((T@_ = str) ∧ (U@_ = bool)) ∨ ((T@_ = str) ∧ (U@_ = str))]
+    # revealed: ty_extensions.ConstraintSet[((T@f = bool) ∧ (U@f = bool)) ∨ ((T@f = bool) ∧ (U@f = str)) ∨ ((T@f = str) ∧ (U@f = bool)) ∨ ((T@f = str) ∧ (U@f = str))]
     reveal_type((t1 | t2) & (u1 | u2))
 ```
 
@@ -632,9 +632,9 @@ intersections whose elements appear in different orders.
 ```py
 from typing import Never
 
-def _[T]():
-    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ int | str)]
+def f[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
     reveal_type(range_constraint(Never, T, str | int))
-    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ int | str)]
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
     reveal_type(range_constraint(Never, T, int | str))
 ```
