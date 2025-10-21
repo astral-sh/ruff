@@ -646,9 +646,9 @@ impl Tokens {
         Self::before_impl(&self.raw, offset)
     }
 
-    fn before_impl(me: &[Token], offset: TextSize) -> &[Token] {
-        let partition_point = me.partition_point(|token| token.start() < offset);
-        let before = &me[..partition_point];
+    fn before_impl(tokens: &[Token], offset: TextSize) -> &[Token] {
+        let partition_point = tokens.partition_point(|token| token.start() < offset);
+        let before = &tokens[..partition_point];
 
         if let Some(last) = before.last() {
             // If it's equal to the end offset, then it's at a token boundary which is
