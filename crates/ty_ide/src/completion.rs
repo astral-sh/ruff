@@ -1452,24 +1452,18 @@ def frob(): ...
         ");
     }
 
+    /// Regression test for https://github.com/astral-sh/ty/issues/1392
+    /// This test ensures completions work when the cursor is at the
+    /// start of a zero-length token.
     #[test]
     fn completion_at_eof() {
-        let test = cursor_test(
-            "
-from typing import Protocol
+        let test = cursor_test("def f(msg: str):\n    msg.<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
 
-class Test(Protocol):
-    def x(self: Self): ...
-    def y(self: Self): ...
-
-def f(msg: Test):
-    msg.<CURSOR>",
-        );
-
-        assert_snapshot!(test.completions_if(|completion| matches!(&*completion.name, "x" | "y")), @r"
-        x
-        y
-        ");
+        let test = cursor_test("def f(msg: str):\n    msg.u<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_do_not_include("capitalize");
     }
 
     #[test]
