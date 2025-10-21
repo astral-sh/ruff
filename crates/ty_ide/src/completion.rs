@@ -608,7 +608,7 @@ struct ScopedTarget<'t> {
     node: ast::AnyNodeRef<'t>,
 }
 
-/// Returns a slice of tokens that all start before or at the given
+/// Returns a slice of tokens that all start before the given
 /// [`TextSize`] offset.
 ///
 /// If the given offset is between two tokens, the returned slice will end just
@@ -620,10 +620,9 @@ struct ScopedTarget<'t> {
 /// range (including if it's at the very beginning), then that token will be
 /// included in the slice returned.
 fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
-    let idx = tokens
-        .binary_search_by_start(offset)
-        .unwrap_or_else(|idx| idx);
-    &tokens[..idx]
+    let partition_point = tokens.partition_point(|token| token.start() < offset);
+
+    &tokens[..partition_point]
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
