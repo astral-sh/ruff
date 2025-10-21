@@ -366,7 +366,7 @@ on function-like callables:
 
 ```py
 def f_wrong(c: Callable[[], None]):
-    # error: [unresolved-attribute] "Type `() -> None` has no attribute `__qualname__`"
+    # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
     # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."

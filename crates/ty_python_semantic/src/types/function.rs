@@ -152,23 +152,35 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-    pub struct DataclassTransformerParams: u8 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
-        const FIELD_SPECIFIERS= 1 << 4;
     }
 }
 
-impl get_size2::GetSize for DataclassTransformerParams {}
+impl get_size2::GetSize for DataclassTransformerFlags {}
 
-impl Default for DataclassTransformerParams {
+impl Default for DataclassTransformerFlags {
     fn default() -> Self {
         Self::EQ_DEFAULT
     }
 }
+
+/// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
+/// instance that we use as the return type for `dataclass_transform(…)` calls.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DataclassTransformerParams<'db> {
+    pub flags: DataclassTransformerFlags,
+
+    #[returns(deref)]
+    pub field_specifiers: Box<[Type<'db>]>,
+}
+
+impl get_size2::GetSize for DataclassTransformerParams<'_> {}
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
@@ -201,7 +213,7 @@ pub struct OverloadLiteral<'db> {
 
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
-    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -212,7 +224,7 @@ impl<'db> OverloadLiteral<'db> {
     fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -353,28 +365,12 @@ impl<'db> OverloadLiteral<'db> {
         if function_node.is_async && !is_generator {
             signature = signature.wrap_coroutine_return_type(db);
         }
-        signature = signature.mark_typevars_inferable(db);
-
-        let pep695_ctx = function_node.type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(db, index, self.definition(db), type_params)
-        });
-        let legacy_ctx = GenericContext::from_function_params(
-            db,
-            self.definition(db),
-            signature.parameters(),
-            signature.return_ty,
-        );
-        // We need to update `signature.generic_context` here,
-        // because type variables in `GenericContext::variables` are still non-inferable.
-        signature.generic_context =
-            GenericContext::merge_pep695_and_legacy(db, pep695_ctx, legacy_ctx);
 
         signature
     }
 
     /// Typed internally-visible "raw" signature for this function.
-    /// That is, type variables in parameter types and the return type remain non-inferable,
-    /// and the return types of async functions are not wrapped in `CoroutineType[...]`.
+    /// That is, the return types of async functions are not wrapped in `CoroutineType[...]`.
     ///
     /// ## Warning
     ///
@@ -620,10 +616,10 @@ impl<'db> FunctionLiteral<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let (overloads, implementation) = self.overloads_and_implementation(db);
-        if let Some(implementation) = implementation {
-            if overloads.is_empty() {
-                return CallableSignature::single(implementation.signature(db));
-            }
+        if let Some(implementation) = implementation
+            && overloads.is_empty()
+        {
+            return CallableSignature::single(implementation.signature(db));
         }
 
         CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
@@ -740,7 +736,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
@@ -1052,8 +1048,8 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        if let Type::NominalInstance(instance) = ty {
-            if instance
+        if let Type::NominalInstance(instance) = ty
+            && instance
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
@@ -1061,9 +1057,8 @@ fn is_instance_truthiness<'db>(
                     ClassType::Generic(c) => c.origin(db) == class,
                     ClassType::NonGeneric(c) => c == class,
                 })
-            {
-                return true;
-            }
+        {
+            return true;
         }
         false
     };
@@ -1121,7 +1116,6 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::NonInferableTypeVar(..)
         | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
@@ -1647,15 +1641,15 @@ impl KnownFunction {
 
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if let Some(protocol_class) = class.into_protocol_class(db) {
-                            if !protocol_class.is_runtime_checkable(db) {
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    context,
-                                    call_expression,
-                                    protocol_class,
-                                    self,
-                                );
-                            }
+                        if let Some(protocol_class) = class.into_protocol_class(db)
+                            && !protocol_class.is_runtime_checkable(db)
+                        {
+                            report_runtime_check_against_non_runtime_checkable_protocol(
+                                context,
+                                call_expression,
+                                protocol_class,
+                                self,
+                            );
                         }
 
                         if self == KnownFunction::IsInstance {
@@ -1717,11 +1711,7 @@ impl KnownFunction {
             }
 
             KnownFunction::RangeConstraint => {
-                let [
-                    Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
-                    Some(upper),
-                ] = parameter_types
+                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
                 else {
                     return;
                 };
@@ -1734,11 +1724,7 @@ impl KnownFunction {
             }
 
             KnownFunction::NegatedRangeConstraint => {
-                let [
-                    Some(lower),
-                    Some(Type::NonInferableTypeVar(typevar)),
-                    Some(upper),
-                ] = parameter_types
+                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
                 else {
                     return;
                 };

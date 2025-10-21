@@ -28,10 +28,9 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, TypeContext, TypeMapping, TypeRelation,
-    VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
+    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -446,19 +445,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(super) fn mark_typevars_inferable(self, db: &'db dyn Db) -> Self {
-        if let Some(definition) = self.definition {
-            self.apply_type_mapping_impl(
-                db,
-                &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(definition))),
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
-            )
-        } else {
-            self
-        }
-    }
-
     pub(super) fn wrap_coroutine_return_type(self, db: &'db dyn Db) -> Self {
         let return_ty = self.return_ty.map(|return_ty| {
             KnownClass::CoroutineType
@@ -617,6 +603,15 @@ impl<'db> Signature<'db> {
         inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        // The typevars in self and other should also be considered inferable when checking whether
+        // two signatures are equivalent.
+        let self_inferable =
+            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
+        let other_inferable =
+            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
+        let inferable = inferable.merge(self_inferable.as_ref());
+        let inferable = inferable.merge(other_inferable.as_ref());
+
         let mut result = ConstraintSet::from(true);
         let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             let self_type = self_type.unwrap_or(Type::unknown());
@@ -766,6 +761,15 @@ impl<'db> Signature<'db> {
                 )
             }
         }
+
+        // The typevars in self and other should also be considered inferable when checking whether
+        // two signatures are equivalent.
+        let self_inferable =
+            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
+        let other_inferable =
+            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
+        let inferable = inferable.merge(self_inferable.as_ref());
+        let inferable = inferable.merge(other_inferable.as_ref());
 
         let mut result = ConstraintSet::from(true);
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
@@ -1301,19 +1305,8 @@ impl<'db> Parameters<'db> {
                     let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                     Some(
-                        // It looks like unnecessary work here that we create the implicit Self
-                        // annotation using non-inferable typevars and then immediately apply
-                        // `MarkTypeVarsInferable` to it. However, this is currently necessary to
-                        // ensure that implicit-Self and explicit Self annotations are both treated
-                        // the same. Marking type vars inferable will cause reification of lazy
-                        // typevar defaults/bounds/constraints; this needs to happen for both
-                        // implicit and explicit Self so they remain the "same" typevar.
-                        typing_self(db, scope_id, typevar_binding_context, class, &Type::NonInferableTypeVar)
-                            .expect("We should always find the surrounding class for an implicit self: Self annotation").apply_type_mapping(
-                                db,
-                                &TypeMapping::MarkTypeVarsInferable(None),
-                                TypeContext::default()
-                            )
+                        typing_self(db, scope_id, typevar_binding_context, class)
+                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
                     )
                 } else {
                     // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or

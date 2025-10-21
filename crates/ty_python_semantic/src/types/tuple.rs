@@ -22,6 +22,7 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
+use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
@@ -31,7 +32,6 @@ use crate::types::{
     UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
-use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

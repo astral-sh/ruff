@@ -291,6 +291,10 @@ function defineAyuThemes(monaco: Monaco) {
         token: "keyword",
       },
       {
+        foreground: COSMIC,
+        token: "builtinConstant",
+      },
+      {
         foreground: CONSTELLATION,
         token: "number",
       },
@@ -574,6 +578,10 @@ function defineAyuThemes(monaco: Monaco) {
       {
         foreground: RADIATE,
         token: "keyword",
+      },
+      {
+        foreground: RADIATE,
+        token: "builtinConstant",
       },
       {
         foreground: PROTON,

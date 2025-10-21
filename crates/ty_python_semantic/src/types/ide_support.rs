@@ -14,7 +14,7 @@ use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{
     ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
-    class::CodeGeneratorKind,
+    TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
@@ -122,7 +122,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_instance_members(db, ty, class_literal);
 
                 // If this is a NamedTuple instance, include members from NamedTupleFallback
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
             }
@@ -142,7 +142,7 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
 
@@ -153,7 +153,7 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
                 self.extend_with_class_members(db, ty, class_literal);
@@ -164,7 +164,7 @@ impl<'db> AllMembers<'db> {
                     let class_literal = class_type.class_literal(db).0;
                     self.extend_with_class_members(db, ty, class_literal);
 
-                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
                         self.extend_with_type(
                             db,
                             KnownClass::NamedTupleFallback.to_class_literal(db),
@@ -176,6 +176,29 @@ impl<'db> AllMembers<'db> {
             Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {}
 
             Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    None => {
+                        self.extend_with_type(db, Type::object());
+                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        self.extend_with_type(db, bound);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        self.members.extend(
+                            constraints
+                                .elements(db)
+                                .iter()
+                                .map(|ty| AllMembers::of(db, *ty).members)
+                                .reduce(|acc, members| {
+                                    acc.intersection(&members).cloned().collect()
+                                })
+                                .unwrap_or_default(),
+                        );
+                    }
+                }
+            }
 
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -194,8 +217,6 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
-            | Type::NonInferableTypeVar(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {

@@ -2787,7 +2787,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn in_loop_context(&self) -> bool {
-        true
+        self.current_scope_info().current_loop.is_some()
     }
     fn is_bound_parameter(&self, _name: &str) -> bool {
         false

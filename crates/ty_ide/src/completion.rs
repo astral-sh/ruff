@@ -131,7 +131,7 @@ impl<'db> Completion<'db> {
                 | Type::BytesLiteral(_) => CompletionKind::Value,
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
@@ -608,7 +608,7 @@ struct ScopedTarget<'t> {
     node: ast::AnyNodeRef<'t>,
 }
 
-/// Returns a slice of tokens that all start before or at the given
+/// Returns a slice of tokens that all start before the given
 /// [`TextSize`] offset.
 ///
 /// If the given offset is between two tokens, the returned slice will end just
@@ -620,11 +620,9 @@ struct ScopedTarget<'t> {
 /// range (including if it's at the very beginning), then that token will be
 /// included in the slice returned.
 fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
-    let idx = match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
-        Ok(idx) => idx,
-        Err(idx) => idx,
-    };
-    &tokens[..idx]
+    let partition_point = tokens.partition_point(|token| token.start() < offset);
+
+    &tokens[..partition_point]
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
@@ -1451,6 +1449,21 @@ def frob(): ...
         foo
         frob
         ");
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1392>
+    ///
+    /// This test ensures completions work when the cursor is at the
+    /// start of a zero-length token.
+    #[test]
+    fn completion_at_eof() {
+        let test = cursor_test("def f(msg: str):\n    msg.<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+
+        let test = cursor_test("def f(msg: str):\n    msg.u<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_do_not_include("capitalize");
     }
 
     #[test]
@@ -3894,6 +3907,55 @@ print(t'''{Foo} and Foo.zqzq<CURSOR>
 ",
         );
         assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn typevar_with_upper_bound() {
+        let test = cursor_test(
+            "\
+def f[T: str](msg: T):
+    msg.<CURSOR>
+",
+        );
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+    }
+
+    #[test]
+    fn typevar_with_constraints() {
+        // Test TypeVar with constraints
+        let test = cursor_test(
+            "\
+from typing import TypeVar
+
+class A:
+    only_on_a: int
+    on_a_and_b: str
+
+class B:
+    only_on_b: float
+    on_a_and_b: str
+
+T = TypeVar('T', A, B)
+
+def f(x: T):
+    x.<CURSOR>
+",
+        );
+        test.assert_completions_include("on_a_and_b");
+        test.assert_completions_do_not_include("only_on_a");
+        test.assert_completions_do_not_include("only_on_b");
+    }
+
+    #[test]
+    fn typevar_without_bounds_or_constraints() {
+        let test = cursor_test(
+            "\
+def f[T](x: T):
+    x.<CURSOR>
+",
+        );
+        test.assert_completions_include("__repr__");
     }
 
     // NOTE: The methods below are getting somewhat ridiculous.

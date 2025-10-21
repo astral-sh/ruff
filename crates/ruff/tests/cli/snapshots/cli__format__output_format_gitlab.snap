@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/format.rs
+source: crates/ruff/tests/cli/format.rs
 info:
   program: ruff
   args:
