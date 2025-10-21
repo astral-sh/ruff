@@ -17,6 +17,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
@@ -716,6 +717,26 @@ impl<'db> Bindings<'db> {
                                     KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
+                        }
+
+                        Some(KnownFunction::ImpliesGivenConstraints) => {
+                            let [Some(constraints), Some(ty_a), Some(ty_b)] =
+                                overload.parameter_types()
+                            else {
+                                continue;
+                            };
+
+                            let constraints = match constraints {
+                                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) => {
+                                    tracked.constraints(db)
+                                }
+                                Type::BooleanLiteral(b) => ConstraintSet::from(*b),
+                                _ => continue,
+                            };
+
+                            let result =
+                                constraints.type_implies(db, *ty_a, *ty_b, InferableTypeVars::None);
+                            overload.set_return_type(Type::BooleanLiteral(result));
                         }
 
                         Some(KnownFunction::IsSingleton) => {

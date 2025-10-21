@@ -4847,6 +4847,30 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
+                Some(KnownFunction::ImpliesGivenConstraints) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("a")))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [
+                                        KnownClass::Bool.to_instance(db),
+                                        KnownClass::ConstraintSet.to_instance(db),
+                                    ],
+                                )),
+                            Parameter::positional_only(Some(Name::new_static("a")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("b")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(KnownClass::Bool.to_instance(db)),
+                    ),
+                )
+                .into(),
+
                 Some(KnownFunction::RangeConstraint | KnownFunction::NegatedRangeConstraint) => {
                     Binding::single(
                         self,

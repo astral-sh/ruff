@@ -186,7 +186,7 @@ impl<'db> ConstraintSet<'db> {
         self.node.is_always_satisfied(db)
     }
 
-    fn type_implies(
+    pub(crate) fn type_implies(
         self,
         db: &'db dyn Db,
         lhs: Type<'db>,
