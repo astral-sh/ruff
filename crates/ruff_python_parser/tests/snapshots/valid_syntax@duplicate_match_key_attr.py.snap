@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 18..34,
                                     node_index: NodeIndex(None),
+                                    range: 18..34,
                                     keys: [
                                         Attribute(
                                             ExprAttribute {
@@ -75,8 +75,8 @@ Module(
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 24..25,
                                                 node_index: NodeIndex(None),
+                                                range: 24..25,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
@@ -90,8 +90,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 32..33,
                                                 node_index: NodeIndex(None),
+                                                range: 32..33,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
