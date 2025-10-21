@@ -325,14 +325,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         ConstraintAssignment::Negative(self)
     }
 
-    fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db) != other.typevar(db) {
-            return false;
-        }
-        self.lower(db).is_subtype_of(db, other.lower(db))
-            && other.upper(db).is_subtype_of(db, self.upper(db))
-    }
-
     /// Defines the ordering of the variables in a constraint set BDD.
     ///
     /// If we only care about _correctness_, we can choose any ordering that we want, as long as
@@ -1111,10 +1103,10 @@ impl<'db> InteriorNode<'db> {
 
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.
-            let larger_smaller = if left_constraint.contains(db, right_constraint) {
-                Some((left_constraint, right_constraint))
-            } else if right_constraint.contains(db, left_constraint) {
+            let larger_smaller = if left_constraint.implies(db, right_constraint, constraints) {
                 Some((right_constraint, left_constraint))
+            } else if right_constraint.implies(db, left_constraint, constraints) {
+                Some((left_constraint, right_constraint))
             } else {
                 None
             };
