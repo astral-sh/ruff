@@ -407,7 +407,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 #[derive(Clone, Copy)]
 struct ConstraintOrdering<'db>(&'db dyn Db, ConstrainedTypeVar<'db>);
 
-impl<'db> PartialEq for ConstraintOrdering<'db> {
+impl PartialEq for ConstraintOrdering<'_> {
     fn eq(&self, other: &Self) -> bool {
         let ConstraintOrdering(_, self_constraint) = *self;
         let ConstraintOrdering(_, other_constraint) = *other;
@@ -415,9 +415,9 @@ impl<'db> PartialEq for ConstraintOrdering<'db> {
     }
 }
 
-impl<'db> Eq for ConstraintOrdering<'db> {}
+impl Eq for ConstraintOrdering<'_> {}
 
-impl<'db> Ord for ConstraintOrdering<'db> {
+impl Ord for ConstraintOrdering<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         let ConstraintOrdering(db, self_constraint) = *self;
         let ConstraintOrdering(_, other_constraint) = *other;
@@ -431,7 +431,7 @@ impl<'db> Ord for ConstraintOrdering<'db> {
     }
 }
 
-impl<'db> PartialOrd for ConstraintOrdering<'db> {
+impl PartialOrd for ConstraintOrdering<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
