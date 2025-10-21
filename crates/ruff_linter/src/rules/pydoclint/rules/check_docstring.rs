@@ -9,6 +9,7 @@ use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -816,6 +817,8 @@ struct BodyVisitor<'a> {
     currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
+    /// Maps exception variable names to their exception types in the current except clause
+    exception_variables: FxHashMap<&'a str, QualifiedName<'a>>,
 }
 
 impl<'a> BodyVisitor<'a> {
@@ -826,6 +829,7 @@ impl<'a> BodyVisitor<'a> {
             currently_suspended_exceptions: None,
             raised_exceptions: Vec::new(),
             semantic,
+            exception_variables: FxHashMap::default(),
         }
     }
 
@@ -863,14 +867,39 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
     fn visit_except_handler(&mut self, handler: &'a ast::ExceptHandler) {
         let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
         self.currently_suspended_exceptions = handler_inner.type_.as_deref();
+
+        // Track exception variable bindings
+        if let Some(name) = handler_inner.name.as_ref() {
+            if let Some(exceptions) = self.currently_suspended_exceptions {
+                let mut store_exception_variable = |exception| {
+                    if let Some(qualified_name) = self.semantic.resolve_qualified_name(exception) {
+                        self.exception_variables
+                            .insert(name.id.as_str(), qualified_name);
+                    }
+                };
+
+                if let ast::Expr::Tuple(tuple) = exceptions {
+                    // For tuple exceptions, we'll store the first one
+                    if let Some(first_exception) = tuple.elts.first() {
+                        store_exception_variable(first_exception);
+                    }
+                } else {
+                    store_exception_variable(exceptions);
+                }
+            }
+        }
+
         visitor::walk_except_handler(self, handler);
         self.currently_suspended_exceptions = None;
+        // Clear exception variables when leaving the except handler
+        self.exception_variables.clear();
     }
 
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if let Some(exc) = exc.as_ref() {
+                    // First try to resolve the exception directly
                     if let Some(qualified_name) =
                         self.semantic.resolve_qualified_name(map_callable(exc))
                     {
@@ -878,6 +907,15 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                             qualified_name,
                             range: exc.range(),
                         });
+                    } else if let ast::Expr::Name(name) = exc.as_ref() {
+                        // If it's a variable name, check if it's bound to an exception in the current except clause
+                        if let Some(qualified_name) = self.exception_variables.get(name.id.as_str())
+                        {
+                            self.raised_exceptions.push(ExceptionEntry {
+                                qualified_name: qualified_name.clone(),
+                                range: exc.range(),
+                            });
+                        }
                     }
                 } else if let Some(exceptions) = self.currently_suspended_exceptions {
                     let mut maybe_store_exception = |exception| {
