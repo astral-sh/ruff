@@ -1052,8 +1052,10 @@ mod resolve_definition {
     }
 
     use indexmap::IndexSet;
-    use ruff_db::files::{File, FileRange};
+    use ruff_db::files::{File, FileRange, vendored_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::system::SystemPath;
+    use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
     use rustc_hash::FxHashSet;
     use tracing::trace;
@@ -1311,17 +1313,42 @@ mod resolve_definition {
     pub fn map_stub_definition<'db>(
         db: &'db dyn Db,
         def: &ResolvedDefinition<'db>,
+        cached_vendored_typeshed: Option<&SystemPath>,
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
-        trace!("Stub mapping definition...");
         // If the file isn't a stub, this is presumably the real definition
         let stub_file = def.file(db);
+        trace!("Stub mapping definition in: {}", stub_file.path(db));
         if !stub_file.is_stub(db) {
             trace!("File isn't a stub, no stub mapping to do");
             return None;
         }
 
+        // We write vendored typeshed stubs to disk in the cache, and consequently "forget"
+        // that they're typeshed when an IDE hands those paths back to us later. For most
+        // purposes this seemingly doesn't matter at all, and avoids issues with someone
+        // editing the cache by hand in their IDE and us getting confused about the contents
+        // of the file (hello and welcome to anyone who has found Bigger Issues this causes).
+        //
+        // The major exception is in exactly stub-mapping, where we need to "remember" that
+        // we're in typeshed to successfully stub-map to the Real Stdlib. So here we attempt
+        // to do just that. The resulting file must not be used for anything other than
+        // this module lookup, as the `ResolvedDefinition` we're handling isn't for that file.
+        let mut stub_file_for_module_lookup = stub_file;
+        if let Some(vendored_typeshed) = cached_vendored_typeshed
+            && let Some(stub_path) = stub_file.path(db).as_system_path()
+            && let Ok(rel_path) = stub_path.strip_prefix(vendored_typeshed)
+            && let Ok(typeshed_file) =
+                vendored_path_to_file(db, VendoredPathBuf::from(rel_path.as_str()))
+        {
+            trace!(
+                "Stub is cached vendored typeshed: {}",
+                typeshed_file.path(db)
+            );
+            stub_file_for_module_lookup = typeshed_file;
+        }
+
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
-        let stub_module = file_to_module(db, stub_file)?;
+        let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
         let real_module = resolve_real_module(db, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
