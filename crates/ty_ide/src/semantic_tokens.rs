@@ -488,7 +488,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         // here https://github.com/astral-sh/ruff/blob/71f8389f61a243a0c7584adffc49134ccf792aba/crates/ruff_python_parser/src/parser/statement.rs#L3176-L3179
         let parameters_by_start = parameters
             .iter()
-            .sorted_by_key(|parameter| parameter.start());
+            .sorted_by_key(ruff_text_size::Ranged::start);
 
         for any_param in parameters_by_start {
             let parameter = any_param.as_parameter();
