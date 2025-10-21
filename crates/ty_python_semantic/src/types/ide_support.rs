@@ -12,7 +12,10 @@ use crate::semantic_index::{
 };
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
-use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{
+    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
+    TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -27,35 +30,55 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = Member<'db>> + 'db {
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     use_def_map
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
-            place_from_declarations(db, declarations)
+            let place_result = place_from_declarations(db, declarations);
+            let definition = place_result.single_declaration;
+            place_result
                 .ignore_conflicting_declarations()
                 .place
-                .ignore_possibly_unbound()
+                .ignore_possibly_undefined()
                 .map(|ty| {
                     let symbol = table.symbol(symbol_id);
-                    Member {
+                    let member = Member {
                         name: symbol.name().clone(),
                         ty,
-                    }
+                    };
+                    MemberWithDefinition { member, definition }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
             move |(symbol_id, bindings)| {
+                // It's not clear to AG how to using a bindings
+                // iterator here to get the correct definition for
+                // this binding. Below, we look through all bindings
+                // with a definition and only take one if there is
+                // exactly one. I don't think this can be wrong, but
+                // it's probably omitting definitions in some cases.
+                let mut definition = None;
+                for binding in bindings.clone() {
+                    if let Some(def) = binding.binding.definition() {
+                        if definition.is_some() {
+                            definition = None;
+                            break;
+                        }
+                        definition = Some(def);
+                    }
+                }
                 place_from_bindings(db, bindings)
-                    .ignore_possibly_unbound()
+                    .ignore_possibly_undefined()
                     .map(|ty| {
                         let symbol = table.symbol(symbol_id);
-                        Member {
+                        let member = Member {
                             name: symbol.name().clone(),
                             ty,
-                        }
+                        };
+                        MemberWithDefinition { member, definition }
                     })
             },
         ))
@@ -95,8 +118,13 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class(db).class_literal(db);
+                let class_literal = instance.class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
+
+                // If this is a NamedTuple instance, include members from NamedTupleFallback
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -114,6 +142,10 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
+
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
                 }
@@ -121,18 +153,52 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
                 self.extend_with_class_members(db, ty, class_literal);
             }
 
             Type::SubclassOf(subclass_of_type) => {
-                if let Some(class_literal) = subclass_of_type.subclass_of().into_class() {
-                    self.extend_with_class_members(db, ty, class_literal.class_literal(db).0);
+                if let Some(class_type) = subclass_of_type.subclass_of().into_class() {
+                    let class_literal = class_type.class_literal(db).0;
+                    self.extend_with_class_members(db, ty, class_literal);
+
+                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
+                        self.extend_with_type(
+                            db,
+                            KnownClass::NamedTupleFallback.to_class_literal(db),
+                        );
+                    }
                 }
             }
 
             Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {}
 
             Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    None => {
+                        self.extend_with_type(db, Type::object());
+                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        self.extend_with_type(db, bound);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        self.members.extend(
+                            constraints
+                                .elements(db)
+                                .iter()
+                                .map(|ty| AllMembers::of(db, *ty).members)
+                                .reduce(|acc, members| {
+                                    acc.intersection(&members).cloned().collect()
+                                })
+                                .unwrap_or_default(),
+                        );
+                    }
+                }
+            }
 
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -143,7 +209,7 @@ impl<'db> AllMembers<'db> {
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -151,8 +217,6 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
-            | Type::NonInferableTypeVar(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
@@ -196,7 +260,8 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Type(ty, _) = imported_symbol(db, file, symbol_name, None).place
+                    let Place::Defined(ty, _, _) =
+                        imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
                     };
@@ -211,7 +276,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.class(db).known(db),
+                                    instance.known_class(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
@@ -282,12 +347,15 @@ impl<'db> AllMembers<'db> {
             .map(|class| class.class_literal(db).0)
         {
             let parent_scope = parent.body_scope(db);
-            for Member { name, .. } in all_declarations_and_bindings(db, parent_scope) {
-                let result = ty.member(db, name.as_str());
-                let Some(ty) = result.place.ignore_possibly_unbound() else {
+            for memberdef in all_declarations_and_bindings(db, parent_scope) {
+                let result = ty.member(db, memberdef.member.name.as_str());
+                let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
-                self.members.insert(Member { name, ty });
+                self.members.insert(Member {
+                    name: memberdef.member.name,
+                    ty,
+                });
             }
         }
     }
@@ -312,7 +380,7 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
                     let result = ty.member(db, name);
-                    let Some(ty) = result.place.ignore_possibly_unbound() else {
+                    let Some(ty) = result.place.ignore_possibly_undefined() else {
                         continue;
                     };
                     self.members.insert(Member {
@@ -327,15 +395,25 @@ impl<'db> AllMembers<'db> {
             // class member. This gets us the right type for each
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
-            for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
-                let result = ty.member(db, name.as_str());
-                let Some(ty) = result.place.ignore_possibly_unbound() else {
+            for memberdef in all_declarations_and_bindings(db, class_body_scope) {
+                let result = ty.member(db, memberdef.member.name.as_str());
+                let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
-                self.members.insert(Member { name, ty });
+                self.members.insert(Member {
+                    name: memberdef.member.name,
+                    ty,
+                });
             }
         }
     }
+}
+
+/// A member of a type with an optional definition.
+#[derive(Clone, Debug)]
+pub struct MemberWithDefinition<'db> {
+    pub member: Member<'db>,
+    pub definition: Option<Definition<'db>>,
 }
 
 /// A member of a type.
@@ -721,7 +799,7 @@ pub fn definitions_for_keyword_argument<'db>(
 
     let mut resolved_definitions = Vec::new();
 
-    if let Some(Type::Callable(callable_type)) = func_type.into_callable(db) {
+    if let Some(Type::Callable(callable_type)) = func_type.try_upcast_to_callable(db) {
         let signatures = callable_type.signatures(db);
 
         // For each signature, find the parameter with the matching name
@@ -801,7 +879,7 @@ pub struct CallSignatureDetails<'db> {
 
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
-    pub argument_to_parameter_mapping: Vec<MatchedArgument>,
+    pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
 }
 
 /// Extract signature details from a function call expression.
@@ -816,12 +894,14 @@ pub fn call_signature_details<'db>(
     let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
-    if let Some(callable_type) = func_type.into_callable(db) {
+    if let Some(callable_type) = func_type.try_upcast_to_callable(db) {
         let call_arguments =
-            CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
+            CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
                 splatted_value.inferred_type(model)
             });
-        let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
+        let bindings = callable_type
+            .bindings(db)
+            .match_parameters(db, &call_arguments);
 
         // Extract signature details from all callable bindings
         bindings

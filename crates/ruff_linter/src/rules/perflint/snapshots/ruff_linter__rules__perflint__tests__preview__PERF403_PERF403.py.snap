@@ -372,8 +372,72 @@ help: Replace for loop with dict comprehension
     -     v = {}
     -     for o,(x,)in():
     -         v[x,]=o
-170 +     v = {x: o for o,(x,) in ()}
+170 +     v = {(x,): o for o,(x,) in ()}
 171 | 
 172 | 
 173 | # https://github.com/astral-sh/ruff/issues/19005
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:200:9
+    |
+198 |     v = {}
+199 |     for o, (x,) in ["ox"]:
+200 |         v[x,] = o
+    |         ^^^^^^^^^
+201 |     return v
+    |
+help: Replace for loop with dict comprehension
+195 | 
+196 | 
+197 | def issue_19153_1():
+    -     v = {}
+    -     for o, (x,) in ["ox"]:
+    -         v[x,] = o
+198 +     v = {(x,): o for o, (x,) in ["ox"]}
+199 |     return v
+200 | 
+201 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:207:9
+    |
+205 |     v = {}
+206 |     for (o, p), x in [("op", "x")]:
+207 |         v[x] = o, p
+    |         ^^^^^^^^^^^
+208 |     return v
+    |
+help: Replace for loop with dict comprehension
+202 | 
+203 | 
+204 | def issue_19153_2():
+    -     v = {}
+    -     for (o, p), x in [("op", "x")]:
+    -         v[x] = o, p
+205 +     v = {x: (o, p) for (o, p), x in [("op", "x")]}
+206 |     return v
+207 | 
+208 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:214:9
+    |
+212 |     v = {}
+213 |     for o, (x,) in ["ox"]: 
+214 |         v[(x,)] = o 
+    |         ^^^^^^^^^^^
+215 |     return v
+    |
+help: Replace for loop with dict comprehension
+209 | 
+210 | 
+211 | def issue_19153_3():
+    -     v = {}
+    -     for o, (x,) in ["ox"]: 
+    -         v[(x,)] = o 
+212 +     v = {(x,): o for o, (x,) in ["ox"]} 
+213 |     return v
 note: This is an unsafe fix and may change runtime behavior

@@ -86,7 +86,7 @@ class B:
     reveal_type(a.x)  # revealed: Literal["a"]
 
 def f():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
 
@@ -96,7 +96,7 @@ class C:
     reveal_type(a.x)  # revealed: str | None
 
 def g():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: str | None
 
@@ -109,7 +109,7 @@ class D:
     reveal_type(a.x)  # revealed: Literal["a"]
 
 def h():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 # TODO: should be `str | None`
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
@@ -161,7 +161,7 @@ class _:
     a.b = B()
 
     class _:
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a.b.c1.d)  # revealed: D | None
         reveal_type(a.b.c1)  # revealed: C | None
 ```
@@ -190,7 +190,7 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
@@ -206,7 +206,7 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
@@ -246,6 +246,13 @@ def f(x: str | None):
         if x is not None:
             def closure():
                 reveal_type(x)  # revealed: str | None
+    x = None
+
+def f(x: str | None):
+    def _(x: str | None):
+        if x is not None:
+            def closure():
+                reveal_type(x)  # revealed: str
     x = None
 
 def f(x: str | None):
@@ -317,8 +324,7 @@ def f(l: list[str | None]):
     def _():
         l: list[str | None] = [None]
         def _():
-            # TODO: should be `str | None`
-            reveal_type(l[0])  # revealed: @Todo(list literal element type)
+            reveal_type(l[0])  # revealed: str | None
 
     def _():
         def _():
@@ -376,12 +382,12 @@ def f():
     if a.x is not None:
         def _():
             # Lazy nested scope narrowing is not performed on attributes/subscripts because it's difficult to track their changes.
-            reveal_type(a.x)  # revealed: Unknown | str | None
+            reveal_type(a.x)  # revealed: str | None
 
         class D:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
-        [reveal_type(a.x) for _ in range(1)]  # revealed: (Unknown & ~None) | str
+        [reveal_type(a.x) for _ in range(1)]  # revealed: str
 
     if l[0] is not None:
         def _():
@@ -467,11 +473,11 @@ def f():
         if a.x is not None:
             def _():
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1]) | str | None
+                    reveal_type(a.x)  # revealed: str | None
 
             class D:
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1] & ~None) | str
+                    reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             def _():

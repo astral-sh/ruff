@@ -268,6 +268,7 @@ help: Replace with `Path(...).expanduser()`
 27 | bbb = xisdir(p)
 28 | bbbb = xisfile(p)
 29 | bbbbb = xislink(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH112 [*] `os.path.isdir()` should be replaced by `Path.is_dir()`
   --> import_from_as.py:26:7
@@ -480,6 +481,7 @@ help: Replace with `Path(...).name`
 37 | xdirname(p)
 38 | xsamefile(p)
 39 | xsplitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
   --> import_from_as.py:36:1
@@ -507,6 +509,7 @@ help: Replace with `Path(...).parent`
 37 + pathlib.Path(p).parent
 38 | xsamefile(p)
 39 | xsplitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
   --> import_from_as.py:37:1

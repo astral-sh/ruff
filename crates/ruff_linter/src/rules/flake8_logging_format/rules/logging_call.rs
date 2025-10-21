@@ -1,8 +1,9 @@
 use ruff_python_ast::InterpolatedStringElement;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
+
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_f_string_logging_enabled;
@@ -41,38 +42,52 @@ fn logging_f_string(
     // Default to double quotes if we can't determine it.
     let quote_str = f_string
         .value
-        .f_strings()
+        .iter()
+        .map(|part| match part {
+            ast::FStringPart::Literal(literal) => literal.flags.quote_str(),
+            ast::FStringPart::FString(f) => f.flags.quote_str(),
+        })
         .next()
-        .map(|f| f.flags.quote_str())
         .unwrap_or("\"");
 
-    for f in f_string.value.f_strings() {
-        for element in &f.elements {
-            match element {
-                InterpolatedStringElement::Literal(lit) => {
-                    // If the literal text contains a '%' placeholder, bail out: mixing
-                    // f-string interpolation with '%' placeholders is ambiguous for our
-                    // automatic conversion, so don't offer a fix for this case.
-                    if lit.value.as_ref().contains('%') {
-                        return;
-                    }
-                    format_string.push_str(lit.value.as_ref());
+    for part in &f_string.value {
+        match part {
+            ast::FStringPart::Literal(literal) => {
+                let literal_text = literal.as_str();
+                if literal_text.contains('%') {
+                    return;
                 }
-                InterpolatedStringElement::Interpolation(interpolated) => {
-                    if interpolated.format_spec.is_some()
-                        || !matches!(
-                            interpolated.conversion,
-                            ruff_python_ast::ConversionFlag::None
-                        )
-                    {
-                        return;
-                    }
-                    match interpolated.expression.as_ref() {
-                        Expr::Name(name) => {
-                            format_string.push_str("%s");
-                            args.push(name.id.as_str());
+                format_string.push_str(literal_text);
+            }
+            ast::FStringPart::FString(f) => {
+                for element in &f.elements {
+                    match element {
+                        InterpolatedStringElement::Literal(lit) => {
+                            // If the literal text contains a '%' placeholder, bail out: mixing
+                            // f-string interpolation with '%' placeholders is ambiguous for our
+                            // automatic conversion, so don't offer a fix for this case.
+                            if lit.value.as_ref().contains('%') {
+                                return;
+                            }
+                            format_string.push_str(lit.value.as_ref());
                         }
-                        _ => return,
+                        InterpolatedStringElement::Interpolation(interpolated) => {
+                            if interpolated.format_spec.is_some()
+                                || !matches!(
+                                    interpolated.conversion,
+                                    ruff_python_ast::ConversionFlag::None
+                                )
+                            {
+                                return;
+                            }
+                            match interpolated.expression.as_ref() {
+                                Expr::Name(name) => {
+                                    format_string.push_str("%s");
+                                    args.push(name.id.as_str());
+                                }
+                                _ => return,
+                            }
+                        }
                     }
                 }
             }
@@ -198,7 +213,7 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum LoggingCallType {
+pub(crate) enum LoggingCallType {
     /// Logging call with a level method, e.g., `logging.info`.
     LevelCall(LoggingLevel),
     /// Logging call with an integer level as an argument, e.g., `logger.log(level, ...)`.
@@ -215,39 +230,41 @@ impl LoggingCallType {
     }
 }
 
-/// Check logging calls for violations.
-pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn find_logging_call(
+    checker: &Checker,
+    call: &ast::ExprCall,
+) -> Option<(LoggingCallType, TextRange)> {
     // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
-    let (logging_call_type, range) = match call.func.as_ref() {
+    match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {
-            let Some(call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
-                return;
-            };
+            let call_type = LoggingCallType::from_attribute(attr.as_str())?;
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
-                return;
+                return None;
             }
-            (call_type, attr.range())
+            Some((call_type, attr.range()))
         }
         Expr::Name(_) => {
-            let Some(qualified_name) = checker
+            let qualified_name = checker
                 .semantic()
-                .resolve_qualified_name(call.func.as_ref())
-            else {
-                return;
-            };
+                .resolve_qualified_name(call.func.as_ref())?;
             let ["logging", attribute] = qualified_name.segments() else {
-                return;
+                return None;
             };
-            let Some(call_type) = LoggingCallType::from_attribute(attribute) else {
-                return;
-            };
-            (call_type, call.func.range())
+            let call_type = LoggingCallType::from_attribute(attribute)?;
+            Some((call_type, call.func.range()))
         }
-        _ => return,
+        _ => None,
+    }
+}
+
+/// Check logging calls for violations.
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
+    let Some((logging_call_type, range)) = find_logging_call(checker, call) else {
+        return;
     };
 
     // G001, G002, G003, G004

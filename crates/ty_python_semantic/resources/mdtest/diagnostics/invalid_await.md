@@ -23,7 +23,7 @@ async def main() -> None:
     await MissingAwait()  # error: [invalid-await]
 ```
 
-## Custom type with possibly unbound `__await__`
+## Custom type with possibly missing `__await__`
 
 This diagnostic also points to the method definition if available.
 

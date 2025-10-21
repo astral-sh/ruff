@@ -42,12 +42,21 @@ impl EnvVars {
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 
-    /// Used to determine if an active Conda environment is the base environment or not.
+    /// Adds additional directories to ty's search paths.
+    /// The format is the same as the shell’s PATH:
+    /// one or more directory pathnames separated by os appropriate pathsep
+    /// (e.g. colons on Unix or semicolons on Windows).
+    pub const PYTHONPATH: &'static str = "PYTHONPATH";
+
+    /// Used to determine the name of the active Conda environment.
     pub const CONDA_DEFAULT_ENV: &'static str = "CONDA_DEFAULT_ENV";
 
-    /// Used to detect an activated Conda environment location.
+    /// Used to detect the path of an active Conda environment.
     /// If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
     pub const CONDA_PREFIX: &'static str = "CONDA_PREFIX";
+
+    /// Used to determine the root install path of Conda.
+    pub const CONDA_ROOT: &'static str = "_CONDA_ROOT";
 
     /// Filter which tests to run in mdtest.
     ///

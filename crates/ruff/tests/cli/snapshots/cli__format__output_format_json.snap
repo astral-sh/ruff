@@ -1,0 +1,52 @@
+---
+source: crates/ruff/tests/cli/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - json
+    - "--preview"
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "cell": null,
+    "code": "unformatted",
+    "end_location": {
+      "column": 1,
+      "row": 2
+    },
+    "filename": "[TMP]/input.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": null
+    },
+    "location": {
+      "column": 1,
+      "row": 1
+    },
+    "message": "File would be reformatted",
+    "noqa_row": null,
+    "url": null
+  }
+]
+----- stderr -----

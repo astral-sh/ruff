@@ -38,7 +38,7 @@ pub struct Definition<'db> {
     #[no_eq]
     #[returns(ref)]
     #[tracked]
-    pub(crate) kind: DefinitionKind<'db>,
+    pub kind: DefinitionKind<'db>,
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
     pub(crate) is_reexported: bool,
@@ -706,13 +706,6 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub(crate) fn as_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
-        match self {
-            DefinitionKind::TypeVar(type_var) => Some(type_var),
-            _ => None,
-        }
-    }
-
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
@@ -769,13 +762,14 @@ impl DefinitionKind<'_> {
                 target_range.cover(value_range)
             }
             DefinitionKind::AnnotatedAssignment(assign) => {
-                let target_range = assign.target.node(module).range();
+                let mut full_range = assign.target.node(module).range();
+                full_range = full_range.cover(assign.annotation.node(module).range());
+
                 if let Some(ref value) = assign.value {
-                    let value_range = value.node(module).range();
-                    target_range.cover(value_range)
-                } else {
-                    target_range
+                    full_range = full_range.cover(value.node(module).range());
                 }
+
+                full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
@@ -875,7 +869,7 @@ pub struct StarImportDefinitionKind {
 }
 
 impl StarImportDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }
 
@@ -959,7 +953,7 @@ pub struct ImportDefinitionKind {
 }
 
 impl ImportDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
         self.node.node(module)
     }
 
@@ -980,7 +974,7 @@ pub struct ImportFromDefinitionKind {
 }
 
 impl ImportFromDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }
 
@@ -1224,5 +1218,14 @@ impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
 impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
     fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
         Self(NodeKey::from_node(value))
+    }
+}
+
+impl<T> From<&AstNodeRef<T>> for DefinitionNodeKey
+where
+    for<'a> &'a T: Into<DefinitionNodeKey>,
+{
+    fn from(value: &AstNodeRef<T>) -> Self {
+        Self(NodeKey::from_node_ref(value))
     }
 }

@@ -402,25 +402,6 @@ help: Add backslash to escape sequence
 96 | 
 97 | #: Okay
 
-W605 [*] Invalid escape sequence: `\w`
-   --> W605_1.py:109:1
-    |
-107 | regex = t'\w'  # noqa
-108 | regex = t'''
-109 | \w
-    | ^^
-110 | '''  # noqa
-    |
-help: Use a raw string literal
-105 | '''
-106 | s = t'\\'
-107 | regex = t'\w'  # noqa
-    - regex = t'''
-108 + regex = rt'''
-109 | \w
-110 | '''  # noqa
-111 | 
-
 W605 [*] Invalid escape sequence: `\_`
    --> W605_1.py:112:13
     |

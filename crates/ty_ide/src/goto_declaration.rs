@@ -126,6 +126,23 @@ mod tests {
         6 | instance = MyClass()
           |            ^^^^^^^
           |
+
+        info[goto-declaration]: Declaration
+         --> main.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self):
+          |         ^^^^^^^^
+        4 |         pass
+          |
+        info: Source
+         --> main.py:6:12
+          |
+        4 |         pass
+        5 |
+        6 | instance = MyClass()
+          |            ^^^^^^^
+          |
         ");
     }
 
@@ -1353,6 +1370,462 @@ class MyClass:
            |                           ^^^^^^
            |
         "#);
+    }
+
+    #[test]
+    fn goto_declaration_overload_type_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: str): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_type_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mymodule import ab
+
+a<CURSOR>b("hello")
+"#,
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: str): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_overload_arity_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, 2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int, b: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: int): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_arity_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int, b: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: int): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_keyword_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, b=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, *, b: int): ...
+           |     ^^
+         9 |
+        10 | @overload
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:11:5
+           |
+        10 | @overload
+        11 | def ab(a: int, *, c: int): ...
+           |     ^^
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_keyword_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, c=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, *, b: int): ...
+           |     ^^
+         9 |
+        10 | @overload
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:11:5
+           |
+        10 | @overload
+        11 | def ab(a: int, *, c: int): ...
+           |     ^^
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+        ");
     }
 
     impl CursorTest {

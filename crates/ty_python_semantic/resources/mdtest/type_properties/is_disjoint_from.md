@@ -165,6 +165,37 @@ static_assert(is_disjoint_from(D, B))
 static_assert(not is_disjoint_from(D, A))
 ```
 
+## Dataclasses
+
+```py
+from dataclasses import dataclass
+from ty_extensions import is_disjoint_from, static_assert
+
+@dataclass(slots=True)
+class F: ...
+
+@dataclass(slots=True)
+class G: ...
+
+@dataclass(slots=True)
+class I:
+    x: int
+
+@dataclass(slots=True)
+class J:
+    y: int
+
+# A dataclass with empty `__slots__` is not disjoint from another dataclass with `__slots__`
+static_assert(not is_disjoint_from(F, G))
+static_assert(not is_disjoint_from(F, I))
+static_assert(not is_disjoint_from(G, I))
+static_assert(not is_disjoint_from(F, J))
+static_assert(not is_disjoint_from(G, J))
+
+# But two dataclasses with non-empty `__slots__` are disjoint
+static_assert(is_disjoint_from(I, J))
+```
+
 ## Tuple types
 
 ```py
@@ -583,6 +614,31 @@ class BarNone(Protocol):
     BAR: None
 
 static_assert(is_disjoint_from(type[Foo], BarNone))
+```
+
+### `NamedTuple`
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, final
+from ty_extensions import is_disjoint_from, static_assert
+
+@final
+class Path(NamedTuple):
+    prev: Path | None
+    key: str
+
+@final
+class Path2(NamedTuple):
+    prev: Path2 | None
+    key: str
+
+static_assert(not is_disjoint_from(Path, Path))
+static_assert(not is_disjoint_from(Path, tuple[Path | None, str]))
+static_assert(is_disjoint_from(Path, tuple[Path | None]))
+static_assert(is_disjoint_from(Path, tuple[Path | None, str, int]))
+static_assert(is_disjoint_from(Path, Path2))
 ```
 
 ## Callables

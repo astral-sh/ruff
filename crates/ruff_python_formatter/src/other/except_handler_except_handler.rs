@@ -1,10 +1,12 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::write;
-use ruff_python_ast::ExceptHandlerExceptHandler;
+use ruff_python_ast::{ExceptHandlerExceptHandler, Expr, PythonVersion};
 
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::preview::is_remove_parens_around_except_types_enabled;
 use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
@@ -57,7 +59,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                 clause_header(
                     ClauseHeader::ExceptHandler(item),
                     dangling_comments,
-                    &format_with(|f| {
+                    &format_with(|f: &mut PyFormatter| {
                         write!(
                             f,
                             [
@@ -69,21 +71,50 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                             ]
                         )?;
 
-                        if let Some(type_) = type_ {
-                            write!(
-                                f,
-                                [
-                                    space(),
-                                    maybe_parenthesize_expression(
-                                        type_,
-                                        item,
-                                        Parenthesize::IfBreaks
+                        match type_.as_deref() {
+                            // For tuples of exception types without an `as` name and on 3.14+, the
+                            // parentheses are optional.
+                            //
+                            // ```py
+                            // try:
+                            //     ...
+                            // except BaseException, Exception:  # Ok
+                            //     ...
+                            // ```
+                            Some(Expr::Tuple(tuple))
+                                if f.options().target_version() >= PythonVersion::PY314
+                                    && is_remove_parens_around_except_types_enabled(
+                                        f.context(),
                                     )
-                                ]
-                            )?;
-                            if let Some(name) = name {
-                                write!(f, [space(), token("as"), space(), name.format()])?;
+                                    && name.is_none() =>
+                            {
+                                write!(
+                                    f,
+                                    [
+                                        space(),
+                                        tuple
+                                            .format()
+                                            .with_options(TupleParentheses::NeverPreserve)
+                                    ]
+                                )?;
                             }
+                            Some(type_) => {
+                                write!(
+                                    f,
+                                    [
+                                        space(),
+                                        maybe_parenthesize_expression(
+                                            type_,
+                                            item,
+                                            Parenthesize::IfBreaks
+                                        )
+                                    ]
+                                )?;
+                                if let Some(name) = name {
+                                    write!(f, [space(), token("as"), space(), name.format()])?;
+                                }
+                            }
+                            _ => {}
                         }
 
                         Ok(())

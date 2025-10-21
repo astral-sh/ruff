@@ -120,7 +120,7 @@ help: Rewrite `f` as a `def`
 61 | class Scope:
 note: This is an unsafe fix and may change runtime behavior
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:73:9
    |
 71 |     x: Callable[[int], int]
@@ -142,7 +142,7 @@ help: Rewrite `x` as a `def`
 77 |     return x
 note: This is a display-only fix and is likely to be incorrect
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:75:9
    |
 73 |         x = lambda: 1
@@ -176,7 +176,7 @@ help: Rewrite `f` as a `def`
 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
 85 |     P = ParamSpec("P")
    -     f: Callable[P, int] = lambda *args: len(args)
-86 +     def f(*args):
+86 +     def f(*args) -> int:
 87 +         return len(args)
 88 | 
 89 | 
@@ -506,6 +506,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 191 | |
 192 | | )
     | |_^
+193 |
+194 |   # https://github.com/astral-sh/ruff/issues/20097
     |
 help: Rewrite `foo_tooltip` as a `def`
 185 |     else ""
@@ -519,4 +521,42 @@ help: Rewrite `foo_tooltip` as a `def`
 188 + def foo_tooltip(x, data):
 189 +     return (f"\nfoo: {data['foo'][int(x)]}" +
 190 +     more)
+191 | 
+192 | # https://github.com/astral-sh/ruff/issues/20097
+193 | def scope():
+note: This is an unsafe fix and may change runtime behavior
+
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:200:5
+    |
+199 |     P = ParamSpec("P")
+200 |     f1: Callable[P, str] = lambda x: str(x)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+201 |     f2: Callable[..., str] = lambda x: str(x)
+    |
+help: Rewrite `f1` as a `def`
+197 |     from typing import ParamSpec
+198 | 
+199 |     P = ParamSpec("P")
+    -     f1: Callable[P, str] = lambda x: str(x)
+200 +     def f1(x) -> str:
+201 +         return str(x)
+202 |     f2: Callable[..., str] = lambda x: str(x)
+note: This is an unsafe fix and may change runtime behavior
+
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:201:5
+    |
+199 |     P = ParamSpec("P")
+200 |     f1: Callable[P, str] = lambda x: str(x)
+201 |     f2: Callable[..., str] = lambda x: str(x)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Rewrite `f2` as a `def`
+198 | 
+199 |     P = ParamSpec("P")
+200 |     f1: Callable[P, str] = lambda x: str(x)
+    -     f2: Callable[..., str] = lambda x: str(x)
+201 +     def f2(x) -> str:
+202 +         return str(x)
 note: This is an unsafe fix and may change runtime behavior

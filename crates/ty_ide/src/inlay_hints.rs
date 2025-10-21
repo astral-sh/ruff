@@ -6,7 +6,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::types::ide_support::inlay_hint_function_argument_details;
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -264,6 +265,15 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 }
                 source_order::walk_expr(self, expr);
             }
+            Expr::Attribute(attribute) => {
+                if self.in_assignment {
+                    if attribute.ctx.is_store() {
+                        let ty = expr.inferred_type(&self.model);
+                        self.add_type_hint(expr.range().end(), ty);
+                    }
+                }
+                source_order::walk_expr(self, expr);
+            }
             Expr::Call(call) => {
                 let argument_names =
                     inlay_hint_function_argument_details(self.db, &self.model, call)
@@ -433,6 +443,31 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
         y = 2
+        ");
+    }
+
+    #[test]
+    fn test_assign_attribute_of_instance() {
+        let test = inlay_hint_test(
+            "
+            class A:
+                def __init__(self, y):
+                    self.x = 1
+                    self.y = y
+
+            a = A(2)
+            a.y = 3
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class A:
+            def __init__(self, y):
+                self.x[: Literal[1]] = 1
+                self.y[: Unknown] = y
+
+        a[: A] = A([y=]2)
+        a.y[: Literal[3]] = 3
         ");
     }
 

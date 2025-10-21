@@ -11,7 +11,8 @@ from airflow import (
 )
 from airflow.api_connexion.security import requires_access
 from airflow.contrib.aws_athena_hook import AWSAthenaHook
-from airflow.datasets import DatasetAliasEvent
+from airflow.datasets import DatasetAliasEvent, DatasetEvent
+from airflow.operators.postgres_operator import Mapping
 from airflow.operators.subdag import SubDagOperator
 from airflow.secrets.cache import SecretCache
 from airflow.secrets.local_filesystem import LocalFilesystemBackend
@@ -47,11 +48,14 @@ AWSAthenaHook()
 
 # airflow.datasets
 DatasetAliasEvent()
+DatasetEvent()
 
 
 # airflow.operators.subdag.*
 SubDagOperator()
 
+# airflow.operators.postgres_operator
+Mapping()
 
 # airflow.secrets
 # get_connection

@@ -164,7 +164,7 @@ fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Are
                         stack.push(&mut string.left);
                         stack.push(&mut string.right);
                     }
-                    libcst_native::String::Formatted(_) => {}
+                    libcst_native::String::Formatted(_) | libcst_native::String::Templated(_) => {}
                 }
             }
         }

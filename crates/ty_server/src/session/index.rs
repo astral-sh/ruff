@@ -178,7 +178,7 @@ impl Index {
         let path = key.path();
 
         let Some(_) = self.documents.remove(path) else {
-            anyhow::bail!("tried to close document that didn't exist at {}", key)
+            anyhow::bail!("tried to close document that didn't exist at {key}")
         };
         Ok(())
     }
@@ -189,7 +189,7 @@ impl Index {
     ) -> crate::Result<&mut DocumentController> {
         let path = key.path();
         let Some(controller) = self.documents.get_mut(path) else {
-            anyhow::bail!("Document controller not available at `{}`", key);
+            anyhow::bail!("Document controller not available at `{key}`");
         };
         Ok(controller)
     }

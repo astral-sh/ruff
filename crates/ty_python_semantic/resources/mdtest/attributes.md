@@ -820,22 +820,34 @@ reveal_type(C().c)  # revealed: int
 
 ### Inheritance of class/instance attributes
 
-#### Instance variable defined in a base class
-
 ```py
 class Base:
-    declared_in_body: int | None = 1
+    attribute: int | None = 1
 
-    base_class_attribute_1: str | None
-    base_class_attribute_2: str | None
-    base_class_attribute_3: str | None
+    redeclared_with_same_type: str | None
+    redeclared_with_narrower_type: str | None
+    redeclared_with_wider_type: str | None
+
+    redeclared_in_method_with_same_type: str | None
+    redeclared_in_method_with_narrower_type: str | None
+    redeclared_in_method_with_wider_type: str | None
+
+    overwritten_in_subclass_body: str
+    overwritten_in_subclass_method: str
+
+    undeclared = "base"
 
     def __init__(self) -> None:
-        self.defined_in_init: str | None = "value in base"
+        self.pure_attribute: str | None = "value in base"
+
+        self.pure_overwritten_in_subclass_body: str = "value in base"
+        self.pure_overwritten_in_subclass_method: str = "value in base"
+
+        self.pure_undeclared = "base"
 
 class Intermediate(Base):
     # Redeclaring base class attributes with the *same *type is fine:
-    base_class_attribute_1: str | None = None
+    redeclared_with_same_type: str | None = None
 
     # Redeclaring them with a *narrower type* is unsound, because modifications
     # through a `Base` reference could violate that constraint.
@@ -847,22 +859,90 @@ class Intermediate(Base):
     # enabled by default can still be discussed.
     #
     # TODO: This should be an error
-    base_class_attribute_2: str
+    redeclared_with_narrower_type: str
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
     # TODO: This should be an error
-    base_class_attribute_3: str | int | None
+    redeclared_with_wider_type: str | int | None
+
+    # TODO: This should be an `invalid-assignment` error
+    overwritten_in_subclass_body = None
+
+    # TODO: This should be an `invalid-assignment` error
+    pure_overwritten_in_subclass_body = None
+
+    undeclared = "intermediate"
+
+    def set_attributes(self) -> None:
+        self.redeclared_in_method_with_same_type: str | None = None
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_narrower_type: str = "foo"
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_wider_type: object = object()
+
+        # TODO: This should be an `invalid-assignment` error
+        self.overwritten_in_subclass_method = None
+
+        # TODO: This should be an `invalid-assignment` error
+        self.pure_overwritten_in_subclass_method = None
+
+        self.pure_undeclared = "intermediate"
 
 class Derived(Intermediate): ...
 
-reveal_type(Derived.declared_in_body)  # revealed: int | None
+reveal_type(Derived.attribute)  # revealed: int | None
+reveal_type(Derived().attribute)  # revealed: int | None
 
-reveal_type(Derived().declared_in_body)  # revealed: int | None
+reveal_type(Derived.redeclared_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_with_same_type)  # revealed: str | None
 
-reveal_type(Derived().defined_in_init)  # revealed: str | None
+# We infer the narrower type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_with_narrower_type)  # revealed: str
+reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
+
+# We infer the wider type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
+reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
+
+# TODO: Both of these should be `str`
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
+
+# TODO: both of these should be `str`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_narrower_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_narrower_type)  # revealed: str | None
+
+# TODO: both of these should be `object`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_wider_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_wider_type)  # revealed: object
+
+reveal_type(Derived.overwritten_in_subclass_method)  # revealed: str
+reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
+
+reveal_type(Derived().pure_attribute)  # revealed: str | None
+
+# TODO: This should be `str`
+reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
+
+# TODO: Both of these should be `Unknown | Literal["intermediate", "base"]`
+reveal_type(Derived.undeclared)  # revealed: Unknown | Literal["intermediate"]
+reveal_type(Derived().undeclared)  # revealed: Unknown | Literal["intermediate"]
+
+reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate", "base"]
 ```
 
 ## Accessing attributes on class objects
@@ -914,7 +994,7 @@ def _(flag: bool):
     reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
 ```
 
-If the *metaclass* attribute is only partially defined, we emit a `possibly-unbound-attribute`
+If the *metaclass* attribute is only partially defined, we emit a `possibly-missing-attribute`
 diagnostic:
 
 ```py
@@ -924,12 +1004,12 @@ def _(flag: bool):
             attr1: str = "metaclass value"
 
     class C4(metaclass=Meta4): ...
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C4.attr1)  # revealed: str
 ```
 
 Finally, if both the metaclass attribute and the class-level attribute are only partially defined,
-we union them and emit a `possibly-unbound-attribute` diagnostic:
+we union them and emit a `possibly-missing-attribute` diagnostic:
 
 ```py
 def _(flag1: bool, flag2: bool):
@@ -941,7 +1021,7 @@ def _(flag1: bool, flag2: bool):
         if flag2:
             attr1 = "class value"
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
@@ -1180,13 +1260,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1212,18 +1292,18 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     C.x = 100
 
-    # Note: we might want to consider ignoring possibly-unbound diagnostics for instance attributes eventually,
+    # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     C().x = 100
 ```
 
@@ -1287,16 +1367,16 @@ def _(flag: bool):
         if flag:
             x = 2
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     Bar.x = 3
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     Bar().x = 3
 ```
 
@@ -1304,7 +1384,7 @@ def _(flag: bool):
 
 We currently treat implicit instance attributes to be bound, even if they are only conditionally
 defined within a method. If the class-level definition or the whole method is only conditionally
-available, we emit a `possibly-unbound-attribute` diagnostic.
+available, we emit a `possibly-missing-attribute` diagnostic.
 
 #### Possibly unbound and undeclared
 
@@ -1353,7 +1433,7 @@ def _(flag: bool):
     class C2: ...
     C = C1 if flag else C2
 
-    # error: [unresolved-attribute] "Type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
+    # error: [unresolved-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 
     # TODO: This should ideally be a `unresolved-attribute` error. We need better union
@@ -1484,17 +1564,17 @@ def _(flag: bool):
     class B1: ...
 
     def inner1(a_and_b: Intersection[A1, B1]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
 
     class A2:
@@ -1509,7 +1589,7 @@ def _(flag: bool):
 
         # TODO: this should not be an error, we need better intersection
         # handling in `validate_attribute_assignment` for this
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
@@ -1524,17 +1604,17 @@ def _(flag: bool):
             x: Q = Q()
 
     def inner3(a_and_b: Intersection[A3, B3]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-missing-attribute]
         a_and_b.x = R()
 
     class A4: ...
@@ -1649,7 +1729,7 @@ If an attribute is defined on the class, it takes precedence over the `__getattr
 reveal_type(c.class_attr)  # revealed: int
 ```
 
-If the class attribute is possibly unbound, we union the type of the attribute with the fallback
+If the class attribute is possibly missing, we union the type of the attribute with the fallback
 type of the `__getattr__` method:
 
 ```py
@@ -1691,7 +1771,7 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
 reveal_type(date.century)  # revealed: Unknown
 ```
 
@@ -2057,8 +2137,13 @@ reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 Some attributes are special-cased, however:
 
 ```py
+import types
+from ty_extensions import static_assert, TypeOf, is_subtype_of
+
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
 reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
+static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
+static_assert(is_subtype_of(TypeOf[f.__call__], types.MethodWrapperType))
 ```
 
 ### Int-literal attributes
@@ -2104,7 +2189,7 @@ All attribute access on literal `bytes` types is currently delegated to `builtin
 ```py
 # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 
@@ -2278,6 +2363,55 @@ reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
 ```
 
+And cycles between many attributes:
+
+```py
+class ManyCycles:
+    def __init__(self: "ManyCycles"):
+        self.x1 = 0
+        self.x2 = 0
+        self.x3 = 0
+        self.x4 = 0
+        self.x5 = 0
+        self.x6 = 0
+        self.x7 = 1
+
+    def f1(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f2(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f3(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+        reveal_type(self.x1)  # revealed: Unknown | int
+        reveal_type(self.x2)  # revealed: Unknown | int
+        reveal_type(self.x3)  # revealed: Unknown | int
+        reveal_type(self.x4)  # revealed: Unknown | int
+        reveal_type(self.x5)  # revealed: Unknown | int
+        reveal_type(self.x6)  # revealed: Unknown | int
+        reveal_type(self.x7)  # revealed: Unknown | int
+```
+
 This case additionally tests our union/intersection simplification logic:
 
 ```py
@@ -2410,8 +2544,42 @@ class Answer(enum.Enum):
     YES = 1
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
-reveal_type(Answer.NO.value)  # revealed: Any
+reveal_type(Answer.NO.value)  # revealed: Literal[0]
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
+```
+
+## Divergent inferred implicit instance attribute types
+
+```py
+# TODO: This test currently panics, see https://github.com/astral-sh/ty/issues/837
+
+# class C:
+#    def f(self, other: "C"):
+#        self.x = (other.x, 1)
+#
+# reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+## Attributes of standard library modules that aren't yet defined
+
+For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`main.py`:
+
+```py
+import datetime
+
+# error: [unresolved-attribute]
+reveal_type(datetime.UTC)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(datetime.fakenotreal)  # revealed: Unknown
 ```
 
 ## References

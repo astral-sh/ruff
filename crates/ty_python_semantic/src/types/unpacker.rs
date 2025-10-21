@@ -9,7 +9,7 @@ use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -48,8 +48,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let value_type =
+            infer_expression_types(self.db(), value.expression(), TypeContext::default())
+                .expression_type(value.expression().node_ref(self.db(), self.module()));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -117,6 +118,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
                 let mut unpacker = TupleUnpacker::new(self.db(), target_len);
 
+                // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
+                // For our purposes here, we get better error messages and more precise inference
+                // if we manually map over the union and call `try_iterate` on each union element.
+                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
+                // for more discussion.
                 let unpack_types = match value_ty {
                     Type::Union(union_ty) => union_ty.elements(self.db()),
                     _ => std::slice::from_ref(&value_ty),
@@ -224,7 +230,7 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_fallback(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(cycle_fallback_type: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),

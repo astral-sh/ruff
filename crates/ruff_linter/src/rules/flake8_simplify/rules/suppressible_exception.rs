@@ -58,7 +58,9 @@ impl Violation for SuppressibleException {
 
     fn fix_title(&self) -> Option<String> {
         let SuppressibleException { exception } = self;
-        Some(format!("Replace with `contextlib.suppress({exception})`"))
+        Some(format!(
+            "Replace `try`-`except`-`pass` with `with contextlib.suppress({exception}): ...`"
+        ))
     }
 }
 

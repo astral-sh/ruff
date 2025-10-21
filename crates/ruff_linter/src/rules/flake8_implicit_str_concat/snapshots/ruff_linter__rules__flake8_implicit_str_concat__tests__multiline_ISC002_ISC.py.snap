@@ -67,3 +67,25 @@ ISC002 Implicitly concatenated string literals over multiple lines
 76 |
 77 |   # Explicitly concatenated nested f-strings
    |
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:196:1
+    |
+195 |   # ISC002
+196 | / t"The quick brown fox jumps over the lazy "\
+197 | | t"dog."
+    | |_______^
+198 |
+199 |   # ISC003
+    |
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:208:10
+    |
+206 |   _ = "a" f"b {t"c" t"d"} e" "f"
+207 |   _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+208 |   _ = f"b {t"abc" \
+    |  __________^
+209 | |     t"def"} g"
+    | |__________^
+    |

@@ -1,12 +1,14 @@
 use std::fmt::{Debug, Display};
 
+use serde::Serialize;
+
 use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use crate::{codes::Rule, message::create_lint_diagnostic};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub enum FixAvailability {
     Sometimes,
     Always,

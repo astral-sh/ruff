@@ -5,6 +5,11 @@ specific value types for each valid key. Each string key can be either required 
 
 ## Basic
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Here, we define a `TypedDict` using the class-based syntax:
 
 ```py
@@ -46,6 +51,46 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 ```
 
+`TypedDict` keys do not have to be string literals, as long as they can be statically determined
+(inferred to be of type string `Literal`).
+
+```py
+from typing import Literal, Final
+
+NAME = "name"
+AGE = "age"
+
+def non_literal() -> str:
+    return "name"
+
+def name_or_age() -> Literal["name", "age"]:
+    return "name"
+
+carol: Person = {NAME: "Carol", AGE: 20}
+
+reveal_type(carol[NAME])  # revealed: str
+# error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
+reveal_type(carol[non_literal()])  # revealed: Unknown
+reveal_type(carol[name_or_age()])  # revealed: str | int | None
+
+FINAL_NAME: Final = "name"
+FINAL_AGE: Final = "age"
+
+def _():
+    carol: Person = {FINAL_NAME: "Carol", FINAL_AGE: 20}
+
+CAPITALIZED_NAME = "Name"
+
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "Name" - did you mean "name"?"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
+
+def age() -> Literal["age"] | None:
+    return "age"
+
+eve: Person = {"na" + "me": "Eve", age() or "age": 20}
+```
+
 The construction of a `TypedDict` is checked for type correctness:
 
 ```py
@@ -63,6 +108,40 @@ eve2b = Person(age=22)
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
+```
+
+Also, the value types ​​declared in a `TypedDict` affect generic call inference:
+
+```py
+class Plot(TypedDict):
+    y: list[int]
+    x: list[int] | None
+
+plot1: Plot = {"y": [1, 2, 3], "x": None}
+
+def homogeneous_list[T](*args: T) -> list[T]:
+    return list(args)
+
+reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[Literal[1, 2, 3]]
+plot2: Plot = {"y": homogeneous_list(1, 2, 3), "x": None}
+reveal_type(plot2["y"])  # revealed: list[int]
+
+plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
+reveal_type(plot3["y"])  # revealed: list[int]
+reveal_type(plot3["x"])  # revealed: list[int] | None
+
+Y = "y"
+X = "x"
+
+plot4: Plot = {Y: [1, 2, 3], X: None}
+plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
+
+class Items(TypedDict):
+    items: list[int | str]
+
+items1: Items = {"items": homogeneous_list(1, 2, 3)}
+ITEMS = "items"
+items2: Items = {ITEMS: homogeneous_list(1, 2, 3)}
 ```
 
 Assignments to keys are also validated:
@@ -83,6 +162,34 @@ alice["extra"] = True
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 bob["extra"] = True
+```
+
+## Nested `TypedDict`
+
+Nested `TypedDict` fields are also supported.
+
+```py
+from typing import TypedDict
+
+class Inner(TypedDict):
+    name: str
+    age: int | None
+
+class Person(TypedDict):
+    inner: Inner
+```
+
+```py
+alice: Person = {"inner": {"name": "Alice", "age": 30}}
+
+reveal_type(alice["inner"]["name"])  # revealed: str
+reveal_type(alice["inner"]["age"])  # revealed: int | None
+
+# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "non_existing""
+reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
+
+# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "extra""
+alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
 ```
 
 ## Validation of `TypedDict` construction
@@ -124,10 +231,15 @@ Person(name="Alice")
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 Person({"name": "Alice"})
 
-# TODO: this should be an error, similar to the above
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 accepts_person({"name": "Alice"})
+
 # TODO: this should be an error, similar to the above
 house.owner = {"name": "Alice"}
+
+a_person: Person
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+a_person = {"name": "Alice"}
 ```
 
 All of these have an invalid type for the `name` field:
@@ -140,10 +252,16 @@ Person(name=None, age=30)
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 Person({"name": None, "age": 30})
 
-# TODO: this should be an error, similar to the above
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 accepts_person({"name": None, "age": 30})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": None, "age": 30}
+
+a_person: Person
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+a_person = {"name": None, "age": 30}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+(a_person := {"name": None, "age": 30})
 ```
 
 All of these have an extra field that is not defined in the `TypedDict`:
@@ -156,10 +274,16 @@ Person(name="Alice", age=30, extra=True)
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 Person({"name": "Alice", "age": 30, "extra": True})
 
-# TODO: this should be an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 # TODO: this should be an error
 house.owner = {"name": "Alice", "age": 30, "extra": True}
+
+a_person: Person
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+a_person = {"name": "Alice", "age": 30, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+(a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
 ## Type ignore compatibility issues
@@ -242,11 +366,12 @@ invalid_extra = OptionalPerson(name="George", extra=True)
 
 ## `Required` and `NotRequired`
 
-You can have fine-grained control over field requirements using `Required` and `NotRequired`
-qualifiers, which override the class-level `total=` setting:
+You can have fine-grained control over keys using `Required` and `NotRequired` qualifiers. These
+qualifiers override the class-level `total` setting, which sets the default (`total=True` means that
+all keys are required by default, `total=False` means that all keys are non-required by default):
 
 ```py
-from typing_extensions import TypedDict, Required, NotRequired
+from typing_extensions import TypedDict, Required, NotRequired, Final
 
 # total=False by default, but id is explicitly Required
 class Message(TypedDict, total=False):
@@ -260,10 +385,17 @@ class User(TypedDict):
     email: Required[str]  # Explicitly required (redundant here)
     bio: NotRequired[str]  # Optional despite total=True
 
+ID: Final = "id"
+
 # Valid Message constructions
 msg1 = Message(id=1)  # id required, content optional
 msg2 = Message(id=2, content="Hello")  # both provided
 msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
+msg4: Message = {"id": 4}  # id required, content optional
+msg5: Message = {ID: 5}  # id required, content optional
+
+def msg() -> Message:
+    return {ID: 1}
 
 # Valid User constructions
 user1 = User(name="Alice", email="alice@example.com")  # required fields
@@ -434,8 +566,7 @@ def _(person: Person, unknown_key: Any):
 
 ## `ReadOnly`
 
-`ReadOnly` is not supported yet, but this test makes sure that we do not emit any false positive
-diagnostics:
+Assignments to keys that are marked `ReadOnly` will produce an error:
 
 ```py
 from typing_extensions import TypedDict, ReadOnly, Required
@@ -444,25 +575,79 @@ class Person(TypedDict, total=False):
     id: ReadOnly[Required[int]]
     name: str
     age: int | None
+
+alice: Person = {"id": 1, "name": "Alice", "age": 30}
+alice["age"] = 31  # okay
+
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `Person`: key is marked read-only"
+alice["id"] = 2
+```
+
+This also works if all fields on a `TypedDict` are `ReadOnly`, in which case we synthesize a
+`__setitem__` method with a `key` type of `Never`:
+
+```py
+class Config(TypedDict):
+    host: ReadOnly[str]
+    port: ReadOnly[int]
+
+config: Config = {"host": "localhost", "port": 8080}
+
+# error: [invalid-assignment] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
+config["host"] = "127.0.0.1"
+# error: [invalid-assignment] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
+config["port"] = 80
 ```
 
 ## Methods on `TypedDict`
 
 ```py
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 class Person(TypedDict):
     name: str
     age: int | None
+    extra: NotRequired[str]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
     reveal_type(p.values())  # revealed: dict_values[str, object]
 
-    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
+    # `get()` returns the field type for required keys (no None union)
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("age"))  # revealed: int | None
 
-    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
+    # It doesn't matter if a default is specified:
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("age", 999))  # revealed: int | None
+
+    # `get()` can return `None` for non-required keys
+    reveal_type(p.get("extra"))  # revealed: str | None
+    reveal_type(p.get("extra", "default"))  # revealed: str
+
+    # The type of the default parameter can be anything:
+    reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
+
+    # We allow access to unknown keys (they could be set for a subtype of Person)
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
+    reveal_type(p.get("unknown", "default"))  # revealed: Unknown | Literal["default"]
+
+    # `pop()` only works on non-required fields
+    reveal_type(p.pop("extra"))  # revealed: str
+    reveal_type(p.pop("extra", "fallback"))  # revealed: str
+    # error: [invalid-argument-type] "Cannot pop required field 'name' from TypedDict `Person`"
+    reveal_type(p.pop("name"))  # revealed: Unknown
+
+    # Similar to above, the default parameter can be of any type:
+    reveal_type(p.pop("extra", 0))  # revealed: str | Literal[0]
+
+    # `setdefault()` always returns the field type
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+    reveal_type(p.setdefault("extra", "default"))  # revealed: str
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
+    reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
 ## Unlike normal classes
@@ -487,18 +672,18 @@ Also, the "attributes" on the class definition can not be accessed. Neither on t
 on inhabitants of the type defined by the class:
 
 ```py
-# error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
+# error: [unresolved-attribute] "Class `Person` has no attribute `name`"
 Person.name
 
 def _(P: type[Person]):
-    # error: [unresolved-attribute] "Type `type[Person]` has no attribute `name`"
+    # error: [unresolved-attribute] "Object of type `type[Person]` has no attribute `name`"
     P.name
 
 def _(p: Person) -> None:
-    # error: [unresolved-attribute] "Type `Person` has no attribute `name`"
+    # error: [unresolved-attribute] "Object of type `Person` has no attribute `name`"
     p.name
 
-    type(p).name  # error: [unresolved-attribute] "Type `<class 'dict[str, object]'>` has no attribute `name`"
+    type(p).name  # error: [unresolved-attribute] "Class `dict[str, object]` has no attribute `name`"
 ```
 
 ## Special properties
@@ -564,6 +749,16 @@ alice: Employee = {"name": "Alice", "employee_id": 1}
 
 # error: [missing-typed-dict-key] "Missing required key 'employee_id' in TypedDict `Employee` constructor"
 eve: Employee = {"name": "Eve"}
+
+def combine(p: Person, e: Employee):
+    reveal_type(p.copy())  # revealed: Person
+    reveal_type(e.copy())  # revealed: Employee
+
+    reveal_type(p | p)  # revealed: Person
+    reveal_type(e | e)  # revealed: Employee
+
+    # TODO: Should be `Person` once we support subtyping for TypedDicts
+    reveal_type(p | e)  # revealed: Person | Employee
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
@@ -655,6 +850,18 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+
+class Items(TypedDict, Generic[T]):
+    items: list[T]
+
+def homogeneous_list(*args: T) -> list[T]:
+    return list(args)
+
+items1: Items[int] = {"items": [1, 2, 3]}
+items2: Items[str] = {"items": ["a", "b", "c"]}
+items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
+items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
+items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
 ```
 
 ### PEP-695 generics
@@ -676,6 +883,18 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+
+class Items[T](TypedDict):
+    items: list[T]
+
+def homogeneous_list[T](*args: T) -> list[T]:
+    return list(args)
+
+items1: Items[int] = {"items": [1, 2, 3]}
+items2: Items[str] = {"items": ["a", "b", "c"]}
+items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
+items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
+items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
 ```
 
 ## Recursive `TypedDict`
@@ -696,7 +915,7 @@ grandchild: Node = {"name": "grandchild", "parent": child}
 
 nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", "parent": None}}}
 
-# TODO: this should be an error (invalid type for `name` in innermost node)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
 ```
 
@@ -732,6 +951,38 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
+### `dict`-subclass inhabitants
+
+Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
+
+```py
+from typing import TypedDict
+
+class MyDict(dict):
+    pass
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+# TODO: this should be an error
+x: Person = MyDict({"name": "Alice", "age": 30})
+```
+
+### Cannot be used in `isinstance` tests
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+def _(obj: object) -> bool:
+    # TODO: this should be an error
+    return isinstance(obj, Person)
+```
+
 ## Diagnostics
 
 <!-- snapshot-diagnostics -->
@@ -764,6 +1015,19 @@ def write_to_non_existing_key(person: Person):
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
+```
+
+Assignment to `ReadOnly` keys:
+
+```py
+from typing_extensions import ReadOnly
+
+class Employee(TypedDict):
+    id: ReadOnly[int]
+    name: str
+
+def write_to_readonly_key(employee: Employee):
+    employee["id"] = 42  # error: [invalid-assignment]
 ```
 
 ## Import aliases

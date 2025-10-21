@@ -44,6 +44,43 @@ import some_module
 __all__ = ["some_module"]
 ```
 
+## Preview
+When [preview] is enabled (and certain simplifying assumptions
+are met), we analyze all import statements for a given module
+when determining whether an import is used, rather than simply
+the last of these statements. This can result in both different and
+more import statements being marked as unused.
+
+For example, if a module consists of
+
+```python
+import a
+import a.b
+```
+
+then both statements are marked as unused under [preview], whereas
+only the second is marked as unused under stable behavior.
+
+As another example, if a module consists of
+
+```python
+import a.b
+import a
+
+a.b.foo()
+```
+
+then a diagnostic will only be emitted for the first line under [preview],
+whereas a diagnostic would only be emitted for the second line under
+stable behavior.
+
+Note that this behavior is somewhat subjective and is designed
+to conform to the developer's intuition rather than Python's actual
+execution. To wit, the statement `import a.b` automatically executes
+`import a`, so in some sense `import a` is _always_ redundant
+in the presence of `import a.b`.
+
+
 ## Fix safety
 
 Fixes to remove unused imports are safe, except in `__init__.py` files.
@@ -54,6 +91,10 @@ either a redundant alias or, if already present in the file, an `__all__` entry.
 `__all__` declarations are present, Ruff will not offer a fix. Ruff will suggest an unsafe fix
 to remove third-party and standard library imports -- the fix is unsafe because the module's
 interface changes.
+
+See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc)
+for more details on how Ruff
+determines whether an import is first or third-party.
 
 ## Example
 
@@ -83,11 +124,6 @@ else:
     print("numpy is not installed")
 ```
 
-## Preview
-When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-the criterion for determining whether an import is first-party
-is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-
 ## Options
 - `lint.ignore-init-module-imports`
 - `lint.pyflakes.allowed-unused-imports`
@@ -96,5 +132,7 @@ is stricter, which could affect the suggested fix. See [this FAQ section](https:
 - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
 - [Typing documentation: interface conventions](https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols)
+
+[preview]: https://docs.astral.sh/ruff/preview/
 
 ----- stderr -----

@@ -4,19 +4,9 @@ source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 invalid-syntax: missing closing quote in string literal
  --> ISC_syntax_error.py:2:5
   |
-1 | # The lexer doesn't emit a string token if it's unterminated
+1 | # The lexer emits a string token if it's unterminated
 2 | "a" "b
   |     ^^
-3 | "a" "b" "c
-4 | "a" """b
-  |
-
-invalid-syntax: Expected a statement
- --> ISC_syntax_error.py:2:7
-  |
-1 | # The lexer doesn't emit a string token if it's unterminated
-2 | "a" "b
-  |       ^
 3 | "a" "b" "c
 4 | "a" """b
   |
@@ -24,21 +14,10 @@ invalid-syntax: Expected a statement
 invalid-syntax: missing closing quote in string literal
  --> ISC_syntax_error.py:3:9
   |
-1 | # The lexer doesn't emit a string token if it's unterminated
+1 | # The lexer emits a string token if it's unterminated
 2 | "a" "b
 3 | "a" "b" "c
   |         ^^
-4 | "a" """b
-5 | c""" "d
-  |
-
-invalid-syntax: Expected a statement
- --> ISC_syntax_error.py:3:11
-  |
-1 | # The lexer doesn't emit a string token if it's unterminated
-2 | "a" "b
-3 | "a" "b" "c
-  |           ^
 4 | "a" """b
 5 | c""" "d
   |
@@ -51,24 +30,13 @@ invalid-syntax: missing closing quote in string literal
 5 | c""" "d
   |      ^^
 6 |
-7 | # For f-strings, the `FStringRanges` won't contain the range for
-  |
-
-invalid-syntax: Expected a statement
- --> ISC_syntax_error.py:5:8
-  |
-3 | "a" "b" "c
-4 | "a" """b
-5 | c""" "d
-  |        ^
-6 |
-7 | # For f-strings, the `FStringRanges` won't contain the range for
+7 | # This is also true for
   |
 
 invalid-syntax: f-string: unterminated string
   --> ISC_syntax_error.py:9:8
    |
- 7 | # For f-strings, the `FStringRanges` won't contain the range for
+ 7 | # This is also true for
  8 | # unterminated f-strings.
  9 | f"a" f"b
    |        ^
@@ -79,7 +47,7 @@ invalid-syntax: f-string: unterminated string
 invalid-syntax: Expected FStringEnd, found newline
   --> ISC_syntax_error.py:9:9
    |
- 7 | # For f-strings, the `FStringRanges` won't contain the range for
+ 7 | # This is also true for
  8 | # unterminated f-strings.
  9 | f"a" f"b
    |         ^
@@ -131,14 +99,6 @@ invalid-syntax: f-string: unterminated triple-quoted string
 28 | |     "i" "j"
 29 | | )
    | |__^
-   |
-
-invalid-syntax: unexpected EOF while parsing
-  --> ISC_syntax_error.py:30:1
-   |
-28 |     "i" "j"
-29 | )
-   |  ^
    |
 
 invalid-syntax: f-string: unterminated string

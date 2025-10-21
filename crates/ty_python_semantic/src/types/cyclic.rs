@@ -44,7 +44,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
 #[derive(Debug)]
-pub(crate) struct CycleDetector<Tag, T, R> {
+pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
@@ -64,7 +64,7 @@ pub(crate) struct CycleDetector<Tag, T, R> {
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
-    pub(crate) fn new(fallback: R) -> Self {
+    pub fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
@@ -73,7 +73,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         }
     }
 
-    pub(crate) fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }
@@ -88,5 +88,11 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         self.cache.borrow_mut().insert(item, ret.clone());
 
         ret
+    }
+}
+
+impl<Tag, T: Hash + Eq + Clone, R: Default + Clone> Default for CycleDetector<Tag, T, R> {
+    fn default() -> Self {
+        CycleDetector::new(R::default())
     }
 }
