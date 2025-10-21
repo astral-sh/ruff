@@ -1,5 +1,6 @@
 use crate::Db;
 use bitflags::bitflags;
+use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -476,7 +477,20 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) {
         let mut param_index = 0;
 
-        for any_param in parameters {
+        // The `parameters.iter` method does return the parameters in sorted order but only if
+        // the AST is well-formed, but e.g. not for:
+        // ```py
+        // def foo(self, **key, value):
+        //     return
+        // ```
+        // Ideally, the ast would use a single vec for all parameters to avoid this issue as
+        // discussed here https://github.com/astral-sh/ruff/issues/14315 and
+        // here https://github.com/astral-sh/ruff/blob/71f8389f61a243a0c7584adffc49134ccf792aba/crates/ruff_python_parser/src/parser/statement.rs#L3176-L3179
+        let parameters_by_start = parameters
+            .iter()
+            .sorted_by_key(|parameter| parameter.start());
+
+        for any_param in parameters_by_start {
             let parameter = any_param.as_parameter();
 
             let token_type = match any_param {
@@ -509,6 +523,10 @@ impl<'db> SemanticTokenVisitor<'db> {
             // Handle parameter type annotations
             if let Some(annotation) = &parameter.annotation {
                 self.visit_annotation(annotation);
+            }
+
+            if let Some(default) = any_param.default() {
+                self.visit_expr(default);
             }
         }
     }
@@ -2253,6 +2271,27 @@ class C:
         "test" @ 144..148: Variable
         "self" @ 159..163: Parameter
         "x" @ 164..165: Variable
+        "#);
+    }
+
+    /// Regression test for https://github.com/astral-sh/ty/issues/1406
+    #[test]
+    fn test_invalid_kwargs() {
+        let test = cursor_test(
+            r#"
+def foo(self, **<CURSOR>key, value=10):
+    return
+"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "foo" @ 5..8: Function [definition]
+        "self" @ 9..13: Parameter
+        "key" @ 17..20: Parameter
+        "value" @ 22..27: Parameter
+        "10" @ 28..30: Number
         "#);
     }
 }
