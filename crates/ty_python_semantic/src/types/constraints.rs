@@ -1216,45 +1216,45 @@ impl<'db> ConstraintAssignment<'db> {
 
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
         match (self, other) {
-            // For two positive constraints, one range has to fully contain the other; the larger
-            // constraint implies the smaller.
+            // For two positive constraints, one range has to fully contain the other; the smaller
+            // constraint implies the larger.
             //
-            //     ....|-----self------|....
-            //     ......|---other---|......
+            //     ....|----other-----|....
+            //     ......|---self---|......
             (
                 ConstraintAssignment::Positive(self_constraint),
                 ConstraintAssignment::Positive(other_constraint),
             ) => self_constraint.implies(db, other_constraint),
 
             // For two negative constraints, one range has to fully contain the other; the ranges
-            // represent "holes", though, so the constraint with the smaller range implies the one
-            // with the larger.
+            // represent "holes", though, so the constraint with the larger range implies the one
+            // with the smaller.
             //
-            //     |-----|...self....|-----|
-            //     |---|.....other.....|---|
+            //     |-----|...other...|-----|
+            //     |---|.....self......|---|
             (
                 ConstraintAssignment::Negative(self_constraint),
                 ConstraintAssignment::Negative(other_constraint),
             ) => other_constraint.implies(db, self_constraint),
 
             // For a positive and negative constraint, the ranges have to be disjoint, and the
-            // negative range implies the positive range.
+            // positive range implies the negative range.
             //
             //     |---------------|...self...|---|
             //     ..|---other---|................|
             (
-                ConstraintAssignment::Negative(self_constraint),
-                ConstraintAssignment::Positive(other_constraint),
+                ConstraintAssignment::Positive(self_constraint),
+                ConstraintAssignment::Negative(other_constraint),
             ) => self_constraint.intersect(db, other_constraint).is_none(),
 
-            // It's theoretically possible for a positive constraint to imply a negative constraint
+            // It's theoretically possible for a negative constraint to imply a positive constraint
             // if the positive constraint is always satisfied (`Never ≤ T ≤ object`). But we never
-            // create constraints of that form, so with our representation, a positive constraint
-            // can never imply a negative constraint.
+            // create constraints of that form, so with our representation, a negative constraint
+            // can never imply a positive constraint.
             //
-            //     |-------self--------|
-            //     |---|...other...|---|
-            (ConstraintAssignment::Positive(_), ConstraintAssignment::Negative(_)) => false,
+            //     |------other-------|
+            //     |---|...self...|---|
+            (ConstraintAssignment::Negative(_), ConstraintAssignment::Positive(_)) => false,
         }
     }
 
@@ -1326,9 +1326,9 @@ impl<'db> SatisfiedClause<'db> {
         false
     }
 
-    /// Simplifies this clause by removing constraints that imply other constraints in the clause.
-    /// (Clauses are the intersection of constraints, so if two clauses are redundant, we want to
-    /// remove the larger one and keep the smaller one.)
+    /// Simplifies this clause by removing constraints that are implied by other constraints in the
+    /// clause. (Clauses are the intersection of constraints, so if two clauses are redundant, we
+    /// want to remove the larger one and keep the smaller one.)
     fn simplify(&mut self, db: &'db dyn Db) -> bool {
         let mut changes_made = false;
         let mut i = 0;
