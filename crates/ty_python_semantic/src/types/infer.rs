@@ -62,7 +62,7 @@ mod builder;
 mod tests;
 
 /// How many fixpoint iterations to allow before falling back to Divergent type.
-const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
+const ITERATIONS_BEFORE_FALLBACK: u32 = 20;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -567,7 +567,7 @@ impl<'db> CycleRecovery<'db> {
     fn fallback_type(self) -> Type<'db> {
         match self {
             Self::Initial => Type::Never,
-            Self::Divergent(scope) => Type::divergent(scope),
+            Self::Divergent(scope) => Type::divergent(Some(scope)),
         }
     }
 }

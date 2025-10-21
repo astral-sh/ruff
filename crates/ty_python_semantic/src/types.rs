@@ -827,7 +827,7 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn divergent(scope: Option<ScopeId<'db>>) -> Self {
         Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
     }
 
@@ -7646,7 +7646,7 @@ impl<'db> KnownInstanceType<'db> {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct DivergentType<'db> {
     /// The scope where this divergence was detected.
-    scope: ScopeId<'db>,
+    scope: Option<ScopeId<'db>>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
@@ -11751,7 +11751,7 @@ pub(crate) mod tests {
         let file_scope_id = FileScopeId::global();
         let scope = file_scope_id.to_scope_id(&db, file);
 
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope }));
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope: Some(scope) }));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.

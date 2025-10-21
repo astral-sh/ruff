@@ -2576,13 +2576,11 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ## Divergent inferred implicit instance attribute types
 
 ```py
-# TODO: This test currently panics, see https://github.com/astral-sh/ty/issues/837
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x, 1)
 
-# class C:
-#    def f(self, other: "C"):
-#        self.x = (other.x, 1)
-#
-# reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

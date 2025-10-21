@@ -5968,7 +5968,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut annotated_elt_tys = annotated_tuple.as_ref().map(Tuple::all_elements);
 
         let db = self.db();
-        let divergent = Type::divergent(self.scope());
+        let divergent = Type::divergent(Some(self.scope()));
         let element_types = elts.iter().map(|element| {
             let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
             let element_type = self.infer_expression(element, TypeContext::new(annotated_elt_ty));

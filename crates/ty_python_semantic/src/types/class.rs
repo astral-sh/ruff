@@ -30,7 +30,9 @@ use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
-use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{
+    MAX_SPECIALIZATION_DEPTH, NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
@@ -1609,19 +1611,6 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> ClassType<'db> {
-        // To prevent infinite recursion during type inference for infinite types, we fall back to
-        // `C[Divergent]` once a certain amount of levels of specialization have occurred. For
-        // example:
-        //
-        // ```py
-        // x = 1
-        // while random_bool():
-        //     x = [x]
-        //
-        // reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
-        // ```
-        const MAX_SPECIALIZATION_DEPTH: usize = 10;
-
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
@@ -1629,11 +1618,8 @@ impl<'db> ClassLiteral<'db> {
 
                 for (idx, ty) in specialization.types(db).iter().enumerate() {
                     if specialization_depth(db, *ty) > MAX_SPECIALIZATION_DEPTH {
-                        specialization = specialization.with_replaced_type(
-                            db,
-                            idx,
-                            Type::divergent(self.body_scope(db)),
-                        );
+                        specialization =
+                            specialization.with_replaced_type(db, idx, Type::divergent(None));
                     }
                 }
 

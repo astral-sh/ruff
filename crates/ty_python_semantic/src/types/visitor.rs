@@ -301,6 +301,19 @@ pub(super) fn any_over_type<'db>(
     visitor.found_matching_type.get()
 }
 
+// To prevent infinite recursion during type inference for infinite types, we fall back to
+// `C[Divergent]` once a certain amount of levels of specialization have occurred. For
+// example:
+//
+// ```py
+// x = 1
+// while random_bool():
+//     x = [x]
+//
+// reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
+// ```
+pub(super) const MAX_SPECIALIZATION_DEPTH: usize = 10;
+
 /// Returns the maximum number of layers of generic specializations for a given type.
 ///
 /// For example, `int` has a depth of `0`, `list[int]` has a depth of `1`, and `list[set[int]]`

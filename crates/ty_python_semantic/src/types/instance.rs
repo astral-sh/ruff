@@ -12,10 +12,11 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::visitor::MAX_SPECIALIZATION_DEPTH;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    TypeMapping, TypeRelation, VarianceInferable, specialization_depth,
 };
 use crate::{Db, FxOrderSet};
 
@@ -72,7 +73,13 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements.into_iter().map(Into::into),
+            elements.into_iter().map(Into::into).map(|ty| {
+                if specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH {
+                    Type::divergent(None)
+                } else {
+                    ty
+                }
+            }),
         ))
     }
 
