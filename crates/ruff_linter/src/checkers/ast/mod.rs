@@ -1561,6 +1561,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 2: Traversal
+        let mut added_dunder_class_scope = false;
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt,
@@ -1632,6 +1633,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic
                         .current_scope_mut()
                         .add("__class__", binding_id);
+                    added_dunder_class_scope = true;
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
@@ -2069,10 +2071,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.analyze.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope(); // Lambda/Generator/Comprehension scope
                 // Also pop the DunderClassCell scope if it exists
-                if matches!(
-                    self.semantic.current_scope().kind,
-                    ScopeKind::DunderClassCell
-                ) {
+                if added_dunder_class_scope {
                     self.semantic.pop_scope();
                 }
             }
