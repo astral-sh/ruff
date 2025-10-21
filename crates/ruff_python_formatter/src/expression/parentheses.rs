@@ -70,6 +70,10 @@ pub(crate) enum Parenthesize {
     /// when outer parentheses are present.
     IfBreaksParenthesizedNested,
 
+    /// Parenthesize the expression if it doesn't fit on a line or if the expression is
+    /// parenthesized in the source code. This is similar to `Self::Optional` except that this
+    /// variant will also include parentheses in nested calls, like
+    /// `Self::IfBreaksParenthesizedNested`.
     IfBreaksComprehension,
 }
 
