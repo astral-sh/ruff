@@ -1451,7 +1451,8 @@ def frob(): ...
         ");
     }
 
-    /// Regression test for https://github.com/astral-sh/ty/issues/1392
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1392>
+    ///
     /// This test ensures completions work when the cursor is at the
     /// start of a zero-length token.
     #[test]
