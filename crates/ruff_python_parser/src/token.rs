@@ -486,7 +486,7 @@ impl TokenKind {
     ///
     /// [`as_unary_operator`]: TokenKind::as_unary_operator
     #[inline]
-    pub(crate) const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
+    pub const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
         Some(match self {
             TokenKind::Plus => UnaryOp::UAdd,
             TokenKind::Minus => UnaryOp::USub,
@@ -514,7 +514,7 @@ impl TokenKind {
     /// Returns the [`BoolOp`] that corresponds to this token kind, if it is a boolean operator,
     /// otherwise return [None].
     #[inline]
-    pub(crate) const fn as_bool_operator(self) -> Option<BoolOp> {
+    pub const fn as_bool_operator(self) -> Option<BoolOp> {
         Some(match self {
             TokenKind::And => BoolOp::And,
             TokenKind::Or => BoolOp::Or,
@@ -550,7 +550,7 @@ impl TokenKind {
     /// Returns the [`Operator`] that corresponds to this token kind, if it is
     /// an augmented assignment operator, or [`None`] otherwise.
     #[inline]
-    pub(crate) const fn as_augmented_assign_operator(self) -> Option<Operator> {
+    pub const fn as_augmented_assign_operator(self) -> Option<Operator> {
         Some(match self {
             TokenKind::PlusEqual => Operator::Add,
             TokenKind::MinusEqual => Operator::Sub,
