@@ -1,3 +1,4 @@
+# ruff: noqa: PYI021
 import sys
 from collections.abc import Iterable
 from enum import Enum
@@ -58,12 +59,39 @@ def negated_range_constraint(
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been
 # standardized yet (https://peps.python.org/pep-0747).
-def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_subtype_of(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_assignable_to(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_singleton(ty: Any) -> bool: ...
-def is_single_valued(ty: Any) -> bool: ...
+def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint that is satisfied when `type_a` and `type_b` are
+    `equivalent`_ types.
+
+    .. _equivalent: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
+    """
+
+def is_subtype_of(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint that is satisfied when `type_a` is a `subtype`_ of `type_b`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_assignable_to(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint that is satisfied when `type_a` is `assignable`_ to `type_b`.
+
+    .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    """
+
+def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint that is satisfied when `type_a` and `type_b` are disjoint types.
+
+    Two types are disjoint if they have no inhabitants in common.
+    """
+
+def is_singleton(ty: Any) -> bool:
+    """Returns `True` if `ty` is a singleton type.
+
+    A singleton type has exactly one inhabitant (one possible value).
+    """
+
+def is_single_valued(ty: Any) -> bool:
+    """Returns `True` if all inhabitants of `ty` compare equal to each other."""
 
 # Returns the generic context of a type as a tuple of typevars, or `None` if the
 # type is not generic.
