@@ -1708,7 +1708,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
+                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1721,8 +1721,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints =
-                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
+                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,

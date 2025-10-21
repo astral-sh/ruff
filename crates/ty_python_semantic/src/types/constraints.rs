@@ -65,7 +65,9 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
-use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, TypeRelation, UnionType};
+use crate::types::{
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType,
+};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -244,20 +246,87 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
-        Self {
-            node: ConstrainedTypeVar::new_node(db, lower, typevar, upper),
-        }
+
+        // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
+        // typevars, we have to ensure that the bounds are "earlier" according to that order than
+        // the typevar being constrained.
+        //
+        // In the comments below, we use brackets to indicate which typevar is "larger", and
+        // therefore the typevar that the constraint applies to.
+        let node = match (lower, upper) {
+            // A ≤ T ≤ A == (T ≤ [A] ≤ T)
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
+                let (bound, typevar) = if lower < typevar {
+                    (lower, typevar)
+                } else {
+                    (typevar, lower)
+                };
+                ConstrainedTypeVar::new_node(
+                    db,
+                    Type::TypeVar(bound),
+                    typevar.identity(db),
+                    Type::TypeVar(bound),
+                )
+            }
+
+            // A ≤ T ≤ B == ([A] ≤ T) && (T ≤ [B])
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
+                let lower = ConstrainedTypeVar::new_node(
+                    db,
+                    Type::Never,
+                    lower.identity(db),
+                    Type::TypeVar(typevar),
+                );
+                let upper = ConstrainedTypeVar::new_node(
+                    db,
+                    Type::TypeVar(typevar),
+                    upper.identity(db),
+                    Type::object(),
+                );
+                lower.and(db, upper)
+            }
+
+            // A ≤ T ≤ B == ([A] ≤ T) && ([T] ≤ B)
+            (Type::TypeVar(lower), _) if lower > typevar => {
+                let lower = ConstrainedTypeVar::new_node(
+                    db,
+                    Type::Never,
+                    lower.identity(db),
+                    Type::TypeVar(typevar),
+                );
+                let upper =
+                    ConstrainedTypeVar::new_node(db, Type::Never, typevar.identity(db), upper);
+                lower.and(db, upper)
+            }
+
+            // A ≤ T ≤ B == (A ≤ [T]) && (T ≤ [B])
+            (_, Type::TypeVar(upper)) if upper > typevar => {
+                let lower =
+                    ConstrainedTypeVar::new_node(db, lower, typevar.identity(db), Type::object());
+                let upper = ConstrainedTypeVar::new_node(
+                    db,
+                    Type::TypeVar(typevar),
+                    upper.identity(db),
+                    Type::object(),
+                );
+                lower.and(db, upper)
+            }
+
+            _ => ConstrainedTypeVar::new_node(db, lower, typevar.identity(db), upper),
+        };
+
+        Self { node }
     }
 
     pub(crate) fn negated_range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         Self::range(db, lower, typevar, upper).negate(db)
