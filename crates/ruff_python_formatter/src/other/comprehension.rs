@@ -1,12 +1,12 @@
 use ruff_formatter::{Buffer, FormatResult, format_args, write};
-use ruff_python_ast::{self as ast, Comprehension, Expr};
+use ruff_python_ast::{Comprehension, Expr};
 use ruff_python_trivia::{SimpleTokenKind, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parenthesize, is_expression_parenthesized};
+use crate::expression::{OwnParentheses, has_own_parentheses, maybe_parenthesize_expression};
 use crate::prelude::*;
 use crate::preview::is_wrap_comprehension_in_enabled;
 
@@ -109,20 +109,14 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             ]
         )?;
 
-        if is_wrap_comprehension_in_enabled(f.context()) {
+        if is_wrap_comprehension_in_enabled(f.context())
+            && has_own_parentheses(iter, f.context()).is_none_or(OwnParentheses::is_empty)
+        {
             write!(
                 f,
                 [
                     space(),
-                    maybe_parenthesize_expression(
-                        iter,
-                        item,
-                        if needs_nested_parentheses(iter) {
-                            Parenthesize::IfBreaksParenthesizedNested
-                        } else {
-                            Parenthesize::IfBreaks
-                        }
-                    )
+                    maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaksComprehension)
                 ]
             )?;
         } else {
@@ -190,70 +184,5 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
                 .fmt(f),
             other => other.format().fmt(f),
         }
-    }
-}
-
-/// Returns `true` if the expression needs additional parentheses when used as the `in` clause of a
-/// comprehension.
-///
-/// For example, we need to parenthesize a long attribute expression:
-///
-/// ```python
-/// [
-///     a
-///     for graph_path_expression in (
-///         refined_constraint.condition_as_predicate.variables
-///     )
-/// ]
-/// ```
-///
-/// but avoid adding additional parentheses to a set or other collection:
-///
-/// ```python
-/// [
-///     x
-///     for x in {  # _not_ `({`
-///         x
-///         for x in "long line long line long line long line long line long line long line"
-///     }
-/// ]
-/// ```
-fn needs_nested_parentheses(expr: &Expr) -> bool {
-    match expr {
-        Expr::Tuple(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_) => false,
-
-        Expr::Starred(ast::ExprStarred { value, .. }) => needs_nested_parentheses(value),
-
-        Expr::BoolOp(_)
-        | Expr::Named(_)
-        | Expr::BinOp(_)
-        | Expr::UnaryOp(_)
-        | Expr::Lambda(_)
-        | Expr::If(_)
-        | Expr::Generator(_)
-        | Expr::Await(_)
-        | Expr::Yield(_)
-        | Expr::YieldFrom(_)
-        | Expr::Compare(_)
-        | Expr::Call(_)
-        | Expr::Attribute(_)
-        | Expr::Subscript(_)
-        | Expr::Name(_)
-        | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::FString(_)
-        | Expr::TString(_)
-        | Expr::EllipsisLiteral(_) => true,
     }
 }

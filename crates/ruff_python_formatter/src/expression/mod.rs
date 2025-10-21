@@ -387,7 +387,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
             // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
             // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
-            _ if f.context().node_level().is_parenthesized() => {
+            _ if f.context().node_level().is_parenthesized()
+                && !matches!(parenthesize, Parenthesize::IfBreaksComprehension) =>
+            {
                 return if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .with_indent(!is_expression_huggable(expression, f.context()))
@@ -408,7 +410,8 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 Parenthesize::Optional
                 | Parenthesize::IfBreaks
                 | Parenthesize::IfBreaksParenthesized
-                | Parenthesize::IfBreaksParenthesizedNested => {
+                | Parenthesize::IfBreaksParenthesizedNested
+                | Parenthesize::IfBreaksComprehension => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
@@ -417,7 +420,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
+                Parenthesize::IfBreaksParenthesized
+                | Parenthesize::IfBreaksParenthesizedNested
+                | Parenthesize::IfBreaksComprehension => {
                     // Can-omit layout is relevant for `"abcd".call`. We don't want to add unnecessary
                     // parentheses in this case.
                     if can_omit_optional_parentheses(expression, f.context()) {
@@ -448,7 +453,8 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 | Parenthesize::IfBreaks
                 | Parenthesize::IfRequired
                 | Parenthesize::IfBreaksParenthesized
-                | Parenthesize::IfBreaksParenthesizedNested => unparenthesized.fmt(f),
+                | Parenthesize::IfBreaksParenthesizedNested
+                | Parenthesize::IfBreaksComprehension => unparenthesized.fmt(f),
             },
 
             OptionalParentheses::Always => {
@@ -988,6 +994,10 @@ pub(crate) enum OwnParentheses {
 impl OwnParentheses {
     const fn is_non_empty(self) -> bool {
         matches!(self, OwnParentheses::NonEmpty)
+    }
+
+    pub(crate) const fn is_empty(self) -> bool {
+        matches!(self, OwnParentheses::Empty)
     }
 }
 

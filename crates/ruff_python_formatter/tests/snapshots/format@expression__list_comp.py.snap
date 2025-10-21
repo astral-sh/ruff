@@ -409,22 +409,7 @@ y = [
      if fffffffffffffffffffffffffffffffffffffffffff
      < gggggggggggggggggggggggggggggggggggggggggggggg
      < hhhhhhhhhhhhhhhhhhhhhhhhhh
-@@ -112,9 +115,11 @@
- 
- [
-     f(x, y)
--    for head_name in f(
--        x,
--        y,
-+    for head_name in (
-+        f(
-+            x,
-+            y,
-+        )
-     )
-     if head_name
- ]
-@@ -130,13 +135,15 @@
+@@ -130,13 +133,15 @@
  
  [
      1
@@ -443,7 +428,7 @@ y = [
  
  
  # Leading expression comments:
-@@ -186,9 +193,10 @@
+@@ -186,9 +191,10 @@
      a
      for
      # comment

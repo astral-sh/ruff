@@ -689,17 +689,6 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -255,8 +255,8 @@
-     ...     def by_first_letter_of_column_values(self, col: str) -> list[pl.DataFrame]:
-     ...         return [
-     ...             self._df.filter(pl.col(col).str.starts_with(c))
--    ...             for c in sorted(
--    ...                 set(df.select(pl.col(col).str.slice(0, 1)).to_series())
-+    ...             for c in (
-+    ...                 sorted(set(df.select(pl.col(col).str.slice(0, 1)).to_series()))
-     ...             )
-     ...         ]
-     """
 @@ -270,9 +270,11 @@
  
          Examples
@@ -1817,17 +1806,6 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -255,8 +255,8 @@
- 	...     def by_first_letter_of_column_values(self, col: str) -> list[pl.DataFrame]:
- 	...         return [
- 	...             self._df.filter(pl.col(col).str.starts_with(c))
--	...             for c in sorted(
--	...                 set(df.select(pl.col(col).str.slice(0, 1)).to_series())
-+	...             for c in (
-+	...                 sorted(set(df.select(pl.col(col).str.slice(0, 1)).to_series()))
- 	...             )
- 	...         ]
- 	"""
 @@ -270,9 +270,11 @@
  
  		Examples
@@ -2936,28 +2914,7 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -681,11 +681,15 @@
- 	...         ) -> list[pl.DataFrame]:
- 	...                 return [
- 	...                         self._df.filter(pl.col(col).str.starts_with(c))
--	...                         for c in sorted(
--	...                                 set(
--	...                                         df.select(
--	...                                                 pl.col(col).str.slice(0, 1)
--	...                                         ).to_series()
-+	...                         for c in (
-+	...                                 sorted(
-+	...                                         set(
-+	...                                                 df.select(
-+	...                                                         pl.col(
-+	...                                                                 col
-+	...                                                         ).str.slice(0, 1)
-+	...                                                 ).to_series()
-+	...                                         )
- 	...                                 )
- 	...                         )
- 	...                 ]
-@@ -700,9 +704,11 @@
+@@ -700,9 +700,11 @@
  
  		Examples
  		--------
@@ -2972,7 +2929,7 @@ def length_rst_in_section():
  		"""
  
  
-@@ -730,30 +736,28 @@
+@@ -730,30 +732,28 @@
  	    Integer length of the list of numbers.
  
  	Example:
@@ -3025,7 +2982,7 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -768,30 +772,28 @@
+@@ -768,30 +768,28 @@
  	        Integer length of the list of numbers.
  
  	Example:
@@ -3078,7 +3035,7 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -809,31 +811,29 @@
+@@ -809,31 +807,29 @@
  	Example:
  
  	    ```
@@ -3133,7 +3090,7 @@ def length_rst_in_section():
  	    ```
  	"""
  
-@@ -843,31 +843,29 @@
+@@ -843,31 +839,29 @@
  	"""
  	Do cool stuff::
  
@@ -3188,7 +3145,7 @@ def length_rst_in_section():
  	"""
  	pass
  
-@@ -878,29 +876,27 @@
+@@ -878,29 +872,27 @@
  	Examples:
  	    Do cool stuff::
  

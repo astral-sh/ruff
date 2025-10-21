@@ -69,6 +69,8 @@ pub(crate) enum Parenthesize {
     /// [`maybe_parenthesized_expression`] calls unlike other layouts that always omit parentheses
     /// when outer parentheses are present.
     IfBreaksParenthesizedNested,
+
+    IfBreaksComprehension,
 }
 
 impl Parenthesize {
