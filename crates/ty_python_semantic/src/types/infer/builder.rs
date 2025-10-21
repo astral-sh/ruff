@@ -6508,7 +6508,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6521,7 +6522,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6538,7 +6540,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::keyword_only(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -8213,80 +8216,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
                 op,
-            ) => {
-                // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
-                // the Python spec [1] is:
-                //
-                //   - If rhs is a (proper) subclass of lhs, and it provides a different
-                //     implementation of __rop__, use that.
-                //   - Otherwise, if lhs implements __op__, use that.
-                //   - Otherwise, if lhs and rhs are different types, and rhs implements __rop__,
-                //     use that.
-                //
-                // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
-
-                // Technically we don't have to check left_ty != right_ty here, since if the types
-                // are the same, they will trivially have the same implementation of the reflected
-                // dunder, and so we'll fail the inner check. But the type equality check will be
-                // faster for the common case, and allow us to skip the (two) class member lookups.
-                let left_class = left_ty.to_meta_type(self.db());
-                let right_class = right_ty.to_meta_type(self.db());
-                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
-                    let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right_class.member(self.db(), reflected_dunder).place;
-                    // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
-                    // Bindings together
-                    if !rhs_reflected.is_undefined()
-                        && rhs_reflected != left_class.member(self.db(), reflected_dunder).place
-                    {
-                        return right_ty
-                            .try_call_dunder(
-                                self.db(),
-                                reflected_dunder,
-                                CallArguments::positional([left_ty]),
-                                TypeContext::default(),
-                            )
-                            .map(|outcome| outcome.return_type(self.db()))
-                            .or_else(|_| {
-                                left_ty
-                                    .try_call_dunder(
-                                        self.db(),
-                                        op.dunder(),
-                                        CallArguments::positional([right_ty]),
-                                        TypeContext::default(),
-                                    )
-                                    .map(|outcome| outcome.return_type(self.db()))
-                            })
-                            .ok();
-                    }
-                }
-
-                let call_on_left_instance = left_ty
-                    .try_call_dunder(
-                        self.db(),
-                        op.dunder(),
-                        CallArguments::positional([right_ty]),
-                        TypeContext::default(),
-                    )
-                    .map(|outcome| outcome.return_type(self.db()))
-                    .ok();
-
-                call_on_left_instance.or_else(|| {
-                    if left_ty == right_ty {
-                        None
-                    } else {
-                        right_ty
-                            .try_call_dunder(
-                                self.db(),
-                                op.reflected_dunder(),
-                                CallArguments::positional([left_ty]),
-                                TypeContext::default(),
-                            )
-                            .map(|outcome| outcome.return_type(self.db()))
-                            .ok()
-                    }
-                })
-            }
+            ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
+                .map(|outcome| outcome.return_type(self.db()))
+                .ok(),
         }
     }
 

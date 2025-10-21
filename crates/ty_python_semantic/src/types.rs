@@ -6678,6 +6678,7 @@ impl<'db> Type<'db> {
                     }
                 }
                 TypeMapping::PromoteLiterals
+                    | TypeMapping::ReplaceParameterDefaults
                     | TypeMapping::BindLegacyTypevars(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
                 Type::TypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
@@ -6693,7 +6694,8 @@ impl<'db> Type<'db> {
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) => self,
+                TypeMapping::Materialize(_) |
+                TypeMapping::ReplaceParameterDefaults => self,
             }
 
             Type::FunctionLiteral(function) => {
@@ -6807,7 +6809,8 @@ impl<'db> Type<'db> {
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) => self,
+                TypeMapping::Materialize(_) |
+                TypeMapping::ReplaceParameterDefaults => self,
                 TypeMapping::PromoteLiterals => self.promote_literals_impl(db, tcx)
             }
 
@@ -6817,7 +6820,8 @@ impl<'db> Type<'db> {
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::PromoteLiterals => self,
+                TypeMapping::PromoteLiterals |
+                TypeMapping::ReplaceParameterDefaults => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -6991,6 +6995,15 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::TypedDict(_) => {}
         }
+    }
+
+    /// Replace default types in parameters of callables with `Unknown`.
+    pub(crate) fn replace_parameter_defaults(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceParameterDefaults,
+            TypeContext::default(),
+        )
     }
 
     /// Return the string representation of this type when converted to string as it would be
@@ -7369,6 +7382,9 @@ pub enum TypeMapping<'a, 'db> {
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
+    /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
+    /// recursion when the type of the default value of a parameter depends on the callable itself.
+    ReplaceParameterDefaults,
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -7383,7 +7399,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::PartialSpecialization(_)
             | TypeMapping::PromoteLiterals
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::Materialize(_) => context,
+            | TypeMapping::Materialize(_)
+            | TypeMapping::ReplaceParameterDefaults => context,
             TypeMapping::BindSelf(_) => GenericContext::from_typevar_instances(
                 db,
                 context
@@ -9968,6 +9985,14 @@ impl<'db> BoundMethodType<'db> {
             self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
         }
         self_instance
+    }
+
+    pub(crate) fn map_self_type(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> Self {
+        Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
     #[salsa::tracked(cycle_fn=into_callable_type_cycle_recover, cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
