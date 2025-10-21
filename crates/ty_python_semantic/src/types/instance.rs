@@ -72,11 +72,11 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements.into_iter().map(Into::into).map(|ty| {
-                if exceeds_max_specialization_depth(db, ty) {
+            elements.into_iter().map(Into::into).map(|element| {
+                if exceeds_max_specialization_depth(db, element) {
                     Type::divergent()
                 } else {
-                    ty
+                    element
                 }
             }),
         ))

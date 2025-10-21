@@ -388,62 +388,62 @@ mod tests {
     fn test_generics_layering_depth() {
         let db = setup_db();
 
-        let list_of_int =
-            KnownClass::List.to_specialized_instance(&db, [KnownClass::Int.to_instance(&db)]);
+        let int = || KnownClass::Int.to_instance(&db);
+        let list = |element| KnownClass::List.to_specialized_instance(&db, [element]);
+        let dict = |key, value| KnownClass::Dict.to_specialized_instance(&db, [key, value]);
+        let set = |element| KnownClass::Set.to_specialized_instance(&db, [element]);
+        let str = || KnownClass::Str.to_instance(&db);
+        let bytes = || KnownClass::Bytes.to_instance(&db);
+
+        let list_of_int = list(int());
         assert_eq!(specialization_depth(&db, list_of_int), 1);
 
-        let list_of_list_of_int = KnownClass::List.to_specialized_instance(&db, [list_of_int]);
+        let list_of_list_of_int = list(list_of_int);
         assert_eq!(specialization_depth(&db, list_of_list_of_int), 2);
 
-        let list_of_list_of_list_of_int =
-            KnownClass::List.to_specialized_instance(&db, [list_of_list_of_int]);
+        let list_of_list_of_list_of_int = list(list_of_list_of_int);
         assert_eq!(specialization_depth(&db, list_of_list_of_list_of_int), 3);
 
-        let set_of_dict_of_str_and_list_of_int = KnownClass::Set.to_specialized_instance(
-            &db,
-            [KnownClass::Dict
-                .to_specialized_instance(&db, [KnownClass::Str.to_instance(&db), list_of_int])],
-        );
+        assert_eq!(specialization_depth(&db, set(dict(str(), list_of_int))), 3);
+
         assert_eq!(
-            specialization_depth(&db, set_of_dict_of_str_and_list_of_int),
+            specialization_depth(
+                &db,
+                UnionType::from_elements(&db, [list_of_list_of_list_of_int, list_of_list_of_int])
+            ),
             3
         );
 
-        let union_type_1 =
-            UnionType::from_elements(&db, [list_of_list_of_list_of_int, list_of_list_of_int]);
-        assert_eq!(specialization_depth(&db, union_type_1), 3);
-
-        let union_type_2 =
-            UnionType::from_elements(&db, [list_of_list_of_int, list_of_list_of_list_of_int]);
-        assert_eq!(specialization_depth(&db, union_type_2), 3);
-
-        let tuple_of_tuple_of_int = Type::heterogeneous_tuple(
-            &db,
-            [Type::heterogeneous_tuple(
+        assert_eq!(
+            specialization_depth(
                 &db,
-                [KnownClass::Int.to_instance(&db)],
-            )],
+                UnionType::from_elements(&db, [list_of_list_of_int, list_of_list_of_list_of_int])
+            ),
+            3
         );
-        assert_eq!(specialization_depth(&db, tuple_of_tuple_of_int), 2);
 
-        let tuple_of_list_of_int_and_str = KnownClass::Tuple
-            .to_specialized_instance(&db, [list_of_int, KnownClass::Str.to_instance(&db)]);
-        assert_eq!(specialization_depth(&db, tuple_of_list_of_int_and_str), 1);
-
-        let list_of_union_of_lists = KnownClass::List.to_specialized_instance(
-            &db,
-            [UnionType::from_elements(
+        assert_eq!(
+            specialization_depth(
                 &db,
-                [
-                    KnownClass::List
-                        .to_specialized_instance(&db, [KnownClass::Int.to_instance(&db)]),
-                    KnownClass::List
-                        .to_specialized_instance(&db, [KnownClass::Str.to_instance(&db)]),
-                    KnownClass::List
-                        .to_specialized_instance(&db, [KnownClass::Bytes.to_instance(&db)]),
-                ],
-            )],
+                Type::heterogeneous_tuple(&db, [Type::heterogeneous_tuple(&db, [int()])])
+            ),
+            2
         );
-        assert_eq!(specialization_depth(&db, list_of_union_of_lists), 2);
+
+        assert_eq!(
+            specialization_depth(&db, Type::heterogeneous_tuple(&db, [list_of_int, str()])),
+            2
+        );
+
+        assert_eq!(
+            specialization_depth(
+                &db,
+                list(UnionType::from_elements(
+                    &db,
+                    [list(int()), list(str()), list(bytes())]
+                ))
+            ),
+            2
+        );
     }
 }

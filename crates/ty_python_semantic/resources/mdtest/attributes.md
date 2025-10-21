@@ -2617,6 +2617,19 @@ class D:
 reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
+And it also works for homogeneous tuples:
+
+```py
+def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
+    return (x, x)
+
+class E:
+    def f(self, other: "E"):
+        self.x = make_homogeneous_tuple(other.x)
+
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, ...]
+```
+
 ## Attributes of standard library modules that aren't yet defined
 
 For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
