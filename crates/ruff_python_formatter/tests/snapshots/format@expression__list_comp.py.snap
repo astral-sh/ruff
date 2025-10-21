@@ -409,7 +409,7 @@ y = [
      if fffffffffffffffffffffffffffffffffffffffffff
      < gggggggggggggggggggggggggggggggggggggggggggggg
      < hhhhhhhhhhhhhhhhhhhhhhhhhh
-@@ -130,13 +133,15 @@
+@@ -130,8 +133,10 @@
  
  [
      1
@@ -422,12 +422,6 @@ y = [
  ]
  
  # Parenthesized targets and iterators.
- [x for (x) in y]
--[x for x in (y)]
-+[x for x in y]
- 
- 
- # Leading expression comments:
 @@ -186,9 +191,10 @@
      a
      for

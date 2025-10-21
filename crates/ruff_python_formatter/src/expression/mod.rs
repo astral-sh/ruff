@@ -359,12 +359,14 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             parenthesize,
         } = self;
 
-        let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized(
-                (*expression).into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            );
+        let preserve_parentheses = matches!(
+            parenthesize,
+            Parenthesize::Optional | Parenthesize::IfBreaksComprehension
+        ) && is_expression_parenthesized(
+            (*expression).into(),
+            f.context().comments().ranges(),
+            f.context().source(),
+        );
 
         // If we want to preserve parentheses, short-circuit.
         if preserve_parentheses {

@@ -92,6 +92,13 @@ dict_with_really_long_names = {
          for y in (
              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
          )
+@@ -84,5 +86,5 @@
+ }
+ {
+     key_with_super_really_long_name: key_with_super_really_long_name
+-    for key in dictionary
++    for key in (dictionary)
+ }
 ```
 
 ## Ruff Output
@@ -185,7 +192,7 @@ dict_with_really_long_names = {
 }
 {
     key_with_super_really_long_name: key_with_super_really_long_name
-    for key in dictionary
+    for key in (dictionary)
 }
 ```
 

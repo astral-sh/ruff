@@ -73,12 +73,6 @@ pub(crate) enum Parenthesize {
     IfBreaksComprehension,
 }
 
-impl Parenthesize {
-    pub(crate) const fn is_optional(self) -> bool {
-        matches!(self, Parenthesize::Optional)
-    }
-}
-
 /// Whether it is necessary to add parentheses around an expression.
 /// This is different from [`Parenthesize`] in that it is the resolved representation: It takes into account
 /// whether there are parentheses in the source code or not.

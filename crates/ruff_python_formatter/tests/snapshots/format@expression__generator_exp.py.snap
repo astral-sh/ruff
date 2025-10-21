@@ -159,23 +159,3 @@ tuple(
     )
 )
 ```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -11,10 +11,10 @@
- f((1 for _ in a))
- 
- # make sure source parenthesis detection isn't fooled by these
--f((1) for _ in (a))
-+f((1) for _ in a)
- 
- # combination of the two above
--f(((1) for _ in (a)))
-+f(((1) for _ in a))
- 
- bases = tuple(
-     (base._meta.label_lower if hasattr(base, "_meta") else base)
-```
