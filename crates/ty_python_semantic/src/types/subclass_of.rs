@@ -1,12 +1,13 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::ConstraintSet;
+use crate::types::generics::InferableTypeVars;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
-    TypeRelation,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
+    TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -84,6 +85,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.subclass_of {
@@ -91,6 +93,7 @@ impl<'db> SubclassOfType<'db> {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
                     db,
                     type_mapping,
+                    tcx,
                     visitor,
                 )),
             }),
@@ -133,12 +136,14 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(relation.is_assignability())
+                ConstraintSet::from(!relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
                 ConstraintSet::from(other_class.is_object(db) || relation.is_assignability())
@@ -150,9 +155,15 @@ impl<'db> SubclassOfType<'db> {
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
-            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to_impl(db, other_class, relation, visitor)
-            }
+            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => self_class
+                .has_relation_to_impl(
+                    db,
+                    other_class,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
         }
     }
 
@@ -163,6 +174,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {

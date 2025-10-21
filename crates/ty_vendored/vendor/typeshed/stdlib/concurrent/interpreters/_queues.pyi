@@ -71,60 +71,74 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
         def empty(self) -> bool: ...
         def full(self) -> bool: ...
         def qsize(self) -> int: ...
-        def put(
-            self,
-            obj: object,
-            timeout: SupportsIndex | None = None,
-            *,
-            unbounditems: _AnyUnbound | None = None,
-            _delay: float = 0.01,
-        ) -> None:
-            """Add the object to the queue.
+        if sys.version_info >= (3, 14):
+            def put(
+                self,
+                obj: object,
+                block: bool = True,
+                timeout: SupportsIndex | None = None,
+                *,
+                unbounditems: _AnyUnbound | None = None,
+                _delay: float = 0.01,
+            ) -> None:
+                """Add the object to the queue.
 
-            This blocks while the queue is full.
+                If "block" is true, this blocks while the queue is full.
 
-            For most objects, the object received through Queue.get() will
-            be a new one, equivalent to the original and not sharing any
-            actual underlying data.  The notable exceptions include
-            cross-interpreter types (like Queue) and memoryview, where the
-            underlying data is actually shared.  Furthermore, some types
-            can be sent through a queue more efficiently than others.  This
-            group includes various immutable types like int, str, bytes, and
-            tuple (if the items are likewise efficiently shareable).  See interpreters.is_shareable().
+                For most objects, the object received through Queue.get() will
+                be a new one, equivalent to the original and not sharing any
+                actual underlying data.  The notable exceptions include
+                cross-interpreter types (like Queue) and memoryview, where the
+                underlying data is actually shared.  Furthermore, some types
+                can be sent through a queue more efficiently than others.  This
+                group includes various immutable types like int, str, bytes, and
+                tuple (if the items are likewise efficiently shareable).  See interpreters.is_shareable().
 
-            "unbounditems" controls the behavior of Queue.get() for the given
-            object if the current interpreter (calling put()) is later
-            destroyed.
+                "unbounditems" controls the behavior of Queue.get() for the given
+                object if the current interpreter (calling put()) is later
+                destroyed.
 
-            If "unbounditems" is None (the default) then it uses the
-            queue's default, set with create_queue(),
-            which is usually UNBOUND.
+                If "unbounditems" is None (the default) then it uses the
+                queue's default, set with create_queue(),
+                which is usually UNBOUND.
 
-            If "unbounditems" is UNBOUND_ERROR then get() will raise an
-            ItemInterpreterDestroyed exception if the original interpreter
-            has been destroyed.  This does not otherwise affect the queue;
-            the next call to put() will work like normal, returning the next
-            item in the queue.
+                If "unbounditems" is UNBOUND_ERROR then get() will raise an
+                ItemInterpreterDestroyed exception if the original interpreter
+                has been destroyed.  This does not otherwise affect the queue;
+                the next call to put() will work like normal, returning the next
+                item in the queue.
 
-            If "unbounditems" is UNBOUND_REMOVE then the item will be removed
-            from the queue as soon as the original interpreter is destroyed.
-            Be aware that this will introduce an imbalance between put()
-            and get() calls.
+                If "unbounditems" is UNBOUND_REMOVE then the item will be removed
+                from the queue as soon as the original interpreter is destroyed.
+                Be aware that this will introduce an imbalance between put()
+                and get() calls.
 
-            If "unbounditems" is UNBOUND then it is returned by get() in place
-            of the unbound item.
-            """
+                If "unbounditems" is UNBOUND then it is returned by get() in place
+                of the unbound item.
+                """
+        else:
+            def put(
+                self,
+                obj: object,
+                timeout: SupportsIndex | None = None,
+                *,
+                unbounditems: _AnyUnbound | None = None,
+                _delay: float = 0.01,
+            ) -> None: ...
 
         def put_nowait(self, obj: object, *, unbounditems: _AnyUnbound | None = None) -> None: ...
-        def get(self, timeout: SupportsIndex | None = None, *, _delay: float = 0.01) -> object:
-            """Return the next object from the queue.
+        if sys.version_info >= (3, 14):
+            def get(self, block: bool = True, timeout: SupportsIndex | None = None, *, _delay: float = 0.01) -> object:
+                """Return the next object from the queue.
 
-            This blocks while the queue is empty.
+                If "block" is true, this blocks while the queue is empty.
 
-            If the next item's original interpreter has been destroyed
-            then the "next object" is determined by the value of the
-            "unbounditems" argument to put().
-            """
+                If the next item's original interpreter has been destroyed
+                then the "next object" is determined by the value of the
+                "unbounditems" argument to put().
+                """
+        else:
+            def get(self, timeout: SupportsIndex | None = None, *, _delay: float = 0.01) -> object: ...
 
         def get_nowait(self) -> object:
             """Return the next object from the channel.

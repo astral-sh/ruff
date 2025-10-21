@@ -457,6 +457,10 @@ impl SemanticDb for ProjectDatabase {
     fn lint_registry(&self) -> &LintRegistry {
         ty_python_semantic::default_lint_registry()
     }
+
+    fn verbose(&self) -> bool {
+        self.project().verbose(self)
+    }
 }
 
 #[salsa::db]
@@ -608,6 +612,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
+        }
+
+        fn verbose(&self) -> bool {
+            false
         }
     }
 

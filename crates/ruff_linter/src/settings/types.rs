@@ -9,6 +9,7 @@ use anyhow::{Context, Result, bail};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
+use ruff_db::diagnostic::DiagnosticFormat;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use strum_macros::EnumIter;
@@ -534,6 +535,20 @@ pub enum OutputFormat {
     Sarif,
 }
 
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(
+            self,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        )
+    }
+}
+
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -549,6 +564,34 @@ impl Display for OutputFormat {
             Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
+        }
+    }
+}
+
+/// The subset of output formats only implemented in Ruff, not in `ruff_db` via `DisplayDiagnostics`.
+pub enum RuffOutputFormat {
+    Github,
+    Grouped,
+    Sarif,
+}
+
+impl TryFrom<OutputFormat> for DiagnosticFormat {
+    type Error = RuffOutputFormat;
+
+    fn try_from(format: OutputFormat) -> std::result::Result<Self, Self::Error> {
+        match format {
+            OutputFormat::Concise => Ok(DiagnosticFormat::Concise),
+            OutputFormat::Full => Ok(DiagnosticFormat::Full),
+            OutputFormat::Json => Ok(DiagnosticFormat::Json),
+            OutputFormat::JsonLines => Ok(DiagnosticFormat::JsonLines),
+            OutputFormat::Junit => Ok(DiagnosticFormat::Junit),
+            OutputFormat::Gitlab => Ok(DiagnosticFormat::Gitlab),
+            OutputFormat::Pylint => Ok(DiagnosticFormat::Pylint),
+            OutputFormat::Rdjson => Ok(DiagnosticFormat::Rdjson),
+            OutputFormat::Azure => Ok(DiagnosticFormat::Azure),
+            OutputFormat::Github => Err(RuffOutputFormat::Github),
+            OutputFormat::Grouped => Err(RuffOutputFormat::Grouped),
+            OutputFormat::Sarif => Err(RuffOutputFormat::Sarif),
         }
     }
 }
@@ -574,12 +617,12 @@ impl TryFrom<String> for RequiredVersion {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for RequiredVersion {
-    fn schema_name() -> String {
-        "RequiredVersion".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("RequiredVersion")
     }
 
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        generator.subschema_for::<String>()
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <String as schemars::JsonSchema>::json_schema(generator)
     }
 }
 

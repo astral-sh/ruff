@@ -11,14 +11,15 @@ use crate::checkers::ast::Checker;
 /// Checks for usage of `datetime.date.today()`.
 ///
 /// ## Why is this bad?
-/// Python datetime objects can be naive or timezone-aware. While an aware
+/// Python date objects are naive, that is, not timezone-aware. While an aware
 /// object represents a specific moment in time, a naive object does not
 /// contain enough information to unambiguously locate itself relative to other
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.date.today` returns a naive datetime object. Instead, use
-/// `datetime.datetime.now(tz=...).date()` to create a timezone-aware object.
+/// `datetime.date.today` returns a naive date object without taking timezones
+/// into account. Instead, use `datetime.datetime.now(tz=...).date()` to
+/// create a timezone-aware object and retrieve its date component.
 ///
 /// ## Example
 /// ```python

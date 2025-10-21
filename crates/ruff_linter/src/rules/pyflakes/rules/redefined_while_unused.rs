@@ -191,15 +191,14 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 },
                 binding.range(),
             );
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 
             diagnostic.secondary_annotation(
                 format_args!("previous definition of `{name}` here"),
                 shadowed,
             );
 
-            if let Some(ann) = diagnostic.primary_annotation_mut() {
-                ann.set_message(format_args!("`{name}` redefined here"));
-            }
+            diagnostic.set_primary_message(format_args!("`{name}` redefined here"));
 
             if let Some(range) = binding.parent_range(checker.semantic()) {
                 diagnostic.set_parent(range.start());

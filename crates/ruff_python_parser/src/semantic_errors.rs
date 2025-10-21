@@ -65,8 +65,28 @@ impl SemanticSyntaxChecker {
                 names,
                 ..
             }) => {
-                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                if matches!(module.as_deref(), Some("__future__")) {
+                    for name in names {
+                        if !is_known_future_feature(&name.name) {
+                            // test_ok valid_future_feature
+                            // from __future__ import annotations
+
+                            // test_err invalid_future_feature
+                            // from __future__ import invalid_feature
+                            // from __future__ import annotations, invalid_feature
+                            // from __future__ import invalid_feature_1, invalid_feature_2
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::FutureFeatureNotDefined(
+                                    name.name.to_string(),
+                                ),
+                                name.range,
+                            );
+                        }
+                    }
+                    if self.seen_futures_boundary {
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                    }
                 }
                 for alias in names {
                     if alias.name.as_str() == "*" && !ctx.in_module_scope() {
@@ -202,6 +222,16 @@ impl SemanticSyntaxChecker {
                         SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel,
                         *range,
                     );
+                }
+            }
+            Stmt::Break(ast::StmtBreak { range, .. }) => {
+                if !ctx.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
+                }
+            }
+            Stmt::Continue(ast::StmtContinue { range, .. }) => {
+                if !ctx.in_loop_context() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
                 }
             }
             _ => {}
@@ -386,6 +416,40 @@ impl SemanticSyntaxChecker {
                 SemanticSyntaxErrorKind::InvalidStarExpression,
                 expr.range(),
             );
+        }
+    }
+
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr_ctx: ExprContext,
+        elts: &[Expr],
+        range: TextRange,
+    ) {
+        if expr_ctx.is_store() {
+            let mut has_starred = false;
+            for elt in elts {
+                if elt.is_starred_expr() {
+                    if has_starred {
+                        // test_err multiple_starred_assignment_target
+                        // (*a, *b) = (1, 2)
+                        // [*a, *b] = (1, 2)
+                        // (*a, *b, c) = (1, 2, 3)
+                        // [*a, *b, c] = (1, 2, 3)
+                        // (*a, *b, (*c, *d)) = (1, 2)
+
+                        // test_ok multiple_starred_assignment_target
+                        // (*a, b) = (1, 2)
+                        // (*_, normed), *_ = [(1,), 2]
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                            range,
+                        );
+                        return;
+                    }
+                    has_starred = true;
+                }
+            }
         }
     }
 
@@ -754,6 +818,20 @@ impl SemanticSyntaxChecker {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
                 Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
             }
+            Expr::Tuple(ast::ExprTuple {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            })
+            | Expr::List(ast::ExprList {
+                elts,
+                ctx: expr_ctx,
+                range,
+                ..
+            }) => {
+                Self::multiple_star_expression(ctx, *expr_ctx, elts, *range);
+            }
             Expr::Lambda(ast::ExprLambda {
                 parameters: Some(parameters),
                 ..
@@ -930,6 +1008,22 @@ impl SemanticSyntaxChecker {
     }
 }
 
+fn is_known_future_feature(name: &str) -> bool {
+    matches!(
+        name,
+        "nested_scopes"
+            | "generators"
+            | "division"
+            | "absolute_import"
+            | "with_statement"
+            | "print_function"
+            | "unicode_literals"
+            | "barry_as_FLUFL"
+            | "generator_stop"
+            | "annotations"
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
@@ -1034,6 +1128,17 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
                 write!(f, "`from {name} import *` only allowed at module level")
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                write!(f, "Two starred expressions in assignment")
+            }
+            SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                write!(f, "Future feature `{name}` is not defined")
+            }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
+            SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
+            SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
+                write!(f, "alternative patterns bind different names")
             }
         }
     }
@@ -1398,6 +1503,36 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `from <module> import *` outside module scope.
     NonModuleImportStar(String),
+
+    /// Represents the use of more than one starred expression in an assignment.
+    ///
+    /// Python only allows a single starred target when unpacking values on the
+    /// left-hand side of an assignment. Using multiple starred expressions makes
+    /// the statement invalid and results in a `SyntaxError`.
+    MultipleStarredExpressions,
+
+    /// Represents the use of a `__future__` feature that is not defined.
+    FutureFeatureNotDefined(String),
+
+    /// Represents the use of a `break` statement outside of a loop.
+    BreakOutsideLoop,
+
+    /// Represents the use of a `continue` statement outside of a loop.
+    ContinueOutsideLoop,
+
+    /// Represents the use of alternative patterns in a `match` statement that bind different names.
+    ///
+    /// Python requires all alternatives in an OR pattern (`|`) to bind the same set of names.
+    /// Using different names results in a `SyntaxError`.
+    ///
+    /// ## Example:
+    ///
+    /// ```python
+    /// match 5:
+    ///     case [x] | [y]:  # error
+    ///         ...
+    /// ```
+    DifferentMatchPatternBindings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1640,7 +1775,9 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                     self.insert(name);
                 }
             }
-            Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+            Pattern::MatchOr(ast::PatternMatchOr {
+                patterns, range, ..
+            }) => {
                 // each of these patterns should be visited separately because patterns can only be
                 // duplicated within a single arm of the or pattern. For example, the case below is
                 // a valid pattern.
@@ -1648,12 +1785,48 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // test_ok multiple_assignment_in_case_pattern
                 // match 2:
                 //     case Class(x) | [x] | x: ...
+
+                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
+                    let Some(prev) = &previous_names else {
+                        previous_names = Some(visitor.names);
+                        continue;
+                    };
+                    if prev.symmetric_difference(&visitor.names).next().is_some() {
+                        // test_err different_match_pattern_bindings
+                        // match x:
+                        //     case [a] | [b]: ...
+                        //     case [a] | []: ...
+                        //     case (x, y) | (x,): ...
+                        //     case [a, _] | [a, b]: ...
+                        //     case (x, (y | z)): ...
+                        //     case [a] | [b] | [c]: ...
+                        //     case [] | [a]: ...
+                        //     case [a] | [C(x)]: ...
+                        //     case [[a] | [b]]: ...
+                        //     case [C(a)] | [C(b)]: ...
+                        //     case [C(D(a))] | [C(D(b))]: ...
+                        //     case [(a, b)] | [(c, d)]: ...
+
+                        // test_ok different_match_pattern_bindings
+                        // match x:
+                        //     case [a] | [a]: ...
+                        //     case (x, y) | (x, y): ...
+                        //     case (x, (y | y)): ...
+                        //     case [a, _] | [a, _]: ...
+                        //     case [a] | [C(a)]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
+                            *range,
+                        );
+                        break;
+                    }
                 }
             }
         }
@@ -1879,6 +2052,8 @@ pub trait SemanticSyntaxContext {
     fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
+
+    fn in_loop_context(&self) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

@@ -136,7 +136,7 @@ class InspectLoader(Loader):
 
     @staticmethod
     def source_to_code(
-        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath = "<string>"
+        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath = "<string>"
     ) -> types.CodeType:
         """Compile 'data' into a code object.
 
@@ -342,10 +342,10 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
     def get_data(self, path: str) -> bytes:
         """Return the data from path as raw bytes."""
 
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
-    def load_module(self, name: str | None = None) -> types.ModuleType:
+    def load_module(self, fullname: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.

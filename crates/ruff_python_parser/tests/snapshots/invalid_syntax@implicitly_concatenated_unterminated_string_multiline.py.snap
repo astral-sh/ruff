@@ -30,6 +30,7 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
@@ -67,6 +68,7 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Regular,
                                                     triple_quoted: false,
+                                                    unclosed: true,
                                                 },
                                             },
                                         ),
@@ -111,59 +113,62 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 38..51,
-                    value: StringLiteral(
-                        ExprStringLiteral {
-                            node_index: NodeIndex(None),
-                            range: 44..51,
-                            value: StringLiteralValue {
-                                inner: Single(
-                                    StringLiteral {
-                                        range: 44..51,
-                                        node_index: NodeIndex(None),
-                                        value: "first",
-                                        flags: StringLiteralFlags {
-                                            quote_style: Single,
-                                            prefix: Empty,
-                                            triple_quoted: false,
-                                        },
-                                    },
-                                ),
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 68..76,
+                    range: 38..78,
                     value: FString(
                         ExprFString {
                             node_index: NodeIndex(None),
-                            range: 68..76,
+                            range: 44..76,
                             value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 68..76,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Literal(
-                                                    InterpolatedStringLiteralElement {
-                                                        range: 70..75,
-                                                        node_index: NodeIndex(None),
-                                                        value: "third",
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Single,
-                                                prefix: Regular,
-                                                triple_quoted: false,
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 44..51,
+                                                node_index: NodeIndex(None),
+                                                value: "first",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
                                             },
-                                        },
-                                    ),
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 56..63,
+                                                node_index: NodeIndex(None),
+                                                value: "second",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: true,
+                                                },
+                                            },
+                                        ),
+                                        FString(
+                                            FString {
+                                                range: 68..76,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Literal(
+                                                        InterpolatedStringLiteralElement {
+                                                            range: 70..75,
+                                                            node_index: NodeIndex(None),
+                                                            value: "third",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Single,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
                                 ),
                             },
                         },
@@ -245,22 +250,4 @@ Module(
    |     ^^^^^^^ Syntax Error: missing closing quote in string literal
  9 |     f'third'
 10 | )
-   |
-
-
-   |
- 8 |     'second
- 9 |     f'third'
-10 | )
-   | ^ Syntax Error: Expected a statement
-11 | 2 + 2
-   |
-
-
-   |
- 8 |     'second
- 9 |     f'third'
-10 | )
-   |  ^ Syntax Error: Expected a statement
-11 | 2 + 2
    |

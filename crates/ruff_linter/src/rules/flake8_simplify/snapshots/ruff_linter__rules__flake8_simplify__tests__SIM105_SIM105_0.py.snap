@@ -11,7 +11,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
 9 | |     pass
   | |________^
   |
-help: Replace with `contextlib.suppress(ValueError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
 1  + import contextlib
 2  | def foo():
 3  |     pass
@@ -40,7 +40,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`exce
 17 |
 18 |   # SIM105
    |
-help: Replace with `contextlib.suppress(ValueError, OSError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError, OSError): ...`
 1  + import contextlib
 2  | def foo():
 3  |     pass
@@ -71,7 +71,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`exce
 23 |
 24 |   # SIM105
    |
-help: Replace with `contextlib.suppress(ValueError, OSError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError, OSError): ...`
 1  + import contextlib
 2  | def foo():
 3  |     pass
@@ -102,7 +102,7 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
 29 |
 30 |   # SIM105
    |
-help: Replace with `contextlib.suppress(BaseException)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
 1  + import contextlib
 2  + import builtins
 3  | def foo():
@@ -134,7 +134,7 @@ SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`
 35 |
 36 |   # OK
    |
-help: Replace with `contextlib.suppress(a.Error, b.Error)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(a.Error, b.Error): ...`
 1  + import contextlib
 2  | def foo():
 3  |     pass
@@ -164,7 +164,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
 88 | |         ...
    | |___________^
    |
-help: Replace with `contextlib.suppress(ValueError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
 1  + import contextlib
 2  | def foo():
 3  |     pass
@@ -195,7 +195,7 @@ SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-
 104 |
 105 |   try:
     |
-help: Replace with `contextlib.suppress(ValueError, OSError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError, OSError): ...`
 
 SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
    --> SIM105_0.py:117:5
@@ -210,7 +210,7 @@ SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
 121 |
 122 |       try: os.makedirs(model_dir);
     |
-help: Replace with `contextlib.suppress(OSError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(OSError): ...`
 1   + import contextlib
 2   | def foo():
 3   |     pass
@@ -241,7 +241,7 @@ SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
 125 |
 126 |       try: os.makedirs(model_dir);
     |
-help: Replace with `contextlib.suppress(OSError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(OSError): ...`
 1   + import contextlib
 2   | def foo():
 3   |     pass
@@ -271,7 +271,7 @@ SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
 129 |               \
 130 |               #
     |
-help: Replace with `contextlib.suppress(OSError)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(OSError): ...`
 1   + import contextlib
 2   | def foo():
 3   |     pass
@@ -299,7 +299,7 @@ SIM105 [*] Use `contextlib.suppress()` instead of `try`-`except`-`pass`
 136 | |     pass
     | |________^
     |
-help: Replace with `contextlib.suppress()`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(): ...`
 1   + import contextlib
 2   | def foo():
 3   |     pass
@@ -328,7 +328,7 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
 143 | |     pass
     | |________^
     |
-help: Replace with `contextlib.suppress(BaseException)`
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
 1   + import contextlib
 2   | def foo():
 3   |     pass

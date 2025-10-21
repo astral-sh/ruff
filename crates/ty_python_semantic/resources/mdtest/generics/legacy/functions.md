@@ -181,7 +181,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ```py
 from typing import TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T", bound=int)
 
@@ -200,7 +199,6 @@ reveal_type(f("string"))  # revealed: Unknown
 
 ```py
 from typing import TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T", int, None)
 
@@ -323,6 +321,9 @@ def union_param(x: T | None) -> T:
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
 reveal_type(union_param(None))  # revealed: Unknown
+
+def _(x: int | None):
+    reveal_type(union_param(x))  # revealed: int
 ```
 
 ```py
@@ -464,6 +465,7 @@ def f(x: str):
 from typing import TypeVar, overload
 
 T = TypeVar("T")
+S = TypeVar("S")
 
 def outer(t: T) -> None:
     def inner(t: T) -> None: ...
@@ -479,6 +481,13 @@ def overloaded_outer(t: T | None = None) -> None:
 
     if t is not None:
         inner(t)
+
+def outer(t: T) -> None:
+    def inner(inner_t: T, s: S) -> tuple[T, S]:
+        return inner_t, s
+    reveal_type(inner(t, 1))  # revealed: tuple[T@outer, Literal[1]]
+
+    inner("wrong", 1)  # error: [invalid-argument-type]
 ```
 
 ## Unpacking a TypeVar
@@ -521,4 +530,18 @@ reveal_type(team.employees)  # revealed: list[Employee]
 age, name = team.employees[0]
 reveal_type(age)  # revealed: Age
 reveal_type(name)  # revealed: Name
+```
+
+## `~T` is never assignable to `T`
+
+```py
+from typing import TypeVar
+from ty_extensions import Not
+
+T = TypeVar("T")
+
+def f(x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
 ```

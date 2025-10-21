@@ -685,6 +685,46 @@ help: Remove outdated version block
 184 |     print("py3")
 note: This is an unsafe fix and may change runtime behavior
 
+UP036 [*] Version block is outdated for minimum Python version
+   --> UP036_0.py:185:4
+    |
+183 |     print("py3")
+184 |
+185 | if sys.version_info <= (3,13):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+186 |     print("py3")
+    |
+help: Remove outdated version block
+182 | if sys.version_info < (3,13):
+183 |     print("py3")
+184 | 
+    - if sys.version_info <= (3,13):
+    -     print("py3")
+185 | 
+186 | if sys.version_info <= (3,13):
+187 |     print("py3")
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 [*] Version block is outdated for minimum Python version
+   --> UP036_0.py:188:4
+    |
+186 |     print("py3")
+187 |
+188 | if sys.version_info <= (3,13):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+189 |     print("py3")
+    |
+help: Remove outdated version block
+185 | if sys.version_info <= (3,13):
+186 |     print("py3")
+187 | 
+    - if sys.version_info <= (3,13):
+    -     print("py3")
+188 | 
+189 | if sys.version_info == 10000000:
+190 |     print("py3")
+note: This is an unsafe fix and may change runtime behavior
+
 UP036 Version specifier is invalid
    --> UP036_0.py:191:24
     |
@@ -714,6 +754,27 @@ UP036 Version specifier is invalid
     |                        ^^^^^^^^^^^^
 198 |     print("py3")
     |
+
+UP036 [*] Version block is outdated for minimum Python version
+   --> UP036_0.py:200:4
+    |
+198 |     print("py3")
+199 |
+200 | if sys.version_info > (3,13):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+201 |     print("py3")
+    |
+help: Remove outdated version block
+197 | if sys.version_info <= (3,10000000):
+198 |     print("py3")
+199 | 
+    - if sys.version_info > (3,13):
+    -     print("py3")
+200 + print("py3")
+201 | 
+202 | if sys.version_info >= (3,13):
+203 |     print("py3")
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
    --> UP036_0.py:203:4

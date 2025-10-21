@@ -23,6 +23,7 @@ mod tests {
     #[test_case(Path::new("G003.py"))]
     #[test_case(Path::new("G004.py"))]
     #[test_case(Path::new("G004_arg_order.py"))]
+    #[test_case(Path::new("G004_implicit_concat.py"))]
     #[test_case(Path::new("G010.py"))]
     #[test_case(Path::new("G101_1.py"))]
     #[test_case(Path::new("G101_2.py"))]
@@ -52,6 +53,7 @@ mod tests {
 
     #[test_case(Rule::LoggingFString, Path::new("G004.py"))]
     #[test_case(Rule::LoggingFString, Path::new("G004_arg_order.py"))]
+    #[test_case(Rule::LoggingFString, Path::new("G004_implicit_concat.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

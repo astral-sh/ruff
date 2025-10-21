@@ -431,6 +431,8 @@ def _(flag: bool):
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 
     C7.union_of_metaclass_attributes = 2 if flag else 1
+    # TODO: https://github.com/astral-sh/ty/issues/1163
+    # error: [invalid-assignment]
     C7.union_of_metaclass_data_descriptor_and_attribute = 2 if flag else 100
     C7.union_of_class_attributes = 2 if flag else 1
     C7.union_of_class_data_descriptor_and_attribute = 2 if flag else DataDescriptor()
@@ -756,16 +758,16 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-missing-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `non_data` on type `PossiblyUnbound` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `data` on type `PossiblyUnbound` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().data)  # revealed: int
 ```
 

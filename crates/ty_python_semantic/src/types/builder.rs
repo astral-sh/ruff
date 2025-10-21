@@ -421,7 +421,7 @@ impl<'db> UnionBuilder<'db> {
                     .elements
                     .iter()
                     .filter_map(UnionElement::to_type_element)
-                    .filter_map(Type::into_enum_literal)
+                    .filter_map(Type::as_enum_literal)
                     .map(|literal| literal.name(self.db).clone())
                     .chain(std::iter::once(enum_member_to_add.name(self.db).clone()))
                     .collect::<FxOrderSet<_>>();
@@ -502,11 +502,9 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
-                if ty.is_equivalent_to(self.db, element_type)
-                    || ty.is_subtype_of(self.db, element_type)
-                {
+                if ty.is_redundant_with(self.db, element_type) {
                     return;
-                } else if element_type.is_subtype_of(self.db, ty) {
+                } else if element_type.is_redundant_with(self.db, ty) {
                     to_remove.push(index);
                 } else if ty_negated.is_subtype_of(self.db, element_type) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
@@ -652,7 +650,7 @@ impl<'db> IntersectionBuilder<'db> {
                 for intersection in &self.intersections {
                     if intersection.negative.iter().any(|negative| {
                         negative
-                            .into_enum_literal()
+                            .as_enum_literal()
                             .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
                     }) {
                         contains_enum_literal_as_negative_element = true;
@@ -923,13 +921,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
-                    if existing_positive.is_subtype_of(db, new_positive)
-                        || existing_positive.is_equivalent_to(db, new_positive)
-                    {
+                    if existing_positive.is_redundant_with(db, new_positive) {
                         return;
                     }
                     // same rule, reverse order
-                    if new_positive.is_subtype_of(db, *existing_positive) {
+                    if new_positive.is_redundant_with(db, *existing_positive) {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
@@ -1020,9 +1016,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
-                    if existing_negative.is_subtype_of(db, new_negative)
-                        || existing_negative.is_equivalent_to(db, new_negative)
-                    {
+                    if existing_negative.is_redundant_with(db, new_negative) {
                         to_remove.push(index);
                     }
                     // same rule, reverse order
@@ -1068,8 +1062,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let (Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar)) = ty
-            else {
+            let Type::TypeVar(bound_typevar) = ty else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
@@ -1083,7 +1076,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // don't need to worry about finding any particular constraint more than once.
             let constraints = constraints.elements(db);
             let mut positive_constraint_count = 0;
-            for positive in &self.positive {
+            for (i, positive) in self.positive.iter().enumerate() {
+                if i == typevar_index {
+                    continue;
+                }
+
                 // This linear search should be fine as long as we don't encounter typevars with
                 // thousands of constraints.
                 positive_constraint_count += constraints
@@ -1257,7 +1254,7 @@ mod tests {
 
         let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap();
 
         let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)

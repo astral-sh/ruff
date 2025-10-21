@@ -37,3 +37,9 @@ log(logging.INFO, "Hello %r", repr("World!"))
 def str(s): return f"str = {s}"
 # Don't flag this
 logging.info("Hello %s", str("World!"))
+
+logging.info("Debug info: %r", repr("test\nstring"))
+logging.warning("Value: %r", repr(42))
+logging.error("Error: %r", repr([1, 2, 3]))
+logging.info("Debug info: %s", repr("test\nstring"))
+logging.warning("Value: %s", repr(42))

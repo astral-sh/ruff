@@ -1,0 +1,19 @@
+---
+source: crates/ruff/tests/cli/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - github
+    - "--preview"
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+::error title=Ruff (unformatted),file=[TMP]/input.py,line=1,col=1,endLine=2,endColumn=1::input.py:1:1: unformatted: File would be reformatted
+
+----- stderr -----

@@ -44,15 +44,15 @@ def any_str_param(s: AnyStr) -> AnyStr:
     return s
 
 
-# these cases are not handled
-
-# TODO(brent) default requires 3.13
+# default requires 3.13
 V = TypeVar("V", default=Any, bound=str)
 
 
 def default_var(v: V) -> V:
     return v
 
+
+# these cases are not handled
 
 def outer():
     def inner(t: T) -> T:
