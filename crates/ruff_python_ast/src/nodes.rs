@@ -2848,10 +2848,10 @@ pub enum IrrefutablePatternKind {
     Wildcard,
 }
 
-/// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the arguments to a [`crate::PatternMatchClass`], i.e., the
 /// parenthesized contents in `case Point(1, x=0, y=0)`.
 ///
-/// Like [`Arguments`], but for [`PatternMatchClass`].
+/// Like [`Arguments`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternArguments {
@@ -2861,10 +2861,10 @@ pub struct PatternArguments {
     pub keywords: Vec<PatternKeyword>,
 }
 
-/// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
 /// `x=0` and `y=0` in `case Point(x=0, y=0)`.
 ///
-/// Like [`Keyword`], but for [`PatternMatchClass`].
+/// Like [`Keyword`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternKeyword {
