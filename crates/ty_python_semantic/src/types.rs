@@ -9883,11 +9883,11 @@ pub(crate) enum TypeRelation<'db> {
     /// result. (A concrete type is any fully static type that is not a typevar. It can _contain_ a
     /// typevar, though — `list[T]` is considered concrete.)
     ///
-    /// The interesting case is typevars. The other typing relationships all "punt" on the question
-    /// when considering a typevar, by translating the desired relationship into a constraint set.
-    /// That is, we say that `T` is assignable to `int` when `T ≤ int`. (There are interesting
-    /// nuances when comparing a typevar with a dynamic type, but they all end up translating the
-    /// types into a constraint in some way.)
+    /// The interesting case is typevars. The other typing relationships (TODO: will) all "punt" on
+    /// the question when considering a typevar, by translating the desired relationship into a
+    /// constraint set. That is, we say that `T` is assignable to `int` when `T ≤ int`. (There are
+    /// interesting nuances when comparing a typevar with a dynamic type, but they all end up
+    /// translating the types into a constraint in some way.)
     ///
     /// At some point, though, we need to resolve a constraint set; at that point, we can no longer
     /// punt on the question, and have to determine whether a runtime instance being a member of
