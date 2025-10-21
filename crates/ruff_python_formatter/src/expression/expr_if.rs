@@ -89,7 +89,7 @@ impl NeedsParentheses for ExprIf {
         parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if parent.is_expr_await() || parent.is_comprehension() {
+        if parent.is_expr_await() {
             OptionalParentheses::Always
         } else {
             OptionalParentheses::Multiline
