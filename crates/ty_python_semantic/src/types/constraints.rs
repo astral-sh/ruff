@@ -1411,14 +1411,14 @@ impl<'db> SatisfiedClauses<'db> {
     /// function. (This is used when displaying a BDD, to make sure that the representation that we
     /// show is as simple as possible while still producing the same results.)
     fn simplify(&mut self, db: &'db dyn Db) {
-        while self.simplify_one_round() {
-            // Keep going
-        }
-
-        // Lastly simplify each clause individually, by removing constraints that are implied by
+        // First simplify each clause individually, by removing constraints that are implied by
         // other constraints in the clause.
         for clause in &mut self.clauses {
             clause.simplify(db);
+        }
+
+        while self.simplify_one_round() {
+            // Keep going
         }
     }
 
