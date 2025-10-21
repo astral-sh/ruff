@@ -999,7 +999,7 @@ pub fn definitions_for_unary_op<'db>(
 
 /// Promotes literal types in `self` positions to their fallback instance types.
 ///
-/// This is so that we show `int.__add__` instead of `IntLiteral.__add__`.
+/// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
 fn promote_literals_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     match ty {
         Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
