@@ -2538,13 +2538,13 @@ def ab(a: int, *, c: int):
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:2:10
+         --> main.py:2:12
           |
         2 | result = 5 + 3
-          |          ^^-^^
-          |          | |
-          |          | Cursor offset
-          |          source
+          |            -
+          |            |
+          |            source
+          |            Cursor offset
           |
         ");
     }
@@ -2582,15 +2582,15 @@ def ab(a: int, *, c: int):
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:15:1
+          --> main.py:15:8
            |
         13 | class Other: ...
         14 |
         15 | Test() + Test()
-           | ^^^^^^^-^^^^^^^
-           | |      |
-           | |      Cursor offset
-           | source
+           |        -
+           |        |
+           |        source
+           |        Cursor offset
            |
         ");
     }
@@ -2622,14 +2622,13 @@ def ab(a: int, *, c: int):
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:13:5
+          --> main.py:13:7
            |
         12 | def _(a: Test | Other):
         13 |     a + Other()
-           |     ^^^-^^^^^^^
-           |     |  |
-           |     |  Cursor offset
-           |     source
+           |       ^- Cursor offset
+           |       |
+           |       source
            |
         ");
     }

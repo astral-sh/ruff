@@ -1139,12 +1139,12 @@ a <CURSOR>+ b
         4 |         return Test()
           |
         info: Source
-          --> main.py:10:1
+          --> main.py:10:3
            |
          8 | b = Test()
          9 |
         10 | a + b
-           | ^^^^^
+           |   ^
            |
         ");
     }
@@ -1176,12 +1176,12 @@ B() <CURSOR>+ A()
         4 |         return self
           |
         info: Source
-         --> main.py:8:1
+         --> main.py:8:5
           |
         6 | class B: ...
         7 |
         8 | B() + A()
-          | ^^^^^^^^^
+          |     ^
           |
         ");
     }
@@ -1215,12 +1215,12 @@ a<CURSOR>+b
         4 |         return Test()
           |
         info: Source
-          --> main.py:10:1
+          --> main.py:10:2
            |
          8 | b = Test()
          9 |
         10 | a+b
-           | ^^^
+           |  ^
            |
         ");
     }
@@ -1319,7 +1319,7 @@ a = Test()
         5 | a = Test()
         6 |
         7 | not a
-          | ^^^^^
+          | ^^^
           |
         ");
     }
@@ -1356,7 +1356,7 @@ not<CURSOR> a
         5 | a = Test()
         6 |
         7 | not a
-          | ^^^^^
+          | ^^^
           |
         ");
     }
