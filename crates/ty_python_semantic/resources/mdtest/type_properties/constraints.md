@@ -601,3 +601,26 @@ def _[T, U]() -> None:
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(~union | union)
 ```
+
+## Other simplifications
+
+When rendering a constraint set, we transform the internal BDD representation into a DNF formula
+(i.e., the logical OR of several clauses, each of which is the logical AND of several constraints).
+This section contains several examples that show that we simplify the DNF formula as much as we can
+before rendering it.
+
+```py
+from ty_extensions import range_constraint
+def _[T, U]():
+    t1 = range_constraint(str, T, str)
+    t2 = range_constraint(bool, T, bool)
+    u1 = range_constraint(str, U, str)
+    u2 = range_constraint(bool, U, bool)
+
+    # revealed: ty_extensions.ConstraintSet[(T@_ = bool) ∨ (T@_ = str)]
+    reveal_type(t1 | t2)
+    # revealed: ty_extensions.ConstraintSet[(U@_ = bool) ∨ (U@_ = str)]
+    reveal_type(u1 | u2)
+    # revealed: ty_extensions.ConstraintSet[((T@_ = bool) ∧ (U@_ = bool)) ∨ ((T@_ = bool) ∧ (U@_ = str)) ∨ ((T@_ = str) ∧ (U@_ = bool)) ∨ ((T@_ = str) ∧ (U@_ = str))]
+    reveal_type((t1 | t2) & (u1 | u2))
+```
