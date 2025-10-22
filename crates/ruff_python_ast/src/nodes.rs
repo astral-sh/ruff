@@ -2892,37 +2892,6 @@ impl TypeParam {
     }
 }
 
-/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub bound: Option<Box<Expr>>,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamParamSpec {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVarTuple {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
-}
-
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]

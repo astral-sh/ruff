@@ -605,10 +605,27 @@ fields = [{ name = "patterns", type = "Pattern*" }]
 [TypeParam]
 doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
 
-[TypeParam.nodes]
-TypeParamTypeVar = {}
-TypeParamTypeVarTuple = {}
-TypeParamParamSpec = {}
+[TypeParam.nodes.TypeParamTypeVar]
+doc = "See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "bound", type = "Box<Expr>?" },
+  { name = "default", type = "Box<Expr>?" },
+]
+
+[TypeParam.nodes.TypeParamTypeVarTuple]
+doc = "See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "default", type = "Box<Expr>?" },
+]
+
+[TypeParam.nodes.TypeParamParamSpec]
+doc = "See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "default", type = "Box<Expr>?" },
+]
 
 [ungrouped.nodes]
 InterpolatedStringFormatSpec = {}

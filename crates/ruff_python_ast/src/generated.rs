@@ -9713,6 +9713,37 @@ pub struct PatternMatchOr {
     pub patterns: Vec<Pattern>,
 }
 
+/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct TypeParamTypeVar {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: crate::Identifier,
+    pub bound: Option<Box<Expr>>,
+    pub default: Option<Box<Expr>>,
+}
+
+/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct TypeParamTypeVarTuple {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: crate::Identifier,
+    pub default: Option<Box<Expr>>,
+}
+
+/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct TypeParamParamSpec {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: crate::Identifier,
+    pub default: Option<Box<Expr>>,
+}
+
 impl ModModule {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -10775,6 +10806,68 @@ impl PatternMatchOr {
 
         for elm in patterns {
             visitor.visit_pattern(elm);
+        }
+    }
+}
+
+impl TypeParamTypeVar {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let TypeParamTypeVar {
+            name,
+            bound,
+            default,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_identifier(name);
+
+        if let Some(bound) = bound {
+            visitor.visit_expr(bound);
+        }
+
+        if let Some(default) = default {
+            visitor.visit_expr(default);
+        }
+    }
+}
+
+impl TypeParamTypeVarTuple {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let TypeParamTypeVarTuple {
+            name,
+            default,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_identifier(name);
+
+        if let Some(default) = default {
+            visitor.visit_expr(default);
+        }
+    }
+}
+
+impl TypeParamParamSpec {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let TypeParamParamSpec {
+            name,
+            default,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_identifier(name);
+
+        if let Some(default) = default {
+            visitor.visit_expr(default);
         }
     }
 }
