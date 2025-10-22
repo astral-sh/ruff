@@ -144,6 +144,12 @@ pub(crate) enum InterpolatedStringState {
     ///
     /// The containing `FStringContext` is the surrounding f-string context.
     InsideInterpolatedElement(InterpolatedStringContext),
+    /// The formatter is inside more than one nested f-string, such as in `nested` in:
+    ///
+    /// ```py
+    /// f"{f'''{'nested'} inner'''} outer"
+    /// ```
+    NestedInterpolatedElement(InterpolatedStringContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,
@@ -152,11 +158,17 @@ pub(crate) enum InterpolatedStringState {
 impl InterpolatedStringState {
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
-            InterpolatedStringState::InsideInterpolatedElement(context) => {
+            InterpolatedStringState::InsideInterpolatedElement(context)
+            | InterpolatedStringState::NestedInterpolatedElement(context) => {
                 Some(context.is_multiline())
             }
             InterpolatedStringState::Outside => None,
         }
+    }
+
+    /// Returns `true` if the interpolated string state is [`NestedInterpolatedElement`].
+    pub(crate) fn is_nested(self) -> bool {
+        matches!(self, Self::NestedInterpolatedElement(..))
     }
 }
 

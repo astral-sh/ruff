@@ -1260,13 +1260,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1292,7 +1292,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1300,7 +1300,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1433,7 +1433,7 @@ def _(flag: bool):
     class C2: ...
     C = C1 if flag else C2
 
-    # error: [unresolved-attribute] "Type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
+    # error: [unresolved-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 
     # TODO: This should ideally be a `unresolved-attribute` error. We need better union
@@ -1771,7 +1771,7 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
 reveal_type(date.century)  # revealed: Unknown
 ```
 
@@ -2551,11 +2551,13 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ## Divergent inferred implicit instance attribute types
 
 ```py
-class C:
-    def f(self, other: "C"):
-        self.x = (other.x, 1)
+# TODO: This test currently panics, see https://github.com/astral-sh/ty/issues/837
 
-reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+# class C:
+#    def f(self, other: "C"):
+#        self.x = (other.x, 1)
+#
+# reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

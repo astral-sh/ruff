@@ -96,6 +96,10 @@ impl<'db> Bindings<'db> {
         &self.argument_forms.values
     }
 
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableBinding<'db>> {
+        self.elements.iter()
+    }
+
     /// Match the arguments of a call site against the parameters of a collection of possibly
     /// unioned, possibly overloaded signatures.
     ///
@@ -618,6 +622,9 @@ impl<'db> Bindings<'db> {
                         let kw_only = overload
                             .parameter_type_by_name("kw_only", true)
                             .unwrap_or(None);
+                        let alias = overload
+                            .parameter_type_by_name("alias", true)
+                            .unwrap_or(None);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -650,6 +657,10 @@ impl<'db> Bindings<'db> {
                             None
                         };
 
+                        let alias = alias
+                            .and_then(Type::as_string_literal)
+                            .map(|literal| Box::from(literal.value(db)));
+
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
@@ -658,7 +669,7 @@ impl<'db> Bindings<'db> {
                         // are assignable to `T` if the default type of the field is assignable
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only),
+                            FieldInstance::new(db, default_ty, init, kw_only, alias),
                         )));
                     }
 
@@ -1172,7 +1183,16 @@ impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
     type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.elements.iter()
+        self.iter()
+    }
+}
+
+impl<'db> IntoIterator for Bindings<'db> {
+    type Item = CallableBinding<'db>;
+    type IntoIter = smallvec::IntoIter<[CallableBinding<'db>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.into_iter()
     }
 }
 
@@ -2097,6 +2117,15 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.overloads.iter()
+    }
+}
+
+impl<'db> IntoIterator for CallableBinding<'db> {
+    type Item = Binding<'db>;
+    type IntoIter = smallvec::IntoIter<[Binding<'db>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.overloads.into_iter()
     }
 }
 

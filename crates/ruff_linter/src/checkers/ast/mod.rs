@@ -723,7 +723,9 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::DifferentMatchPatternBindings
             | SemanticSyntaxErrorKind::InvalidExpression(..)
+            | SemanticSyntaxErrorKind::GlobalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
@@ -843,6 +845,26 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
             child = parent;
         }
+        false
+    }
+
+    fn is_bound_parameter(&self, name: &str) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { parameters, .. })
+                | ScopeKind::Lambda(ast::ExprLambda {
+                    parameters: Some(parameters),
+                    ..
+                }) => return parameters.includes(name),
+                ScopeKind::Lambda(_)
+                | ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
+            }
+        }
+
         false
     }
 }

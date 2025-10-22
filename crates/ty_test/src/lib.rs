@@ -323,26 +323,6 @@ fn run_test(
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let pull_types_result = attempt_test(
-                db,
-                pull_types,
-                test_file,
-                "\"pull types\"",
-                Some(
-                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
-                    directive to this test",
-                ),
-            );
-            match pull_types_result {
-                Ok(()) => {}
-                Err(failures) => {
-                    any_pull_types_failures = true;
-                    if !test.should_skip_pulling_types() {
-                        return Some(failures);
-                    }
-                }
-            }
-
             let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
@@ -385,6 +365,26 @@ fn run_test(
                     diagnostic.id() != DiagnosticId::RevealedType
                         && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
                 }));
+            }
+
+            let pull_types_result = attempt_test(
+                db,
+                pull_types,
+                test_file,
+                "\"pull types\"",
+                Some(
+                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
+                    directive to this test",
+                ),
+            );
+            match pull_types_result {
+                Ok(()) => {}
+                Err(failures) => {
+                    any_pull_types_failures = true;
+                    if !test.should_skip_pulling_types() {
+                        return Some(failures);
+                    }
+                }
             }
 
             failure

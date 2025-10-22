@@ -247,7 +247,7 @@ X: int = 42
 from . import foo
 import package
 
-# error: [unresolved-attribute] "Type `<module 'package'>` has no attribute `foo`"
+# error: [unresolved-attribute] "Module `package` has no member `foo`"
 reveal_type(package.foo.X)  # revealed: Unknown
 ```
 

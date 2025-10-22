@@ -27,7 +27,7 @@ impl<'db> SemanticModel<'db> {
 
     // TODO we don't actually want to expose the Db directly to lint rules, but we need to find a
     // solution for exposing information from types
-    pub fn db(&self) -> &dyn Db {
+    pub fn db(&self) -> &'db dyn Db {
         self.db
     }
 
@@ -485,6 +485,7 @@ impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
 impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
+impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {

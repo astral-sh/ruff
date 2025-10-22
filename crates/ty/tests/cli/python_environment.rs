@@ -30,7 +30,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Type `<module 'sys'>` has no attribute `last_exc`
+    error[unresolved-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
     4 | # Access `sys.last_exc` that was only added in Python 3.12
@@ -962,7 +962,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Type `<module 'os'>` has no attribute `grantpt`
+    error[unresolved-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
     2 | import os

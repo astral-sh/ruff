@@ -17,6 +17,7 @@ use super::{
     infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, infer_unpack_types,
 };
+use crate::diagnostic::format_enumeration;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
     KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
@@ -45,6 +46,7 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
+use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
@@ -104,9 +106,7 @@ use crate::types::{
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
-use crate::util::diagnostics::format_enumeration;
-use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
 mod type_expression;
@@ -257,8 +257,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///     return x
     /// ```
     ///
+    /// To keep the calculation deterministic, we use an `FxIndexSet` whose order is determined by the sequence of insertion calls.
+    ///
     /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
-    called_functions: FxHashSet<FunctionType<'db>>,
+    called_functions: FxIndexSet<FunctionType<'db>>,
 
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
@@ -312,7 +314,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region,
             scope,
             return_types_and_ranges: vec![],
-            called_functions: FxHashSet::default(),
+            called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             multi_inference_state: MultiInferenceState::Panic,
             expressions: FxHashMap::default(),
@@ -577,7 +579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
+            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class, None);
 
             // (2) If it's a `NamedTuple` class, check that no field without a default value
             // appears after a field with a default value.
@@ -898,7 +900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (7) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-                CodeGeneratorKind::from_class(self.db(), class)
+                CodeGeneratorKind::from_class(self.db(), class, None)
             {
                 let specialization = None;
 
@@ -932,7 +934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
-                protocol.validate_members(&self.context, self.index);
+                protocol.validate_members(&self.context);
             }
         }
     }
@@ -949,7 +951,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Collect all the unique overloaded function places in this scope. This requires a set
         // because an overloaded function uses the same place for each of the overloads and the
         // implementation.
-        let overloaded_function_places: FxHashSet<_> = self
+        let overloaded_function_places: FxIndexSet<_> = self
             .declarations
             .iter()
             .filter_map(|(definition, ty)| {
@@ -971,7 +973,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
 
-        let mut public_functions = FxHashSet::default();
+        let mut public_functions = FxIndexSet::default();
 
         for place in overloaded_function_places {
             if let Place::Defined(Type::FunctionLiteral(function), _, Definedness::AlwaysDefined) =
@@ -4584,11 +4586,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .dataclass_params(db)
                     .map(|params| SmallVec::from(params.field_specifiers(db)))
                     .or_else(|| {
-                        class_literal
-                            .try_metaclass(db)
-                            .ok()
-                            .and_then(|(_, params)| params)
-                            .map(|params| SmallVec::from(params.field_specifiers(db)))
+                        Some(SmallVec::from(
+                            CodeGeneratorKind::from_class(db, class_literal, None)?
+                                .dataclass_transformer_params()?
+                                .field_specifiers(db),
+                        ))
                     })
             }
 
@@ -6521,7 +6523,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6534,7 +6537,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6551,7 +6555,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::keyword_only(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -7633,25 +7638,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .context
                             .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                         {
-                        if bound_on_instance {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Attribute `{}` can only be accessed on instances, \
-                                     not on the class object `{}` itself.",
-                                    attr.id,
-                                    value_type.display(db)
-                                ),
-                            );
-                        } else {
-                            let diagnostic = builder.into_diagnostic(
-                                format_args!(
-                                    "Type `{}` has no attribute `{}`",
-                                    value_type.display(db),
-                                    attr.id
-                                ),
-                            );
-                            hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
-                        }
+                            if bound_on_instance {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Attribute `{}` can only be accessed on instances, \
+                                        not on the class object `{}` itself.",
+                                        attr.id,
+                                        value_type.display(db)
+                                    ),
+                                );
+                            } else {
+                                let diagnostic = match value_type {
+                                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+                                        "Module `{}` has no member `{}`",
+                                        module.module(db).name(db),
+                                        &attr.id
+                                    )),
+                                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+                                        "Class `{}` has no attribute `{}`",
+                                        class.name(db),
+                                        &attr.id
+                                    )),
+                                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                                        "Class `{}` has no attribute `{}`",
+                                        alias.display(db),
+                                        &attr.id
+                                    )),
+                                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
+                                        "Function `{}` has no attribute `{}`",
+                                        function.name(db),
+                                        &attr.id
+                                    )),
+                                    _ => builder.into_diagnostic(format_args!(
+                                        "Object of type `{}` has no attribute `{}`",
+                                        value_type.display(db),
+                                        &attr.id
+                                    )),
+                                };
+                                hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
+                            }
                         }
                     }
 
@@ -8206,80 +8231,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
                 op,
-            ) => {
-                // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
-                // the Python spec [1] is:
-                //
-                //   - If rhs is a (proper) subclass of lhs, and it provides a different
-                //     implementation of __rop__, use that.
-                //   - Otherwise, if lhs implements __op__, use that.
-                //   - Otherwise, if lhs and rhs are different types, and rhs implements __rop__,
-                //     use that.
-                //
-                // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
-
-                // Technically we don't have to check left_ty != right_ty here, since if the types
-                // are the same, they will trivially have the same implementation of the reflected
-                // dunder, and so we'll fail the inner check. But the type equality check will be
-                // faster for the common case, and allow us to skip the (two) class member lookups.
-                let left_class = left_ty.to_meta_type(self.db());
-                let right_class = right_ty.to_meta_type(self.db());
-                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
-                    let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right_class.member(self.db(), reflected_dunder).place;
-                    // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
-                    // Bindings together
-                    if !rhs_reflected.is_undefined()
-                        && rhs_reflected != left_class.member(self.db(), reflected_dunder).place
-                    {
-                        return right_ty
-                            .try_call_dunder(
-                                self.db(),
-                                reflected_dunder,
-                                CallArguments::positional([left_ty]),
-                                TypeContext::default(),
-                            )
-                            .map(|outcome| outcome.return_type(self.db()))
-                            .or_else(|_| {
-                                left_ty
-                                    .try_call_dunder(
-                                        self.db(),
-                                        op.dunder(),
-                                        CallArguments::positional([right_ty]),
-                                        TypeContext::default(),
-                                    )
-                                    .map(|outcome| outcome.return_type(self.db()))
-                            })
-                            .ok();
-                    }
-                }
-
-                let call_on_left_instance = left_ty
-                    .try_call_dunder(
-                        self.db(),
-                        op.dunder(),
-                        CallArguments::positional([right_ty]),
-                        TypeContext::default(),
-                    )
-                    .map(|outcome| outcome.return_type(self.db()))
-                    .ok();
-
-                call_on_left_instance.or_else(|| {
-                    if left_ty == right_ty {
-                        None
-                    } else {
-                        right_ty
-                            .try_call_dunder(
-                                self.db(),
-                                op.reflected_dunder(),
-                                CallArguments::positional([left_ty]),
-                                TypeContext::default(),
-                            )
-                            .map(|outcome| outcome.return_type(self.db()))
-                            .ok()
-                    }
-                })
-            }
+            ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
+                .map(|outcome| outcome.return_type(self.db()))
+                .ok(),
         }
     }
 

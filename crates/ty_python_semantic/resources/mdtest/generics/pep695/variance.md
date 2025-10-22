@@ -790,6 +790,65 @@ static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
 ```
 
+## Type aliases
+
+The variance of the type alias matches the variance of the value type (RHS type).
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+from typing import Literal
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+type CovariantLiteral1 = Covariant[Literal[1]]
+type CovariantInt = Covariant[int]
+type MyCovariant[T] = Covariant[T]
+
+static_assert(is_subtype_of(CovariantLiteral1, CovariantInt))
+static_assert(is_subtype_of(MyCovariant[Literal[1]], MyCovariant[int]))
+
+class Contravariant[T]:
+    def set(self, value: T):
+        pass
+
+type ContravariantLiteral1 = Contravariant[Literal[1]]
+type ContravariantInt = Contravariant[int]
+type MyContravariant[T] = Contravariant[T]
+
+static_assert(is_subtype_of(ContravariantInt, ContravariantLiteral1))
+static_assert(is_subtype_of(MyContravariant[int], MyContravariant[Literal[1]]))
+
+class Invariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+    def set(self, value: T):
+        pass
+
+type InvariantLiteral1 = Invariant[Literal[1]]
+type InvariantInt = Invariant[int]
+type MyInvariant[T] = Invariant[T]
+
+static_assert(not is_subtype_of(InvariantInt, InvariantLiteral1))
+static_assert(not is_subtype_of(InvariantLiteral1, InvariantInt))
+static_assert(not is_subtype_of(MyInvariant[Literal[1]], MyInvariant[int]))
+static_assert(not is_subtype_of(MyInvariant[int], MyInvariant[Literal[1]]))
+
+class Bivariant[T]:
+    pass
+
+type BivariantLiteral1 = Bivariant[Literal[1]]
+type BivariantInt = Bivariant[int]
+type MyBivariant[T] = Bivariant[T]
+
+static_assert(is_subtype_of(BivariantInt, BivariantLiteral1))
+static_assert(is_subtype_of(BivariantLiteral1, BivariantInt))
+static_assert(is_subtype_of(MyBivariant[Literal[1]], MyBivariant[int]))
+static_assert(is_subtype_of(MyBivariant[int], MyBivariant[Literal[1]]))
+```
+
 ## Inheriting from generic classes with inferred variance
 
 When inheriting from a generic class with our type variable substituted in, we count its occurrences

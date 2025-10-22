@@ -11,7 +11,6 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
-use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -21,8 +20,7 @@ use crate::types::{
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
-    walk_bound_type_var_type,
+    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet};
 
@@ -35,31 +33,7 @@ pub(crate) fn enclosing_generic_contexts<'db>(
 ) -> impl Iterator<Item = GenericContext<'db>> {
     index
         .ancestor_scopes(scope)
-        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
-            NodeWithScopeKind::Class(class) => {
-                let definition = index.expect_single_definition(class);
-                binding_type(db, definition)
-                    .as_class_literal()?
-                    .generic_context(db)
-            }
-            NodeWithScopeKind::Function(function) => {
-                let definition = index.expect_single_definition(function);
-                infer_definition_types(db, definition)
-                    .undecorated_type()
-                    .expect("function should have undecorated type")
-                    .as_function_literal()?
-                    .last_definition_signature(db)
-                    .generic_context
-            }
-            NodeWithScopeKind::TypeAlias(type_alias) => {
-                let definition = index.expect_single_definition(type_alias);
-                binding_type(db, definition)
-                    .as_type_alias()?
-                    .as_pep_695_type_alias()?
-                    .generic_context(db)
-            }
-            _ => None,
-        })
+        .filter_map(|(_, ancestor_scope)| ancestor_scope.node().generic_context(db, index))
 }
 
 /// Binds an unbound typevar.
