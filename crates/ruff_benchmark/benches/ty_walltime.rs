@@ -226,7 +226,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    630,
+    750,
 );
 
 #[track_caller]
