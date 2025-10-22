@@ -32,6 +32,10 @@ warn_unreachable = true
 local_partial_types = true
 enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
 
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+unused-ignore-comment = "error"
+
 [tool.ruff]
 fix = true
 preview = true

@@ -5,6 +5,7 @@
 use std::fmt::Formatter;
 
 use ruff_db::diagnostic::SecondaryCode;
+use serde::Serialize;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
@@ -74,7 +75,7 @@ impl serde::Serialize for NoqaCode {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub enum RuleGroup {
     /// The rule is stable.
     Stable,

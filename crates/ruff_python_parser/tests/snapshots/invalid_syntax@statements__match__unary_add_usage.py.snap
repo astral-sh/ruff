@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 98..100,
                                     node_index: NodeIndex(None),
+                                    range: 98..100,
                                     value: UnaryOp(
                                         ExprUnaryOp {
                                             node_index: NodeIndex(None),
@@ -63,13 +63,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 124..135,
                                     node_index: NodeIndex(None),
+                                    range: 124..135,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 124..125,
                                                 node_index: NodeIndex(None),
+                                                range: 124..125,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
@@ -83,8 +83,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 128..130,
                                                 node_index: NodeIndex(None),
+                                                range: 128..130,
                                                 value: UnaryOp(
                                                     ExprUnaryOp {
                                                         node_index: NodeIndex(None),
@@ -105,8 +105,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 133..135,
                                                 node_index: NodeIndex(None),
+                                                range: 133..135,
                                                 value: UnaryOp(
                                                     ExprUnaryOp {
                                                         node_index: NodeIndex(None),
@@ -143,13 +143,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 159..170,
                                     node_index: NodeIndex(None),
+                                    range: 159..170,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 160..161,
                                                 node_index: NodeIndex(None),
+                                                range: 160..161,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
@@ -163,8 +163,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 163..165,
                                                 node_index: NodeIndex(None),
+                                                range: 163..165,
                                                 value: UnaryOp(
                                                     ExprUnaryOp {
                                                         node_index: NodeIndex(None),
@@ -185,8 +185,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 167..169,
                                                 node_index: NodeIndex(None),
+                                                range: 167..169,
                                                 value: UnaryOp(
                                                     ExprUnaryOp {
                                                         node_index: NodeIndex(None),
@@ -223,8 +223,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 194..209,
                                     node_index: NodeIndex(None),
+                                    range: 194..209,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -248,8 +248,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 200..202,
                                                         node_index: NodeIndex(None),
+                                                        range: 200..202,
                                                         value: UnaryOp(
                                                             ExprUnaryOp {
                                                                 node_index: NodeIndex(None),
@@ -279,8 +279,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 206..208,
                                                         node_index: NodeIndex(None),
+                                                        range: 206..208,
                                                         value: UnaryOp(
                                                             ExprUnaryOp {
                                                                 node_index: NodeIndex(None),
@@ -319,8 +319,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 233..254,
                                     node_index: NodeIndex(None),
+                                    range: 233..254,
                                     keys: [
                                         BooleanLiteral(
                                             ExprBooleanLiteral {
@@ -340,8 +340,8 @@ Module(
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 240..242,
                                                 node_index: NodeIndex(None),
+                                                range: 240..242,
                                                 value: UnaryOp(
                                                     ExprUnaryOp {
                                                         node_index: NodeIndex(None),
@@ -362,8 +362,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 251..253,
                                                 node_index: NodeIndex(None),
+                                                range: 251..253,
                                                 value: UnaryOp(
                                                     ExprUnaryOp {
                                                         node_index: NodeIndex(None),

@@ -1,0 +1,56 @@
+---
+source: crates/ty_test/src/lib.rs
+assertion_line: 427
+expression: snapshot
+---
+---
+mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Truncation for long unions and literals
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Literal, Union
+ 2 | 
+ 3 | class A: ...
+ 4 | class B: ...
+ 5 | class C: ...
+ 6 | class D: ...
+ 7 | class E: ...
+ 8 | class F: ...
+ 9 | 
+10 | def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
+11 |     return 0
+12 | 
+13 | def _(n: int):
+14 |     x = n
+15 |     # error: [invalid-argument-type]
+16 |     f1(x)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f1` is incorrect
+  --> src/mdtest_snippet.py:16:8
+   |
+14 |     x = n
+15 |     # error: [invalid-argument-type]
+16 |     f1(x)
+   |        ^ Expected `Literal[1, 2, 3, 4, 5, ... omitted 3 literals] | A | B | ... omitted 4 union elements`, found `int`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:10:5
+   |
+ 8 | class F: ...
+ 9 |
+10 | def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
+   |     ^^ ----------------------------------------------------------- Parameter declared here
+11 |     return 0
+   |
+info: rule `invalid-argument-type` is enabled by default
+
+```

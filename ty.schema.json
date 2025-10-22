@@ -15,17 +15,18 @@
       ]
     },
     "overrides": {
-      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations that apply to matching files. Multiple overrides can match the same file, with later overrides taking precedence.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/OverrideOptions"
-      }
+      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations\nthat apply to matching files. Multiple overrides can match the same file,\nwith later overrides taking precedence.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/OverridesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule. * `warn`: Enable the rule and create a warning diagnostic. * `error`: Enable the rule and create an error diagnostic. ty will exit with a non-zero code if any error diagnostics are emitted.",
+      "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -58,28 +59,38 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "Array_of_string": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/string"
+      }
+    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
         "extra-paths": {
-          "description": "User-provided paths that should take first priority in module resolution.\n\nThis is an advanced option that should usually only be used for first-party or third-party modules that are not installed into your Python environment in a conventional way. Use the `python` option to specify the location of your Python environment.\n\nThis option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath` configuration setting.",
+          "description": "User-provided paths that should take first priority in module resolution.\n\nThis is an advanced option that should usually only be used for first-party or third-party\nmodules that are not installed into your Python environment in a conventional way.\nUse the `python` option to specify the location of your Python environment.\n\nThis option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`\nconfiguration setting.",
           "type": [
             "array",
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/RelativePathBuf"
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment to resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment variable to point to your project's virtual environment. ty can also infer the location of your environment from an activated Conda environment, and will look for a `.venv` directory in the project root if none of the above apply.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable (such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
-          "type": [
-            "string",
-            "null"
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need\nto specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`\nenvironment variable to point to your project's virtual environment. ty can also infer\nthe location of your environment from an activated Conda environment, and will look for\na `.venv` directory in the project root if none of the above apply.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable\n(such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelativePathBuf"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "python-platform": {
-          "description": "Specifies the target platform that will be used to analyze the source code. If specified, ty will understand conditions based on comparisons with `sys.platform`, such as are commonly found in typeshed to reflect the differing contents of the standard library across platforms. If `all` is specified, ty will assume that the source code can run on any platform.\n\nIf no platform is specified, ty will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
+          "description": "Specifies the target platform that will be used to analyze the source code.\nIf specified, ty will understand conditions based on comparisons with `sys.platform`, such\nas are commonly found in typeshed to reflect the differing contents of the standard library across platforms.\nIf `all` is specified, ty will assume that the source code can run on any platform.\n\nIf no platform is specified, ty will use the current platform:\n- `win32` for Windows\n- `darwin` for macOS\n- `android` for Android\n- `ios` for iOS\n- `linux` for everything else",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonPlatform"
@@ -90,7 +101,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference to determine a value: 1. Check for the `project.requires-python` setting in a `pyproject.toml` file and use the minimum version from the specified range 2. Check for an activated or configured Python environment and attempt to infer the Python version of that environment 3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons with `sys.version_info`. These are commonly found in typeshed, for example, to reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonVersion"
@@ -101,20 +112,24 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file), it will also be included in the first party search path.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
           "type": [
             "array",
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/RelativePathBuf"
           }
         },
         "typeshed": {
-          "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types. If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib, bundled as a zip file in the binary",
-          "type": [
-            "string",
-            "null"
+          "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types.\nIf this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,\nbundled as a zip file in the binary",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelativePathBuf"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },
@@ -126,25 +141,19 @@
           "title": "Ignore",
           "description": "The lint is disabled and should not run.",
           "type": "string",
-          "enum": [
-            "ignore"
-          ]
+          "const": "ignore"
         },
         {
           "title": "Warn",
           "description": "The lint is enabled and diagnostic should have a warning severity.",
           "type": "string",
-          "enum": [
-            "warn"
-          ]
+          "const": "warn"
         },
         {
           "title": "Error",
           "description": "The lint is enabled and diagnostics have an error severity.",
           "type": "string",
-          "enum": [
-            "error"
-          ]
+          "const": "error"
         }
       ]
     },
@@ -152,32 +161,24 @@
       "description": "The diagnostic output format.",
       "oneOf": [
         {
-          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`.\nMoreover, diagnostic messages may include additional\ncontext and annotations on the input to help understand\nthe message.",
           "type": "string",
-          "enum": [
-            "full"
-          ]
+          "const": "full"
         },
         {
-          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on\na single line. Only the most important or primary aspects\nof the diagnostic are included. Contextual information is\ndropped.\n\nThis may use color when printing to a `tty`.",
           "type": "string",
-          "enum": [
-            "concise"
-          ]
+          "const": "concise"
         },
         {
           "description": "Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.\n\n[Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format",
           "type": "string",
-          "enum": [
-            "gitlab"
-          ]
+          "const": "gitlab"
         },
         {
           "description": "Print diagnostics in the format used by [GitHub Actions] workflow error annotations.\n\n[GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message",
           "type": "string",
-          "enum": [
-            "github"
-          ]
+          "const": "github"
         }
       ]
     },
@@ -185,27 +186,29 @@
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`. Exclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`.\nExclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Array_of_string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "include": {
-          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed:\nIncluding a file or directory will make it so that it (and its contents)\nare affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Array_of_string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "rules": {
-          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules taking precedence for matching files. You can set rules to different severity levels or disable them entirely.",
+          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules\ntaking precedence for matching files. You can set rules to different\nseverity levels or disable them entirely.",
           "anyOf": [
             {
               "$ref": "#/definitions/Rules"
@@ -217,6 +220,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "OverridesOptions": {
+      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific\nfiles or directories. Multiple overrides can match the same file, with\nlater overrides take precedence.\n\n### Precedence\n\n- Later overrides in the array take precedence over earlier ones\n- Override rules take precedence over global rules for matching files\n\n### Examples\n\n```toml\n# Relax rules for test files\n[[tool.ty.overrides]]\ninclude = [\"tests/**\", \"**/test_*.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"warn\"\n\n# Ignore generated files but still check important ones\n[[tool.ty.overrides]]\ninclude = [\"generated/**\"]\nexclude = [\"generated/important.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"ignore\"\n```",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/OverrideOptions"
+      }
     },
     "PythonPlatform": {
       "description": "The target platform to assume when resolving types.\n",
@@ -279,6 +289,14 @@
         {
           "description": "Python 3.14",
           "const": "3.14"
+        }
+      ]
+    },
+    "RelativePathBuf": {
+      "description": "A possibly relative path in a configuration file.\n\nRelative paths in configuration files or from CLI options\nrequire different anchoring:\n\n* CLI: The path is relative to the current working directory\n* Configuration file: The path is relative to the project's root.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SystemPathBuf"
         }
       ]
     },
@@ -409,6 +427,16 @@
           "title": "detects F-strings in type annotation positions",
           "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "ignore-comment-unknown-rule": {
+          "title": "detects `ty: ignore` comments that reference unknown rules",
+          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -925,16 +953,6 @@
             }
           ]
         },
-        "unknown-rule": {
-          "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
-          "default": "warn",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "unresolved-attribute": {
           "title": "detects references to unresolved attributes",
           "description": "## What it does\nChecks for unresolved attributes.\n\n## Why is this bad?\nAccessing an unbound attribute will raise an `AttributeError` at runtime.\nAn unresolved attribute is not guaranteed to exist from the type alone,\nso this could also indicate that the object is not of the type that the user expects.\n\n## Examples\n```python\nclass A: ...\n\nA().foo  # AttributeError: 'A' object has no attribute 'foo'\n```",
@@ -1044,42 +1062,52 @@
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "A list of file and directory patterns to exclude from type checking.\n\nPatterns follow a syntax similar to `.gitignore`:\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches files or directories named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid. - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)\n\nAll paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`). To exclude any directory or file named `src`, use `**/src` instead.\n\nBy default, ty excludes commonly ignored directories:\n\n- `**/.bzr/` - `**/.direnv/` - `**/.eggs/` - `**/.git/` - `**/.git-rewrite/` - `**/.hg/` - `**/.mypy_cache/` - `**/.nox/` - `**/.pants.d/` - `**/.pytype/` - `**/.ruff_cache/` - `**/.svn/` - `**/.tox/` - `**/.venv/` - `**/__pypackages__/` - `**/_build/` - `**/buck-out/` - `**/dist/` - `**/node_modules/` - `**/venv/`\n\nYou can override any default exclude by using a negated pattern. For example, to re-include `dist` use `exclude = [\"!dist\"]`",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "A list of file and directory patterns to exclude from type checking.\n\nPatterns follow a syntax similar to `.gitignore`:\n\n- `./src/` matches only a directory\n- `./src` matches both files and directories\n- `src` matches files or directories named `src`\n- `*` matches any (possibly empty) sequence of characters (except `/`).\n- `**` matches zero or more path components.\n  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.\n  A sequence of more than two consecutive `*` characters is also invalid.\n- `?` matches any single character except `/`\n- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,\n  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n- `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)\n\nAll paths are anchored relative to the project root (`src` only\nmatches `<project_root>/src` and not `<project_root>/test/src`).\nTo exclude any directory or file named `src`, use `**/src` instead.\n\nBy default, ty excludes commonly ignored directories:\n\n- `**/.bzr/`\n- `**/.direnv/`\n- `**/.eggs/`\n- `**/.git/`\n- `**/.git-rewrite/`\n- `**/.hg/`\n- `**/.mypy_cache/`\n- `**/.nox/`\n- `**/.pants.d/`\n- `**/.pytype/`\n- `**/.ruff_cache/`\n- `**/.svn/`\n- `**/.tox/`\n- `**/.venv/`\n- `**/__pypackages__/`\n- `**/_build/`\n- `**/buck-out/`\n- `**/dist/`\n- `**/node_modules/`\n- `**/venv/`\n\nYou can override any default exclude by using a negated pattern. For example,\nto re-include `dist` use `exclude = [\"!dist\"]`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Array_of_string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "include": {
-          "description": "A list of files and directories to check. The `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are type checked.\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches a file or directory named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "A list of files and directories to check. The `include` option\nfollows a similar syntax to `.gitignore` but reversed:\nIncluding a file or directory will make it so that it (and its contents)\nare type checked.\n\n- `./src/` matches only a directory\n- `./src` matches both files and directories\n- `src` matches a file or directory named `src`\n- `*` matches any (possibly empty) sequence of characters (except `/`).\n- `**` matches zero or more path components.\n  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.\n  A sequence of more than two consecutive `*` characters is also invalid.\n- `?` matches any single character except `/`\n- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,\n  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only\nmatches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Array_of_string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "respect-ignore-files": {
-          "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
+          "description": "Whether to automatically exclude files that are ignored by `.ignore`,\n`.gitignore`, `.git/info/exclude`, and global `gitignore` files.\nEnabled by default.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file), it will also be included in the first party search path.",
-          "deprecated": true,
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelativePathBuf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "deprecated": true
         }
       },
       "additionalProperties": false
+    },
+    "SystemPathBuf": {
+      "description": "An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).\n\nThe path is guaranteed to be valid UTF-8.",
+      "type": "string"
     },
     "TerminalOptions": {
       "type": "object",
@@ -1104,6 +1132,9 @@
         }
       },
       "additionalProperties": false
+    },
+    "string": {
+      "type": "string"
     }
   }
 }

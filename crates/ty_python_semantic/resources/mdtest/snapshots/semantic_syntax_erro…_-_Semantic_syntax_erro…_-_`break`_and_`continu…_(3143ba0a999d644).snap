@@ -1,0 +1,107 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: semantic_syntax_errors.md - Semantic syntax error diagnostics - `break` and `continue` outside a loop
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syntax_errors.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | break  # error: [invalid-syntax]
+ 2 | continue  # error: [invalid-syntax]
+ 3 | 
+ 4 | for x in range(42):
+ 5 |     break  # fine
+ 6 |     continue  # fine
+ 7 | 
+ 8 |     def _():
+ 9 |         break  # error: [invalid-syntax]
+10 |         continue  # error: [invalid-syntax]
+11 | 
+12 |     class Fine:
+13 |         # this is invalid syntax despite it being in an eager-nested scope!
+14 |         break  # error: [invalid-syntax]
+15 |         continue  # error: [invalid-syntax]
+```
+
+# Diagnostics
+
+```
+error[invalid-syntax]: `break` outside loop
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | break  # error: [invalid-syntax]
+  | ^^^^^
+2 | continue  # error: [invalid-syntax]
+  |
+
+```
+
+```
+error[invalid-syntax]: `continue` outside loop
+ --> src/mdtest_snippet.py:2:1
+  |
+1 | break  # error: [invalid-syntax]
+2 | continue  # error: [invalid-syntax]
+  | ^^^^^^^^
+3 |
+4 | for x in range(42):
+  |
+
+```
+
+```
+error[invalid-syntax]: `break` outside loop
+  --> src/mdtest_snippet.py:9:9
+   |
+ 8 |     def _():
+ 9 |         break  # error: [invalid-syntax]
+   |         ^^^^^
+10 |         continue  # error: [invalid-syntax]
+   |
+
+```
+
+```
+error[invalid-syntax]: `continue` outside loop
+  --> src/mdtest_snippet.py:10:9
+   |
+ 8 |     def _():
+ 9 |         break  # error: [invalid-syntax]
+10 |         continue  # error: [invalid-syntax]
+   |         ^^^^^^^^
+11 |
+12 |     class Fine:
+   |
+
+```
+
+```
+error[invalid-syntax]: `break` outside loop
+  --> src/mdtest_snippet.py:14:9
+   |
+12 |     class Fine:
+13 |         # this is invalid syntax despite it being in an eager-nested scope!
+14 |         break  # error: [invalid-syntax]
+   |         ^^^^^
+15 |         continue  # error: [invalid-syntax]
+   |
+
+```
+
+```
+error[invalid-syntax]: `continue` outside loop
+  --> src/mdtest_snippet.py:15:9
+   |
+13 |         # this is invalid syntax despite it being in an eager-nested scope!
+14 |         break  # error: [invalid-syntax]
+15 |         continue  # error: [invalid-syntax]
+   |         ^^^^^^^^
+   |
+
+```

@@ -47,8 +47,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 22..23,
                                     node_index: NodeIndex(None),
+                                    range: 22..23,
                                     pattern: None,
                                     name: None,
                                 },

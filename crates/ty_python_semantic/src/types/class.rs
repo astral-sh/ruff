@@ -37,7 +37,8 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
     TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, infer_definition_types,
+    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -190,7 +191,11 @@ pub(crate) enum CodeGeneratorKind<'db> {
 }
 
 impl<'db> CodeGeneratorKind<'db> {
-    pub(crate) fn from_class(db: &'db dyn Db, class: ClassLiteral<'db>) -> Option<Self> {
+    pub(crate) fn from_class(
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Self> {
         #[salsa::tracked(
             cycle_fn=code_generator_of_class_recover,
             cycle_initial=code_generator_of_class_initial,
@@ -199,10 +204,19 @@ impl<'db> CodeGeneratorKind<'db> {
         fn code_generator_of_class<'db>(
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
+            specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
             } else if let Ok((_, Some(transformer_params))) = class.try_metaclass(db) {
+                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
+            } else if let Some(transformer_params) =
+                class.iter_mro(db, specialization).skip(1).find_map(|base| {
+                    base.into_class().and_then(|class| {
+                        class.class_literal(db).0.dataclass_transformer_params(db)
+                    })
+                })
+            {
                 Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
             } else if class
                 .explicit_bases(db)
@@ -219,6 +233,7 @@ impl<'db> CodeGeneratorKind<'db> {
         fn code_generator_of_class_initial<'db>(
             _db: &'db dyn Db,
             _class: ClassLiteral<'db>,
+            _specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
             None
         }
@@ -229,20 +244,36 @@ impl<'db> CodeGeneratorKind<'db> {
             _value: &Option<CodeGeneratorKind<'db>>,
             _count: u32,
             _class: ClassLiteral<'db>,
+            _specialization: Option<Specialization<'db>>,
         ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind<'db>>> {
             salsa::CycleRecoveryAction::Iterate
         }
 
-        code_generator_of_class(db, class)
+        code_generator_of_class(db, class, specialization)
     }
 
-    pub(super) fn matches(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    pub(super) fn matches(
+        self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> bool {
         matches!(
-            (CodeGeneratorKind::from_class(db, class), self),
+            (
+                CodeGeneratorKind::from_class(db, class, specialization),
+                self
+            ),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
                 | (Some(Self::NamedTuple), Self::NamedTuple)
                 | (Some(Self::TypedDict), Self::TypedDict)
         )
+    }
+
+    pub(super) fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
+        match self {
+            Self::DataclassLike(params) => params,
+            Self::NamedTuple | Self::TypedDict => None,
+        }
     }
 }
 
@@ -1311,6 +1342,8 @@ pub(crate) enum FieldKind<'db> {
         init: bool,
         /// Whether or not this field can only be passed as a keyword argument to `__init__`.
         kw_only: Option<bool>,
+        /// The name for this field in the `__init__` signature, if specified.
+        alias: Option<Box<str>>,
     },
     /// `TypedDict` field metadata
     TypedDict {
@@ -1580,7 +1613,18 @@ impl<'db> ClassLiteral<'db> {
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
-                let specialization = f(generic_context);
+                let mut specialization = f(generic_context);
+
+                for (idx, ty) in specialization.types(db).iter().enumerate() {
+                    if exceeds_max_specialization_depth(db, *ty) {
+                        specialization = specialization.with_replaced_type(
+                            db,
+                            idx,
+                            Type::divergent(Some(self.body_scope(db))),
+                        );
+                    }
+                }
+
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
         }
@@ -2200,7 +2244,7 @@ impl<'db> ClassLiteral<'db> {
             };
         }
 
-        if CodeGeneratorKind::NamedTuple.matches(db, self) {
+        if CodeGeneratorKind::NamedTuple.matches(db, self, specialization) {
             if let Some(field) = self
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
@@ -2262,7 +2306,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
 
-        let field_policy = CodeGeneratorKind::from_class(db, self)?;
+        let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 
         let transformer_params =
             if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
@@ -2284,14 +2328,15 @@ impl<'db> ClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only) = match field.kind {
-                    FieldKind::NamedTuple { default_ty } => (true, default_ty, None),
+                let (init, mut default_ty, kw_only, alias) = match &field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None),
                     FieldKind::Dataclass {
                         init,
                         default_ty,
                         kw_only,
+                        alias,
                         ..
-                    } => (init, default_ty, kw_only),
+                    } => (*init, *default_ty, *kw_only, alias.as_ref()),
                     FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
@@ -2357,10 +2402,13 @@ impl<'db> ClassLiteral<'db> {
                 let is_kw_only = name == "__replace__"
                     || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
 
+                // Use the alias name if provided, otherwise use the field name
+                let parameter_name = alias.map(Name::new).unwrap_or(field_name);
+
                 let mut parameter = if is_kw_only {
-                    Parameter::keyword_only(field_name)
+                    Parameter::keyword_only(parameter_name)
                 } else {
-                    Parameter::positional_or_keyword(field_name)
+                    Parameter::positional_or_keyword(parameter_name)
                 }
                 .with_annotated_type(field_ty);
 
@@ -2808,7 +2856,7 @@ impl<'db> ClassLiteral<'db> {
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let (class_literal, specialization) = class.class_literal(db);
-                    if field_policy.matches(db, class_literal) {
+                    if field_policy.matches(db, class_literal, specialization) {
                         Some((class_literal, specialization))
                     } else {
                         None
@@ -2895,6 +2943,7 @@ impl<'db> ClassLiteral<'db> {
 
                 let mut init = true;
                 let mut kw_only = None;
+                let mut alias = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     if self
@@ -2908,6 +2957,7 @@ impl<'db> ClassLiteral<'db> {
                     } else {
                         init = field.init(db);
                         kw_only = field.kw_only(db);
+                        alias = field.alias(db);
                     }
                 }
 
@@ -2918,6 +2968,7 @@ impl<'db> ClassLiteral<'db> {
                         init_only: attr.is_init_var(),
                         init,
                         kw_only,
+                        alias,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
@@ -3623,7 +3674,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             .map(|class| class.variance_of(db, typevar));
 
         let default_attribute_variance = {
-            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self, None);
             // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
             // their field types in contravariant position, thus meaning a frozen dataclass must
             // still be invariant in its field types. Other synthesized methods on dataclasses are
@@ -4575,7 +4626,13 @@ impl KnownClass {
     /// the class. If this class is generic, this will use the default specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    #[track_caller]
     pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
@@ -4584,7 +4641,13 @@ impl KnownClass {
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
     /// parameter is specialized to `Unknown`.
+    #[track_caller]
     pub(crate) fn to_instance_unknown(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.try_to_class_literal(db)
             .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
             .unwrap_or_else(Type::unknown)
@@ -4628,11 +4691,17 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
+    #[track_caller]
     pub(crate) fn to_specialized_instance<'db>(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.to_specialized_class_type(db, specialization)
             .and_then(|class_type| Type::from(class_type).to_instance(db))
             .unwrap_or_else(Type::unknown)
@@ -5527,11 +5596,19 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
-            assert_ne!(
-                class.to_instance(&db),
-                Type::unknown(),
-                "Unexpectedly fell back to `Unknown` for `{class:?}`"
-            );
+            // Check the class can be looked up successfully
+            class.try_to_class_literal_without_logging(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}`"
+                );
+            }
         }
     }
 
@@ -5578,11 +5655,19 @@ mod tests {
                 current_version = version_added;
             }
 
-            assert_ne!(
-                class.to_instance(&db),
-                Type::unknown(),
-                "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
-            );
+            // Check the class can be looked up successfully
+            class.try_to_class_literal_without_logging(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
+                );
+            }
         }
     }
 }

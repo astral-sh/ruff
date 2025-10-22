@@ -1267,9 +1267,9 @@ impl<'db> Parameters<'db> {
         } = parameters;
 
         let default_type = |param: &ast::ParameterWithDefault| {
-            param
-                .default()
-                .map(|default| definition_expression_type(db, definition, default))
+            param.default().map(|default| {
+                definition_expression_type(db, definition, default).replace_parameter_defaults(db)
+            })
         };
 
         let method_info = infer_method_information(db, definition);
@@ -1873,23 +1873,27 @@ impl<'db> ParameterKind<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let apply_to_default_type = |default_type: &Option<Type<'db>>| {
+            if type_mapping == &TypeMapping::ReplaceParameterDefaults && default_type.is_some() {
+                Some(Type::unknown())
+            } else {
+                default_type
+                    .as_ref()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+        };
+
         match self {
             Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
-                default_type: default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                default_type: apply_to_default_type(default_type),
                 name: name.clone(),
             },
             Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
-                default_type: default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                default_type: apply_to_default_type(default_type),
                 name: name.clone(),
             },
             Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
-                default_type: default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                default_type: apply_to_default_type(default_type),
                 name: name.clone(),
             },
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),

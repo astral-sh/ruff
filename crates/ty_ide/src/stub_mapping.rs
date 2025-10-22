@@ -1,5 +1,8 @@
 use itertools::Either;
+use ruff_db::system::SystemPathBuf;
 use ty_python_semantic::{ResolvedDefinition, map_stub_definition};
+
+use crate::cached_vendored_root;
 
 /// Maps `ResolvedDefinitions` from stub files to corresponding definitions in source files.
 ///
@@ -9,11 +12,16 @@ use ty_python_semantic::{ResolvedDefinition, map_stub_definition};
 /// docstrings for functions that resolve to stubs.
 pub(crate) struct StubMapper<'db> {
     db: &'db dyn crate::Db,
+    cached_vendored_root: Option<SystemPathBuf>,
 }
 
 impl<'db> StubMapper<'db> {
     pub(crate) fn new(db: &'db dyn crate::Db) -> Self {
-        Self { db }
+        let cached_vendored_root = cached_vendored_root(db);
+        Self {
+            db,
+            cached_vendored_root,
+        }
     }
 
     /// Map a `ResolvedDefinition` from a stub file to corresponding definitions in source files.
@@ -24,7 +32,9 @@ impl<'db> StubMapper<'db> {
         &self,
         def: ResolvedDefinition<'db>,
     ) -> impl Iterator<Item = ResolvedDefinition<'db>> {
-        if let Some(definitions) = map_stub_definition(self.db, &def) {
+        if let Some(definitions) =
+            map_stub_definition(self.db, &def, self.cached_vendored_root.as_deref())
+        {
             return Either::Left(definitions.into_iter());
         }
         Either::Right(std::iter::once(def))

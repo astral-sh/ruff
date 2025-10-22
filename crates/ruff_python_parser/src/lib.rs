@@ -489,6 +489,23 @@ impl Tokens {
         TokenIterWithContext::new(&self.raw)
     }
 
+    /// Performs a binary search to find the index of the **first** token that starts at the given `offset`.
+    ///
+    /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens start at the same offset,
+    /// it returns the index of the first one. Multiple tokens can start at the same offset in cases where
+    /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
+    pub fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
+        let partition_point = self.partition_point(|token| token.start() < offset);
+
+        let after = &self[partition_point..];
+
+        if after.first().is_some_and(|first| first.start() == offset) {
+            Ok(partition_point)
+        } else {
+            Err(partition_point)
+        }
+    }
+
     /// Returns a slice of [`Token`] that are within the given `range`.
     ///
     /// The start and end offset of the given range should be either:
@@ -532,30 +549,7 @@ impl Tokens {
     pub fn in_range(&self, range: TextRange) -> &[Token] {
         let tokens_after_start = self.after(range.start());
 
-        match tokens_after_start.binary_search_by_key(&range.end(), Ranged::end) {
-            Ok(idx) => {
-                // If we found the token with the end offset, that token should be included in the
-                // return slice.
-                &tokens_after_start[..=idx]
-            }
-            Err(idx) => {
-                if let Some(token) = tokens_after_start.get(idx) {
-                    // If it's equal to the start offset, then it's at a token boundary which is
-                    // valid. If it's less than the start offset, then it's in the gap between the
-                    // tokens which is valid as well.
-                    assert!(
-                        range.end() <= token.start(),
-                        "End offset {:?} is inside a token range {:?}",
-                        range.end(),
-                        token.range()
-                    );
-                }
-
-                // This index is where the token with the offset _could_ be, so that token should
-                // be excluded from the return slice.
-                &tokens_after_start[..idx]
-            }
-        }
+        Self::before_impl(tokens_after_start, range.end())
     }
 
     /// Searches the token(s) at `offset`.
@@ -597,7 +591,7 @@ impl Tokens {
     /// assert_eq!(collect_tokens(TextSize::new(57)), vec! []);
     /// ```
     pub fn at_offset(&self, offset: TextSize) -> TokenAt {
-        match self.binary_search_by_key(&offset, ruff_text_size::Ranged::start) {
+        match self.binary_search_by_start(offset) {
             // The token at `index` starts exactly at `offset.
             // ```python
             // object.attribute
@@ -649,28 +643,25 @@ impl Tokens {
     /// If the given offset is inside a token range at any point
     /// other than the start of the range.
     pub fn before(&self, offset: TextSize) -> &[Token] {
-        match self.binary_search_by(|token| token.start().cmp(&offset)) {
-            Ok(idx) => &self[..idx],
-            Err(idx) => {
-                // We can't use `saturating_sub` here because a file could contain a BOM header, in
-                // which case the token starts at offset 3 for UTF-8 encoded file content.
-                if idx > 0 {
-                    if let Some(prev) = self.get(idx - 1) {
-                        // If it's equal to the end offset, then it's at a token boundary which is
-                        // valid. If it's greater than the end offset, then it's in the gap between
-                        // the tokens which is valid as well.
-                        assert!(
-                            offset >= prev.end(),
-                            "Offset {:?} is inside a token range {:?}",
-                            offset,
-                            prev.range()
-                        );
-                    }
-                }
+        Self::before_impl(&self.raw, offset)
+    }
 
-                &self[..idx]
-            }
+    fn before_impl(tokens: &[Token], offset: TextSize) -> &[Token] {
+        let partition_point = tokens.partition_point(|token| token.start() < offset);
+        let before = &tokens[..partition_point];
+
+        if let Some(last) = before.last() {
+            // If it's equal to the end offset, then it's at a token boundary which is
+            // valid. If it's greater than the end offset, then it's in the gap between
+            // the tokens which is valid as well.
+            assert!(
+                offset >= last.end(),
+                "Offset {:?} is inside a token range {:?}",
+                offset,
+                last.range()
+            );
         }
+        before
     }
 
     /// Returns a slice of tokens after the given [`TextSize`] offset.
@@ -684,28 +675,21 @@ impl Tokens {
     /// If the given offset is inside a token range at any point
     /// other than the start of the range.
     pub fn after(&self, offset: TextSize) -> &[Token] {
-        match self.binary_search_by(|token| token.start().cmp(&offset)) {
-            Ok(idx) => &self[idx..],
-            Err(idx) => {
-                // We can't use `saturating_sub` here because a file could contain a BOM header, in
-                // which case the token starts at offset 3 for UTF-8 encoded file content.
-                if idx > 0 {
-                    if let Some(prev) = self.get(idx - 1) {
-                        // If it's equal to the end offset, then it's at a token boundary which is
-                        // valid. If it's greater than the end offset, then it's in the gap between
-                        // the tokens which is valid as well.
-                        assert!(
-                            offset >= prev.end(),
-                            "Offset {:?} is inside a token range {:?}",
-                            offset,
-                            prev.range()
-                        );
-                    }
-                }
+        let partition_point = self.partition_point(|token| token.end() <= offset);
+        let after = &self[partition_point..];
 
-                &self[idx..]
-            }
+        if let Some(first) = after.first() {
+            // valid. If it's greater than the end offset, then it's in the gap between
+            // the tokens which is valid as well.
+            assert!(
+                offset <= first.start(),
+                "Offset {:?} is inside a token range {:?}",
+                offset,
+                first.range()
+            );
         }
+
+        after
     }
 }
 
@@ -1099,7 +1083,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "End offset 6 is inside a token range 4..7")]
+    #[should_panic(expected = "Offset 6 is inside a token range 4..7")]
     fn tokens_in_range_end_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(0.into(), 6.into()));

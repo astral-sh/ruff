@@ -1,0 +1,162 @@
+---
+source: crates/ruff_linter/src/rules/flake8_gettext/mod.rs
+---
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+ --> INT002.py:1:3
+  |
+1 | _("{}".format("line"))
+  |   ^^^^^^^^^^^^^^^^^^^
+2 | gettext("{}".format("line"))
+3 | ngettext("{}".format("line"), "{}".format("lines"), 2)
+  |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+ --> INT002.py:2:9
+  |
+1 | _("{}".format("line"))
+2 | gettext("{}".format("line"))
+  |         ^^^^^^^^^^^^^^^^^^^
+3 | ngettext("{}".format("line"), "{}".format("lines"), 2)
+  |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+ --> INT002.py:3:10
+  |
+1 | _("{}".format("line"))
+2 | gettext("{}".format("line"))
+3 | ngettext("{}".format("line"), "{}".format("lines"), 2)
+  |          ^^^^^^^^^^^^^^^^^^^
+4 |
+5 | _gettext("{}".format("line"))  # no lint
+  |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:18:21
+   |
+16 | name = "Guido"
+17 |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:19:22
+   |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+20 | gettext_fn("Hello, {}!".format(name))
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:20:12
+   |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:21:13
+   |
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:27:14
+   |
+25 | def _(message): return message
+26 |
+27 | animals = [_("{}".format("mollusk")),
+   |              ^^^^^^^^^^^^^^^^^^^^^^
+28 |            _("{}".format("albatross")),
+29 |            _("{}".format("rat")),
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:28:14
+   |
+27 | animals = [_("{}".format("mollusk")),
+28 |            _("{}".format("albatross")),
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^
+29 |            _("{}".format("rat")),
+30 |            _("{}".format("penguin")),
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:29:14
+   |
+27 | animals = [_("{}".format("mollusk")),
+28 |            _("{}".format("albatross")),
+29 |            _("{}".format("rat")),
+   |              ^^^^^^^^^^^^^^^^^^
+30 |            _("{}".format("penguin")),
+31 |            _("{}".format("python")),]
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:30:14
+   |
+28 |            _("{}".format("albatross")),
+29 |            _("{}".format("rat")),
+30 |            _("{}".format("penguin")),
+   |              ^^^^^^^^^^^^^^^^^^^^^^
+31 |            _("{}".format("python")),]
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:31:14
+   |
+29 |            _("{}".format("rat")),
+30 |            _("{}".format("penguin")),
+31 |            _("{}".format("python")),]
+   |              ^^^^^^^^^^^^^^^^^^^^^
+32 |
+33 | del _
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:37:13
+   |
+35 | for a in animals:
+36 |     print(_(a))
+37 |     print(_("{}".format(a)))
+   |             ^^^^^^^^^^^^^^
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:47:12
+   |
+45 | builtins.__dict__["gettext"] = gettext_fn
+46 |
+47 | builtins._("{}".format("line"))
+   |            ^^^^^^^^^^^^^^^^^^^
+48 | builtins.gettext("{}".format("line"))
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:48:18
+   |
+47 | builtins._("{}".format("line"))
+48 | builtins.gettext("{}".format("line"))
+   |                  ^^^^^^^^^^^^^^^^^^^
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |
+
+INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  --> INT002.py:49:19
+   |
+47 | builtins._("{}".format("line"))
+48 | builtins.gettext("{}".format("line"))
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |                   ^^^^^^^^^^^^^^^^^^^
+   |

@@ -308,7 +308,7 @@ class B(A): ...
 
 reveal_type(super(B))  # revealed: super
 
-# error: [unresolved-attribute] "Type `super` has no attribute `a`"
+# error: [unresolved-attribute] "Object of type `super` has no attribute `a`"
 super(B).a
 ```
 
@@ -436,7 +436,7 @@ def f(x: C | D):
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [possibly-missing-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `b` may be missing on object of type `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
 def f(flag: bool):
@@ -476,7 +476,7 @@ def f(flag: bool):
     reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [possibly-missing-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `a` may be missing on object of type `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
     reveal_type(s.a)  # revealed: str
 ```
 
@@ -619,7 +619,7 @@ class B(A):
         # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
         super().a
 
-# error: [unresolved-attribute] "Type `<super: <class 'B'>, B>` has no attribute `a`"
+# error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
 ```
 

@@ -89,8 +89,7 @@ creator of [isort](https://github.com/PyCQA/isort):
 > Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe
 > it was working till I intentionally introduced some errors.
 
-[**Tim Abbott**](https://github.com/astral-sh/ruff/issues/465#issuecomment-1317400028), lead
-developer of [Zulip](https://github.com/zulip/zulip):
+[**Tim Abbott**](https://github.com/zulip/zulip/pull/23431#issuecomment-1302557034), lead developer of [Zulip](https://github.com/zulip/zulip) (also [here](https://github.com/astral-sh/ruff/issues/465#issuecomment-1317400028)):
 
 > This is just ridiculously fast... `ruff` is amazing.
 

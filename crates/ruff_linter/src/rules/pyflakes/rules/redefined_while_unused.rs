@@ -191,6 +191,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 },
                 binding.range(),
             );
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 
             diagnostic.secondary_annotation(
                 format_args!("previous definition of `{name}` here"),

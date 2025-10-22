@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 145..158,
                                     node_index: NodeIndex(None),
+                                    range: 145..158,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),

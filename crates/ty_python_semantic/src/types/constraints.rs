@@ -61,6 +61,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
+use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
@@ -278,20 +279,20 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.or(db, other.node).simplify(db);
+        self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.and(db, other.node).simplify(db);
+        self.node = self.node.and(db, other.node);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
-            node: self.node.negate(db).simplify(db),
+            node: self.node.negate(db),
         }
     }
 
@@ -360,7 +361,6 @@ impl From<bool> for ConstraintSet<'_> {
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
     lower: Type<'db>,
@@ -415,6 +415,31 @@ impl<'db> ConstrainedTypeVar<'db> {
         }
         self.lower(db).is_subtype_of(db, other.lower(db))
             && other.upper(db).is_subtype_of(db, self.upper(db))
+    }
+
+    /// Defines the ordering of the variables in a constraint set BDD.
+    ///
+    /// If we only care about _correctness_, we can choose any ordering that we want, as long as
+    /// it's consistent. However, different orderings can have very different _performance_
+    /// characteristics. Many BDD libraries attempt to reorder variables on the fly while building
+    /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
+    /// have clear wins.
+    ///
+    /// In particular, we compare the _typevars_ of each constraint first, so that all constraints
+    /// for a single typevar are guaranteed to be adjacent in the BDD structure. There are several
+    /// simplifications that we perform that operate on constraints with the same typevar, and this
+    /// ensures that we can find all candidate simplifications more easily.
+    fn ordering(self, db: &'db dyn Db) -> impl Ord {
+        (self.typevar(db), self.as_id())
+    }
+
+    /// Returns whether this constraint implies another — i.e., whether every type that
+    /// satisfies this constraint also satisfies `other`.
+    ///
+    /// This is used (among other places) to simplify how we display constraint sets, by removing
+    /// redundant constraints from a clause.
+    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
+        other.contains(db, self)
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -505,8 +530,8 @@ impl<'db> ConstrainedTypeVar<'db> {
 /// that point at the same node.
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
-/// visits variables in the same order. [`ConstrainedTypeVar`]s are interned, so we can use the IDs
-/// that salsa assigns to define this order.
+/// visits variables in the same order. [`ConstrainedTypeVar::ordering`] defines the variable
+/// ordering that we use for constraint set BDDs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 enum Node<'db> {
     AlwaysFalse,
@@ -522,13 +547,13 @@ impl<'db> Node<'db> {
         if_true: Node<'db>,
         if_false: Node<'db>,
     ) -> Self {
+        debug_assert!((if_true.root_constraint(db)).is_none_or(|root_constraint| {
+            root_constraint.ordering(db) > constraint.ordering(db)
+        }));
         debug_assert!(
-            (if_true.root_constraint(db))
-                .is_none_or(|root_constraint| root_constraint > constraint)
-        );
-        debug_assert!(
-            (if_false.root_constraint(db))
-                .is_none_or(|root_constraint| root_constraint > constraint)
+            (if_false.root_constraint(db)).is_none_or(|root_constraint| {
+                root_constraint.ordering(db) > constraint.ordering(db)
+            })
         );
         if if_true == if_false {
             return if_true;
@@ -887,14 +912,87 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => f.write_str("never"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
-                        clauses.simplify();
+                        clauses.simplify(self.db);
                         clauses.display(self.db).fmt(f)
                     }
                 }
             }
         }
 
-        DisplayNode { node: self, db }
+        DisplayNode {
+            node: self.simplify(db),
+            db,
+        }
+    }
+
+    /// Displays the full graph structure of this BDD. `prefix` will be output before each line
+    /// other than the first. Produces output like the following:
+    ///
+    /// ```text
+    /// (T@_ = str)
+    /// ┡━₁ (U@_ = str)
+    /// │   ┡━₁ always
+    /// │   └─₀ (U@_ = bool)
+    /// │       ┡━₁ always
+    /// │       └─₀ never
+    /// └─₀ (T@_ = bool)
+    ///     ┡━₁ (U@_ = str)
+    ///     │   ┡━₁ always
+    ///     │   └─₀ (U@_ = bool)
+    ///     │       ┡━₁ always
+    ///     │       └─₀ never
+    ///     └─₀ never
+    /// ```
+    #[cfg_attr(not(test), expect(dead_code))] // Keep this around for debugging purposes
+    fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
+        struct DisplayNode<'a, 'db> {
+            db: &'db dyn Db,
+            node: Node<'db>,
+            prefix: &'a dyn Display,
+        }
+
+        impl<'a, 'db> DisplayNode<'a, 'db> {
+            fn new(db: &'db dyn Db, node: Node<'db>, prefix: &'a dyn Display) -> Self {
+                Self { db, node, prefix }
+            }
+        }
+
+        impl Display for DisplayNode<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.node {
+                    Node::AlwaysTrue => write!(f, "always"),
+                    Node::AlwaysFalse => write!(f, "never"),
+                    Node::Interior(interior) => {
+                        interior.constraint(self.db).display(self.db).fmt(f)?;
+                        // Calling display_graph recursively here causes rustc to claim that the
+                        // expect(unused) up above is unfulfilled!
+                        write!(
+                            f,
+                            "\n{}┡━₁ {}",
+                            self.prefix,
+                            DisplayNode::new(
+                                self.db,
+                                interior.if_true(self.db),
+                                &format_args!("{}│   ", self.prefix)
+                            ),
+                        )?;
+                        write!(
+                            f,
+                            "\n{}└─₀ {}",
+                            self.prefix,
+                            DisplayNode::new(
+                                self.db,
+                                interior.if_false(self.db),
+                                &format_args!("{}    ", self.prefix)
+                            ),
+                        )?;
+                        Ok(())
+                    }
+                }
+            }
+        }
+
+        DisplayNode::new(db, self, prefix)
     }
 }
 
@@ -925,7 +1023,7 @@ impl<'db> InteriorNode<'db> {
     fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
+        match (self_constraint.ordering(db)).cmp(&other_constraint.ordering(db)) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
@@ -951,7 +1049,7 @@ impl<'db> InteriorNode<'db> {
     fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
+        match (self_constraint.ordering(db)).cmp(&other_constraint.ordering(db)) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
@@ -977,7 +1075,7 @@ impl<'db> InteriorNode<'db> {
     fn iff(self, db: &'db dyn Db, other: Self) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
-        match self_constraint.cmp(&other_constraint) {
+        match (self_constraint.ordering(db)).cmp(&other_constraint.ordering(db)) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
@@ -1021,7 +1119,7 @@ impl<'db> InteriorNode<'db> {
         // point in the BDD where the assignment can no longer affect the result,
         // and we can return early.
         let self_constraint = self.constraint(db);
-        if assignment.constraint() < self_constraint {
+        if assignment.constraint().ordering(db) < self_constraint.ordering(db) {
             return (Node::Interior(self), false);
         }
 
@@ -1282,6 +1380,55 @@ impl<'db> ConstraintAssignment<'db> {
         *self = self.negated();
     }
 
+    /// Returns whether this constraint implies another — i.e., whether every type that
+    /// satisfies this constraint also satisfies `other`.
+    ///
+    /// This is used (among other places) to simplify how we display constraint sets, by removing
+    /// redundant constraints from a clause.
+    fn implies(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            // For two positive constraints, one range has to fully contain the other; the smaller
+            // constraint implies the larger.
+            //
+            //     ....|----other-----|....
+            //     ......|---self---|......
+            (
+                ConstraintAssignment::Positive(self_constraint),
+                ConstraintAssignment::Positive(other_constraint),
+            ) => self_constraint.implies(db, other_constraint),
+
+            // For two negative constraints, one range has to fully contain the other; the ranges
+            // represent "holes", though, so the constraint with the larger range implies the one
+            // with the smaller.
+            //
+            //     |-----|...other...|-----|
+            //     |---|.....self......|---|
+            (
+                ConstraintAssignment::Negative(self_constraint),
+                ConstraintAssignment::Negative(other_constraint),
+            ) => other_constraint.implies(db, self_constraint),
+
+            // For a positive and negative constraint, the ranges have to be disjoint, and the
+            // positive range implies the negative range.
+            //
+            //     |---------------|...self...|---|
+            //     ..|---other---|................|
+            (
+                ConstraintAssignment::Positive(self_constraint),
+                ConstraintAssignment::Negative(other_constraint),
+            ) => self_constraint.intersect(db, other_constraint).is_none(),
+
+            // It's theoretically possible for a negative constraint to imply a positive constraint
+            // if the positive constraint is always satisfied (`Never ≤ T ≤ object`). But we never
+            // create constraints of that form, so with our representation, a negative constraint
+            // can never imply a positive constraint.
+            //
+            //     |------other-------|
+            //     |---|...self...|---|
+            (ConstraintAssignment::Negative(_), ConstraintAssignment::Positive(_)) => false,
+        }
+    }
+
     // Keep this for future debugging needs, even though it's not currently used when rendering
     // constraint sets.
     #[expect(dead_code)]
@@ -1350,6 +1497,43 @@ impl<'db> SatisfiedClause<'db> {
         false
     }
 
+    /// Simplifies this clause by removing constraints that are implied by other constraints in the
+    /// clause. (Clauses are the intersection of constraints, so if two clauses are redundant, we
+    /// want to remove the larger one and keep the smaller one.)
+    ///
+    /// Returns a boolean that indicates whether any simplifications were made.
+    fn simplify(&mut self, db: &'db dyn Db) -> bool {
+        let mut changes_made = false;
+        let mut i = 0;
+        // Loop through each constraint, comparing it with any constraints that appear later in the
+        // list.
+        'outer: while i < self.constraints.len() {
+            let mut j = i + 1;
+            while j < self.constraints.len() {
+                if self.constraints[j].implies(db, self.constraints[i]) {
+                    // If constraint `i` is removed, then we don't need to compare it with any
+                    // later constraints in the list. Note that we continue the outer loop, instead
+                    // of breaking from the inner loop, so that we don't bump index `i` below.
+                    // (We'll have swapped another element into place at that index, and want to
+                    // make sure that we process it.)
+                    self.constraints.swap_remove(i);
+                    changes_made = true;
+                    continue 'outer;
+                } else if self.constraints[i].implies(db, self.constraints[j]) {
+                    // If constraint `j` is removed, then we can continue the inner loop. We will
+                    // swap a new element into place at index `j`, and will continue comparing the
+                    // constraint at index `i` with later constraints.
+                    self.constraints.swap_remove(j);
+                    changes_made = true;
+                } else {
+                    j += 1;
+                }
+            }
+            i += 1;
+        }
+        changes_made
+    }
+
     fn display(&self, db: &'db dyn Db) -> String {
         // This is a bit heavy-handed, but we need to output the constraints in a consistent order
         // even though Salsa IDs are assigned non-deterministically. This Display output is only
@@ -1399,7 +1583,13 @@ impl<'db> SatisfiedClauses<'db> {
     /// Simplifies the DNF representation, removing redundancies that do not change the underlying
     /// function. (This is used when displaying a BDD, to make sure that the representation that we
     /// show is as simple as possible while still producing the same results.)
-    fn simplify(&mut self) {
+    fn simplify(&mut self, db: &'db dyn Db) {
+        // First simplify each clause individually, by removing constraints that are implied by
+        // other constraints in the clause.
+        for clause in &mut self.clauses {
+            clause.simplify(db);
+        }
+
         while self.simplify_one_round() {
             // Keep going
         }
@@ -1506,5 +1696,49 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
+    use crate::db::tests::setup_db;
+    use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+
+    #[test]
+    fn test_display_graph_output() {
+        let expected = indoc! {r#"
+            (T = str)
+            ┡━₁ (U = str)
+            │   ┡━₁ always
+            │   └─₀ (U = bool)
+            │       ┡━₁ always
+            │       └─₀ never
+            └─₀ (T = bool)
+                ┡━₁ (U = str)
+                │   ┡━₁ always
+                │   └─₀ (U = bool)
+                │       ┡━₁ always
+                │       └─₀ never
+                └─₀ never
+        "#}
+        .trim_end();
+
+        let db = setup_db();
+        let t = BoundTypeVarInstance::synthetic(&db, "T", TypeVarVariance::Invariant);
+        let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
+        let bool_type = KnownClass::Bool.to_instance(&db);
+        let str_type = KnownClass::Str.to_instance(&db);
+        let t_str = ConstraintSet::range(&db, str_type, t.identity(&db), str_type);
+        let t_bool = ConstraintSet::range(&db, bool_type, t.identity(&db), bool_type);
+        let u_str = ConstraintSet::range(&db, str_type, u.identity(&db), str_type);
+        let u_bool = ConstraintSet::range(&db, bool_type, u.identity(&db), bool_type);
+        let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
+        let actual = constraints.node.display_graph(&db, &"").to_string();
+        assert_eq!(actual, expected);
     }
 }

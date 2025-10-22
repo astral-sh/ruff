@@ -753,5 +753,29 @@ class C(C, Generic[T]): ...
 class D(D[int], Generic[T]): ...
 ```
 
+### Cyclic inheritance in a stub file combined with constrained type variables
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1390>; we used to panic on
+this:
+
+`stub.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+class A(B): ...
+class G: ...
+
+T = TypeVar("T", G, A)
+
+class C(Generic[T]): ...
+class B(C[A]): ...
+class D(C[G]): ...
+
+def func(x: D): ...
+
+func(G())  # error: [invalid-argument-type]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

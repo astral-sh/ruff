@@ -567,7 +567,7 @@ impl<'db> CycleRecovery<'db> {
     fn fallback_type(self) -> Type<'db> {
         match self {
             Self::Initial => Type::Never,
-            Self::Divergent(scope) => Type::divergent(scope),
+            Self::Divergent(scope) => Type::divergent(Some(scope)),
         }
     }
 }

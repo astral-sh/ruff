@@ -65,7 +65,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
                         .diagnostic_mode()
                         .is_open_files_only()
                 {
-                    clear_diagnostics(&key, client);
+                    clear_diagnostics(session, &key, client);
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
@@ -78,7 +78,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
 
                 // Always clear diagnostics for virtual files, as they don't really exist on disk
                 // which means closing them is like deleting the file.
-                clear_diagnostics(&key, client);
+                clear_diagnostics(session, &key, client);
             }
         }
 

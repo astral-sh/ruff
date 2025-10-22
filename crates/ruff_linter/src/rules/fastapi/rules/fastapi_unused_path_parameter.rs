@@ -7,6 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Fix;
@@ -191,7 +192,7 @@ pub(crate) fn fastapi_unused_path_parameter(
                 .add_start(TextSize::from(range.start as u32 + 1))
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
         );
-        if !is_positional {
+        if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
             diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
                 path_param,
                 &function_def.parameters,

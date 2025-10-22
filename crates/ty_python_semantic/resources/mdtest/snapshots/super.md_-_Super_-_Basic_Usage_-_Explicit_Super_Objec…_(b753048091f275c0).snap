@@ -118,7 +118,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 # Diagnostics
 
 ```
-error[unresolved-attribute]: Type `<super: <class 'C'>, C>` has no attribute `c`
+error[unresolved-attribute]: Object of type `<super: <class 'C'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:19:1
    |
 17 | super(C, C()).a
@@ -133,7 +133,7 @@ info: rule `unresolved-attribute` is enabled by default
 ```
 
 ```
-error[unresolved-attribute]: Type `<super: <class 'B'>, C>` has no attribute `b`
+error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `b`
   --> src/mdtest_snippet.py:22:1
    |
 21 | super(B, C()).a
@@ -146,7 +146,7 @@ info: rule `unresolved-attribute` is enabled by default
 ```
 
 ```
-error[unresolved-attribute]: Type `<super: <class 'B'>, C>` has no attribute `c`
+error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:23:1
    |
 21 | super(B, C()).a
@@ -161,7 +161,7 @@ info: rule `unresolved-attribute` is enabled by default
 ```
 
 ```
-error[unresolved-attribute]: Type `<super: <class 'A'>, C>` has no attribute `a`
+error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `a`
   --> src/mdtest_snippet.py:25:1
    |
 23 | super(B, C()).c  # error: [unresolved-attribute]
@@ -176,7 +176,7 @@ info: rule `unresolved-attribute` is enabled by default
 ```
 
 ```
-error[unresolved-attribute]: Type `<super: <class 'A'>, C>` has no attribute `b`
+error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `b`
   --> src/mdtest_snippet.py:26:1
    |
 25 | super(A, C()).a  # error: [unresolved-attribute]
@@ -189,7 +189,7 @@ info: rule `unresolved-attribute` is enabled by default
 ```
 
 ```
-error[unresolved-attribute]: Type `<super: <class 'A'>, C>` has no attribute `c`
+error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:27:1
    |
 25 | super(A, C()).a  # error: [unresolved-attribute]

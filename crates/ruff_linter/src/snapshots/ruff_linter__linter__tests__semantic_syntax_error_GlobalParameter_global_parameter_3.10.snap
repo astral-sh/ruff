@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: name `a` is parameter and global
+ --> <filename>:3:12
+  |
+2 | def f(a):
+3 |     global a
+  |            ^
+4 |
+5 | def g(a):
+  |
+
+invalid-syntax: name `a` is parameter and global
+ --> <filename>:7:16
+  |
+5 | def g(a):
+6 |     if True:
+7 |         global a 
+  |                ^
+8 |
+9 | def h(a):
+  |
+
+invalid-syntax: name `a` is parameter and global
+  --> <filename>:15:16
+   |
+13 | def i(a):
+14 |     try:
+15 |         global a 
+   |                ^
+16 |     except Exception:
+17 |         pass
+   |
+
+invalid-syntax: name `a` is parameter and global
+  --> <filename>:21:12
+   |
+19 | def f(a):
+20 |     a = 1
+21 |     global a
+   |            ^
+22 |
+23 | def f(a):
+   |
+
+invalid-syntax: name `a` is parameter and global
+  --> <filename>:26:12
+   |
+24 |     a = 1
+25 |     a = 2
+26 |     global a
+   |            ^
+27 |
+28 | def f(a):
+   |

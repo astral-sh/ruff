@@ -672,18 +672,18 @@ Also, the "attributes" on the class definition can not be accessed. Neither on t
 on inhabitants of the type defined by the class:
 
 ```py
-# error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
+# error: [unresolved-attribute] "Class `Person` has no attribute `name`"
 Person.name
 
 def _(P: type[Person]):
-    # error: [unresolved-attribute] "Type `type[Person]` has no attribute `name`"
+    # error: [unresolved-attribute] "Object of type `type[Person]` has no attribute `name`"
     P.name
 
 def _(p: Person) -> None:
-    # error: [unresolved-attribute] "Type `Person` has no attribute `name`"
+    # error: [unresolved-attribute] "Object of type `Person` has no attribute `name`"
     p.name
 
-    type(p).name  # error: [unresolved-attribute] "Type `<class 'dict[str, object]'>` has no attribute `name`"
+    type(p).name  # error: [unresolved-attribute] "Class `dict[str, object]` has no attribute `name`"
 ```
 
 ## Special properties

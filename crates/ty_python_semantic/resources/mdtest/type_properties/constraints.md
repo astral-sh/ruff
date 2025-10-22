@@ -601,3 +601,40 @@ def _[T, U]() -> None:
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(~union | union)
 ```
+
+## Other simplifications
+
+When displaying a constraint set, we transform the internal BDD representation into a DNF formula
+(i.e., the logical OR of several clauses, each of which is the logical AND of several constraints).
+This section contains several examples that show that we simplify the DNF formula as much as we can
+before displaying it.
+
+```py
+from ty_extensions import range_constraint
+
+def f[T, U]():
+    t1 = range_constraint(str, T, str)
+    t2 = range_constraint(bool, T, bool)
+    u1 = range_constraint(str, U, str)
+    u2 = range_constraint(bool, U, bool)
+
+    # revealed: ty_extensions.ConstraintSet[(T@f = bool) ∨ (T@f = str)]
+    reveal_type(t1 | t2)
+    # revealed: ty_extensions.ConstraintSet[(U@f = bool) ∨ (U@f = str)]
+    reveal_type(u1 | u2)
+    # revealed: ty_extensions.ConstraintSet[((T@f = bool) ∧ (U@f = bool)) ∨ ((T@f = bool) ∧ (U@f = str)) ∨ ((T@f = str) ∧ (U@f = bool)) ∨ ((T@f = str) ∧ (U@f = str))]
+    reveal_type((t1 | t2) & (u1 | u2))
+```
+
+The lower and upper bounds of a constraint are normalized, so that we equate unions and
+intersections whose elements appear in different orders.
+
+```py
+from typing import Never
+
+def f[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
+    reveal_type(range_constraint(Never, T, str | int))
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
+    reveal_type(range_constraint(Never, T, int | str))
+```

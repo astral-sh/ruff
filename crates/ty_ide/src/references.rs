@@ -18,6 +18,7 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
+use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::ImportAliasResolution;
 
@@ -127,6 +128,7 @@ fn references_for_file(
         target_definitions,
         references,
         mode,
+        tokens: module.tokens(),
         target_text,
         ancestors: Vec::new(),
     };
@@ -156,6 +158,7 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 struct LocalReferencesFinder<'a> {
     db: &'a dyn Db,
     file: File,
+    tokens: &'a Tokens,
     target_definitions: &'a [NavigationTarget],
     references: &'a mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
@@ -282,7 +285,9 @@ impl LocalReferencesFinder<'_> {
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
 
-        if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
+        if let Some(goto_target) =
+            GotoTarget::from_covering_node(covering_node, offset, self.tokens)
+        {
             // Get the definitions for this goto target
             if let Some(current_definitions_nav) = goto_target
                 .get_definition_targets(self.file, self.db, ImportAliasResolution::PreserveAliases)

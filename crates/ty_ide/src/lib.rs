@@ -45,7 +45,11 @@ pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, 
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
-use ruff_db::files::{File, FileRange};
+use ruff_db::{
+    files::{File, FileRange},
+    system::SystemPathBuf,
+    vendored::VendoredPath,
+};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
@@ -285,6 +289,38 @@ impl HasNavigationTargets for TypeDefinition<'_> {
             full_range: full_range.range(),
         })
     }
+}
+
+/// Get the cache-relative path where vendored paths should be written to.
+pub fn relative_cached_vendored_root() -> SystemPathBuf {
+    // The vendored files are uniquely identified by the source commit.
+    SystemPathBuf::from(format!("vendored/typeshed/{}", ty_vendored::SOURCE_COMMIT))
+}
+
+/// Get the cached version of a vendored path in the cache, ensuring the file is written to disk.
+pub fn cached_vendored_path(
+    db: &dyn ty_python_semantic::Db,
+    path: &VendoredPath,
+) -> Option<SystemPathBuf> {
+    let writable = db.system().as_writable()?;
+    let mut relative_path = relative_cached_vendored_root();
+    relative_path.push(path.as_str());
+
+    // Extract the vendored file onto the system.
+    writable
+        .get_or_cache(&relative_path, &|| db.vendored().read_to_string(path))
+        .ok()
+        .flatten()
+}
+
+/// Get the absolute root path of all cached vendored paths.
+///
+/// This does not ensure that this path exists (this is only used for mapping cached paths
+/// back to vendored ones, so this only matters if we've already been handed a path inside here).
+pub fn cached_vendored_root(db: &dyn ty_python_semantic::Db) -> Option<SystemPathBuf> {
+    let writable = db.system().as_writable()?;
+    let relative_root = relative_cached_vendored_root();
+    Some(writable.cache_dir()?.join(relative_root))
 }
 
 #[cfg(test)]

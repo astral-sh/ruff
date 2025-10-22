@@ -326,27 +326,26 @@ fn validate_from_dict_literal<'db, 'ast>(
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
         // Validate dict entries
         for dict_item in &dict_expr.items {
-            if let Some(ref key_expr) = dict_item.key {
-                if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+            if let Some(ref key_expr) = dict_item.key
+                && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
                     value: key_value, ..
                 }) = key_expr
-                {
-                    let key_str = key_value.to_str();
-                    provided_keys.insert(key_str);
+            {
+                let key_str = key_value.to_str();
+                provided_keys.insert(key_str);
 
-                    // Get the already-inferred argument type
-                    let value_type = expression_type_fn(&dict_item.value);
-                    validate_typed_dict_key_assignment(
-                        context,
-                        typed_dict,
-                        key_str,
-                        value_type,
-                        error_node,
-                        key_expr,
-                        &dict_item.value,
-                        TypedDictAssignmentKind::Constructor,
-                    );
-                }
+                // Get the already-inferred argument type
+                let value_type = expression_type_fn(&dict_item.value);
+                validate_typed_dict_key_assignment(
+                    context,
+                    typed_dict,
+                    key_str,
+                    value_type,
+                    error_node,
+                    key_expr,
+                    &dict_item.value,
+                    TypedDictAssignmentKind::Constructor,
+                );
             }
         }
     }
@@ -404,25 +403,24 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
 
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
-        if let Some(key_expr) = &item.key {
-            let key_ty = expression_type_fn(key_expr);
-            if let Type::StringLiteral(key_str) = key_ty {
-                let key_str = key_str.value(context.db());
-                provided_keys.insert(key_str);
+        if let Some(key_expr) = &item.key
+            && let Type::StringLiteral(key_str) = expression_type_fn(key_expr)
+        {
+            let key_str = key_str.value(context.db());
+            provided_keys.insert(key_str);
 
-                let value_type = expression_type_fn(&item.value);
+            let value_type = expression_type_fn(&item.value);
 
-                valid &= validate_typed_dict_key_assignment(
-                    context,
-                    typed_dict,
-                    key_str,
-                    value_type,
-                    error_node,
-                    key_expr,
-                    &item.value,
-                    TypedDictAssignmentKind::Constructor,
-                );
-            }
+            valid &= validate_typed_dict_key_assignment(
+                context,
+                typed_dict,
+                key_str,
+                value_type,
+                error_node,
+                key_expr,
+                &item.value,
+                TypedDictAssignmentKind::Constructor,
+            );
         }
     }
 

@@ -618,7 +618,7 @@ import importlib
 from module2 import importlib as other_importlib
 from ty_extensions import TypeOf, static_assert, is_equivalent_to
 
-# error: [unresolved-attribute] "Type `<module 'importlib'>` has no attribute `abc`"
+# error: [unresolved-attribute] "Module `importlib` has no member `abc`"
 reveal_type(importlib.abc)  # revealed: Unknown
 
 reveal_type(other_importlib.abc)  # revealed: <module 'importlib.abc'>

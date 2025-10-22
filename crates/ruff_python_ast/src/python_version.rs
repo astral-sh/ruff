@@ -188,42 +188,39 @@ mod serde {
 #[cfg(feature = "schemars")]
 mod schemars {
     use super::PythonVersion;
-    use schemars::_serde_json::Value;
-    use schemars::JsonSchema;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
+    use schemars::{JsonSchema, Schema, SchemaGenerator};
+    use serde_json::Value;
 
     impl JsonSchema for PythonVersion {
-        fn schema_name() -> String {
-            "PythonVersion".to_string()
+        fn schema_name() -> std::borrow::Cow<'static, str> {
+            std::borrow::Cow::Borrowed("PythonVersion")
         }
 
-        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
-            let sub_schemas = std::iter::once(Schema::Object(SchemaObject {
-                instance_type: Some(schemars::schema::InstanceType::String.into()),
-                string: Some(Box::new(schemars::schema::StringValidation {
-                    pattern: Some(r"^\d+\.\d+$".to_string()),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            }))
-            .chain(Self::iter().map(|v| {
-                Schema::Object(SchemaObject {
-                    const_value: Some(Value::String(v.to_string())),
-                    metadata: Some(Box::new(Metadata {
-                        description: Some(format!("Python {v}")),
-                        ..Metadata::default()
-                    })),
-                    ..SchemaObject::default()
+        fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+            let mut any_of: Vec<Value> = vec![
+                schemars::json_schema!({
+                    "type": "string",
+                    "pattern": r"^\d+\.\d+$",
                 })
-            }));
+                .into(),
+            ];
 
-            Schema::Object(SchemaObject {
-                subschemas: Some(Box::new(SubschemaValidation {
-                    any_of: Some(sub_schemas.collect()),
-                    ..Default::default()
-                })),
-                ..SchemaObject::default()
-            })
+            for version in Self::iter() {
+                let mut schema = schemars::json_schema!({
+                    "const": version.to_string(),
+                });
+                schema.ensure_object().insert(
+                    "description".to_string(),
+                    Value::String(format!("Python {version}")),
+                );
+                any_of.push(schema.into());
+            }
+
+            let mut schema = Schema::default();
+            schema
+                .ensure_object()
+                .insert("anyOf".to_string(), Value::Array(any_of));
+            schema
         }
     }
 }

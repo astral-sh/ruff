@@ -250,11 +250,11 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         ("test.py", "print(10)"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
@@ -265,7 +265,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -275,16 +275,16 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "print(10)")?;
 
-    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -852,7 +852,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -864,7 +864,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
       |
     info: rule `division-by-zero` was selected in the configuration file
 
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
       --> pyproject.toml:10:1
        |
      8 | [tool.ty.overrides.rules]
@@ -884,7 +884,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }

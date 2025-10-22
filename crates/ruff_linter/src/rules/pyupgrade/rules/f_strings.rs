@@ -145,7 +145,6 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             Expr::BinOp(_)
             | Expr::UnaryOp(_)
             | Expr::BoolOp(_)
-            | Expr::Named(_)
             | Expr::Compare(_)
             | Expr::If(_)
             | Expr::Lambda(_)
@@ -167,6 +166,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             _,
             Expr::Generator(_)
             | Expr::Dict(_)
+            | Expr::Named(_)
             | Expr::Set(_)
             | Expr::SetComp(_)
             | Expr::DictComp(_),

@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 36..46,
                                     node_index: NodeIndex(None),
+                                    range: 36..46,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -84,8 +84,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 70..76,
                                     node_index: NodeIndex(None),
+                                    range: 70..76,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -128,8 +128,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 100..106,
                                     node_index: NodeIndex(None),
+                                    range: 100..106,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -172,8 +172,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 130..142,
                                     node_index: NodeIndex(None),
+                                    range: 130..142,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -233,8 +233,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 166..177,
                                     node_index: NodeIndex(None),
+                                    range: 166..177,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -296,8 +296,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 201..215,
                                     node_index: NodeIndex(None),
+                                    range: 201..215,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -360,8 +360,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 239..246,
                                     node_index: NodeIndex(None),
+                                    range: 239..246,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -406,8 +406,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 270..278,
                                     node_index: NodeIndex(None),
+                                    range: 270..278,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -459,8 +459,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 302..318,
                                     node_index: NodeIndex(None),
+                                    range: 302..318,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -540,8 +540,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 370..379,
                                     node_index: NodeIndex(None),
+                                    range: 370..379,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -595,8 +595,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 403..408,
                                     node_index: NodeIndex(None),
+                                    range: 403..408,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -638,8 +638,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 432..437,
                                     node_index: NodeIndex(None),
+                                    range: 432..437,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -681,8 +681,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 461..472,
                                     node_index: NodeIndex(None),
+                                    range: 461..472,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -741,8 +741,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 496..506,
                                     node_index: NodeIndex(None),
+                                    range: 496..506,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -803,8 +803,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 530..543,
                                     node_index: NodeIndex(None),
+                                    range: 530..543,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -866,8 +866,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 567..572,
                                     node_index: NodeIndex(None),
+                                    range: 567..572,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -910,8 +910,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 596..611,
                                     node_index: NodeIndex(None),
+                                    range: 596..611,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -990,8 +990,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 667..680,
                                     node_index: NodeIndex(None),
+                                    range: 667..680,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),

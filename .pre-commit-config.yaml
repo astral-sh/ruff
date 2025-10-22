@@ -35,6 +35,7 @@ repos:
     rev: 0.7.22
     hooks:
       - id: mdformat
+        language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
           - mdformat-mkdocs==4.0.0
           - mdformat-footnote==0.1.1
@@ -58,6 +59,7 @@ repos:
     rev: 1.19.1
     hooks:
       - id: blacken-docs
+        language: python # means renovate will also update `additional_dependencies`
         args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
         exclude: |
