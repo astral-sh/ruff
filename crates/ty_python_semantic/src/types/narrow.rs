@@ -313,8 +313,16 @@ impl<'db> Conjunction<'db> {
     /// Evaluate this conjunction to a single type.
     /// If there's a `TypeGuard` constraint, it replaces the regular constraint.
     /// Otherwise, returns the regular constraint.
-    fn evaluate_type_constraint(self) -> Type<'db> {
-        self.typeguard.unwrap_or(self.constraint)
+    fn evaluate_type_constraint(self, db: &'db dyn Db) -> Type<'db> {
+        self.typeguard.map_or_else(
+            || self.constraint,
+            |typeguard_constraint| {
+                IntersectionBuilder::new(db)
+                    .add_positive(typeguard_constraint)
+                    .add_positive(self.constraint)
+                    .build()
+            },
+        )
     }
 }
 
@@ -363,7 +371,7 @@ impl<'db> NarrowingConstraint<'db> {
             db,
             self.disjuncts
                 .into_iter()
-                .map(Conjunction::evaluate_type_constraint),
+                .map(|disjunct| Conjunction::evaluate_type_constraint(disjunct, db)),
         )
     }
 }
@@ -1214,7 +1222,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             _ => return None,
         };
 
-        Some(InternalConstraints::from_iter([(place, NarrowingConstraint::regular(narrowed_type))]))
+        Some(InternalConstraints::from_iter([(
+            place,
+            NarrowingConstraint::regular(narrowed_type),
+        )]))
     }
 
     fn evaluate_match_pattern_value(
