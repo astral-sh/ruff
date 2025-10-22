@@ -2624,10 +2624,10 @@ def duplicate(x: T) -> tuple[T, T]:
     return (x, x)
 
 class E:
-    def f(self: Self):
+    def f(self: "E"):
         self.x = duplicate(self.x)
 
-reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Divergent]
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, Divergent]
 ```
 
 And it also works for homogeneous tuples:
