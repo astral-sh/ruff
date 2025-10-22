@@ -424,23 +424,10 @@ bundle for TextMate.
 
 Ruff support is now built into Zed (no separate extension required).
 
-To configure Zed to use the Ruff language server for Python files, add the following
-to your `settings.json` file:
+By default, Zed uses basedpyright as the primary LSP for language features, and Ruff is used by default for formatting and linting.
 
-```json
-{
-  "languages": {
-    "Python": {
-      "language_servers": ["ruff"]
-      // Or, if there are other language servers you want to use with Python
-      // "language_servers": ["pyright", "ruff"]
-    }
-  }
-}
-```
-
-To configure the language server, you can provide the [server settings](settings.md)
-under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/configuring-zed#lsp) key:
+To set up editor-wide Ruff option, provide the [server settings](settings.md)
+under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/configuring-zed#lsp) key of your `settings.json` file:
 
 ```json
 {
@@ -460,22 +447,16 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
 }
 ```
 
-You can configure Ruff to format Python code on-save by registering the Ruff formatter
-and enabling the [`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) setting:
+Alternatively, Zed reads project configuration files (`pyproject.toml`, `ruff.toml`, or `.ruff.toml`) to apply project-specific configurations.
+
+[`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) is enabled by default.
+You can disable it for Python by adding this to your `settings.json` file:
 
 ```json
 {
   "languages": {
     "Python": {
-      "language_servers": ["ruff"],
-      "format_on_save": "on",
-      "formatter": [
-        {
-          "language_server": {
-            "name": "ruff"
-          }
-        }
-      ]
+      "format_on_save": "off"
     }
   }
 }
@@ -488,8 +469,6 @@ You can configure Ruff to fix lint violations and/or organize imports on-save by
 {
   "languages": {
     "Python": {
-      "language_servers": ["ruff"],
-      "format_on_save": "on",
       "formatter": [
         // Fix all auto-fixable lint violations
         { "code_action": "source.fixAll.ruff" },
@@ -515,8 +494,6 @@ following `settings.json`:
 {
   "languages": {
     "Python": {
-      "language_servers": ["ruff"],
-      "format_on_save": "on",
       "formatter": [
         { "code_action": "source.fixAll.ruff" },
         { "code_action": "source.organizeImports.ruff" },
