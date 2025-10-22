@@ -1733,10 +1733,10 @@ mod tests {
         let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
-        let t_str = ConstraintSet::range(&db, str_type, t.identity(&db), str_type);
-        let t_bool = ConstraintSet::range(&db, bool_type, t.identity(&db), bool_type);
-        let u_str = ConstraintSet::range(&db, str_type, u.identity(&db), str_type);
-        let u_bool = ConstraintSet::range(&db, bool_type, u.identity(&db), bool_type);
+        let t_str = ConstraintSet::range(&db, str_type, t, str_type);
+        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
+        let u_str = ConstraintSet::range(&db, str_type, u, str_type);
+        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
         let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);
