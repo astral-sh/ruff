@@ -359,7 +359,33 @@ def narrowed_type_must_be_exact(a: object, b: Baz):
         reveal_type(a)  # revealed: Foo
 ```
 
-## Complex boolean logic with TypeGuard and TypeIs
+## TypeGuard overrides normal constraints
+
+TypeGuard constraints override any previous narrowing, but additional "regular" constraints can be
+added on to TypeGuard constraints.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+class A: ...
+class B: ...
+class C: ...
+
+def f(x: object) -> TypeGuard[A]:
+    return True
+
+def g(x: object) -> TypeGuard[B]:
+    return True
+
+def h(x: object) -> TypeIs[C]:
+    return True
+
+def _(x: object):
+    if f(x) and g(x) and h(x):
+        reveal_type(x)  # revealed: B & C
+```
+
+## Boolean logic with TypeGuard and TypeIs
 
 TypeGuard constraints need to properly distribute through boolean operations.
 
