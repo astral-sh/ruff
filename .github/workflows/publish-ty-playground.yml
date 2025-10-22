@@ -38,6 +38,7 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
+          cache: "npm" # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Install Node dependencies"
         run: npm ci
