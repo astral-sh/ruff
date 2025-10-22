@@ -45,19 +45,3 @@ impl Violation for NonlocalWithoutBinding {
         format!("Nonlocal name `{name}` found without binding")
     }
 }
-
-/// PLE0117
-pub(crate) fn nonlocal_without_binding(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
-    if !checker.semantic().scope_id.is_global() {
-        for name in &nonlocal.names {
-            if checker.semantic().nonlocal(name).is_none() {
-                checker.report_diagnostic(
-                    NonlocalWithoutBinding {
-                        name: name.to_string(),
-                    },
-                    name.range(),
-                );
-            }
-        }
-    }
-}

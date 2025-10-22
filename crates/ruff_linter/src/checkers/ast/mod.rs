@@ -73,7 +73,8 @@ use crate::rules::pyflakes::rules::{
     UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
-    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
+    YieldFromInAsyncFunction,
 };
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
@@ -641,6 +642,12 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.global(name)
     }
 
+    fn nonlocal(&self, name: &str) -> Option<TextRange> {
+        self.semantic
+            .nonlocal(name)
+            .map(|(scope_id, binding_id)| self.semantic.binding(binding_id).range)
+    }
+
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
@@ -715,6 +722,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                 // F702
                 if self.is_rule_enabled(Rule::ContinueOutsideLoop) {
                     self.report_diagnostic(pyflakes::rules::ContinueOutsideLoop, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
+                // PLE0117
+                if self.is_rule_enabled(Rule::NonlocalWithoutBinding) {
+                    self.report_diagnostic(NonlocalWithoutBinding { name }, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
