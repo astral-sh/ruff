@@ -1269,7 +1269,7 @@ impl<'db> ConstraintAssignment<'db> {
         *self = self.negated();
     }
 
-    /// Returns whether this constraint implies contains another — i.e., whether every type that
+    /// Returns whether this constraint implies another — i.e., whether every type that
     /// satisfies this constraint also satisfies `other`.
     ///
     /// This is used (among other places) to simplify how we display constraint sets, by removing
