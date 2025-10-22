@@ -23,6 +23,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Argument](https://docs.python.org/3/glossary.html#term-argument)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.7")]
 pub(crate) struct RepeatedKeywordArgument {
     duplicate_keyword: String,
 }

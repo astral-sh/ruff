@@ -40,6 +40,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.4.4")]
 pub(crate) struct DuplicateLiteralMember {
     duplicate_name: String,
 }

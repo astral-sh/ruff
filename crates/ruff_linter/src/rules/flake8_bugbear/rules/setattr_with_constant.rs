@@ -31,6 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.111")]
 pub(crate) struct SetAttrWithConstant;
 
 impl AlwaysFixableViolation for SetAttrWithConstant {

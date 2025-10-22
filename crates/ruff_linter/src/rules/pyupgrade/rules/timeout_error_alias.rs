@@ -40,6 +40,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.4")]
 pub(crate) struct TimeoutErrorAlias {
     name: Option<String>,
 }

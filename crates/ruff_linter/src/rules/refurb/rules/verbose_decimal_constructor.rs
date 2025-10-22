@@ -47,6 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.3.5")]
 pub(crate) struct VerboseDecimalConstructor {
     replacement: String,
 }

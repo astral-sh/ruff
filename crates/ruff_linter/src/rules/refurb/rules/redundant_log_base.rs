@@ -51,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `math.log10`](https://docs.python.org/3/library/math.html#math.log10)
 /// - [Python documentation: `math.e`](https://docs.python.org/3/library/math.html#math.e)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.7")]
 pub(crate) struct RedundantLogBase {
     base: Base,
     arg: String,

@@ -22,6 +22,7 @@ use crate::checkers::ast::Checker;
 /// foo = x
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.4")]
 pub(crate) struct UselessIfElse;
 
 impl Violation for UselessIfElse {

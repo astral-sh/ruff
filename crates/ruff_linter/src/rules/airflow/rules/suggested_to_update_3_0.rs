@@ -37,6 +37,7 @@ use ruff_text_size::TextRange;
 /// Asset(uri="test://test/")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.11.6")]
 pub(crate) struct Airflow3SuggestedUpdate {
     deprecated: String,
     replacement: Replacement,

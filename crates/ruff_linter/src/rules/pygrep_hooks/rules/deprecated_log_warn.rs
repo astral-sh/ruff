@@ -34,6 +34,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// [G010]: https://docs.astral.sh/ruff/rules/logging-warn/
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.0.187")]
 pub(crate) struct DeprecatedLogWarn;
 
 /// PGH002

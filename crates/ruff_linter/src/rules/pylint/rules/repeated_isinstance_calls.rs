@@ -49,6 +49,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// [SIM101]: https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.0.153")]
 pub(crate) struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }

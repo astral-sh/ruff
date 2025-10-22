@@ -29,6 +29,7 @@ use crate::docstrings::Docstring;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.68")]
 pub(crate) struct EmptyDocstring;
 
 impl Violation for EmptyDocstring {

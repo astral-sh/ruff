@@ -19,6 +19,7 @@ use crate::checkers::ast::Checker;
 /// print([0, 1, 2][3])
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.15")]
 pub(crate) struct PotentialIndexError;
 
 impl Violation for PotentialIndexError {

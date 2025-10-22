@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__len__` method](https://docs.python.org/3/reference/datamodel.html#object.__len__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.4.0")]
 pub(crate) struct InvalidLengthReturnType;
 
 impl Violation for InvalidLengthReturnType {

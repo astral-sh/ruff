@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// - [Cybersecurity and Infrastructure Security Agency (CISA): Alert TA17-156A](https://www.cisa.gov/news-events/alerts/2017/06/05/reducing-risk-snmp-abuse)
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct SnmpInsecureVersion;
 
 impl Violation for SnmpInsecureVersion {

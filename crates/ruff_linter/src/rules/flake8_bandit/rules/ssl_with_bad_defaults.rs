@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// def func(version=ssl.PROTOCOL_TLSv1_2): ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.12")]
 pub(crate) struct SslWithBadDefaults {
     protocol: String,
 }

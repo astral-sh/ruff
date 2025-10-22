@@ -33,6 +33,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logging.basicConfig(level=logging.WARNING)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.290")]
 pub(crate) struct UndocumentedWarn;
 
 impl Violation for UndocumentedWarn {

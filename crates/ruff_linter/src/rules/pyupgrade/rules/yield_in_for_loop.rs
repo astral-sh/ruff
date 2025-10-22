@@ -51,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
 /// - [PEP 380 – Syntax for Delegating to a Subgenerator](https://peps.python.org/pep-0380/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.210")]
 pub(crate) struct YieldInForLoop;
 
 impl Violation for YieldInForLoop {

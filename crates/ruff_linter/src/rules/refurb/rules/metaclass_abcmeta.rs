@@ -47,6 +47,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.0")]
 pub(crate) struct MetaClassABCMeta;
 
 impl AlwaysFixableViolation for MetaClassABCMeta {

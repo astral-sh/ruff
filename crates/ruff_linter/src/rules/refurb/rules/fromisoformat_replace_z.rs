@@ -67,6 +67,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [iso-8601]: https://www.iso.org/obp/ui/#iso:std:iso:8601
 /// [fromisoformat]: https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.7")]
 pub(crate) struct FromisoformatReplaceZ;
 
 impl AlwaysFixableViolation for FromisoformatReplaceZ {

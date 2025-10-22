@@ -39,6 +39,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation:`int.bit_count`](https://docs.python.org/3/library/stdtypes.html#int.bit_count)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.10")]
 pub(crate) struct BitCount {
     existing: SourceCodeSnippet,
     replacement: SourceCodeSnippet,

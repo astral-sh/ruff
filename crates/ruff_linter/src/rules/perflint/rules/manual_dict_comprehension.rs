@@ -46,6 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// result.update({x: y for x, y in pairs if y % 2})
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.290")]
 pub(crate) struct ManualDictComprehension {
     fix_type: DictComprehensionType,
     is_async: bool,

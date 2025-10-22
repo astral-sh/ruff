@@ -36,6 +36,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.14")]
 pub(crate) struct EnumerateForLoop {
     index: String,
 }

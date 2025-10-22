@@ -37,6 +37,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.4")]
 pub(crate) struct BadOpenMode {
     mode: String,
 }

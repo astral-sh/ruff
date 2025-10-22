@@ -58,6 +58,7 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     return distance / time
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.14.1")]
 pub(crate) struct DocstringExtraneousParameter {
     id: String,
 }
@@ -112,6 +113,7 @@ impl Violation for DocstringExtraneousParameter {
 ///     return distance / time
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringMissingReturns;
 
 impl Violation for DocstringMissingReturns {
@@ -163,6 +165,7 @@ impl Violation for DocstringMissingReturns {
 ///         print("Hello!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringExtraneousReturns;
 
 impl Violation for DocstringExtraneousReturns {
@@ -215,6 +218,7 @@ impl Violation for DocstringExtraneousReturns {
 ///         yield i
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringMissingYields;
 
 impl Violation for DocstringMissingYields {
@@ -266,6 +270,7 @@ impl Violation for DocstringMissingYields {
 ///         print("Hello!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringExtraneousYields;
 
 impl Violation for DocstringExtraneousYields {
@@ -337,6 +342,7 @@ impl Violation for DocstringExtraneousYields {
 ///         raise FasterThanLightError from exc
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringMissingException {
     id: String,
 }
@@ -404,6 +410,7 @@ impl Violation for DocstringMissingException {
 /// could possibly raise, even those which are not explicitly raised using
 /// `raise` statements in the function body.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
 }

@@ -51,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// defaultdict(list)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.1.15")]
 pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }

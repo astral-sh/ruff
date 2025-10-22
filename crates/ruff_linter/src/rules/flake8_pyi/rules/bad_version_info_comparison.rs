@@ -51,6 +51,7 @@ use crate::registry::Rule;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.254")]
 pub(crate) struct BadVersionInfoComparison;
 
 impl Violation for BadVersionInfoComparison {
@@ -100,6 +101,7 @@ impl Violation for BadVersionInfoComparison {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.4.7")]
 pub(crate) struct BadVersionInfoOrder;
 
 impl Violation for BadVersionInfoOrder {

@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.3.3")]
 pub(crate) struct DjangoExtra;
 
 impl Violation for DjangoExtra {

@@ -31,6 +31,7 @@ use crate::Violation;
 ///
 /// [S307]: https://docs.astral.sh/ruff/rules/suspicious-eval-usage/
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.0.152")]
 pub(crate) struct Eval;
 
 /// PGH001

@@ -48,6 +48,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `int`](https://docs.python.org/3/library/functions.html#int)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.3.6")]
 pub(crate) struct IntOnSlicedStr {
     base: u8,
 }

@@ -46,6 +46,7 @@ use crate::checkers::ast::Checker;
 ///     print(f"{instrument}: {section}")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.4.9")]
 pub(crate) struct DictIndexMissingItems;
 
 impl Violation for DictIndexMissingItems {

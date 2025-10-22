@@ -54,6 +54,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.1")]
 pub(crate) struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
