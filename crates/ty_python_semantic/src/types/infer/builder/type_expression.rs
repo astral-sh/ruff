@@ -14,15 +14,18 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
     LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType,
-    exceeds_max_specialization_depth, todo_type,
+    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_type_expression_no_store(expression);
+        let mut ty = self.infer_type_expression_no_store(expression);
+        let divergent = Type::divergent(Some(self.scope()));
+        if ty.has_divergent_type(self.db(), divergent) {
+            ty = divergent;
+        }
         self.store_expression_type(expression, ty);
         ty
     }
@@ -561,16 +564,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
                     self.infer_expression(ellipsis, TypeContext::default());
-                    let element_ty = self.infer_type_expression(element);
-
-                    let result = TupleType::homogeneous(
-                        self.db(),
-                        if exceeds_max_specialization_depth(self.db(), element_ty) {
-                            Type::divergent()
-                        } else {
-                            element_ty
-                        },
-                    );
+                    let result =
+                        TupleType::homogeneous(self.db(), self.infer_type_expression(element));
                     self.store_expression_type(tuple_slice, Type::tuple(Some(result)));
                     return Some(result);
                 }
@@ -593,13 +588,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(
-                            if exceeds_max_specialization_depth(self.db(), element_ty) {
-                                Type::divergent()
-                            } else {
-                                element_ty
-                            },
-                        );
+                        element_types.push(element_ty.fallback_to_divergent(self.db()));
                     }
                 }
 

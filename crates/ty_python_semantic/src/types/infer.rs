@@ -61,6 +61,9 @@ mod builder;
 #[cfg(test)]
 mod tests;
 
+/// How many fixpoint iterations to allow before falling back to Divergent type.
+const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -88,7 +91,7 @@ fn scope_cycle_recover<'db>(
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
-    ScopeInference::cycle_fallback(scope)
+    ScopeInference::cycle_initial(scope)
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -114,19 +117,25 @@ pub(crate) fn infer_definition_types<'db>(
 }
 
 fn definition_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _value: &DefinitionInference<'db>,
-    _count: u32,
-    _definition: Definition<'db>,
+    count: u32,
+    definition: Definition<'db>,
 ) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    if count == ITERATIONS_BEFORE_FALLBACK {
+        salsa::CycleRecoveryAction::Fallback(DefinitionInference::cycle_fallback(
+            definition.scope(db),
+        ))
+    } else {
+        salsa::CycleRecoveryAction::Iterate
+    }
 }
 
 fn definition_cycle_initial<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_fallback(definition.scope(db))
+    DefinitionInference::cycle_initial(definition.scope(db))
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -167,7 +176,7 @@ fn deferred_cycle_initial<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_fallback(definition.scope(db))
+    DefinitionInference::cycle_initial(definition.scope(db))
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).
@@ -229,19 +238,25 @@ pub(crate) fn infer_isolated_expression<'db>(
 }
 
 fn expression_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _value: &ExpressionInference<'db>,
-    _count: u32,
-    _input: InferExpression<'db>,
+    count: u32,
+    input: InferExpression<'db>,
 ) -> salsa::CycleRecoveryAction<ExpressionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    if count == ITERATIONS_BEFORE_FALLBACK {
+        salsa::CycleRecoveryAction::Fallback(ExpressionInference::cycle_fallback(
+            input.expression(db).scope(db),
+        ))
+    } else {
+        salsa::CycleRecoveryAction::Iterate
+    }
 }
 
 fn expression_cycle_initial<'db>(
     db: &'db dyn Db,
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    ExpressionInference::cycle_fallback(input.expression(db).scope(db))
+    ExpressionInference::cycle_initial(input.expression(db).scope(db))
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -528,6 +543,35 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+enum CycleRecovery<'db> {
+    /// An initial-value for fixpoint iteration; all types are `Type::Never`.
+    Initial,
+    /// A divergence-fallback value for fixpoint iteration; all types are `Divergent`.
+    Divergent(ScopeId<'db>),
+}
+
+impl<'db> CycleRecovery<'db> {
+    fn merge(self, other: Option<CycleRecovery<'db>>) -> Self {
+        if let Some(other) = other {
+            match (self, other) {
+                // It's important here that we keep the scope of `self` if merging two `Divergent`.
+                (Self::Divergent(scope), _) | (_, Self::Divergent(scope)) => Self::Divergent(scope),
+                _ => Self::Initial,
+            }
+        } else {
+            self
+        }
+    }
+
+    fn fallback_type(self) -> Type<'db> {
+        match self {
+            Self::Initial => Type::Never,
+            Self::Divergent(scope) => Type::divergent(Some(scope)),
+        }
+    }
+}
+
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
@@ -535,32 +579,31 @@ pub(crate) struct ScopeInference<'db> {
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The extra data that is only present for few inference regions.
-    extra: Option<Box<ScopeInferenceExtra>>,
+    extra: Option<Box<ScopeInferenceExtra<'db>>>,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
-struct ScopeInferenceExtra {
-    /// The fallback type for missing expressions/bindings/declarations.
-    ///
-    /// This is used only when constructing a cycle-recovery `TypeInference`.
-    cycle_fallback: bool,
+struct ScopeInferenceExtra<'db> {
+    /// Is this a cycle-recovery inference result, and if so, what kind?
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'db> ScopeInference<'db> {
-    fn cycle_fallback(scope: ScopeId<'db>) -> Self {
+    fn cycle_initial(scope: ScopeId<'db>) -> Self {
         let _ = scope;
 
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
-                cycle_fallback: true,
+                cycle_recovery: Some(CycleRecovery::Initial),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
         }
     }
+
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
@@ -580,14 +623,10 @@ impl<'db> ScopeInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
-    fn is_cycle_callback(&self) -> bool {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra
             .as_ref()
-            .is_some_and(|extra| extra.cycle_fallback)
-    }
-
-    fn fallback_type(&self) -> Option<Type<'db>> {
-        self.is_cycle_callback().then_some(Type::Never)
+            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 }
 
@@ -620,10 +659,8 @@ pub(crate) struct DefinitionInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
-    /// The fallback type for missing expressions/bindings/declarations.
-    ///
-    /// This is used only when constructing a cycle-recovery `TypeInference`.
-    cycle_fallback: bool,
+    /// Is this a cycle-recovery inference result, and if so, what kind?
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
@@ -636,6 +673,22 @@ struct DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
+    fn cycle_initial(scope: ScopeId<'db>) -> Self {
+        let _ = scope;
+
+        Self {
+            expressions: FxHashMap::default(),
+            bindings: Box::default(),
+            declarations: Box::default(),
+            #[cfg(debug_assertions)]
+            scope,
+            extra: Some(Box::new(DefinitionInferenceExtra {
+                cycle_recovery: Some(CycleRecovery::Initial),
+                ..DefinitionInferenceExtra::default()
+            })),
+        }
+    }
+
     fn cycle_fallback(scope: ScopeId<'db>) -> Self {
         let _ = scope;
 
@@ -646,7 +699,7 @@ impl<'db> DefinitionInference<'db> {
             #[cfg(debug_assertions)]
             scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
-                cycle_fallback: true,
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 ..DefinitionInferenceExtra::default()
             })),
         }
@@ -715,14 +768,10 @@ impl<'db> DefinitionInference<'db> {
         self.declarations.iter().map(|(_, qualifiers)| *qualifiers)
     }
 
-    fn is_cycle_callback(&self) -> bool {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra
             .as_ref()
-            .is_some_and(|extra| extra.cycle_fallback)
-    }
-
-    fn fallback_type(&self) -> Option<Type<'db>> {
-        self.is_cycle_callback().then_some(Type::Never)
+            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
@@ -754,21 +803,34 @@ struct ExpressionInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// `true` if this region is part of a cycle-recovery `TypeInference`.
-    ///
-    /// Falls back to `Type::Never` if an expression is missing.
-    cycle_fallback: bool,
+    /// Is this a cycle recovery inference result, and if so, what kind?
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
 }
 
 impl<'db> ExpressionInference<'db> {
+    fn cycle_initial(scope: ScopeId<'db>) -> Self {
+        let _ = scope;
+        Self {
+            extra: Some(Box::new(ExpressionInferenceExtra {
+                cycle_recovery: Some(CycleRecovery::Initial),
+                all_definitely_bound: true,
+                ..ExpressionInferenceExtra::default()
+            })),
+            expressions: FxHashMap::default(),
+
+            #[cfg(debug_assertions)]
+            scope,
+        }
+    }
+
     fn cycle_fallback(scope: ScopeId<'db>) -> Self {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_fallback: true,
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
@@ -794,14 +856,10 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    fn is_cycle_callback(&self) -> bool {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra
             .as_ref()
-            .is_some_and(|extra| extra.cycle_fallback)
-    }
-
-    fn fallback_type(&self) -> Option<Type<'db>> {
-        self.is_cycle_callback().then_some(Type::Never)
+            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 
     /// Returns true if all places in this expression are definitely bound.

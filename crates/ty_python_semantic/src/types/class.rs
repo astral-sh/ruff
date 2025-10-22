@@ -1617,8 +1617,11 @@ impl<'db> ClassLiteral<'db> {
 
                 for (idx, ty) in specialization.types(db).iter().enumerate() {
                     if exceeds_max_specialization_depth(db, *ty) {
-                        specialization =
-                            specialization.with_replaced_type(db, idx, Type::divergent());
+                        specialization = specialization.with_replaced_type(
+                            db,
+                            idx,
+                            Type::divergent(Some(self.body_scope(db))),
+                        );
                     }
                 }
 

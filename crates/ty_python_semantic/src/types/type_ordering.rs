@@ -267,9 +267,11 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
 
-        (DynamicType::Divergent, DynamicType::Divergent) => Ordering::Equal,
-        (DynamicType::Divergent, _) => Ordering::Less,
-        (_, DynamicType::Divergent) => Ordering::Greater,
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
+            left.scope.cmp(&right.scope)
+        }
+        (DynamicType::Divergent(_), _) => Ordering::Less,
+        (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }
 }
 
