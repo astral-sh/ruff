@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+assertion_line: 114
+---
+D1002 Missing docstring in public module variable
+ --> D1001_D1002.py:7:1
+  |
+6 | # Should trigger D1002 - undocumented public module variable (annotated)
+7 | public_var: int = 1
+  | ^^^^^^^^^^
+8 |
+9 | public_var_without_type = 2
+  |
+
+D1002 Missing docstring in public module variable
+  --> D1001_D1002.py:9:1
+   |
+ 7 | public_var: int = 1
+ 8 |
+ 9 | public_var_without_type = 2
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | public_var_without_value: int
+   |
+
+D1002 Missing docstring in public module variable
+  --> D1001_D1002.py:11:1
+   |
+ 9 | public_var_without_type = 2
+10 |
+11 | public_var_without_value: int
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+12 |
+13 | # Should NOT trigger - has docstring
+   |

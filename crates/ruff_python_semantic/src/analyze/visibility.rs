@@ -195,6 +195,15 @@ pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility
     }
 }
 
+/// Infer the [`Visibility`] of a variable / attribute from its name.
+pub(crate) fn binding_visibility(binding_name: &str) -> Visibility {
+    if binding_name.starts_with('_') {
+        Visibility::Private
+    } else {
+        Visibility::Public
+    }
+}
+
 /// Infer the [`Visibility`] of a method from its name and decorators.
 pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     // Is this a setter or deleter?
