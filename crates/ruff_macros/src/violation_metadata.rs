@@ -29,6 +29,14 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
             fn version() -> Option<&'static str> {
                 #version
             }
+
+            fn file() -> &'static str {
+                file!()
+            }
+
+            fn line() -> u32 {
+                line!()
+            }
         }
     })
 }

@@ -35,6 +35,12 @@ pub trait ViolationMetadata {
 
     /// The Ruff version when a rule was first introduced, e.g. 0.1.2.
     fn version() -> Option<&'static str>;
+
+    /// The file where the violation is declared.
+    fn file() -> &'static str;
+
+    /// The 1-based line where the violation is declared.
+    fn line() -> u32;
 }
 
 pub trait Violation: ViolationMetadata + Sized {
