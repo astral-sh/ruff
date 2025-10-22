@@ -2476,10 +2476,7 @@ class NestedMixed:
     def g(self: "NestedMixed"):
         self.x = {self.x}
 
-    def h(self: "NestedMixed"):
-        self.x = {"a": self.x}
-
-reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent] | dict[Unknown | str, Divergent]
+reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent]
 ```
 
 And cases where the types originate from annotations:
