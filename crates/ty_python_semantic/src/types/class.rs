@@ -523,16 +523,14 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping
-                    | TypeRelation::Redundancy
-                    | TypeRelation::ConstraintImplication(_) => {
+                    TypeRelation::Subtyping | TypeRelation::Redundancy => {
                         ConstraintSet::from(other.is_object(db))
                     }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
