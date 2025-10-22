@@ -2457,6 +2457,48 @@ class Counter:
 reveal_type(Counter().count)  # revealed: Unknown | int
 ```
 
+We also handle infinitely nested generics:
+
+```py
+class NestedLists:
+    def __init__(self: "NestedLists"):
+        self.x = 1
+
+    def f(self: "NestedLists"):
+        self.x = [self.x]
+
+reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+
+class NestedMixed:
+    def f(self: "NestedMixed"):
+        self.x = [self.x]
+
+    def g(self: "NestedMixed"):
+        self.x = {self.x}
+
+    def h(self: "NestedMixed"):
+        self.x = {"a": self.x}
+
+reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent] | dict[Unknown | str, Divergent]
+```
+
+And cases where the types originate from annotations:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def make_list(value: T) -> list[T]:
+    return [value]
+
+class NestedLists2:
+    def f(self: "NestedLists2"):
+        self.x = make_list(self.x)
+
+reveal_type(NestedLists2().x)  # revealed: Unknown | list[Divergent]
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
@@ -2551,13 +2593,54 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ## Divergent inferred implicit instance attribute types
 
 ```py
-# TODO: This test currently panics, see https://github.com/astral-sh/ty/issues/837
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x, 1)
 
-# class C:
-#    def f(self, other: "C"):
-#        self.x = (other.x, 1)
-#
-# reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+This also works if the tuple is not constructed directly:
+
+```py
+from typing import TypeVar, Literal
+
+T = TypeVar("T")
+
+def make_tuple(x: T) -> tuple[T, Literal[1]]:
+    return (x, 1)
+
+class D:
+    def f(self, other: "D"):
+        self.x = make_tuple(other.x)
+
+reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+The tuple type may also expand exponentially "in breadth":
+
+```py
+def duplicate(x: T) -> tuple[T, T]:
+    return (x, x)
+
+class E:
+    def f(self: "E"):
+        self.x = duplicate(self.x)
+
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, Divergent]
+```
+
+And it also works for homogeneous tuples:
+
+```py
+def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
+    return (x, x)
+
+class E:
+    def f(self, other: "E"):
+        self.x = make_homogeneous_tuple(other.x)
+
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

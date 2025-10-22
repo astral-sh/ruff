@@ -72,7 +72,10 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements.into_iter().map(Into::into),
+            elements
+                .into_iter()
+                .map(Into::into)
+                .map(|element| element.fallback_to_divergent(db)),
         ))
     }
 

@@ -69,7 +69,7 @@ use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, exceeds_max_specialization_depth};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -827,8 +827,12 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn divergent(scope: Option<ScopeId<'db>>) -> Self {
         Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
+    }
+
+    pub(crate) const fn is_divergent(&self) -> bool {
+        matches!(self, Type::Dynamic(DynamicType::Divergent(_)))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -6652,7 +6656,7 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
-                    specialization.get(db, bound_typevar).unwrap_or(self)
+                     specialization.get(db, bound_typevar).unwrap_or(self).fallback_to_divergent(db)
                 }
                 TypeMapping::PartialSpecialization(partial) => {
                     partial.get(db, bound_typevar).unwrap_or(self)
@@ -7214,6 +7218,16 @@ impl<'db> Type<'db> {
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
         any_over_type(db, self, &|ty| ty == div, false)
     }
+
+    /// If the specialization depth of `self` exceeds the maximum limit allowed,
+    /// return `Divergent`. Otherwise, return `self`.
+    pub(super) fn fallback_to_divergent(self, db: &'db dyn Db) -> Type<'db> {
+        if exceeds_max_specialization_depth(db, self) {
+            Type::divergent(None)
+        } else {
+            self
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -7659,7 +7673,7 @@ impl<'db> KnownInstanceType<'db> {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct DivergentType<'db> {
     /// The scope where this divergence was detected.
-    scope: ScopeId<'db>,
+    scope: Option<ScopeId<'db>>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
@@ -11772,7 +11786,7 @@ pub(crate) mod tests {
         let file_scope_id = FileScopeId::global();
         let scope = file_scope_id.to_scope_id(&db, file);
 
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope }));
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope: Some(scope) }));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.

@@ -37,7 +37,8 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
     TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, infer_definition_types,
+    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1612,7 +1613,18 @@ impl<'db> ClassLiteral<'db> {
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
-                let specialization = f(generic_context);
+                let mut specialization = f(generic_context);
+
+                for (idx, ty) in specialization.types(db).iter().enumerate() {
+                    if exceeds_max_specialization_depth(db, *ty) {
+                        specialization = specialization.with_replaced_type(
+                            db,
+                            idx,
+                            Type::divergent(Some(self.body_scope(db))),
+                        );
+                    }
+                }
+
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
         }
