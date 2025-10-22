@@ -401,19 +401,9 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
         [... for self.a in IntIterable()]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
-        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
-        # error: [unresolved-attribute]
         [... for self.d in IntIterable() for self.e in IntIterable()]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
@@ -461,9 +451,11 @@ If the comprehension is inside another scope like function then that attribute i
 class C:
     def __init__(self):
         def f():
+            # error: [unresolved-attribute] "Unresolved attribute `a` on type `Self@__init__`."
             [... for self.a in IntIterable()]
 
         def g():
+            # error: [unresolved-attribute] "Unresolved attribute `b` on type `Self@__init__`."
             [... for self.b in IntIterable()]
         g()
 
