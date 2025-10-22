@@ -65,9 +65,7 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
-use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType,
-};
+use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -269,55 +267,37 @@ impl<'db> ConstraintSet<'db> {
                 ConstrainedTypeVar::new_node(
                     db,
                     Type::TypeVar(bound),
-                    typevar.identity(db),
+                    typevar,
                     Type::TypeVar(bound),
                 )
             }
 
             // A ≤ T ≤ B == ([A] ≤ T) && (T ≤ [B])
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
-                let lower = ConstrainedTypeVar::new_node(
-                    db,
-                    Type::Never,
-                    lower.identity(db),
-                    Type::TypeVar(typevar),
-                );
-                let upper = ConstrainedTypeVar::new_node(
-                    db,
-                    Type::TypeVar(typevar),
-                    upper.identity(db),
-                    Type::object(),
-                );
+                let lower =
+                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
+                let upper =
+                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
                 lower.and(db, upper)
             }
 
             // A ≤ T ≤ B == ([A] ≤ T) && ([T] ≤ B)
             (Type::TypeVar(lower), _) if lower > typevar => {
-                let lower = ConstrainedTypeVar::new_node(
-                    db,
-                    Type::Never,
-                    lower.identity(db),
-                    Type::TypeVar(typevar),
-                );
-                let upper =
-                    ConstrainedTypeVar::new_node(db, Type::Never, typevar.identity(db), upper);
+                let lower =
+                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
+                let upper = ConstrainedTypeVar::new_node(db, Type::Never, typevar, upper);
                 lower.and(db, upper)
             }
 
             // A ≤ T ≤ B == (A ≤ [T]) && (T ≤ [B])
             (_, Type::TypeVar(upper)) if upper > typevar => {
-                let lower =
-                    ConstrainedTypeVar::new_node(db, lower, typevar.identity(db), Type::object());
-                let upper = ConstrainedTypeVar::new_node(
-                    db,
-                    Type::TypeVar(typevar),
-                    upper.identity(db),
-                    Type::object(),
-                );
+                let lower = ConstrainedTypeVar::new_node(db, lower, typevar, Type::object());
+                let upper =
+                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
                 lower.and(db, upper)
             }
 
-            _ => ConstrainedTypeVar::new_node(db, lower, typevar.identity(db), upper),
+            _ => ConstrainedTypeVar::new_node(db, lower, typevar, upper),
         };
 
         Self { node }
@@ -347,7 +327,7 @@ impl From<bool> for ConstraintSet<'_> {
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarIdentity<'db>,
+    typevar: BoundTypeVarInstance<'db>,
     lower: Type<'db>,
     upper: Type<'db>,
 }
@@ -363,7 +343,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
@@ -472,7 +452,10 @@ impl<'db> ConstrainedTypeVar<'db> {
                     return write!(
                         f,
                         "({} {} {})",
-                        self.constraint.typevar(self.db).display(self.db),
+                        self.constraint
+                            .typevar(self.db)
+                            .identity(self.db)
+                            .display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
                     );
@@ -485,7 +468,11 @@ impl<'db> ConstrainedTypeVar<'db> {
                 if !lower.is_never() {
                     write!(f, "{} ≤ ", lower.display(self.db))?;
                 }
-                self.constraint.typevar(self.db).display(self.db).fmt(f)?;
+                self.constraint
+                    .typevar(self.db)
+                    .identity(self.db)
+                    .display(self.db)
+                    .fmt(f)?;
                 if !upper.is_object() {
                     write!(f, " ≤ {}", upper.display(self.db))?;
                 }
