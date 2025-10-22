@@ -5950,7 +5950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
                 self.db(),
-                KnownClass::Tuple.to_instance(self.db()),
+                Type::homogeneous_tuple(self.db(), Type::unknown()),
                 inferable,
             )
         });

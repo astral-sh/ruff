@@ -4614,7 +4614,13 @@ impl KnownClass {
     /// the class. If this class is generic, this will use the default specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    #[track_caller]
     pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
@@ -4623,7 +4629,13 @@ impl KnownClass {
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
     /// parameter is specialized to `Unknown`.
+    #[track_caller]
     pub(crate) fn to_instance_unknown(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.try_to_class_literal(db)
             .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
             .unwrap_or_else(Type::unknown)
@@ -4667,11 +4679,17 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
+    #[track_caller]
     pub(crate) fn to_specialized_instance<'db>(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.to_specialized_class_type(db, specialization)
             .and_then(|class_type| Type::from(class_type).to_instance(db))
             .unwrap_or_else(Type::unknown)
@@ -5566,11 +5584,19 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
-            assert_ne!(
-                class.to_instance(&db),
-                Type::unknown(),
-                "Unexpectedly fell back to `Unknown` for `{class:?}`"
-            );
+            // Check the class can be looked up successfully
+            class.try_to_class_literal_without_logging(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}`"
+                );
+            }
         }
     }
 
@@ -5617,11 +5643,19 @@ mod tests {
                 current_version = version_added;
             }
 
-            assert_ne!(
-                class.to_instance(&db),
-                Type::unknown(),
-                "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
-            );
+            // Check the class can be looked up successfully
+            class.try_to_class_literal_without_logging(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
+                );
+            }
         }
     }
 }
