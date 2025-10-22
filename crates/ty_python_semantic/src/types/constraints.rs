@@ -184,7 +184,7 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
     ) -> Self {
         let (lower, upper) = match relation {
             // TODO: Is this the correct constraint for redundancy?
@@ -196,9 +196,6 @@ impl<'db> ConstraintSet<'db> {
                 lower.bottom_materialization(db),
                 upper.top_materialization(db),
             ),
-            TypeRelation::ConstraintImplication(_) => {
-                panic!("cannot constraint a typevar under constraint implication")
-            }
         };
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
@@ -264,6 +261,52 @@ impl<'db> ConstraintSet<'db> {
         self.node.is_always_satisfied(db)
     }
 
+    pub(crate) fn when_type_implies(
+        self,
+        db: &'db dyn Db,
+        lhs: Type<'db>,
+        rhs: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> Self {
+        match (lhs, rhs) {
+            (Type::TypeVar(bound_typevar), _) => {
+                let constrained_typevar = match rhs {
+                    Type::TypeVar(rhs_bound_typevar) if rhs_bound_typevar > bound_typevar => {
+                        rhs_bound_typevar
+                    }
+                    _ => bound_typevar,
+                };
+                let projected = self.project_typevar(db, constrained_typevar.identity(db));
+                let constraint = ConstraintSet::constrain_typevar(
+                    db,
+                    bound_typevar,
+                    Type::Never,
+                    rhs,
+                    TypeRelation::Subtyping,
+                );
+                projected
+                    .and(db, || constraint)
+                    .when_equivalent_to(db, constraint)
+            }
+
+            (_, Type::TypeVar(bound_typevar)) => {
+                let projected = self.project_typevar(db, bound_typevar.identity(db));
+                let constraint = ConstraintSet::constrain_typevar(
+                    db,
+                    bound_typevar,
+                    lhs,
+                    Type::object(),
+                    TypeRelation::Subtyping,
+                );
+                projected
+                    .and(db, || constraint)
+                    .when_equivalent_to(db, constraint)
+            }
+
+            _ => lhs.when_subtype_of(db, rhs, inferable),
+        }
+    }
+
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node);
@@ -317,7 +360,7 @@ impl<'db> ConstraintSet<'db> {
 
     pub(crate) fn when_equivalent_to(self, db: &'db dyn Db, other: Self) -> Self {
         Self {
-            node: self.node.iff(db, other.node).simplify(db, self),
+            node: self.node.iff(db, other.node).simplify(db),
         }
     }
 
@@ -423,7 +466,11 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// This is used (among other places) to simplify how we display constraint sets, by removing
     /// redundant constraints from a clause.
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
-        other.contains(db, self)
+        if self.typevar(db) != other.typevar(db) {
+            return false;
+        }
+        other.lower(db).is_subtype_of(db, self.lower(db))
+            && self.upper(db).is_subtype_of(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -1168,7 +1215,7 @@ impl<'db> InteriorNode<'db> {
     /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
     /// can rewrite any occurrences of `x ∨ y` into `y`.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify(self, db: &'db dyn Db) -> Node<'db> {
+    fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
         // substitution to replace the pair with the simplification.
@@ -1207,9 +1254,9 @@ impl<'db> InteriorNode<'db> {
 
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.
-            let larger_smaller = if left_constraint.implies(db, right_constraint, constraints) {
+            let larger_smaller = if left_constraint.implies(db, right_constraint) {
                 Some((right_constraint, left_constraint))
-            } else if right_constraint.implies(db, left_constraint, constraints) {
+            } else if right_constraint.implies(db, left_constraint) {
                 Some((left_constraint, right_constraint))
             } else {
                 None
@@ -1769,10 +1816,10 @@ mod tests {
         let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
-        let t_str = ConstraintSet::range(&db, str_type, t.identity(&db), str_type);
-        let t_bool = ConstraintSet::range(&db, bool_type, t.identity(&db), bool_type);
-        let u_str = ConstraintSet::range(&db, str_type, u.identity(&db), str_type);
-        let u_bool = ConstraintSet::range(&db, bool_type, u.identity(&db), bool_type);
+        let t_str = ConstraintSet::range(&db, str_type, t, str_type);
+        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
+        let u_str = ConstraintSet::range(&db, str_type, u, str_type);
+        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
         let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);

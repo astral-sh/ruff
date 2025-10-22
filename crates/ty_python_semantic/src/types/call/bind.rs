@@ -734,8 +734,9 @@ impl<'db> Bindings<'db> {
                                 _ => continue,
                             };
 
-                            let result =
-                                constraints.type_implies(db, *ty_a, *ty_b, InferableTypeVars::None);
+                            let result = constraints
+                                .when_type_implies(db, *ty_a, *ty_b, InferableTypeVars::None)
+                                .is_always_satisfied(db);
                             overload.set_return_type(Type::BooleanLiteral(result));
                         }
 
