@@ -16,9 +16,17 @@ from __future__ import annotations
 
 import argparse
 import csv
+import logging
 import subprocess
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from packaging.version import Version
+
+TEMP_DIR = TemporaryDirectory()
+TEMP_PATH = Path(TEMP_DIR.name) / "try.py"
+TEMP_PATH.write_text("1")
 
 
 def get_all_rule_codes() -> list[str]:
@@ -49,16 +57,31 @@ def get_all_rule_codes() -> list[str]:
 
 def run_uvx_rule_check(version: str, rule_code: str) -> bool:
     """Check if a rule exists in a given ruff version using uvx."""
-    try:
-        result = subprocess.run(
-            ["uvx", f"ruff@{version}", "rule", rule_code],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
-        return False
+    if Version(version) < Version("v0.0.136"):
+        # The --explain flag was added in v0.0.136. Use --exit-zero in case one
+        # of the lints is actually triggered
+        args = [
+            "uvx",
+            f"ruff@{version}",
+            "try.py",
+            "--select",
+            rule_code,
+            "--exit-zero",
+        ]
+    elif Version(version) < Version("v0.0.143"):
+        # A file argument was required for --explain before v0.0.143
+        args = ["uvx", f"ruff@{version}", "--explain", rule_code, "try.py"]
+    elif Version(version) < Version("v0.0.237"):
+        # The rule subcommand was added in v0.0.237
+        args = ["uvx", f"ruff@{version}", "--explain", rule_code]
+    else:
+        args = ["uvx", f"ruff@{version}", "rule", rule_code]
+
+    result = subprocess.run(args, capture_output=True, text=True, cwd=TEMP_DIR.name)
+    okay = result.returncode == 0
+    if not okay and "nvalid value" not in result.stderr:
+        logging.error("Failed to invoke `%s`: %s", args, result.stderr)
+    return okay
 
 
 def bisect_rule_introduction(versions: list[str], rule_code: str) -> str | None:
@@ -82,25 +105,37 @@ def bisect_rule_introduction(versions: list[str], rule_code: str) -> str | None:
 def get_ruff_versions() -> list[str]:
     """Get the list of Ruff versions to check."""
     # fmt: off
+    # some of these are commented out if I saw a uv error trying to install them
     return [
         "v0.0.18", "v0.0.19", "v0.0.20", "v0.0.21", "v0.0.22", "v0.0.23", "v0.0.24",
-        "v0.0.25", "v0.0.26", "v0.0.27", "v0.0.28", "v0.0.29", "v0.0.30", "v0.0.31",
-        "v0.0.32", "v0.0.33", "v0.0.34", "v0.0.35", "v0.0.36", "v0.0.37", "v0.0.38",
-        "v0.0.39", "v0.0.40", "v0.0.41", "v0.0.42", "v0.0.43", "v0.0.44", "v0.0.45",
+        "v0.0.25",
+        # "v0.0.26", "v0.0.27",
+        "v0.0.28", "v0.0.29", "v0.0.30", "v0.0.31",
+        "v0.0.32", "v0.0.33", "v0.0.34", "v0.0.35", "v0.0.36", "v0.0.37",
+        # "v0.0.38",
+        "v0.0.39", "v0.0.40",
+        # "v0.0.41",
+        "v0.0.42", "v0.0.43", "v0.0.44", "v0.0.45",
         "v0.0.46", "v0.0.47", "v0.0.48", "v0.0.49", "v0.0.50", "v0.0.51", "v0.0.52",
-        "v0.0.53", "v0.0.54", "v0.0.55", "v0.0.56", "v0.0.57", "v0.0.58", "v0.0.59",
+        "v0.0.53", "v0.0.54", "v0.0.55",
+        # "v0.0.56",
+        "v0.0.57", "v0.0.58", "v0.0.59",
         "v0.0.60", "v0.0.61", "v0.0.62", "v0.0.63", "v0.0.64", "v0.0.65", "v0.0.66",
         "v0.0.67", "v0.0.68", "v0.0.69", "v0.0.70", "v0.0.71", "v0.0.72", "v0.0.73",
         "v0.0.74", "v0.0.75", "v0.0.76", "v0.0.77", "v0.0.78", "v0.0.79", "v0.0.80",
-        "v0.0.81", "v0.0.82", "v0.0.83", "v0.0.84", "v0.0.85", "v0.0.86", "v0.0.87",
+        "v0.0.81", "v0.0.82", "v0.0.83", "v0.0.84", "v0.0.85", "v0.0.86",
+        # "v0.0.87",
         "v0.0.88", "v0.0.89", "v0.0.90", "v0.0.91", "v0.0.92", "v0.0.93", "v0.0.94",
         "v0.0.95", "v0.0.96", "v0.0.97", "v0.0.98", "v0.0.99", "v0.0.100", "v0.0.102",
         "v0.0.103", "v0.0.104", "v0.0.105", "v0.0.106", "v0.0.107", "v0.0.108",
         "v0.0.109", "v0.0.110", "v0.0.111", "v0.0.112", "v0.0.113", "v0.0.114",
-        "v0.0.115", "v0.0.116", "v0.0.117", "v0.0.118", "v0.0.119", "v0.0.120",
+        # "v0.0.115",
+        "v0.0.116", "v0.0.117", "v0.0.118", "v0.0.119", "v0.0.120",
         "v0.0.121", "v0.0.122", "v0.0.123", "v0.0.124", "v0.0.125", "v0.0.126",
         "v0.0.127", "v0.0.128", "v0.0.129", "v0.0.130", "v0.0.131", "v0.0.132",
-        "v0.0.133", "v0.0.134", "v0.0.135", "v0.0.136", "v0.0.137", "v0.0.138",
+        "v0.0.133", "v0.0.134", "v0.0.135",
+        # "v0.0.136",
+        "v0.0.137", "v0.0.138",
         "v0.0.139", "v0.0.140", "v0.0.141", "v0.0.142", "v0.0.143", "v0.0.144",
         "v0.0.145", "v0.0.146", "v0.0.147", "v0.0.148", "v0.0.149", "v0.0.150",
         "v0.0.151", "v0.0.152", "v0.0.153", "v0.0.154", "v0.0.155", "v0.0.156",
@@ -116,13 +151,17 @@ def get_ruff_versions() -> list[str]:
         "v0.0.212", "v0.0.213", "v0.0.214", "v0.0.215", "v0.0.216", "v0.0.217",
         "v0.0.218", "v0.0.219", "v0.0.220", "v0.0.221", "v0.0.222", "v0.0.223",
         "v0.0.224", "v0.0.225", "v0.0.226", "v0.0.227", "v0.0.228", "v0.0.229",
-        "v0.0.230", "v0.0.231", "v0.0.232", "v0.0.233", "v0.0.234", "v0.0.235",
+        "v0.0.230", "v0.0.231",
+        # "v0.0.232",
+        "v0.0.233", "v0.0.234", "v0.0.235",
         "v0.0.236", "v0.0.237", "v0.0.238", "v0.0.239", "v0.0.240", "v0.0.241",
         "v0.0.242", "v0.0.243", "v0.0.244", "v0.0.245", "v0.0.246", "v0.0.247",
         "v0.0.248", "v0.0.249", "v0.0.250", "v0.0.251", "v0.0.252", "v0.0.253",
         "v0.0.254", "v0.0.255", "v0.0.256", "v0.0.257", "v0.0.258", "v0.0.259",
         "v0.0.260", "v0.0.261", "v0.0.262", "v0.0.263", "v0.0.264", "v0.0.265",
-        "v0.0.266", "v0.0.267", "v0.0.268", "v0.0.269", "v0.0.270", "v0.0.271",
+        "v0.0.266", "v0.0.267",
+        # "v0.0.268",
+        "v0.0.269", "v0.0.270", "v0.0.271",
         "v0.0.272", "v0.0.273", "v0.0.274", "v0.0.275", "v0.0.276", "v0.0.277",
         "v0.0.278", "v0.0.279", "v0.0.280", "v0.0.281", "v0.0.282", "v0.0.283",
         "v0.0.284", "v0.0.285", "v0.0.286", "v0.0.287", "v0.0.288", "v0.0.289",
