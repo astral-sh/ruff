@@ -1272,8 +1272,6 @@ impl<'db> Specialization<'db> {
         index: usize,
         new_type: Type<'db>,
     ) -> Self {
-        debug_assert!(index < self.types(db).len());
-
         let mut new_types: Box<[_]> = self.types(db).to_vec().into_boxed_slice();
         new_types[index] = new_type;
 
