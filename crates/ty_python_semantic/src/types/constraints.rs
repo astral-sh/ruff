@@ -448,14 +448,32 @@ impl<'db> ConstrainedTypeVar<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let lower = self.constraint.lower(self.db);
                 let upper = self.constraint.upper(self.db);
+                let typevar = self.constraint.typevar(self.db);
                 if lower.is_equivalent_to(self.db, upper) {
+                    // If this typevar is equivalent to another, output the constraint in a
+                    // consistent alphabetical order, regardless of the salsa ordering that we are
+                    // using the in BDD.
+                    if let Type::TypeVar(bound) = lower {
+                        let bound = bound.identity(self.db).display(self.db).to_string();
+                        let typevar = typevar.identity(self.db).display(self.db).to_string();
+                        let (smaller, larger) = if bound < typevar {
+                            (bound, typevar)
+                        } else {
+                            (typevar, bound)
+                        };
+                        return write!(
+                            f,
+                            "({} {} {})",
+                            smaller,
+                            if self.negated { "≠" } else { "=" },
+                            larger,
+                        );
+                    }
+
                     return write!(
                         f,
                         "({} {} {})",
-                        self.constraint
-                            .typevar(self.db)
-                            .identity(self.db)
-                            .display(self.db),
+                        typevar.identity(self.db).display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
                     );
@@ -468,11 +486,7 @@ impl<'db> ConstrainedTypeVar<'db> {
                 if !lower.is_never() {
                     write!(f, "{} ≤ ", lower.display(self.db))?;
                 }
-                self.constraint
-                    .typevar(self.db)
-                    .identity(self.db)
-                    .display(self.db)
-                    .fmt(f)?;
+                typevar.identity(self.db).display(self.db).fmt(f)?;
                 if !upper.is_object() {
                     write!(f, " ≤ {}", upper.display(self.db))?;
                 }
