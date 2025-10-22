@@ -32,6 +32,9 @@ pub trait ViolationMetadata {
     /// Returns an explanation of what this violation catches,
     /// why it's bad, and what users should do instead.
     fn explain() -> Option<&'static str>;
+
+    /// The Ruff version when a rule was first introduced, e.g. 0.1.2.
+    fn version() -> Option<&'static str>;
 }
 
 pub trait Violation: ViolationMetadata + Sized {
