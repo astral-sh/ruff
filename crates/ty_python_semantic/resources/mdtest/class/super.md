@@ -615,7 +615,7 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # error: [unresolved-attribute] "Type `<super: <class 'B'>, B>` has no attribute `a`"
+        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
         super().a
 
 # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
