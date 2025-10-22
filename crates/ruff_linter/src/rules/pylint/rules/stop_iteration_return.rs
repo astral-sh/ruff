@@ -100,36 +100,17 @@ pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRai
     };
 
     // Check if it's a StopIteration exception (could be with or without a value)
-    if let ast::Expr::Call(ast::ExprCall {
-        func,
-        arguments: _,
-        range: _,
-        node_index: _,
-    }) = exc.as_ref()
-    {
-        // Check if it's calling StopIteration
-        if let ast::Expr::Name(ast::ExprName {
-            id,
-            ctx: _,
-            range: _,
-            node_index: _,
-        }) = func.as_ref()
+    match exc.as_ref() {
+        // `raise StopIteration(...)`
+        ast::Expr::Call(ast::ExprCall { func, .. })
+            if checker.semantic().match_builtin_expr(func, "StopIteration") =>
         {
-            if id == "StopIteration" && checker.semantic().has_builtin_binding("StopIteration") {
-                // It's a StopIteration being raised with arguments
-                checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
-            }
-        }
-    } else if let ast::Expr::Name(ast::ExprName {
-        id,
-        ctx: _,
-        range: _,
-        node_index: _,
-    }) = exc.as_ref()
-    {
-        // Check if it's just `raise StopIteration` (without arguments)
-        if id == "StopIteration" && checker.semantic().has_builtin_binding("StopIteration") {
             checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
         }
+        // `raise StopIteration`
+        expr if checker.semantic().match_builtin_expr(expr, "StopIteration") => {
+            checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
+        }
+        _ => {}
     }
 }
