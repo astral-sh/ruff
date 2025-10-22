@@ -372,7 +372,7 @@ pub(super) fn exceeds_max_specialization_depth(db: &dyn Db, ty: Type<'_>) -> boo
     //
     // reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
     // ```
-    const MAX_SPECIALIZATION_DEPTH: usize = 32;
+    const MAX_SPECIALIZATION_DEPTH: usize = 14;
 
     specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH
 }

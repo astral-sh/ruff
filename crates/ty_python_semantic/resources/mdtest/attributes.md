@@ -2617,6 +2617,19 @@ class D:
 reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
+The tuple type may also expand exponentially "in breadth":
+
+```py
+def duplicate(x: T) -> tuple[T, T]:
+    return (x, x)
+
+class E:
+    def f(self: Self):
+        self.x = duplicate(self.x)
+
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Divergent]
+```
+
 And it also works for homogeneous tuples:
 
 ```py
