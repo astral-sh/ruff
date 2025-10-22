@@ -1077,8 +1077,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 274..279,
                                     node_index: NodeIndex(None),
+                                    range: 274..279,
                                     value: StringLiteral(
                                         ExprStringLiteral {
                                             node_index: NodeIndex(None),
@@ -1117,8 +1117,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 303..331,
                                     node_index: NodeIndex(None),
+                                    range: 303..331,
                                     value: StringLiteral(
                                         ExprStringLiteral {
                                             node_index: NodeIndex(None),

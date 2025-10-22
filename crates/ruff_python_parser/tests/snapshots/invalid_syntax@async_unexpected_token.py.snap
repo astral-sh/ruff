@@ -148,8 +148,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 109..110,
                                     node_index: NodeIndex(None),
+                                    range: 109..110,
                                     pattern: None,
                                     name: None,
                                 },
