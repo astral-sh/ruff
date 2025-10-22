@@ -31,6 +31,25 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
+            let _ = writeln!(
+                &mut output,
+                r#"<small>
+Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{version}">{version}</a> ·
+<a href="https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
+</small>
+
+"#,
+                version = rule.version().unwrap_or(env!("CARGO_PKG_VERSION")),
+                encoded_name =
+                    url::form_urlencoded::byte_serialize(rule.name().as_str().as_bytes())
+                        .collect::<String>(),
+                file =
+                    url::form_urlencoded::byte_serialize(rule.file().replace('\\', "/").as_bytes())
+                        .collect::<String>(),
+                line = rule.line(),
+            );
+
             let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             if linter.url().is_some() {
                 let common_prefix: String = match linter.common_prefix() {
