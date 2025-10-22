@@ -85,16 +85,6 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
-    /// **Private** helper function to create a `Type::NominalInstance` from a class that
-    /// is known not to be `Any`, a protocol class, or a typed dict class.
-    fn non_tuple_instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.is_known(db, KnownClass::Object) {
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-        } else {
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
-        }
-    }
-
     pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
             Type::NominalInstance(instance_type) => Some(instance_type),
@@ -353,9 +343,9 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.normalized_impl(db, visitor))
             }
-            NominalInstanceInner::NonTuple(class) => {
-                Type::non_tuple_instance(db, class.normalized_impl(db, visitor))
-            }
+            NominalInstanceInner::NonTuple(class) => Type::NominalInstance(NominalInstanceType(
+                NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
+            )),
             NominalInstanceInner::Object => Type::object(),
         }
     }
@@ -488,10 +478,11 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            NominalInstanceInner::NonTuple(class) => Type::non_tuple_instance(
-                db,
-                class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
+            NominalInstanceInner::NonTuple(class) => {
+                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(
+                    class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
             NominalInstanceInner::Object => Type::object(),
         }
     }
