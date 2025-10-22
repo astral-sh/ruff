@@ -345,6 +345,7 @@ fn add_unimported_completions<'db>(
             module_name: Some(symbol.module.name(db)),
             import: import_action.import().cloned(),
             builtin: false,
+            // TODO: `is_type_check_only` requires inferring the type of the symbol
             is_type_check_only: false,
             documentation: None,
         });
