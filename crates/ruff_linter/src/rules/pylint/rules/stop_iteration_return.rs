@@ -78,39 +78,38 @@ fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
 
 /// PLR1708
 pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRaise) {
-    // Check if we're in a generator function (function that contains yield statements)
-    let mut in_generator_function = false;
-    for scope in checker.semantic().current_scopes() {
-        if let ruff_python_semantic::ScopeKind::Function(function_def) = scope.kind {
-            // Check if this function contains any yield statements by traversing its body
-            if contains_yield_statement(&function_def.body) {
-                in_generator_function = true;
-                break;
-            }
-        }
-    }
-
-    if !in_generator_function {
-        return;
-    }
-
-    // Check if the raise statement is raising StopIteration
+    // Fast-path: only continue if this is `raise StopIteration` (with or without args)
     let Some(exc) = &raise_stmt.exc else {
         return;
     };
 
-    // Check if it's a StopIteration exception (could be with or without a value)
-    match exc.as_ref() {
-        // `raise StopIteration(...)`
-        ast::Expr::Call(ast::ExprCall { func, .. })
-            if checker.semantic().match_builtin_expr(func, "StopIteration") =>
-        {
-            checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
+    let is_stop_iteration = match exc.as_ref() {
+        ast::Expr::Call(ast::ExprCall { func, .. }) => {
+            checker.semantic().match_builtin_expr(func, "StopIteration")
         }
-        // `raise StopIteration`
-        expr if checker.semantic().match_builtin_expr(expr, "StopIteration") => {
-            checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
-        }
-        _ => {}
+        expr => checker.semantic().match_builtin_expr(expr, "StopIteration"),
+    };
+
+    if !is_stop_iteration {
+        return;
     }
+
+    // Now check the (more expensive) generator context
+    if !in_generator_context(checker) {
+        return;
+    }
+
+    checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
+}
+
+/// Returns true if we're inside a function that contains any `yield`/`yield from`.
+fn in_generator_context(checker: &Checker) -> bool {
+    for scope in checker.semantic().current_scopes() {
+        if let ruff_python_semantic::ScopeKind::Function(function_def) = scope.kind {
+            if contains_yield_statement(&function_def.body) {
+                return true;
+            }
+        }
+    }
+    false
 }
