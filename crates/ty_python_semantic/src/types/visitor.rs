@@ -307,6 +307,7 @@ pub(super) fn any_over_type<'db>(
 /// has a depth of `2`. A set-theoretic type like `list[int] | list[list[int]]` has a maximum
 /// depth of `2`.
 fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
+    #[derive(Debug, Default)]
     struct SpecializationDepthVisitor<'db> {
         seen_types: RefCell<FxHashMap<NonAtomicType<'db>, Option<usize>>>,
         max_depth: Cell<usize>,
@@ -354,10 +355,7 @@ fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
         }
     }
 
-    let visitor = SpecializationDepthVisitor {
-        seen_types: RefCell::new(FxHashMap::default()),
-        max_depth: Cell::new(0),
-    };
+    let visitor = SpecializationDepthVisitor::default();
     visitor.visit_type(db, ty);
     visitor.max_depth.get()
 }
