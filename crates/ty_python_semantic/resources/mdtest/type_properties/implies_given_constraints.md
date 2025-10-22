@@ -155,16 +155,12 @@ def given_constraints[T]():
     # TODO: no static-assert-error
     # error: [static-assert-error]
     static_assert(implies_given_constraints(given_bool, T, int))
-    # TODO: no static-assert-error
-    # error: [static-assert-error]
     static_assert(implies_given_constraints(given_bool, T, bool))
     static_assert(not implies_given_constraints(given_bool, T, str))
 
     given_str = range_constraint(Never, T, str)
     static_assert(not implies_given_constraints(given_str, T, int))
     static_assert(not implies_given_constraints(given_str, T, bool))
-    # TODO: no static-assert-error
-    # error: [static-assert-error]
     static_assert(implies_given_constraints(given_str, T, str))
 ```
 

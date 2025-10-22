@@ -65,7 +65,27 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType};
+use crate::types::{
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType,
+};
+
+fn simplify_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Node<'db>,
+    _count: u32,
+    _self: InteriorNode<'db>,
+    _constraints: ConstraintSet<'db>,
+) -> salsa::CycleRecoveryAction<Node<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn simplify_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    this: InteriorNode<'db>,
+    _constraints: ConstraintSet<'db>,
+) -> Node<'db> {
+    Node::Interior(this)
+}
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -176,6 +196,82 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+        relation: TypeRelation<'db>,
+    ) -> Self {
+        let (lower, upper) = match relation {
+            // TODO: Is this the correct constraint for redundancy?
+            TypeRelation::Subtyping | TypeRelation::Redundancy => (
+                lower.top_materialization(db),
+                upper.bottom_materialization(db),
+            ),
+            TypeRelation::Assignability => (
+                lower.bottom_materialization(db),
+                upper.top_materialization(db),
+            ),
+            TypeRelation::ConstraintImplication(_) => {
+                panic!("cannot constraint a typevar under constraint implication")
+            }
+        };
+
+        // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
+        // typevars, we have to ensure that the bounds are "earlier" according to that order than
+        // the typevar being constrained.
+        //
+        // In the comments below, we use brackets to indicate which typevar is "larger", and
+        // therefore the typevar that the constraint applies to.
+        let node = match (lower, upper) {
+            // A ≤ T ≤ A == (T ≤ [A] ≤ T)
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
+                let (bound, typevar) = if lower < typevar {
+                    (lower, typevar)
+                } else {
+                    (typevar, lower)
+                };
+                ConstrainedTypeVar::new_node(
+                    db,
+                    Type::TypeVar(bound),
+                    typevar,
+                    Type::TypeVar(bound),
+                )
+            }
+
+            // A ≤ T ≤ B == ([A] ≤ T) && (T ≤ [B])
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
+                let lower =
+                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
+                let upper =
+                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
+                lower.and(db, upper)
+            }
+
+            // A ≤ T ≤ B == ([A] ≤ T) && ([T] ≤ B)
+            (Type::TypeVar(lower), _) if lower > typevar => {
+                let lower =
+                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
+                let upper = ConstrainedTypeVar::new_node(db, Type::Never, typevar, upper);
+                lower.and(db, upper)
+            }
+
+            // A ≤ T ≤ B == (A ≤ [T]) && (T ≤ [B])
+            (_, Type::TypeVar(upper)) if upper > typevar => {
+                let lower = ConstrainedTypeVar::new_node(db, lower, typevar, Type::object());
+                let upper =
+                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
+                lower.and(db, upper)
+            }
+
+            _ => ConstrainedTypeVar::new_node(db, lower, typevar, upper),
+        };
+
+        Self { node }
+    }
+
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self, _db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied()
@@ -241,66 +337,31 @@ impl<'db> ConstraintSet<'db> {
         self
     }
 
+    /// Returns a new constraints that only includes constraints on the given typevar, and any
+    /// other typevars that can be the lower or upper bound of that typevar.
+    pub(crate) fn project_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Self {
+        Self {
+            node: self.node.project_typevar(db, typevar),
+        }
+    }
+
+    pub(crate) fn when_equivalent_to(self, db: &'db dyn Db, other: Self) -> Self {
+        Self {
+            node: self.node.iff(db, other.node).simplify(db, self),
+        }
+    }
+
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        let lower = lower.bottom_materialization(db);
-        let upper = upper.top_materialization(db);
-
-        // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
-        // typevars, we have to ensure that the bounds are "earlier" according to that order than
-        // the typevar being constrained.
-        //
-        // In the comments below, we use brackets to indicate which typevar is "larger", and
-        // therefore the typevar that the constraint applies to.
-        let node = match (lower, upper) {
-            // A ≤ T ≤ A == (T ≤ [A] ≤ T)
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
-                let (bound, typevar) = if lower < typevar {
-                    (lower, typevar)
-                } else {
-                    (typevar, lower)
-                };
-                ConstrainedTypeVar::new_node(
-                    db,
-                    Type::TypeVar(bound),
-                    typevar,
-                    Type::TypeVar(bound),
-                )
-            }
-
-            // A ≤ T ≤ B == ([A] ≤ T) && (T ≤ [B])
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
-                let lower =
-                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
-                let upper =
-                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
-                lower.and(db, upper)
-            }
-
-            // A ≤ T ≤ B == ([A] ≤ T) && ([T] ≤ B)
-            (Type::TypeVar(lower), _) if lower > typevar => {
-                let lower =
-                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
-                let upper = ConstrainedTypeVar::new_node(db, Type::Never, typevar, upper);
-                lower.and(db, upper)
-            }
-
-            // A ≤ T ≤ B == (A ≤ [T]) && (T ≤ [B])
-            (_, Type::TypeVar(upper)) if upper > typevar => {
-                let lower = ConstrainedTypeVar::new_node(db, lower, typevar, Type::object());
-                let upper =
-                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
-                lower.and(db, upper)
-            }
-
-            _ => ConstrainedTypeVar::new_node(db, lower, typevar, upper),
-        };
-
-        Self { node }
+        Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
     }
 
     pub(crate) fn negated_range(
@@ -679,6 +740,16 @@ impl<'db> Node<'db> {
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
+    }
+
+    /// Returns a new BDD that only includes constraints on the given typevar, and any other
+    /// typevars that can be the lower or upper bound of that typevar.
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.project_typevar(db, typevar),
+        }
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
@@ -1098,6 +1169,18 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        let if_true = self.if_true(db).project_typevar(db, typevar);
+        let if_false = self.if_false(db).project_typevar(db, typevar);
+        if self_constraint.typevar(db).identity(db) > typevar {
+            if_true.or(db, if_false)
+        } else {
+            Node::new(db, self_constraint, if_true, if_false)
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
         db: &'db dyn Db,
@@ -1133,8 +1216,12 @@ impl<'db> InteriorNode<'db> {
     /// are mentioned in the BDD. For instance, if one constraint implies another (`x → y`), then
     /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
     /// can rewrite any occurrences of `x ∨ y` into `y`.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
+    #[salsa::tracked(
+        cycle_fn=simplify_cycle_recover,
+        cycle_initial=simplify_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn simplify(self, db: &'db dyn Db, constraints: ConstraintSet<'db>) -> Node<'db> {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
         // substitution to replace the pair with the simplification.

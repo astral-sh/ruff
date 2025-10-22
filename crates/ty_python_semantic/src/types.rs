@@ -1598,6 +1598,40 @@ impl<'db> Type<'db> {
         }
 
         match (self, target, relation) {
+            (Type::TypeVar(bound_typevar), _, TypeRelation::ConstraintImplication(constraints)) => {
+                let constrained_typevar = match target {
+                    Type::TypeVar(rhs_bound_typevar) if rhs_bound_typevar > bound_typevar => {
+                        rhs_bound_typevar
+                    }
+                    _ => bound_typevar,
+                };
+                let projected = constraints.project_typevar(db, constrained_typevar.identity(db));
+                let constraint = ConstraintSet::constrain_typevar(
+                    db,
+                    bound_typevar,
+                    Type::Never,
+                    target,
+                    TypeRelation::Subtyping,
+                );
+                projected
+                    .and(db, || constraint)
+                    .when_equivalent_to(db, constraint)
+            }
+
+            (_, Type::TypeVar(bound_typevar), TypeRelation::ConstraintImplication(constraints)) => {
+                let projected = constraints.project_typevar(db, bound_typevar.identity(db));
+                let constraint = ConstraintSet::constrain_typevar(
+                    db,
+                    bound_typevar,
+                    self,
+                    Type::object(),
+                    TypeRelation::Subtyping,
+                );
+                projected
+                    .and(db, || constraint)
+                    .when_equivalent_to(db, constraint)
+            }
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance), _) if instance.is_object() => {
                 ConstraintSet::from(true)
