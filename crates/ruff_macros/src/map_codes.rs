@@ -403,6 +403,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
+    let mut rule_version_match_arms = quote!();
+    let mut rule_file_match_arms = quote!();
+    let mut rule_line_match_arms = quote!();
 
     for Rule {
         name, attrs, path, ..
@@ -420,6 +423,15 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
+        rule_version_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::version(),},
+        );
+        rule_file_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
+        );
+        rule_line_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::line(),},
+        );
     }
 
     quote! {
@@ -454,6 +466,18 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             /// Returns the fix status of this rule.
             pub const fn fixable(&self) -> crate::FixAvailability {
                 match self { #rule_fixable_match_arms }
+            }
+
+            pub fn version(&self) -> Option<&'static str> {
+                match self { #rule_version_match_arms }
+            }
+
+            pub fn file(&self) -> &'static str {
+                match self { #rule_file_match_arms }
+            }
+
+            pub fn line(&self) -> u32 {
+                match self { #rule_line_match_arms }
             }
         }
     }
