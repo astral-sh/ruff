@@ -869,9 +869,6 @@ pub struct CallSignatureDetails<'db> {
     /// within the full signature string.
     pub parameter_label_offsets: Vec<TextRange>,
 
-    /// Offsets for each parameter in the signature definition.
-    pub definition_parameter_label_offsets: HashMap<String, FileRange>,
-
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
     pub parameter_names: Vec<String>,
@@ -883,6 +880,20 @@ pub struct CallSignatureDetails<'db> {
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
+}
+
+impl CallSignatureDetails<'_> {
+    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
+        let definition = self.signature.definition()?;
+        let file = definition.file(db);
+        let module_ref = parsed_module(db, file).load(db);
+        let offsets = definition_parameter_offsets(definition.kind(db), &module_ref)?;
+
+        offsets
+            .into_iter()
+            .find(|(param_name, _)| param_name == name)
+            .map(|(_, text_range)| FileRange::new(file, text_range))
+    }
 }
 
 fn definition_parameter_offsets(
@@ -933,31 +944,12 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(db).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
-                let definition_parameter_label_offsets = signature
-                    .definition()
-                    .and_then(|definition| {
-                        let file = definition.file(db);
-                        let module_ref = parsed_module(db, file).load(db);
-
-                        definition_parameter_offsets(definition.kind(db), &module_ref).map(
-                            |offsets| {
-                                offsets
-                                    .into_iter()
-                                    .map(|(name, text_range)| {
-                                        (name, FileRange::new(file, text_range))
-                                    })
-                                    .collect()
-                            },
-                        )
-                    })
-                    .unwrap_or_default();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
                     signature,
                     label: display_details.label,
                     parameter_label_offsets,
-                    definition_parameter_label_offsets,
                     parameter_names,
                     argument_to_parameter_mapping,
                 }
@@ -1118,9 +1110,6 @@ pub fn inlay_hint_call_argument_details<'db>(
 
     let parameters = call_signature_details.signature.parameters();
 
-    let definition_parameter_label_offsets =
-        &call_signature_details.definition_parameter_label_offsets;
-
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
@@ -1144,17 +1133,14 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         let parameter_label_offset =
-            definition_parameter_label_offsets.get(&param.name()?.to_string());
+            call_signature_details.get_definition_parameter_range(db, param.name()?.as_ref());
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
             let Some(name) = param.name() else {
                 continue;
             };
-            argument_names.insert(
-                arg_index,
-                (name.to_string(), parameter_label_offset.copied()),
-            );
+            argument_names.insert(arg_index, (name.to_string(), parameter_label_offset));
         }
     }
 
