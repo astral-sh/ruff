@@ -29,8 +29,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 7..10,
                                         node_index: NodeIndex(None),
+                                        range: 7..10,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 9..10,

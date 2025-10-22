@@ -506,67 +506,6 @@ impl ast::TypeParams {
     }
 }
 
-impl ast::TypeParamTypeVar {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamTypeVar {
-            bound,
-            default,
-            name,
-            range: _,
-            node_index: _,
-        } = self;
-
-        visitor.visit_identifier(name);
-        if let Some(expr) = bound {
-            visitor.visit_expr(expr);
-        }
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
-impl ast::TypeParamTypeVarTuple {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamTypeVarTuple {
-            range: _,
-            node_index: _,
-            name,
-            default,
-        } = self;
-        visitor.visit_identifier(name);
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
-impl ast::TypeParamParamSpec {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamParamSpec {
-            range: _,
-            node_index: _,
-            name,
-            default,
-        } = self;
-        visitor.visit_identifier(name);
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
 impl ast::FString {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
