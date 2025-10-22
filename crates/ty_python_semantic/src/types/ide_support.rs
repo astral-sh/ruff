@@ -870,7 +870,7 @@ pub struct CallSignatureDetails<'db> {
     pub parameter_label_offsets: Vec<TextRange>,
 
     /// Offsets for each parameter in the signature definition.
-    pub definition_parameter_offsets: HashMap<String, FileRange>,
+    pub definition_parameter_label_offsets: HashMap<String, FileRange>,
 
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
@@ -933,7 +933,7 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(db).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
-                let definition_parameter_offsets = signature
+                let definition_parameter_label_offsets = signature
                     .definition()
                     .and_then(|definition| {
                         let file = definition.file(db);
@@ -943,7 +943,9 @@ pub fn call_signature_details<'db>(
                             |offsets| {
                                 offsets
                                     .into_iter()
-                                    .map(|(name, offset)| (name, FileRange::new(file, offset)))
+                                    .map(|(name, text_range)| {
+                                        (name, FileRange::new(file, text_range))
+                                    })
                                     .collect()
                             },
                         )
@@ -955,7 +957,7 @@ pub fn call_signature_details<'db>(
                     signature,
                     label: display_details.label,
                     parameter_label_offsets,
-                    definition_parameter_offsets,
+                    definition_parameter_label_offsets,
                     parameter_names,
                     argument_to_parameter_mapping,
                 }
@@ -1116,7 +1118,8 @@ pub fn inlay_hint_call_argument_details<'db>(
 
     let parameters = call_signature_details.signature.parameters();
 
-    let definition_parameter_offsets = &call_signature_details.definition_parameter_offsets;
+    let definition_parameter_label_offsets =
+        &call_signature_details.definition_parameter_label_offsets;
 
     let mut argument_names = HashMap::new();
 
@@ -1140,7 +1143,8 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset = definition_parameter_offsets.get(&param.name()?.to_string());
+        let parameter_label_offset =
+            definition_parameter_label_offsets.get(&param.name()?.to_string());
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
