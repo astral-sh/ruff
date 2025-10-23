@@ -616,10 +616,10 @@ impl<'db> FunctionLiteral<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let (overloads, implementation) = self.overloads_and_implementation(db);
-        if let Some(implementation) = implementation {
-            if overloads.is_empty() {
-                return CallableSignature::single(implementation.signature(db));
-            }
+        if let Some(implementation) = implementation
+            && overloads.is_empty()
+        {
+            return CallableSignature::single(implementation.signature(db));
         }
 
         CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
@@ -898,7 +898,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -915,9 +915,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
-        returns(ref),
-        cycle_fn=last_definition_signature_cycle_recover,
-        cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -928,9 +926,7 @@ impl<'db> FunctionType<'db> {
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
     #[salsa::tracked(
-        returns(ref),
-        cycle_fn=last_definition_signature_cycle_recover,
-        cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -1048,8 +1044,8 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        if let Type::NominalInstance(instance) = ty {
-            if instance
+        if let Type::NominalInstance(instance) = ty
+            && instance
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
@@ -1057,9 +1053,8 @@ fn is_instance_truthiness<'db>(
                     ClassType::Generic(c) => c.origin(db) == class,
                     ClassType::NonGeneric(c) => c == class,
                 })
-            {
-                return true;
-            }
+        {
+            return true;
         }
         false
     };
@@ -1195,29 +1190,11 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
     })
 }
 
-fn signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &CallableSignature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<CallableSignature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
     CallableSignature::single(Signature::bottom())
-}
-
-fn last_definition_signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Signature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<Signature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn last_definition_signature_cycle_initial<'db>(
@@ -1642,15 +1619,15 @@ impl KnownFunction {
 
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if let Some(protocol_class) = class.into_protocol_class(db) {
-                            if !protocol_class.is_runtime_checkable(db) {
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    context,
-                                    call_expression,
-                                    protocol_class,
-                                    self,
-                                );
-                            }
+                        if let Some(protocol_class) = class.into_protocol_class(db)
+                            && !protocol_class.is_runtime_checkable(db)
+                        {
+                            report_runtime_check_against_non_runtime_checkable_protocol(
+                                context,
+                                call_expression,
+                                protocol_class,
+                                self,
+                            );
                         }
 
                         if self == KnownFunction::IsInstance {

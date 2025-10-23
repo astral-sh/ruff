@@ -13,7 +13,7 @@ use crate::semantic_index::{
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{
-    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
+    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
@@ -908,24 +908,110 @@ pub fn call_signature_details<'db>(
             .into_iter()
             .flat_map(std::iter::IntoIterator::into_iter)
             .map(|binding| {
-                let signature = &binding.signature;
+                let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+                let signature = binding.signature;
                 let display_details = signature.display(db).to_string_parts();
-                let parameter_label_offsets = display_details.parameter_ranges.clone();
-                let parameter_names = display_details.parameter_names.clone();
+                let parameter_label_offsets = display_details.parameter_ranges;
+                let parameter_names = display_details.parameter_names;
 
                 CallSignatureDetails {
-                    signature: signature.clone(),
+                    definition: signature.definition(),
+                    signature,
                     label: display_details.label,
                     parameter_label_offsets,
                     parameter_names,
-                    definition: signature.definition(),
-                    argument_to_parameter_mapping: binding.argument_matches().to_vec(),
+                    argument_to_parameter_mapping,
                 }
             })
             .collect()
     } else {
         // Type is not callable, return empty signatures
         vec![]
+    }
+}
+
+/// Returns the definitions of the binary operation along with its callable type.
+pub fn definitions_for_bin_op<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    binary_op: &ast::ExprBinOp,
+) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
+    let left_ty = binary_op.left.inferred_type(model);
+    let right_ty = binary_op.right.inferred_type(model);
+
+    let Ok(bindings) = Type::try_call_bin_op(db, left_ty, binary_op.op, right_ty) else {
+        return None;
+    };
+
+    let callable_type = promote_literals_for_self(db, bindings.callable_type());
+
+    let definitions: Vec<_> = bindings
+        .into_iter()
+        .flat_map(std::iter::IntoIterator::into_iter)
+        .filter_map(|binding| {
+            Some(ResolvedDefinition::Definition(
+                binding.signature.definition?,
+            ))
+        })
+        .collect();
+
+    Some((definitions, callable_type))
+}
+
+/// Returns the definitions for an unary operator along with their callable types.
+pub fn definitions_for_unary_op<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    unary_op: &ast::ExprUnaryOp,
+) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
+    let operand_ty = unary_op.operand.inferred_type(model);
+
+    let unary_dunder_method = match unary_op.op {
+        ast::UnaryOp::Invert => "__invert__",
+        ast::UnaryOp::UAdd => "__pos__",
+        ast::UnaryOp::USub => "__neg__",
+        ast::UnaryOp::Not => "__bool__",
+    };
+
+    let Ok(bindings) = operand_ty.try_call_dunder(
+        db,
+        unary_dunder_method,
+        CallArguments::none(),
+        TypeContext::default(),
+    ) else {
+        return None;
+    };
+
+    let callable_type = promote_literals_for_self(db, bindings.callable_type());
+
+    let definitions = bindings
+        .into_iter()
+        .flat_map(std::iter::IntoIterator::into_iter)
+        .filter_map(|binding| {
+            Some(ResolvedDefinition::Definition(
+                binding.signature.definition?,
+            ))
+        })
+        .collect();
+
+    Some((definitions, callable_type))
+}
+
+/// Promotes literal types in `self` positions to their fallback instance types.
+///
+/// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
+fn promote_literals_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
+            self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+        })),
+        Type::Union(elements) => elements.map(db, |ty| match ty {
+            Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
+                self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+            })),
+            _ => *ty,
+        }),
+        ty => ty,
     }
 }
 
@@ -1052,8 +1138,10 @@ mod resolve_definition {
     }
 
     use indexmap::IndexSet;
-    use ruff_db::files::{File, FileRange};
+    use ruff_db::files::{File, FileRange, vendored_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::system::SystemPath;
+    use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
     use rustc_hash::FxHashSet;
     use tracing::trace;
@@ -1311,17 +1399,42 @@ mod resolve_definition {
     pub fn map_stub_definition<'db>(
         db: &'db dyn Db,
         def: &ResolvedDefinition<'db>,
+        cached_vendored_typeshed: Option<&SystemPath>,
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
-        trace!("Stub mapping definition...");
         // If the file isn't a stub, this is presumably the real definition
         let stub_file = def.file(db);
+        trace!("Stub mapping definition in: {}", stub_file.path(db));
         if !stub_file.is_stub(db) {
             trace!("File isn't a stub, no stub mapping to do");
             return None;
         }
 
+        // We write vendored typeshed stubs to disk in the cache, and consequently "forget"
+        // that they're typeshed when an IDE hands those paths back to us later. For most
+        // purposes this seemingly doesn't matter at all, and avoids issues with someone
+        // editing the cache by hand in their IDE and us getting confused about the contents
+        // of the file (hello and welcome to anyone who has found Bigger Issues this causes).
+        //
+        // The major exception is in exactly stub-mapping, where we need to "remember" that
+        // we're in typeshed to successfully stub-map to the Real Stdlib. So here we attempt
+        // to do just that. The resulting file must not be used for anything other than
+        // this module lookup, as the `ResolvedDefinition` we're handling isn't for that file.
+        let mut stub_file_for_module_lookup = stub_file;
+        if let Some(vendored_typeshed) = cached_vendored_typeshed
+            && let Some(stub_path) = stub_file.path(db).as_system_path()
+            && let Ok(rel_path) = stub_path.strip_prefix(vendored_typeshed)
+            && let Ok(typeshed_file) =
+                vendored_path_to_file(db, VendoredPathBuf::from(rel_path.as_str()))
+        {
+            trace!(
+                "Stub is cached vendored typeshed: {}",
+                typeshed_file.path(db)
+            );
+            stub_file_for_module_lookup = typeshed_file;
+        }
+
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
-        let stub_module = file_to_module(db, stub_file)?;
+        let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
         let real_module = resolve_real_module(db, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));

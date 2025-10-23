@@ -11,7 +11,6 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
-use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -21,8 +20,7 @@ use crate::types::{
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
-    walk_bound_type_var_type,
+    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet};
 
@@ -35,31 +33,7 @@ pub(crate) fn enclosing_generic_contexts<'db>(
 ) -> impl Iterator<Item = GenericContext<'db>> {
     index
         .ancestor_scopes(scope)
-        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
-            NodeWithScopeKind::Class(class) => {
-                let definition = index.expect_single_definition(class);
-                binding_type(db, definition)
-                    .as_class_literal()?
-                    .generic_context(db)
-            }
-            NodeWithScopeKind::Function(function) => {
-                let definition = index.expect_single_definition(function);
-                infer_definition_types(db, definition)
-                    .undecorated_type()
-                    .expect("function should have undecorated type")
-                    .as_function_literal()?
-                    .last_definition_signature(db)
-                    .generic_context
-            }
-            NodeWithScopeKind::TypeAlias(type_alias) => {
-                let definition = index.expect_single_definition(type_alias);
-                binding_type(db, definition)
-                    .as_type_alias()?
-                    .as_pep_695_type_alias()?
-                    .generic_context(db)
-            }
-            _ => None,
-        })
+        .filter_map(|(_, ancestor_scope)| ancestor_scope.node().generic_context(db, index))
 }
 
 /// Binds an unbound typevar.
@@ -106,11 +80,11 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    scope_id: ScopeId,
+    function_scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<Type<'db>> {
-    let index = semantic_index(db, scope_id.file(db));
+    let index = semantic_index(db, function_scope_id.file(db));
 
     let identity = TypeVarIdentity::new(
         db,
@@ -136,7 +110,7 @@ pub(crate) fn typing_self<'db>(
     bind_typevar(
         db,
         index,
-        scope_id.file_scope_id(db),
+        function_scope_id.file_scope_id(db),
         typevar_binding_context,
         typevar,
     )
@@ -349,7 +323,6 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_fn=inferable_typevars_cycle_recover,
             cycle_initial=inferable_typevars_cycle_initial,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -650,15 +623,6 @@ impl<'db> GenericContext<'db> {
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
-}
-
-fn inferable_typevars_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &FxHashSet<BoundTypeVarIdentity<'db>>,
-    _count: u32,
-    _self: GenericContext<'db>,
-) -> salsa::CycleRecoveryAction<FxHashSet<BoundTypeVarIdentity<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn inferable_typevars_cycle_initial<'db>(
@@ -1289,6 +1253,25 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
+    }
+
+    /// Returns a copy of this specialization with the type at a given index replaced.
+    pub(crate) fn with_replaced_type(
+        self,
+        db: &'db dyn Db,
+        index: usize,
+        new_type: Type<'db>,
+    ) -> Self {
+        let mut new_types: Box<[_]> = self.types(db).to_vec().into_boxed_slice();
+        new_types[index] = new_type;
+
+        Self::new(
+            db,
+            self.generic_context(db),
+            new_types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
     }
 }
 

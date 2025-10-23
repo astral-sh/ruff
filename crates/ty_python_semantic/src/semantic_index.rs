@@ -527,20 +527,19 @@ impl<'db> SemanticIndex<'db> {
                 break;
             }
             if !ancestor_scope.is_eager() {
-                if let PlaceExprRef::Symbol(symbol) = expr {
-                    if let Some(place_id) =
+                if let PlaceExprRef::Symbol(symbol) = expr
+                    && let Some(place_id) =
                         self.place_tables[enclosing_scope].symbol_id(symbol.name())
-                    {
-                        let key = EnclosingSnapshotKey {
-                            enclosing_scope,
-                            enclosing_place: place_id.into(),
-                            nested_scope,
-                            nested_laziness: ScopeLaziness::Lazy,
-                        };
-                        if let Some(id) = self.enclosing_snapshots.get(&key) {
-                            return self.use_def_maps[enclosing_scope]
-                                .enclosing_snapshot(*id, key.nested_laziness);
-                        }
+                {
+                    let key = EnclosingSnapshotKey {
+                        enclosing_scope,
+                        enclosing_place: place_id.into(),
+                        nested_scope,
+                        nested_laziness: ScopeLaziness::Lazy,
+                    };
+                    if let Some(id) = self.enclosing_snapshots.get(&key) {
+                        return self.use_def_maps[enclosing_scope]
+                            .enclosing_snapshot(*id, key.nested_laziness);
                     }
                 }
                 return EnclosingSnapshotResult::NoLongerInEagerContext;

@@ -608,7 +608,7 @@ struct ScopedTarget<'t> {
     node: ast::AnyNodeRef<'t>,
 }
 
-/// Returns a slice of tokens that all start before or at the given
+/// Returns a slice of tokens that all start before the given
 /// [`TextSize`] offset.
 ///
 /// If the given offset is between two tokens, the returned slice will end just
@@ -620,11 +620,9 @@ struct ScopedTarget<'t> {
 /// range (including if it's at the very beginning), then that token will be
 /// included in the slice returned.
 fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
-    let idx = match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
-        Ok(idx) => idx,
-        Err(idx) => idx,
-    };
-    &tokens[..idx]
+    let partition_point = tokens.partition_point(|token| token.start() < offset);
+
+    &tokens[..partition_point]
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
@@ -1453,6 +1451,21 @@ def frob(): ...
         ");
     }
 
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1392>
+    ///
+    /// This test ensures completions work when the cursor is at the
+    /// start of a zero-length token.
+    #[test]
+    fn completion_at_eof() {
+        let test = cursor_test("def f(msg: str):\n    msg.<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+
+        let test = cursor_test("def f(msg: str):\n    msg.u<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_do_not_include("capitalize");
+    }
+
     #[test]
     fn list_comprehension1() {
         let test = cursor_test(
@@ -1944,14 +1957,34 @@ class Quux:
 ",
         );
 
-        // FIXME: This should list completions on `self`, which should
-        // include, at least, `foo` and `bar`. At time of writing
-        // (2025-06-04), the type of `self` is inferred as `Unknown` in
-        // this context. This in turn prevents us from getting a list
-        // of available attributes.
-        //
-        // See: https://github.com/astral-sh/ty/issues/159
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        assert_snapshot!(test.completions_without_builtins(), @r"
+        bar
+        baz
+        foo
+        __annotations__
+        __class__
+        __delattr__
+        __dict__
+        __dir__
+        __doc__
+        __eq__
+        __format__
+        __getattribute__
+        __getstate__
+        __hash__
+        __init__
+        __init_subclass__
+        __module__
+        __ne__
+        __new__
+        __reduce__
+        __reduce_ex__
+        __repr__
+        __setattr__
+        __sizeof__
+        __str__
+        __subclasshook__
+        ");
     }
 
     #[test]

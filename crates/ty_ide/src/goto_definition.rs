@@ -798,26 +798,6 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
         ");
     }
 
-    impl CursorTest {
-        fn goto_definition(&self) -> String {
-            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
-                return "No goto target found".to_string();
-            };
-
-            if targets.is_empty() {
-                return "No definitions found".to_string();
-            }
-
-            let source = targets.range;
-            self.render_diagnostics(
-                targets
-                    .into_iter()
-                    .map(|target| GotoDefinitionDiagnostic::new(source, &target)),
-            )
-        }
-    }
-
     #[test]
     fn goto_definition_overload_type_disambiguated1() {
         let test = CursorTest::builder()
@@ -1128,6 +1108,315 @@ def ab(a: int, *, c: int): ...
           | ^^
           |
         "#);
+    }
+
+    #[test]
+    fn goto_definition_binary_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+a = Test()
+b = Test()
+
+a <CURSOR>+ b
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __add__(self, other):
+          |         ^^^^^^^
+        4 |         return Test()
+          |
+        info: Source
+          --> main.py:10:3
+           |
+         8 | b = Test()
+         9 |
+        10 | a + b
+           |   ^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_reflected_dunder() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class A:
+    def __radd__(self, other) -> A:
+        return self
+
+class B: ...
+
+B() <CURSOR>+ A()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class A:
+        3 |     def __radd__(self, other) -> A:
+          |         ^^^^^^^^
+        4 |         return self
+          |
+        info: Source
+         --> main.py:8:5
+          |
+        6 | class B: ...
+        7 |
+        8 | B() + A()
+          |     ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_no_spaces_before_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+a = Test()
+b = Test()
+
+a<CURSOR>+b
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __add__(self, other):
+          |         ^^^^^^^
+        4 |         return Test()
+          |
+        info: Source
+          --> main.py:10:2
+           |
+         8 | b = Test()
+         9 |
+        10 | a+b
+           |  ^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_no_spaces_after_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+a = Test()
+b = Test()
+
+a+<CURSOR>b
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+          --> main.py:8:1
+           |
+         7 | a = Test()
+         8 | b = Test()
+           | ^
+         9 |
+        10 | a+b
+           |
+        info: Source
+          --> main.py:10:3
+           |
+         8 | b = Test()
+         9 |
+        10 | a+b
+           |   ^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_comment() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+(
+    Test()  <CURSOR># comment
+    + Test()
+)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_definition_unary_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self) -> bool: ...
+
+a = Test()
+
+<CURSOR>not a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __bool__(self) -> bool: ...
+          |         ^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | not a
+          | ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_after_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self) -> bool: ...
+
+a = Test()
+
+not<CURSOR> a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __bool__(self) -> bool: ...
+          |         ^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | not a
+          | ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_between_operator_and_operand() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self) -> bool: ...
+
+a = Test()
+
+-<CURSOR>a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:5:1
+          |
+        3 |     def __bool__(self) -> bool: ...
+        4 |
+        5 | a = Test()
+          | ^
+        6 |
+        7 | -a
+          |
+        info: Source
+         --> main.py:7:2
+          |
+        5 | a = Test()
+        6 |
+        7 | -a
+          |  ^
+          |
+        ");
+    }
+
+    impl CursorTest {
+        fn goto_definition(&self) -> String {
+            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+            else {
+                return "No goto target found".to_string();
+            };
+
+            if targets.is_empty() {
+                return "No definitions found".to_string();
+            }
+
+            let source = targets.range;
+            self.render_diagnostics(
+                targets
+                    .into_iter()
+                    .map(|target| GotoDefinitionDiagnostic::new(source, &target)),
+            )
+        }
     }
 
     struct GotoDefinitionDiagnostic {

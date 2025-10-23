@@ -256,3 +256,12 @@ async def f4():
 @app.get("/f5/{param: int}")
 async def f5():
     return locals()
+
+# https://github.com/astral-sh/ruff/issues/20941
+@app.get("/imports/{import}")
+async def get_import():
+    ...
+
+@app.get("/debug/{__debug__}")
+async def get_debug():
+    ...
