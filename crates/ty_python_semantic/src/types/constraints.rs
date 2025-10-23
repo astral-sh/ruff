@@ -345,7 +345,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         match (lower, upper) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
-                let (bound, typevar) = if lower < typevar {
+                let (bound, typevar) = if lower.identity(db) < typevar.identity(db) {
                     (lower, typevar)
                 } else {
                     (typevar, lower)
@@ -362,7 +362,10 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
+            (Type::TypeVar(lower), Type::TypeVar(upper))
+                if lower.identity(db) > typevar.identity(db)
+                    && upper.identity(db) > typevar.identity(db) =>
+            {
                 let lower = Node::new_constraint(
                     db,
                     ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
@@ -375,7 +378,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            (Type::TypeVar(lower), _) if lower > typevar => {
+            (Type::TypeVar(lower), _) if lower.identity(db) > typevar.identity(db) => {
                 let lower = Node::new_constraint(
                     db,
                     ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
@@ -385,7 +388,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            (_, Type::TypeVar(upper)) if upper > typevar => {
+            (_, Type::TypeVar(upper)) if upper.identity(db) > typevar.identity(db) => {
                 let lower = Self::new_node(db, typevar, lower, Type::object());
                 let upper = Node::new_constraint(
                     db,
@@ -419,7 +422,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (self.typevar(db), self.as_id())
+        (self.typevar(db).identity(db), self.as_id())
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -428,7 +431,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// This is used to simplify how we display constraint sets, by removing redundant constraints
     /// from a clause.
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db) != other.typevar(db) {
+        if self.typevar(db).identity(db) != other.typevar(db).identity(db) {
             return false;
         }
         other.lower(db).is_subtype_of(db, self.lower(db))
@@ -720,7 +723,9 @@ impl<'db> Node<'db> {
             // implies that constraint.
             (Type::TypeVar(bound_typevar), _) => {
                 let constrained_typevar = match rhs {
-                    Type::TypeVar(rhs_bound_typevar) if rhs_bound_typevar > bound_typevar => {
+                    Type::TypeVar(rhs_bound_typevar)
+                        if rhs_bound_typevar.identity(db) > bound_typevar.identity(db) =>
+                    {
                         rhs_bound_typevar
                     }
                     _ => bound_typevar,
