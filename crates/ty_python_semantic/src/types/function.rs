@@ -1318,6 +1318,8 @@ pub enum KnownFunction {
     RangeConstraint,
     /// `ty_extensions.negated_range_constraint`
     NegatedRangeConstraint,
+    /// `ty_extensions.constraint_set_domain`
+    ConstraintSetDomain,
 }
 
 impl KnownFunction {
@@ -1392,6 +1394,7 @@ impl KnownFunction {
             | Self::RevealProtocolInterface
             | Self::RangeConstraint
             | Self::NegatedRangeConstraint
+            | Self::ConstraintSetDomain
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1695,7 +1698,8 @@ impl KnownFunction {
                 };
 
                 let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
+                let should_simplify = true;
+                let tracked = TrackedConstraintSet::new(db, constraints, should_simplify);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
                 )));
@@ -1709,7 +1713,26 @@ impl KnownFunction {
 
                 let constraints =
                     ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
+                let should_simplify = true;
+                let tracked = TrackedConstraintSet::new(db, constraints, should_simplify);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::ConstraintSetDomain => {
+                let [Some(constraints)] = parameter_types else {
+                    return;
+                };
+
+                let Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) = constraints
+                else {
+                    return;
+                };
+
+                let result = tracked.constraints(db).domain(db);
+                let should_simplify = false;
+                let tracked = TrackedConstraintSet::new(db, result, should_simplify);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
                 )));
@@ -1813,6 +1836,7 @@ pub(crate) mod tests {
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RangeConstraint
                 | KnownFunction::NegatedRangeConstraint
+                | KnownFunction::ConstraintSetDomain
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

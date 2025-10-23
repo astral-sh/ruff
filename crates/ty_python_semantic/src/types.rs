@@ -7389,8 +7389,11 @@ impl<'db> TypeMapping<'_, 'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TrackedConstraintSet<'db> {
+    // XXX: no ref!
     #[returns(ref)]
     constraints: ConstraintSet<'db>,
+
+    should_simplify: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -7585,15 +7588,17 @@ impl<'db> KnownInstanceType<'db> {
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
                         let constraints = tracked_set.constraints(self.db);
-                        if constraints.is_always_satisfied(self.db) {
-                            f.write_str("ty_extensions.ConstraintSet[always]")
-                        } else if constraints.is_never_satisfied(self.db) {
-                            f.write_str("ty_extensions.ConstraintSet[never]")
-                        } else {
+                        if tracked_set.should_simplify(self.db) {
                             write!(
                                 f,
                                 "ty_extensions.ConstraintSet[{}]",
                                 constraints.display(self.db)
+                            )
+                        } else {
+                            write!(
+                                f,
+                                "ty_extensions.ConstraintSet[{}]",
+                                constraints.display_without_simplifying(self.db)
                             )
                         }
                     }

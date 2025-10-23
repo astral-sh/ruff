@@ -57,6 +57,9 @@ def negated_range_constraint(
     lower_bound: Any, typevar: Any, upper_bound: Any
 ) -> ConstraintSet: ...
 
+def constraint_set_domain(constraints: ConstraintSet) -> ConstraintSet: ...
+    """Returns the set of allowed inputs for a constraint set"""
+
 # Predicates on types
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been

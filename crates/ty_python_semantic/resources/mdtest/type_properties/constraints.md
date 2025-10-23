@@ -633,24 +633,34 @@ it!
 
 ```py
 from typing import Never
-from ty_extensions import static_assert
+from ty_extensions import constraint_set_domain, static_assert
 
 def f[T]():
     t_int = range_constraint(Never, T, int)
     t_bool = range_constraint(Never, T, bool)
-    always = range_constraint(Never, T, object)
 
-    # T ≤ bool implies T ≤ int: if a type satisfies the former, it must always satisfy the latter.
-    # We can turn that into a constraint set, using the equivalence `p → q == ¬p ∨ q`:
+    # `T ≤ bool` implies `T ≤ int`: if a type satisfies the former, it must always satisfy the
+    # latter. We can turn that into a constraint set, using the equivalence `p → q == ¬p ∨ q`:
     implication = ~t_bool | t_int
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(implication)
     static_assert(implication)
 
+    # However, because of that implication, some inputs aren't valid: it's not possible for
+    # `T ≤ bool` to be true and `T ≤ int` to be false. This is reflected in the constraint set's
+    # "domain", which maps valid inputs to `true` and invalid inputs to `false`.
+    # TODO: Under the covers, the domain BDD actually does include the `¬(T@f ≤ bool)` constraint,
+    # but it's currently being hidden by our display simplification logic.
+    # TODO: revealed: ty_extensions.ConstraintSet[((T@f ≤ int) ∧ ¬(T@f ≤ bool))]
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int)]
+    reveal_type(constraint_set_domain(implication))
+
+    # This means that two constraint sets that are both always satisfied will not be identical if
+    # they have different domains!
+    always = range_constraint(Never, T, object)
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(always)
     static_assert(always)
-
     static_assert(implication != always)
 ```
 
