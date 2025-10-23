@@ -1299,12 +1299,12 @@ pub enum KnownFunction {
     IsEquivalentTo,
     /// `ty_extensions.is_subtype_of`
     IsSubtypeOf,
+    /// `ty_extensions.is_subtype_of_given`
+    IsSubtypeOfGiven,
     /// `ty_extensions.is_assignable_to`
     IsAssignableTo,
     /// `ty_extensions.is_disjoint_from`
     IsDisjointFrom,
-    /// `ty_extensions.implies_given_constraints`
-    ImpliesGivenConstraints,
     /// `ty_extensions.is_singleton`
     IsSingleton,
     /// `ty_extensions.is_single_valued`
@@ -1391,7 +1391,7 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
-            | Self::ImpliesGivenConstraints
+            | Self::IsSubtypeOfGiven
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
@@ -1812,6 +1812,7 @@ pub(crate) mod tests {
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
+                | KnownFunction::IsSubtypeOfGiven
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
@@ -1820,7 +1821,6 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::ImpliesGivenConstraints
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RangeConstraint

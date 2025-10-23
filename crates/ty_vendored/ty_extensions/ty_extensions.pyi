@@ -74,6 +74,15 @@ def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
 
+def is_subtype_of_given(
+    constraints: bool | ConstraintSet, ty: Any, of: Any
+) -> bool:
+    """Returns a constraint that is satisfied when `ty` is a `subtype`_ of `of`,
+    assuming that all of the constraints in `constraints` hold.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
 def is_assignable_to(ty: Any, to: Any) -> ConstraintSet:
     """Returns a constraint that is satisfied when `ty` is `assignable`_ to `to`.
 
@@ -85,10 +94,6 @@ def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
 
     Two types are disjoint if they have no inhabitants in common.
     """
-
-def implies_given_constraints(
-    constraints: bool | ConstraintSet, type_a: Any, type_b: Any
-) -> bool: ...
 
 def is_singleton(ty: Any) -> bool:
     """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""

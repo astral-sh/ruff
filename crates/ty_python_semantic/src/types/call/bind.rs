@@ -697,6 +697,27 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::IsSubtypeOfGiven) => {
+                            let [Some(constraints), Some(ty_a), Some(ty_b)] =
+                                overload.parameter_types()
+                            else {
+                                continue;
+                            };
+
+                            let constraints = match constraints {
+                                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) => {
+                                    tracked.constraints(db)
+                                }
+                                Type::BooleanLiteral(b) => ConstraintSet::from(*b),
+                                _ => continue,
+                            };
+
+                            let result = constraints
+                                .when_subtype_of_given(db, *ty_a, *ty_b, InferableTypeVars::None)
+                                .is_always_satisfied(db);
+                            overload.set_return_type(Type::BooleanLiteral(result));
+                        }
+
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
@@ -717,27 +738,6 @@ impl<'db> Bindings<'db> {
                                     KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
-                        }
-
-                        Some(KnownFunction::ImpliesGivenConstraints) => {
-                            let [Some(constraints), Some(ty_a), Some(ty_b)] =
-                                overload.parameter_types()
-                            else {
-                                continue;
-                            };
-
-                            let constraints = match constraints {
-                                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) => {
-                                    tracked.constraints(db)
-                                }
-                                Type::BooleanLiteral(b) => ConstraintSet::from(*b),
-                                _ => continue,
-                            };
-
-                            let result = constraints
-                                .when_type_implies(db, *ty_a, *ty_b, InferableTypeVars::None)
-                                .is_always_satisfied(db);
-                            overload.set_return_type(Type::BooleanLiteral(result));
                         }
 
                         Some(KnownFunction::IsSingleton) => {

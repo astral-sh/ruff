@@ -4837,7 +4837,7 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Some(KnownFunction::ImpliesGivenConstraints) => Binding::single(
+                Some(KnownFunction::IsSubtypeOfGiven) => Binding::single(
                     self,
                     Signature::new(
                         Parameters::new([

@@ -261,7 +261,9 @@ impl<'db> ConstraintSet<'db> {
         self.node.is_always_satisfied(db)
     }
 
-    pub(crate) fn when_type_implies(
+    /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
+    /// constraints in this constraint set hold.
+    pub(crate) fn when_subtype_of_given(
         self,
         db: &'db dyn Db,
         lhs: Type<'db>,
