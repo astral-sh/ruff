@@ -8916,6 +8916,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+            ) => match op {
+                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()) == right.constraints(self.db())
+                ))),
+                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()) != right.constraints(self.db())
+                ))),
+                _ => None,
+            }
+
+            (
                 Type::NominalInstance(nominal1),
                 Type::NominalInstance(nominal2),
             ) => nominal1.tuple_spec(self.db())

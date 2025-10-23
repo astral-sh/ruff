@@ -638,6 +638,7 @@ from ty_extensions import static_assert
 def f[T]():
     t_int = range_constraint(Never, T, int)
     t_bool = range_constraint(Never, T, bool)
+    always = range_constraint(Never, T, object)
 
     # T ≤ bool implies T ≤ int: if a type satisfies the former, it must always satisfy the latter.
     # We can turn that into a constraint set, using the equivalence `p → q == ¬p ∨ q`:
@@ -647,6 +648,12 @@ def f[T]():
     # TODO: no error
     # error: [static-assert-error]
     static_assert(implication)
+
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(always)
+    static_assert(always)
+
+    static_assert(implication != always)
 ```
 
 ### Normalized bounds
