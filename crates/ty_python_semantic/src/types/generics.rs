@@ -80,11 +80,11 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    scope_id: ScopeId,
+    function_scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<Type<'db>> {
-    let index = semantic_index(db, scope_id.file(db));
+    let index = semantic_index(db, function_scope_id.file(db));
 
     let identity = TypeVarIdentity::new(
         db,
@@ -110,7 +110,7 @@ pub(crate) fn typing_self<'db>(
     bind_typevar(
         db,
         index,
-        scope_id.file_scope_id(db),
+        function_scope_id.file_scope_id(db),
         typevar_binding_context,
         typevar,
     )

@@ -81,7 +81,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
-    enclosing_generic_contexts,
+    enclosing_generic_contexts, typing_self,
 };
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
@@ -2495,6 +2495,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+            } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
+                ty
             } else {
                 Type::unknown()
             };
@@ -2533,6 +2535,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::homogeneous_tuple(builder.db(), Type::unknown())
             });
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_parameter_type(
+        &mut self,
+        parameter: &ast::Parameter,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let file = self.file();
+
+        let function_scope_id = self.scope();
+        let function_scope = function_scope_id.scope(db);
+        let function = function_scope.node().as_function()?;
+
+        let parent_file_scope_id = function_scope.parent()?;
+        let mut parent_scope_id = parent_file_scope_id.to_scope_id(db, file);
+
+        // Skip type parameter scopes, if the method itself is generic.
+        if parent_scope_id.is_annotation(db) {
+            let parent_scope = parent_scope_id.scope(db);
+            parent_scope_id = parent_scope.parent()?.to_scope_id(db, file);
+        }
+
+        // Return early if this is not a method inside a class.
+        let class = parent_scope_id.scope(db).node().as_class()?;
+
+        let method_definition = self.index.expect_single_definition(function);
+        let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
+            return None;
+        };
+
+        if function_definition
+            .node(self.module())
+            .parameters
+            .index(parameter.name())
+            .is_none_or(|index| index != 0)
+        {
+            return None;
+        }
+
+        let method = infer_definition_types(db, method_definition)
+            .declaration_type(method_definition)
+            .inner_type()
+            .as_function_literal()?;
+
+        if method.is_classmethod(db) {
+            // TODO: set the type for `cls` argument
+            return None;
+        } else if method.is_staticmethod(db) {
+            return None;
+        }
+
+        let class_definition = self.index.expect_single_definition(class);
+        let class_literal = infer_definition_types(db, class_definition)
+            .declaration_type(class_definition)
+            .inner_type()
+            .as_class_literal()?;
+
+        typing_self(db, self.scope(), Some(method_definition), class_literal)
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.

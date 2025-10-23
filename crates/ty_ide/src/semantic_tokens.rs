@@ -1798,23 +1798,23 @@ class BoundedContainer[T: int, U = str]:
         "T" @ 554..555: TypeParameter
         "value2" @ 557..563: Parameter
         "U" @ 565..566: TypeParameter
-        "self" @ 577..581: Variable
+        "self" @ 577..581: TypeParameter
         "value1" @ 582..588: Variable
         "T" @ 590..591: TypeParameter
         "value1" @ 594..600: Parameter
-        "self" @ 609..613: Variable
+        "self" @ 609..613: TypeParameter
         "value2" @ 614..620: Variable
         "U" @ 622..623: TypeParameter
         "value2" @ 626..632: Parameter
         "get_first" @ 642..651: Method [definition]
         "self" @ 652..656: SelfParameter
         "T" @ 661..662: TypeParameter
-        "self" @ 679..683: Variable
+        "self" @ 679..683: TypeParameter
         "value1" @ 684..690: Variable
         "get_second" @ 700..710: Method [definition]
         "self" @ 711..715: SelfParameter
         "U" @ 720..721: TypeParameter
-        "self" @ 738..742: Variable
+        "self" @ 738..742: TypeParameter
         "value2" @ 743..749: Variable
         "BoundedContainer" @ 798..814: Class [definition]
         "T" @ 815..816: TypeParameter [definition]
