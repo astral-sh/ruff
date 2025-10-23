@@ -441,6 +441,7 @@ fn run_test(
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,
+            safe_mode: false,
         }
         .to_search_paths(db.system(), db.vendored())
         .expect("Failed to resolve search path settings"),

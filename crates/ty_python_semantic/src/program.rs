@@ -187,6 +187,12 @@ pub struct SearchPathSettings {
     /// We should ideally only ever use this for things like goto-definition,
     /// where typeshed isn't the right answer.
     pub real_stdlib_path: Option<SystemPathBuf>,
+
+    /// Settings Failure Is Not An Error.
+    ///
+    /// This is used by the default database, which we are incentivized to make infallible,
+    /// while still trying to "do our best" to set things up properly where we can.
+    pub safe_mode: bool,
 }
 
 impl SearchPathSettings {
@@ -204,6 +210,7 @@ impl SearchPathSettings {
             custom_typeshed: None,
             site_packages_paths: vec![],
             real_stdlib_path: None,
+            safe_mode: false,
         }
     }
 

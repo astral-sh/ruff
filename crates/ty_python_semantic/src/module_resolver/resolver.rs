@@ -570,6 +570,7 @@ impl SearchPaths {
             custom_typeshed: typeshed,
             site_packages_paths,
             real_stdlib_path,
+            safe_mode,
         } = settings;
 
         let mut static_paths = vec![];
@@ -578,12 +579,30 @@ impl SearchPaths {
             let path = canonicalize(path, system);
             tracing::debug!("Adding extra search-path `{path}`");
 
-            static_paths.push(SearchPath::extra(system, path)?);
+            match SearchPath::extra(system, path) {
+                Ok(path) => static_paths.push(path),
+                Err(err) => {
+                    if *safe_mode {
+                        tracing::debug!("Skipping invalid extra search-path: {err}");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
         }
 
         for src_root in src_roots {
             tracing::debug!("Adding first-party search path `{src_root}`");
-            static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+            match SearchPath::first_party(system, src_root.to_path_buf()) {
+                Ok(path) => static_paths.push(path),
+                Err(err) => {
+                    if *safe_mode {
+                        tracing::debug!("Skipping invalid first-party search-path: {err}");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
         }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
@@ -592,18 +611,31 @@ impl SearchPaths {
 
             let versions_path = typeshed.join("stdlib/VERSIONS");
 
-            let versions_content = system.read_to_string(&versions_path).map_err(|error| {
-                SearchPathValidationError::FailedToReadVersionsFile {
-                    path: versions_path,
-                    error,
+            let results = system
+                .read_to_string(&versions_path)
+                .map_err(
+                    |error| SearchPathValidationError::FailedToReadVersionsFile {
+                        path: versions_path,
+                        error,
+                    },
+                )
+                .and_then(|versions_content| Ok(versions_content.parse()?))
+                .and_then(|parsed| Ok((parsed, SearchPath::custom_stdlib(system, &typeshed)?)));
+
+            match results {
+                Ok(results) => results,
+                Err(err) => {
+                    if settings.safe_mode {
+                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
+                        (
+                            vendored_typeshed_versions(vendored),
+                            SearchPath::vendored_stdlib(),
+                        )
+                    } else {
+                        return Err(err);
+                    }
                 }
-            })?;
-
-            let parsed: TypeshedVersions = versions_content.parse()?;
-
-            let search_path = SearchPath::custom_stdlib(system, &typeshed)?;
-
-            (parsed, search_path)
+            }
         } else {
             tracing::debug!("Using vendored stdlib");
             (
@@ -613,7 +645,17 @@ impl SearchPaths {
         };
 
         let real_stdlib_path = if let Some(path) = real_stdlib_path {
-            Some(SearchPath::real_stdlib(system, path.clone())?)
+            match SearchPath::real_stdlib(system, path.clone()) {
+                Ok(path) => Some(path),
+                Err(err) => {
+                    if *safe_mode {
+                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                        None
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
         } else {
             None
         };
@@ -622,7 +664,16 @@ impl SearchPaths {
 
         for path in site_packages_paths {
             tracing::debug!("Adding site-packages search path `{path}`");
-            site_packages.push(SearchPath::site_packages(system, path.clone())?);
+            match SearchPath::site_packages(system, path.clone()) {
+                Ok(path) => site_packages.push(path),
+                Err(err) => {
+                    if settings.safe_mode {
+                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
         }
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and

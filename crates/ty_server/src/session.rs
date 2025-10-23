@@ -513,7 +513,7 @@ impl Session {
                     ));
 
                     let db_with_default_settings =
-                        ProjectMetadata::from_options(Options::default(), root, None)
+                        ProjectMetadata::from_options(Options::safe(), root, None)
                             .context("Failed to convert default options to metadata")
                             .and_then(|metadata| ProjectDatabase::new(metadata, system))
                             .expect("Default configuration to be valid");

@@ -94,9 +94,23 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub overrides: Option<OverridesOptions>,
+
+    /// Settings Failure Is Not An Error.
+    ///
+    /// This is used by the default database, which we are incentivized to make infallible,
+    /// while still trying to "do our best" to set things up properly where we can.
+    #[serde(default, skip)]
+    pub safe_mode: bool,
 }
 
 impl Options {
+    pub fn safe() -> Self {
+        Self {
+            safe_mode: true,
+            ..Self::default()
+        }
+    }
+
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
@@ -154,14 +168,25 @@ impl Options {
                 ValueSource::Editor => SysPrefixPathOrigin::Editor,
             };
 
-            Some(PythonEnvironment::new(
-                python_path.absolute(project_root, system),
-                origin,
-                system,
-            )?)
+            PythonEnvironment::new(python_path.absolute(project_root, system), origin, system)
+                .map_err(anyhow::Error::from)
+                .map(Some)
         } else {
             PythonEnvironment::discover(project_root, system)
-                .context("Failed to discover local Python environment")?
+                .context("Failed to discover local Python environment")
+        };
+
+        // If in safe-mode, fallback to None if this fails instead of erroring.
+        let python_environment = match python_environment {
+            Ok(python_environment) => python_environment,
+            Err(err) => {
+                if self.safe_mode {
+                    tracing::debug!("Default settings failed to discover local Python environment");
+                    None
+                } else {
+                    return Err(err);
+                }
+            }
         };
 
         let self_site_packages = self_environment_search_paths(
@@ -174,11 +199,23 @@ impl Options {
         .unwrap_or_default();
 
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
-            self_site_packages.concatenate(
-                python_environment
-                    .site_packages_paths(system)
-                    .context("Failed to discover the site-packages directory")?,
-            )
+            let site_packages_paths = python_environment
+                .site_packages_paths(system)
+                .context("Failed to discover the site-packages directory");
+            let site_packages_paths = match site_packages_paths {
+                Ok(paths) => paths,
+                Err(err) => {
+                    if self.safe_mode {
+                        tracing::debug!(
+                            "Default settings failed to discover site-packages directory"
+                        );
+                        SitePackagesPaths::default()
+                    } else {
+                        return Err(err);
+                    }
+                }
+            };
+            self_site_packages.concatenate(site_packages_paths)
         } else {
             tracing::debug!("No virtual environment found");
             self_site_packages
@@ -201,6 +238,7 @@ impl Options {
             .or_else(|| site_packages_paths.python_version_from_layout())
             .unwrap_or_default();
 
+        // Safe mode is handled inside this function, so we just assume this can't fail
         let search_paths = self.to_search_paths(
             project_root,
             project_name,
@@ -344,6 +382,7 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
+            safe_mode: self.safe_mode,
         };
 
         settings.to_search_paths(system, vendored)
