@@ -85,13 +85,11 @@ def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
     """
 
 def is_singleton(ty: Any) -> bool:
-    """Returns `True` if `ty` is a singleton type.
-
-    A singleton type has exactly one inhabitant (one possible value).
+    """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""
     """
 
 def is_single_valued(ty: Any) -> bool:
-    """Returns `True` if all inhabitants of `ty` compare equal to each other."""
+    """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
 # Returns the generic context of a type as a tuple of typevars, or `None` if the
 # type is not generic.
