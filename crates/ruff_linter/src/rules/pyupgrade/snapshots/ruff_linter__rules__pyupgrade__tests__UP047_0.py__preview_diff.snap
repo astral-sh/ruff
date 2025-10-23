@@ -11,7 +11,7 @@ Added: 1
 
 --- Added ---
 UP047 [*] Generic function `default_var` should use type parameters
-  --> UP047.py:51:5
+  --> UP047_0.py:51:5
    |
 51 | def default_var(v: V) -> V:
    |     ^^^^^^^^^^^^^^^^^

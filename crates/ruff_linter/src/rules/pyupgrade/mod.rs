@@ -111,7 +111,7 @@ mod tests {
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
-    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
     #[test_case(Rule::UselessClassMetaclassType, Path::new("UP050.py"))]
@@ -120,6 +120,22 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
+    fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy().to_string();
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -144,7 +160,7 @@ mod tests {
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
-    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_0.py"))]
     fn type_var_default_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview_diff", path.to_string_lossy());
         assert_diagnostics_diff!(
