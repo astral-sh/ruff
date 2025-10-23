@@ -107,3 +107,8 @@ from airflow.sensors.base import (
 BaseSensorOperator()
 PokeReturnValue()
 poke_mode_only()
+
+from airflow.models.param import Param
+
+# airflow.models
+Param()

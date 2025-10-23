@@ -261,7 +261,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: (*rest).to_string(),
             }
         }
-        ["airflow", "models", "Param"] => Replacement::Rename {
+        ["airflow", "models", .., "Param"] => Replacement::Rename {
             module: "airflow.sdk.definitions.param",
             name: "Param",
         },

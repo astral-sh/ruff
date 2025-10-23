@@ -801,6 +801,8 @@ AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It s
 108 | PokeReturnValue()
 109 | poke_mode_only()
     | ^^^^^^^^^^^^^^
+110 |
+111 | from airflow.models.param import Param
     |
 help: Use `poke_mode_only` from `airflow.sdk` instead.
 100 | from airflow.sensors.base import (
@@ -812,4 +814,22 @@ help: Use `poke_mode_only` from `airflow.sdk` instead.
 105 | 
 106 | # airflow.sensors.base
 107 | BaseSensorOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 [*] `airflow.models.param.Param` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:114:1
+    |
+113 | # airflow.models
+114 | Param()
+    | ^^^^^
+    |
+help: Use `Param` from `airflow.sdk.definitions.param` instead.
+108 | PokeReturnValue()
+109 | poke_mode_only()
+110 | 
+    - from airflow.models.param import Param
+111 + from airflow.sdk.definitions.param import Param
+112 | 
+113 | # airflow.models
+114 | Param()
 note: This is an unsafe fix and may change runtime behavior
