@@ -369,17 +369,6 @@ impl Default for MemberLookupPolicy {
     }
 }
 
-fn member_lookup_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &PlaceAndQualifiers<'db>,
-    _count: u32,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn member_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: Type<'db>,
@@ -389,17 +378,6 @@ fn member_lookup_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-fn class_lookup_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &PlaceAndQualifiers<'db>,
-    _count: u32,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn class_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: Type<'db>,
@@ -407,21 +385,6 @@ fn class_lookup_cycle_initial<'db>(
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
     Place::bound(Type::Never).into()
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn variance_cycle_recover<'db, T>(
-    _db: &'db dyn Db,
-    _value: &TypeVarVariance,
-    count: u32,
-    _self: T,
-    _typevar: BoundTypeVarInstance<'db>,
-) -> salsa::CycleRecoveryAction<TypeVarVariance> {
-    assert!(
-        count <= 2,
-        "Should only be able to cycle at most twice: there are only three levels in the lattice, each cycle should move us one"
-    );
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn variance_cycle_initial<'db, T>(
@@ -1582,7 +1545,7 @@ impl<'db> Type<'db> {
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
-    #[salsa::tracked(cycle_fn=is_redundant_with_cycle_recover, cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
             .is_always_satisfied()
@@ -3628,7 +3591,7 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -4093,7 +4056,7 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -6616,7 +6579,7 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=apply_specialization_cycle_recover, cycle_initial=apply_specialization_cycle_initial)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=apply_specialization_cycle_initial)]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -7336,32 +7299,12 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_redundant_with_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &bool,
-    _count: u32,
-    _subtype: Type<'db>,
-    _supertype: Type<'db>,
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn is_redundant_with_cycle_initial<'db>(
     _db: &'db dyn Db,
     _subtype: Type<'db>,
     _supertype: Type<'db>,
 ) -> bool {
     true
-}
-
-fn apply_specialization_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn apply_specialization_cycle_initial<'db>(
@@ -8340,7 +8283,6 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     #[salsa::tracked(
-        cycle_fn=lazy_bound_or_constraints_cycle_recover,
         cycle_initial=lazy_bound_or_constraints_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -8365,7 +8307,6 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     #[salsa::tracked(
-        cycle_fn=lazy_bound_or_constraints_cycle_recover,
         cycle_initial=lazy_bound_or_constraints_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -8441,16 +8382,6 @@ impl<'db> TypeVarInstance<'db> {
             .generic_context(db, index)?
             .binds_typevar(db, self)
     }
-}
-
-#[allow(clippy::ref_option)]
-fn lazy_bound_or_constraints_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<TypeVarBoundOrConstraints<'db>>,
-    _count: u32,
-    _self: TypeVarInstance<'db>,
-) -> salsa::CycleRecoveryAction<Option<TypeVarBoundOrConstraints<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn lazy_bound_or_constraints_cycle_initial<'db>(
@@ -9975,16 +9906,6 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, method.self_instance(db));
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn into_callable_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &CallableType<'db>,
-    _count: u32,
-    _self: BoundMethodType<'db>,
-) -> salsa::CycleRecoveryAction<CallableType<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn into_callable_type_cycle_initial<'db>(
     db: &'db dyn Db,
     _self: BoundMethodType<'db>,
@@ -10013,7 +9934,7 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
-    #[salsa::tracked(cycle_fn=into_callable_type_cycle_recover, cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
         let self_instance = self.typing_self_type(db);
@@ -10777,7 +10698,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let value_type = self.raw_value_type(db);
 
@@ -10840,7 +10761,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         self.specialization(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=generic_context_cycle_recover, cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
         let file = scope.file(db);
@@ -10863,30 +10784,11 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 }
 
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn generic_context_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<GenericContext<'db>>,
-    _count: u32,
-    _self: PEP695TypeAliasType<'db>,
-) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: PEP695TypeAliasType<'db>,
 ) -> Option<GenericContext<'db>> {
     None
-}
-
-fn value_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
-    _self: PEP695TypeAliasType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {

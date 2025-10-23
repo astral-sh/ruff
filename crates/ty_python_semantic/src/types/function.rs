@@ -898,7 +898,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -915,9 +915,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
-        returns(ref),
-        cycle_fn=last_definition_signature_cycle_recover,
-        cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -928,9 +926,7 @@ impl<'db> FunctionType<'db> {
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
     #[salsa::tracked(
-        returns(ref),
-        cycle_fn=last_definition_signature_cycle_recover,
-        cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -1194,29 +1190,11 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
     })
 }
 
-fn signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &CallableSignature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<CallableSignature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
     CallableSignature::single(Signature::bottom())
-}
-
-fn last_definition_signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Signature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<Signature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn last_definition_signature_cycle_initial<'db>(
