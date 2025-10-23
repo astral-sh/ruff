@@ -313,7 +313,6 @@ static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
-
 ### Cyclic defaults
 
 ```py
@@ -324,10 +323,8 @@ from typing_extensions import TypeVar
 
 T = TypeVar("T", default="C", covariant=True)
 
-
 class P(Protocol[T]):
     pass
-
 
 class C(P[T]):
     pass
