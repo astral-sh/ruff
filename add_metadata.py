@@ -9,22 +9,32 @@ from pathlib import Path
 
 Rule = str
 Version = str
+Name = str
+Status = str
 
 
 def kebab_to_pascal(name):
     return "".join(word.capitalize() for word in name.split("-"))
 
 
-def load_rules() -> dict[Rule, str]:
+def load_rules() -> dict[Rule, (Name, Status)]:
     rules = json.loads(
         subprocess.run(
-            ["ruff", "rule", "--all", "--output-format", "json"],
+            [
+                "/home/brent/astral/ruff/target/debug/ruff",
+                "rule",
+                "--all",
+                "--output-format",
+                "json",
+            ],
             capture_output=True,
             check=True,
         ).stdout
     )
 
-    return {rule["code"]: kebab_to_pascal(rule["name"]) for rule in rules}
+    return {
+        rule["code"]: (kebab_to_pascal(rule["name"]), rule["status"]) for rule in rules
+    }
 
 
 def load_versions() -> dict[Rule, Version]:
@@ -44,7 +54,7 @@ if __name__ == "__main__":
     rules = load_rules()
     versions = load_versions()
 
-    for rule, name in rules.items():
+    for rule, (name, status) in rules.items():
         print(f"searching for {rule}")
         pattern = re.compile(rf"pub(\(crate\))? struct {name}( [{{]|;|<|\()", re.I)
         for path in glob.glob("crates/ruff_linter/src/rules/**/*.rs", recursive=True):
@@ -52,7 +62,7 @@ if __name__ == "__main__":
             contents = path.read_text()
             if pattern.search(contents):
                 new_contents = pattern.sub(
-                    rf'#[violation_metadata(version = "{versions[rule]}")]\n\g<0>',
+                    rf"""#[violation_metadata(version = "{versions[rule]}", group = RuleGroup::{status})]\n\g<0>""",
                     contents,
                 )
                 path.write_text(new_contents)
