@@ -373,12 +373,6 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
-    pub(crate) fn when_equivalent_to(self, db: &'db dyn Db, other: Self) -> Self {
-        Self {
-            node: self.node.iff(db, other.node).simplify(db),
-        }
-    }
-
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
