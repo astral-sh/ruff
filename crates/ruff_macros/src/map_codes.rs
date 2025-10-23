@@ -20,8 +20,6 @@ struct Rule {
     linter: Ident,
     /// The code associated with the rule, e.g., `"E112"`.
     code: LitStr,
-    /// The rule group identifier, e.g., `RuleGroup::Preview`.
-    group: Path,
     /// The path to the struct implementing the rule, e.g.
     /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
     path: Path,
@@ -104,7 +102,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             linter,
             rules
                 .iter()
-                .map(|(code, Rule { group, attrs, .. })| (code.as_str(), group, attrs)),
+                .map(|(code, Rule { attrs, .. })| (code.as_str(), attrs)),
         ));
 
         output.extend(quote! {
@@ -301,7 +299,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 }
             }
 
-
             pub fn is_preview(&self) -> bool {
                 matches!(self.group(), RuleGroup::Preview { .. })
             }
@@ -471,7 +468,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 }
 
 impl Parse for Rule {
-    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+    /// Parses a match arm such as `(Pycodestyle, "E112") => rules::pycodestyle::rules::logical_lines::NoIndentedBlock,`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;
@@ -480,18 +477,13 @@ impl Parse for Rule {
         let _: Token!(,) = pat_tuple.parse()?;
         let code: LitStr = pat_tuple.parse()?;
         let _: Token!(=>) = input.parse()?;
-        let pat_tuple;
-        parenthesized!(pat_tuple in input);
-        let group: Path = pat_tuple.parse()?;
-        let _: Token!(,) = pat_tuple.parse()?;
-        let rule_path: Path = pat_tuple.parse()?;
+        let rule_path: Path = input.parse()?;
         let _: Token!(,) = input.parse()?;
         let rule_name = rule_path.segments.last().unwrap().ident.clone();
         Ok(Rule {
             name: rule_name,
             linter,
             code,
-            group,
             path: rule_path,
             attrs,
         })
