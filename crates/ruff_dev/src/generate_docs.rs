@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 use regex::{Captures, Regex};
+use ruff_linter::codes::RuleGroup;
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
@@ -31,16 +32,39 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
+            let version = rule.version().unwrap_or(env!("CARGO_PKG_VERSION"));
+            let status_text = match rule.group() {
+                RuleGroup::Stable => {
+                    format!(
+                        r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>"#
+                    )
+                }
+                RuleGroup::Preview => {
+                    format!(
+                        r#"Preview (version <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>)"#
+                    )
+                }
+                RuleGroup::Deprecated => {
+                    format!(
+                        r#"Deprecated (version <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>)"#
+                    )
+                }
+                RuleGroup::Removed => {
+                    format!(
+                        r#"Removed (version <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>)"#
+                    )
+                }
+            };
+
             let _ = writeln!(
                 &mut output,
                 r#"<small>
-Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{version}">{version}</a> ·
+{status_text} ·
 <a href="https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20(%27{encoded_name}%27%20OR%20{rule_code})" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 
 "#,
-                version = rule.version().unwrap_or(env!("CARGO_PKG_VERSION")),
                 encoded_name =
                     url::form_urlencoded::byte_serialize(rule.name().as_str().as_bytes())
                         .collect::<String>(),
