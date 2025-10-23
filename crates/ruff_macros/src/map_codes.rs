@@ -254,7 +254,6 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     }
 
     let mut rule_noqa_code_match_arms = quote!();
-    let mut rule_group_match_arms = quote!();
 
     for (rule, codes) in rule_to_codes {
         let rule_name = rule.segments.last().unwrap();
@@ -279,7 +278,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
         let Rule {
             linter,
             code,
-            group,
             attrs,
             ..
         } = codes
@@ -290,10 +288,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
-        });
-
-        rule_group_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => #group,
         });
     }
 
@@ -307,13 +301,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 }
             }
 
-            pub fn group(&self) -> RuleGroup {
-                use crate::registry::RuleNamespace;
-
-                match self {
-                    #rule_group_match_arms
-                }
-            }
 
             pub fn is_preview(&self) -> bool {
                 matches!(self.group(), RuleGroup::Preview)
@@ -404,6 +391,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
     let mut rule_version_match_arms = quote!();
+    let mut rule_group_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
 
@@ -425,6 +413,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
         rule_version_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::version(),},
+        );
+        rule_group_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::group(),},
         );
         rule_file_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
@@ -470,6 +461,10 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             pub fn version(&self) -> Option<&'static str> {
                 match self { #rule_version_match_arms }
+            }
+
+            pub fn group(&self) -> crate::codes::RuleGroup {
+                match self { #rule_group_match_arms }
             }
 
             pub fn file(&self) -> &'static str {

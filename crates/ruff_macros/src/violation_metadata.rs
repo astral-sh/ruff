@@ -5,9 +5,16 @@ use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let version = match get_version(&input.attrs)? {
+    let (version, group) = get_nested_attrs(&input.attrs)?;
+    let version = match version {
         Some(version) => quote!(Some(#version)),
         None => quote!(None),
+    };
+    let Some(group) = group else {
+        return Err(Error::new_spanned(
+            input,
+            "Missing required `group` metadata",
+        ));
     };
 
     let name = input.ident;
@@ -28,6 +35,10 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
             fn version() -> Option<&'static str> {
                 #version
+            }
+
+            fn group() -> crate::codes::RuleGroup {
+                #group
             }
 
             fn file() -> &'static str {
@@ -61,14 +72,19 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 }
 
 /// Extract the version attribute as a string.
-fn get_version(attrs: &[Attribute]) -> syn::Result<Option<String>> {
+fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<(Option<String>, Option<String>)> {
     let mut version = None;
+    let mut group = None;
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("version") {
                     let lit: LitStr = meta.value()?.parse()?;
                     version = Some(lit.value());
+                    return Ok(());
+                } else if meta.path.is_ident("group") {
+                    let lit: LitStr = meta.value()?.parse()?;
+                    group = Some(lit.value());
                     return Ok(());
                 }
                 Err(Error::new_spanned(
@@ -78,7 +94,7 @@ fn get_version(attrs: &[Attribute]) -> syn::Result<Option<String>> {
             })?;
         }
     }
-    Ok(version)
+    Ok((version, group))
 }
 
 fn parse_attr<'a, const LEN: usize>(
