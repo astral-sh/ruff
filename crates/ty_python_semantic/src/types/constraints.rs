@@ -727,14 +727,14 @@ impl<'db> Node<'db> {
                 };
                 let projected = self.project_typevar(db, constrained_typevar.identity(db));
                 let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
-                projected.implies(db, constraint)
+                projected.and(db, constraint).iff(db, projected)
             }
 
             (_, Type::TypeVar(bound_typevar)) => {
                 let projected = self.project_typevar(db, bound_typevar.identity(db));
                 let constraint =
                     ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
-                projected.implies(db, constraint)
+                projected.and(db, constraint).iff(db, projected)
             }
 
             // If neither type is a typevar, then we fall back on a normal subtyping check.
