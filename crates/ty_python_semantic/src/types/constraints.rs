@@ -285,7 +285,7 @@ impl<'db> ConstraintSet<'db> {
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        self.node.simplify(db, self.node).display(db)
+        self.node.simplify(db).display(db)
     }
 }
 
@@ -617,7 +617,7 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(_) => {
-                let domain = self.domain(db, self);
+                let domain = self.domain(db);
                 let restricted = self.and(db, domain);
                 restricted == domain
             }
@@ -917,22 +917,22 @@ impl<'db> Node<'db> {
     }
 
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
-    fn simplify(self, db: &'db dyn Db, given: Node<'db>) -> Self {
+    fn simplify(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => {
-                let (simplified, _) = interior.simplify(db, given);
+                let (simplified, _) = interior.simplify(db);
                 simplified
             }
         }
     }
 
     /// Returns the domain (the set of allowed inputs) for a BDD.
-    fn domain(self, db: &'db dyn Db, given: Node<'db>) -> Self {
+    fn domain(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => Node::AlwaysTrue,
             Node::Interior(interior) => {
-                let (_, domain) = interior.simplify(db, given);
+                let (_, domain) = interior.simplify(db);
                 domain
             }
         }
@@ -1221,7 +1221,7 @@ impl<'db> InteriorNode<'db> {
     /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
     /// can rewrite any occurrences of `x ∨ y` into `y`.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify(self, db: &'db dyn Db, _given: Node<'db>) -> (Node<'db>, Node<'db>) {
+    fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
         // substitution to replace the pair with the simplification.
