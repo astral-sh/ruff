@@ -5,7 +5,7 @@ use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let Some(group) = get_nested_attrs(&input.attrs)? else {
+    let Some(group) = get_rule_status(&input.attrs)? else {
         return Err(Error::new_spanned(
             input,
             "Missing required rule group metadata",
@@ -62,8 +62,18 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
     Ok(explanation)
 }
 
-/// Extract the version attribute as a string.
-fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
+/// Extract the rule status attribute.
+///
+/// These attributes look like:
+///
+/// ```
+/// #[violation_metadata(stable_since = "1.2.3")]
+/// struct MyRule;
+/// ```
+///
+/// The result is returned as a `TokenStream` so that the version string literal can be combined
+/// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
+fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
     let mut group = None;
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
