@@ -53,8 +53,8 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionSpans, FunctionType,
-    KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
+    FunctionType, KnownFunction,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
@@ -866,6 +866,17 @@ impl<'db> Type<'db> {
 
     const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
+    }
+
+    /// Is a value of this type only usable in typing contexts?
+    pub(crate) fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
+            Type::FunctionLiteral(f) => {
+                f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
+            }
+            _ => false,
+        }
     }
 
     // If the type is a specialized instance of the given `KnownClass`, returns the specialization.
