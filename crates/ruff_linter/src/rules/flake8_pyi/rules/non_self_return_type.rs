@@ -88,6 +88,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,

@@ -40,6 +40,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [documentation]: https://docs.python.org/3.13/library/stdtypes.html#dict.get
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.8.5")]
 pub(crate) struct FalsyDictGetFallback;
 
 impl Violation for FalsyDictGetFallback {

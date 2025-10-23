@@ -69,30 +69,11 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-fn explicit_bases_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &[Type<'db>],
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     Box::default()
-}
-
-#[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn inheritance_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<InheritanceCycle>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn inheritance_cycle_initial<'db>(
@@ -102,17 +83,6 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
-fn implicit_attribute_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Member<'db>,
-    _count: u32,
-    _class_body_scope: ScopeId<'db>,
-    _name: String,
-    _target_method_decorator: MethodDecorator,
-) -> salsa::CycleRecoveryAction<Member<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     _class_body_scope: ScopeId<'db>,
@@ -120,16 +90,6 @@ fn implicit_attribute_initial<'db>(
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
     Member::unbound()
-}
-
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-    _specialization: Option<Specialization<'db>>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn try_mro_cycle_initial<'db>(
@@ -143,30 +103,9 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_typed_dict_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &bool,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 #[allow(clippy::unnecessary_wraps)]
 fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassLiteral<'db>) -> bool {
     false
-}
-
-fn try_metaclass_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<
-    Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>>,
-> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -196,9 +135,7 @@ impl<'db> CodeGeneratorKind<'db> {
         class: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Self> {
-        #[salsa::tracked(
-            cycle_fn=code_generator_of_class_recover,
-            cycle_initial=code_generator_of_class_initial,
+        #[salsa::tracked(cycle_initial=code_generator_of_class_initial,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_class<'db>(
@@ -236,17 +173,6 @@ impl<'db> CodeGeneratorKind<'db> {
             _specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
             None
-        }
-
-        #[expect(clippy::ref_option)]
-        fn code_generator_of_class_recover<'db>(
-            _db: &'db dyn Db,
-            _value: &Option<CodeGeneratorKind<'db>>,
-            _count: u32,
-            _class: ClassLiteral<'db>,
-            _specialization: Option<Specialization<'db>>,
-        ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind<'db>>> {
-            salsa::CycleRecoveryAction::Iterate
         }
 
         code_generator_of_class(db, class, specialization)
@@ -1106,7 +1032,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    #[salsa::tracked(cycle_fn=into_callable_cycle_recover, cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1268,16 +1194,6 @@ impl<'db> ClassType<'db> {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn into_callable_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
-    _self: ClassType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn into_callable_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
     Type::Never
 }
@@ -1420,23 +1336,14 @@ pub struct ClassLiteral<'db> {
     /// If this class is deprecated, this holds the deprecation message.
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
+    pub(crate) type_check_only: bool,
+
     pub(crate) dataclass_params: Option<DataclassParams<'db>>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
-
-#[expect(clippy::ref_option)]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn generic_context_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<GenericContext<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -1478,9 +1385,7 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(
-        cycle_fn=generic_context_cycle_recover,
-        cycle_initial=generic_context_cycle_initial,
+    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -1505,9 +1410,7 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
-    #[salsa::tracked(
-        cycle_fn=generic_context_cycle_recover,
-        cycle_initial=generic_context_cycle_initial,
+    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn inherited_legacy_generic_context(
@@ -1691,7 +1594,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
@@ -1827,7 +1730,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -1877,9 +1780,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
     /// `typing.TypedDict`, either directly or indirectly).
-    #[salsa::tracked(
-        cycle_fn=is_typed_dict_cycle_recover,
-        cycle_initial=is_typed_dict_cycle_initial,
+    #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -1940,9 +1841,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
-    #[salsa::tracked(
-        cycle_fn=try_metaclass_cycle_recover,
-        cycle_initial=try_metaclass_cycle_initial,
+    #[salsa::tracked(cycle_initial=try_metaclass_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn try_metaclass(
@@ -3124,9 +3023,7 @@ impl<'db> ClassLiteral<'db> {
         )
     }
 
-    #[salsa::tracked(
-        cycle_fn=implicit_attribute_recover,
-        cycle_initial=implicit_attribute_initial,
+    #[salsa::tracked(cycle_initial=implicit_attribute_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn implicit_attribute_inner(
@@ -3562,7 +3459,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -3654,7 +3551,7 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)

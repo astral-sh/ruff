@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 ///     x += 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.24")]
 pub(crate) struct UndefinedLocal {
     name: String,
 }

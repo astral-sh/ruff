@@ -67,7 +67,7 @@ const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
-#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
@@ -79,15 +79,6 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Sc
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish_scope()
-}
-
-fn scope_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &ScopeInference<'db>,
-    _count: u32,
-    _scope: ScopeId<'db>,
-) -> salsa::CycleRecoveryAction<ScopeInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
@@ -118,6 +109,8 @@ pub(crate) fn infer_definition_types<'db>(
 
 fn definition_cycle_recover<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
+    _last_provisional_value: &DefinitionInference<'db>,
     _value: &DefinitionInference<'db>,
     count: u32,
     definition: Definition<'db>,
@@ -142,7 +135,7 @@ fn definition_cycle_initial<'db>(
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-#[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recover, cycle_initial=deferred_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_initial=deferred_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -161,15 +154,6 @@ pub(crate) fn infer_deferred_types<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
         .finish_definition()
-}
-
-fn deferred_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &DefinitionInference<'db>,
-    _count: u32,
-    _definition: Definition<'db>,
-) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn deferred_cycle_initial<'db>(
@@ -239,6 +223,8 @@ pub(crate) fn infer_isolated_expression<'db>(
 
 fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
+    _last_provisional_value: &ExpressionInference<'db>,
     _value: &ExpressionInference<'db>,
     count: u32,
     input: InferExpression<'db>,
@@ -289,7 +275,7 @@ pub(crate) fn infer_expression_type<'db>(
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(cycle_initial=single_expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
     let file = input.expression(db).file(db);
     let module = parsed_module(db, file).load(db);
@@ -297,15 +283,6 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     // It's okay to call the "same file" version here because we're inside a salsa query.
     let inference = infer_expression_types_impl(db, input);
     inference.expression_type(input.expression(db).node_ref(db, &module))
-}
-
-fn single_expression_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
-    _input: InferExpression<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn single_expression_cycle_initial<'db>(
@@ -402,7 +379,7 @@ impl<'db> TypeContext<'db> {
 ///
 /// Returns [`Truthiness::Ambiguous`] in case any non-definitely bound places
 /// were encountered while inferring the type of the expression.
-#[salsa::tracked(cycle_fn=static_expression_truthiness_cycle_recover, cycle_initial=static_expression_truthiness_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(cycle_initial=static_expression_truthiness_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn static_expression_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -420,16 +397,6 @@ pub(crate) fn static_expression_truthiness<'db>(
     inference.expression_type(node).bool(db)
 }
 
-#[expect(clippy::trivially_copy_pass_by_ref)]
-fn static_expression_truthiness_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Truthiness,
-    _count: u32,
-    _expression: Expression<'db>,
-) -> salsa::CycleRecoveryAction<Truthiness> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn static_expression_truthiness_cycle_initial<'db>(
     _db: &'db dyn Db,
     _expression: Expression<'db>,
@@ -443,7 +410,7 @@ fn static_expression_truthiness_cycle_initial<'db>(
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-#[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_initial=unpack_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let module = parsed_module(db, file).load(db);
@@ -453,15 +420,6 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let mut unpacker = Unpacker::new(db, unpack.target_scope(db), &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
-}
-
-fn unpack_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &UnpackResult<'db>,
-    _count: u32,
-    _unpack: Unpack<'db>,
-) -> salsa::CycleRecoveryAction<UnpackResult<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn unpack_cycle_initial<'db>(_db: &'db dyn Db, _unpack: Unpack<'db>) -> UnpackResult<'db> {

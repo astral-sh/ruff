@@ -143,6 +143,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,

@@ -40,6 +40,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.61")]
 pub(crate) struct UnnecessaryCollectionCall {
     kind: Collection,
 }

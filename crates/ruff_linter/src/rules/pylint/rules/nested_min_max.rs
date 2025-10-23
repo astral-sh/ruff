@@ -75,6 +75,7 @@ pub(crate) enum MinMax {
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.266")]
 pub(crate) struct NestedMinMax {
     func: MinMax,
 }

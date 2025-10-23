@@ -31,6 +31,7 @@ use rustc_hash::FxHashMap;
 /// import bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.171")]
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,

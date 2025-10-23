@@ -46,6 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
