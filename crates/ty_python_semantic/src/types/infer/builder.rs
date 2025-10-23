@@ -57,11 +57,12 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PROTOCOL,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
+    INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -87,6 +88,7 @@ use crate::types::generics::{
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
+use crate::types::newtype::NewType;
 use crate::types::signatures::Signature;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
@@ -3780,7 +3782,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
-            | Type::TypedDict(_) => {
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => {
                 // TODO: We could use the annotated parameter type of `__setattr__` as type context here.
                 // However, we would still have to perform the first inference without type context.
                 let value_ty = infer_value_ty(self, TypeContext::default());
@@ -4345,8 +4348,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             matches!(cls, KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
                         });
 
+                    let is_newtype = callable_type
+                        .as_class_literal()
+                        .and_then(|cls| cls.known(self.db()))
+                        .is_some_and(|cls| matches!(cls, KnownClass::NewType));
+
                     let ty = if let Some(typevar_class) = typevar_class {
                         self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
+                    } else if is_newtype {
+                        self.infer_newtype_expression(target, call_expr, definition)
                     } else {
                         self.infer_call_expression_impl(call_expr, callable_type, tcx)
                     };
@@ -4630,11 +4640,129 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
+    fn infer_newtype_expression(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_NEWTYPE, node) {
+                builder.into_diagnostic(message);
+            }
+            Type::unknown()
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+
+        if !arguments.keywords.is_empty() {
+            return error(
+                &self.context,
+                "Keyword arguments are not supported in `NewType` creation",
+                call_expr,
+            );
+        }
+
+        // REVIEWERS: Is it worth trying to do full argument parsing here? If so is there some
+        // machinery we might want to reuse or factor out somewhere else?
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `NewType` creation",
+                starred,
+            );
+        }
+
+        if arguments.args.len() != 2 {
+            return error(
+                &self.context,
+                format!(
+                    "Wrong number of arguments in `NewType` creation, expected 2, found {}",
+                    arguments.args.len()
+                ),
+                call_expr,
+            );
+        }
+
+        let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
+
+        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+            return error(
+                &self.context,
+                "The first argument to `NewType` must be a string literal",
+                call_expr,
+            );
+        };
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `NewType` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name != target_name {
+            return error(
+                &self.context,
+                format_args!(
+                    "The name of a `NewType` (`{name}`) must match \
+                    the name of the variable it is assigned to (`{target_name}`)"
+                ),
+                target,
+            );
+        }
+
+        // Inference of `tp` must be deferred, to avoid cycles.
+        self.deferred.insert(definition);
+
+        Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
+            db,
+            ast::name::Name::from(name),
+            definition,
+            None,
+        )))
+    }
+
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
-        // Infer deferred bounds/constraints/defaults of a legacy TypeVar.
-        let ast::Expr::Call(ast::ExprCall { arguments, .. }) = value else {
+        let ast::Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = value
+        else {
             return;
         };
+
+        let callable_type =
+            self.infer_maybe_standalone_expression(func.as_ref(), TypeContext::default());
+
+        let is_typevar = callable_type
+            .as_class_literal()
+            .and_then(|cls| cls.known(self.db()))
+            .filter(|cls| matches!(cls, KnownClass::TypeVar | KnownClass::ExtensionsTypeVar))
+            .is_some();
+
+        let is_newtype = callable_type
+            .as_class_literal()
+            .and_then(|cls| cls.known(self.db()))
+            .is_some_and(|cls| matches!(cls, KnownClass::NewType));
+
+        if is_typevar {
+            self.infer_typevar_assignment_deferred(arguments);
+        } else if is_newtype {
+            self.infer_newtype_assignment_deferred(arguments);
+        }
+    }
+
+    // Infer deferred bounds/constraints/defaults of a legacy TypeVar.
+    fn infer_typevar_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         for arg in arguments.args.iter().skip(1) {
             self.infer_type_expression(arg);
         }
@@ -4643,6 +4771,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         if let Some(default) = arguments.find_keyword("default") {
             self.infer_type_expression(&default.value);
+        }
+    }
+
+    // Infer the deferred base type of a NewType.
+    fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
+        match self.infer_type_expression(&arguments.args[1]) {
+            Type::NominalInstance(_) | Type::NewTypeInstance(_) => {}
+            _ => {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
+                {
+                    let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
+                    diag.info("The base of a `NewType` must be a class type or another `NewType`.");
+                }
+            }
         }
     }
 
@@ -6929,6 +7073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Super
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
+                        | KnownClass::NewType
                 )
             ) || (
                 // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
@@ -8026,7 +8171,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
-                | Type::TypedDict(_),
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -8412,7 +8558,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
-                | Type::TypedDict(_),
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_),
                 Type::FunctionLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::Callable(..)
@@ -8441,7 +8588,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
-                | Type::TypedDict(_),
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_),
                 op,
             ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
                 .map(|outcome| outcome.return_type(self.db()))

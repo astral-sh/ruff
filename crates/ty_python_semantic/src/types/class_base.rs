@@ -161,7 +161,8 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
-            | Type::TypedDict(_) => None,
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
@@ -170,7 +171,11 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
-                | KnownInstanceType::ConstraintSet(_) => None,
+                | KnownInstanceType::ConstraintSet(_)
+                // A class inheriting from a newtype would make intuitive sense, but newtype
+                // wrappers are just identity functions at runtime, so this sort of inheritance
+                // doesn't work and isn't allowed.
+                | KnownInstanceType::NewType(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {

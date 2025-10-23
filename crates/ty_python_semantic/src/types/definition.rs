@@ -12,6 +12,7 @@ pub enum TypeDefinition<'db> {
     Function(Definition<'db>),
     TypeVar(Definition<'db>),
     TypeAlias(Definition<'db>),
+    NewType(Definition<'db>),
 }
 
 impl TypeDefinition<'_> {
@@ -21,7 +22,8 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => {
+            | Self::TypeAlias(definition)
+            | Self::NewType(definition) => {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.focus_range(db, &module))
             }
@@ -38,7 +40,8 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => {
+            | Self::TypeAlias(definition)
+            | Self::NewType(definition) => {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }
