@@ -1839,6 +1839,7 @@ except* Exception as e:
 type Y = str"
         );
         assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
+        assert_eq!(round_trip(r"x = (1, (2, 3))"), r"x = 1, (2, 3)");
         assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");
         assert_round_trip!(
             r"def f():
@@ -2143,6 +2144,7 @@ if True:
     #[test_case::test_case("a, b", "(a, b)" ; "basic multi")]
     #[test_case::test_case("x = a,", "x = (a,)" ; "basic assign single")]
     #[test_case::test_case("x = a, b", "x = (a, b)" ; "basic assign multi")]
+    #[test_case::test_case("a, (b, c)", "(a, (b, c))" ; "nested")]
     fn forced_tuple_parentheses(inp: &str, out: &str) {
         let got = round_trip_with(
             &Indentation::default(),
