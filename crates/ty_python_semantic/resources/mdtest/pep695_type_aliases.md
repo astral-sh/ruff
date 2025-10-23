@@ -316,10 +316,7 @@ static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ### Cyclic defaults
 
 ```py
-from __future__ import annotations
-
-from typing import Protocol
-from typing_extensions import TypeVar
+from typing_extensions import Protocol, TypeVar
 
 T = TypeVar("T", default="C", covariant=True)
 
@@ -328,6 +325,9 @@ class P(Protocol[T]):
 
 class C(P[T]):
     pass
+
+reveal_type(C[int]())  # revealed: C[int]
+reveal_type(C())  # revealed: C[Divergent]
 ```
 
 ### Union inside generic
