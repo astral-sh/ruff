@@ -629,8 +629,8 @@ def f[T, S]():
     reveal_type(range_constraint(S, T, object))
 ```
 
-Equivalence constraints are similar; internally we arbitrarily choose one typevar or the other to be
-the constraint, and the other the bound. But we display the result the same way no matter what.
+Equivalence constraints are similar; internally we arbitrarily choose the "later" typevar to be the
+constraint, and the other the bound. But we display the result the same way no matter what.
 
 ```py
 def f[S, T]():

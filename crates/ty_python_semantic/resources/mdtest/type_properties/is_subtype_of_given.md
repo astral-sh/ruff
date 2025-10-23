@@ -5,26 +5,25 @@
 python-version = "3.12"
 ```
 
-This file tests the _constraint implication_ relationship between types. This is used when solving a
-constraint set, which expresses the conditions under which one of the other relationships hold.
+This file tests the _constraint implication_ relationship between types, aka `is_subtype_of_given`,
+which tests whether one type is a [subtype][] of another _assuming that the constraints in a
+particular constraint set hold_.
 
 ## Concrete types
 
-For concrete types, all of the typing relationships (including this one) produce the same result. (A
-concrete type is any fully static type that is not a typevar. It can _contain_ a typevar, though —
-`list[T]` is considered concrete.)
+For concrete types, constraint implication is exactly the same as subtyping. (A concrete type is any
+fully static type that is not a typevar. It can _contain_ a typevar, though — `list[T]` is
+considered concrete.)
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, is_subtype_of_given, static_assert
+from ty_extensions import is_subtype_of, is_subtype_of_given, static_assert
 
 def equivalent_to_other_relationships[T]():
-    static_assert(is_subtype_of_given(True, bool, int))
-    static_assert(is_assignable_to(bool, int))
     static_assert(is_subtype_of(bool, int))
+    static_assert(is_subtype_of_given(True, bool, int))
 
-    static_assert(not is_subtype_of_given(True, bool, str))
-    static_assert(not is_assignable_to(bool, str))
     static_assert(not is_subtype_of(bool, str))
+    static_assert(not is_subtype_of_given(True, bool, str))
 ```
 
 Moreover, for concrete types, the answer does not depend on which constraint set we are considering.
@@ -137,7 +136,8 @@ def subtyping[T]():
 ```
 
 At some point, though, we need to resolve a constraint set; at that point, we can no longer punt on
-the question. This will depend on the final constraint set that we produced.
+the question. Unlike with concrete types, the answer will depend on the constraint set that we are
+considering.
 
 ```py
 from typing import Never
@@ -180,3 +180,5 @@ def mutually_constrained[T, U]():
     static_assert(not is_subtype_of_given(given_int, T, bool))
     static_assert(not is_subtype_of_given(given_int, T, str))
 ```
+
+[subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
