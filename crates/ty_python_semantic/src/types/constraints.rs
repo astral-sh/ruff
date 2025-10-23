@@ -205,7 +205,7 @@ impl<'db> ConstraintSet<'db> {
         // In the comments below, we use brackets to indicate which typevar is "larger", and
         // therefore the typevar that the constraint applies to.
         let node = match (lower, upper) {
-            // A ≤ T ≤ A == (T ≤ [A] ≤ T)
+            // L ≤ T ≤ L == (T ≤ [L] ≤ T)
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
                 let (bound, typevar) = if lower < typevar {
                     (lower, typevar)
@@ -220,7 +220,7 @@ impl<'db> ConstraintSet<'db> {
                 )
             }
 
-            // A ≤ T ≤ B == ([A] ≤ T) && (T ≤ [B])
+            // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
                 let lower =
                     ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
@@ -229,7 +229,7 @@ impl<'db> ConstraintSet<'db> {
                 lower.and(db, upper)
             }
 
-            // A ≤ T ≤ B == ([A] ≤ T) && ([T] ≤ B)
+            // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if lower > typevar => {
                 let lower =
                     ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
@@ -237,7 +237,7 @@ impl<'db> ConstraintSet<'db> {
                 lower.and(db, upper)
             }
 
-            // A ≤ T ≤ B == (A ≤ [T]) && (T ≤ [B])
+            // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if upper > typevar => {
                 let lower = ConstrainedTypeVar::new_node(db, lower, typevar, Type::object());
                 let upper =
