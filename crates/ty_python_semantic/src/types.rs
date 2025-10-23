@@ -5079,6 +5079,23 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                Some(KnownClass::NewType) => {
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("name"))
+                                    .with_annotated_type(Type::LiteralString),
+                                Parameter::positional_or_keyword(Name::new_static("tp")),
+                            ]),
+                            // The true return type is a KnownInstanceType::NewType, but each callsite
+                            // gets its own unique...instance...of that type.
+                            None,
+                        ),
+                    )
+                    .into()
+                }
+
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:

@@ -6781,6 +6781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Super
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
+                        | KnownClass::NewType
                 )
             ) || (
                 // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,

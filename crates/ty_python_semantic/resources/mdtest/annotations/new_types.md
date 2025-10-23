@@ -51,3 +51,19 @@ h(42)  # error: [invalid-argument-type]
 h(Foo(42))  # error: [invalid-argument-type]
 h(Bar(Foo(42)))
 ```
+
+## The name must be a string literal
+
+```py
+from typing_extensions import NewType
+
+def _(name: str) -> None:
+    _ = NewType(name, int)  # error: [invalid-argument-type]
+```
+
+However, the literal doesn't necessarily need to be inline, as long as we infer it:
+
+```py
+name = "Foo"
+Foo = NewType(name, int)  # allowed
+```
