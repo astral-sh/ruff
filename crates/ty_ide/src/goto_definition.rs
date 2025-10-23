@@ -1294,6 +1294,118 @@ class Test:
                 "main.py",
                 "
 class Test:
+    def __invert__(self) -> 'Test': ...
+
+a = Test()
+
+<CURSOR>~a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __invert__(self) -> 'Test': ...
+          |         ^^^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | ~a
+          | ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_after_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __invert__(self) -> 'Test': ...
+
+a = Test()
+
+~<CURSOR> a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __invert__(self) -> 'Test': ...
+          |         ^^^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | ~ a
+          | ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_between_operator_and_operand() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __invert__(self) -> 'Test': ...
+
+a = Test()
+
+-<CURSOR>a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:5:1
+          |
+        3 |     def __invert__(self) -> 'Test': ...
+        4 |
+        5 | a = Test()
+          | ^
+        6 |
+        7 | -a
+          |
+        info: Source
+         --> main.py:7:2
+          |
+        5 | a = Test()
+        6 |
+        7 | -a
+          |  ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_not_with_dunder_bool() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
     def __bool__(self) -> bool: ...
 
 a = Test()
@@ -1325,17 +1437,17 @@ a = Test()
     }
 
     #[test]
-    fn goto_definition_unary_after_operator() {
+    fn goto_definition_unary_not_with_dunder_len() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
                 "
 class Test:
-    def __bool__(self) -> bool: ...
+    def __len__(self) -> 42: ...
 
 a = Test()
 
-not<CURSOR> a
+<CURSOR>not a
 ",
             )
             .build();
@@ -1345,8 +1457,8 @@ not<CURSOR> a
          --> main.py:3:9
           |
         2 | class Test:
-        3 |     def __bool__(self) -> bool: ...
-          |         ^^^^^^^^
+        3 |     def __len__(self) -> 42: ...
+          |         ^^^^^^^
         4 |
         5 | a = Test()
           |
@@ -1361,42 +1473,26 @@ not<CURSOR> a
         ");
     }
 
+    /// If `__bool__` is defined incorrectly, `not` does not fallback to `__len__`.
+    /// The fallback only occurs if `__bool__` is not defined at all.
     #[test]
-    fn goto_definition_unary_between_operator_and_operand() {
+    fn goto_definition_unary_not_with_bad_dunder_bool_and_dunder_len() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
                 "
 class Test:
-    def __bool__(self) -> bool: ...
+    def __bool__(self, extra_arg) -> bool: ...
+    def __len__(self) -> 42: ...
 
 a = Test()
 
--<CURSOR>a
+<CURSOR>not a
 ",
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:5:1
-          |
-        3 |     def __bool__(self) -> bool: ...
-        4 |
-        5 | a = Test()
-          | ^
-        6 |
-        7 | -a
-          |
-        info: Source
-         --> main.py:7:2
-          |
-        5 | a = Test()
-        6 |
-        7 | -a
-          |  ^
-          |
-        ");
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     impl CursorTest {
