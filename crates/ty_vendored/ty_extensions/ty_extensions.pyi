@@ -74,7 +74,9 @@ def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
 
-def is_subtype_of_given(constraints: bool | ConstraintSet, ty: Any, of: Any) -> bool:
+def is_subtype_of_given(
+    constraints: bool | ConstraintSet, ty: Any, of: Any
+) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`,
     assuming that all of the constraints in `constraints` hold.
 

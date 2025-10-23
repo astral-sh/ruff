@@ -4856,7 +4856,7 @@ impl<'db> Type<'db> {
                                 .type_form()
                                 .with_annotated_type(Type::any()),
                         ]),
-                        Some(KnownClass::Bool.to_instance(db)),
+                        Some(KnownClass::ConstraintSet.to_instance(db)),
                     ),
                 )
                 .into(),

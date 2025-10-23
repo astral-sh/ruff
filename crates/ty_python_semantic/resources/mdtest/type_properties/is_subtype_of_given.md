@@ -15,14 +15,14 @@ concrete type is any fully static type that is not a typevar. It can _contain_ a
 `list[T]` is considered concrete.)
 
 ```py
-from ty_extensions import implies_given_constraints, is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import is_assignable_to, is_subtype_of, is_subtype_of_given, static_assert
 
 def equivalent_to_other_relationships[T]():
-    static_assert(implies_given_constraints(True, bool, int))
+    static_assert(is_subtype_of_given(True, bool, int))
     static_assert(is_assignable_to(bool, int))
     static_assert(is_subtype_of(bool, int))
 
-    static_assert(not implies_given_constraints(True, bool, str))
+    static_assert(not is_subtype_of_given(True, bool, str))
     static_assert(not is_assignable_to(bool, str))
     static_assert(not is_subtype_of(bool, str))
 ```
@@ -37,12 +37,12 @@ from ty_extensions import range_constraint
 
 def even_given_constraints[T]():
     constraints = range_constraint(Never, T, int)
-    static_assert(implies_given_constraints(constraints, bool, int))
-    static_assert(not implies_given_constraints(constraints, bool, str))
+    static_assert(is_subtype_of_given(constraints, bool, int))
+    static_assert(not is_subtype_of_given(constraints, bool, str))
 
 def even_given_unsatisfiable_constraints():
-    static_assert(implies_given_constraints(False, bool, int))
-    static_assert(not implies_given_constraints(False, bool, str))
+    static_assert(is_subtype_of_given(False, bool, int))
+    static_assert(not is_subtype_of_given(False, bool, str))
 ```
 
 ## Type variables
@@ -141,23 +141,23 @@ the question. This will depend on the final constraint set that we produced.
 
 ```py
 from typing import Never
-from ty_extensions import implies_given_constraints, range_constraint, static_assert
+from ty_extensions import is_subtype_of_given, range_constraint, static_assert
 
 def given_constraints[T]():
     given_int = range_constraint(Never, T, int)
-    static_assert(implies_given_constraints(given_int, T, int))
-    static_assert(not implies_given_constraints(given_int, T, bool))
-    static_assert(not implies_given_constraints(given_int, T, str))
+    static_assert(is_subtype_of_given(given_int, T, int))
+    static_assert(not is_subtype_of_given(given_int, T, bool))
+    static_assert(not is_subtype_of_given(given_int, T, str))
 
     given_bool = range_constraint(Never, T, bool)
-    static_assert(implies_given_constraints(given_bool, T, int))
-    static_assert(implies_given_constraints(given_bool, T, bool))
-    static_assert(not implies_given_constraints(given_bool, T, str))
+    static_assert(is_subtype_of_given(given_bool, T, int))
+    static_assert(is_subtype_of_given(given_bool, T, bool))
+    static_assert(not is_subtype_of_given(given_bool, T, str))
 
     given_str = range_constraint(Never, T, str)
-    static_assert(not implies_given_constraints(given_str, T, int))
-    static_assert(not implies_given_constraints(given_str, T, bool))
-    static_assert(implies_given_constraints(given_str, T, str))
+    static_assert(not is_subtype_of_given(given_str, T, int))
+    static_assert(not is_subtype_of_given(given_str, T, bool))
+    static_assert(is_subtype_of_given(given_str, T, str))
 ```
 
 This might require propagating constraints from other typevars.
@@ -168,15 +168,15 @@ def mutually_constrained[T, U]():
     given_int = range_constraint(U, T, U) & range_constraint(Never, U, int)
     # TODO: no static-assert-error
     # error: [static-assert-error]
-    static_assert(implies_given_constraints(given_int, T, int))
-    static_assert(not implies_given_constraints(given_int, T, bool))
-    static_assert(not implies_given_constraints(given_int, T, str))
+    static_assert(is_subtype_of_given(given_int, T, int))
+    static_assert(not is_subtype_of_given(given_int, T, bool))
+    static_assert(not is_subtype_of_given(given_int, T, str))
 
     # If [T ≤ U ∧ U ≤ int], then [T ≤ int] must be true as well.
     given_int = range_constraint(Never, T, U) & range_constraint(Never, U, int)
     # TODO: no static-assert-error
     # error: [static-assert-error]
-    static_assert(implies_given_constraints(given_int, T, int))
-    static_assert(not implies_given_constraints(given_int, T, bool))
-    static_assert(not implies_given_constraints(given_int, T, str))
+    static_assert(is_subtype_of_given(given_int, T, int))
+    static_assert(not is_subtype_of_given(given_int, T, bool))
+    static_assert(not is_subtype_of_given(given_int, T, str))
 ```

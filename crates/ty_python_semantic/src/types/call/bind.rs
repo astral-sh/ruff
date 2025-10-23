@@ -712,10 +712,16 @@ impl<'db> Bindings<'db> {
                                 _ => continue,
                             };
 
-                            let result = constraints
-                                .when_subtype_of_given(db, *ty_a, *ty_b, InferableTypeVars::None)
-                                .is_always_satisfied(db);
-                            overload.set_return_type(Type::BooleanLiteral(result));
+                            let result = constraints.when_subtype_of_given(
+                                db,
+                                *ty_a,
+                                *ty_b,
+                                InferableTypeVars::None,
+                            );
+                            let tracked = TrackedConstraintSet::new(db, result);
+                            overload.set_return_type(Type::KnownInstance(
+                                KnownInstanceType::ConstraintSet(tracked),
+                            ));
                         }
 
                         Some(KnownFunction::IsAssignableTo) => {
