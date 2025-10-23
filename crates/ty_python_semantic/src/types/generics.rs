@@ -84,6 +84,10 @@ pub(crate) fn typing_self<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<Type<'db>> {
+    if class.is_final(db) {
+        return Some(Type::instance(db, class.identity_specialization(db)));
+    }
+
     let index = semantic_index(db, function_scope_id.file(db));
 
     let identity = TypeVarIdentity::new(
