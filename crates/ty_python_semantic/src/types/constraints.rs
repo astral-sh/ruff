@@ -284,9 +284,7 @@ impl<'db> ConstraintSet<'db> {
                     rhs,
                     TypeRelation::Subtyping,
                 );
-                projected
-                    .and(db, || constraint)
-                    .when_equivalent_to(db, constraint)
+                projected.implies(db, || constraint)
             }
 
             (_, Type::TypeVar(bound_typevar)) => {
@@ -298,9 +296,7 @@ impl<'db> ConstraintSet<'db> {
                     Type::object(),
                     TypeRelation::Subtyping,
                 );
-                projected
-                    .and(db, || constraint)
-                    .when_equivalent_to(db, constraint)
+                projected.implies(db, || constraint)
             }
 
             _ => lhs.when_subtype_of(db, rhs, inferable),
@@ -344,6 +340,15 @@ impl<'db> ConstraintSet<'db> {
             self.union(db, other());
         }
         self
+    }
+
+    /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In Boolean logic, `p → q` is usually translated into `¬p ∨ q`. However, we translate it
+    /// into the equivalent `¬p ∨ (p ∧ q)`. This ensures that the constraints under which `q` is
+    /// true are compatible with the assumptions introduced by `p`.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.negate(db).or(db, || self.and(db, other))
     }
 
     /// Returns a new constraints that only includes constraints on the given typevar, and any
