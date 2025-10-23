@@ -261,9 +261,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: (*rest).to_string(),
             }
         }
-        ["airflow", "models", .., "Param"] => Replacement::Rename {
-            module: "airflow.sdk.definitions.param",
-            name: "Param",
+        ["airflow", "models", .., ("Param" | "ParamsDict" | "DagParam")] => Replacement::Rename {
+            Replacement::SourceModuleMoved {
+                module: "airflow.sdk",
+                name: (*rest).to_string(),
+            }
         },
 
         // airflow.models.baseoperator
