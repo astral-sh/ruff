@@ -604,6 +604,8 @@ def _[T, U]() -> None:
 
 ## Other simplifications
 
+### Displaying constraint sets
+
 When displaying a constraint set, we transform the internal BDD representation into a DNF formula
 (i.e., the logical OR of several clauses, each of which is the logical AND of several constraints).
 This section contains several examples that show that we simplify the DNF formula as much as we can
@@ -626,11 +628,35 @@ def f[T, U]():
     reveal_type((t1 | t2) & (u1 | u2))
 ```
 
+We might simplify a BDD so much that we can no longer see the constraints that we used to construct
+it!
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+
+def f[T]():
+    t_int = range_constraint(Never, T, int)
+    t_bool = range_constraint(Never, T, bool)
+
+    # T ≤ bool implies T ≤ int: if a type satisfies the former, it must always satisfy the latter.
+    # We can turn that into a constraint set, using the equivalence `p → q == ¬p ∨ q`:
+    implication = ~t_bool | t_int
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(implication)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(implication)
+```
+
+### Normalized bounds
+
 The lower and upper bounds of a constraint are normalized, so that we equate unions and
 intersections whose elements appear in different orders.
 
 ```py
 from typing import Never
+from ty_extensions import range_constraint
 
 def f[T]():
     # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
