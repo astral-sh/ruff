@@ -1,5 +1,6 @@
 """Test cases for PLR1708 stop-iteration-return."""
 
+
 # Valid cases - should not trigger the rule
 def normal_function():
     raise StopIteration  # Not a generator, should not trigger
@@ -59,7 +60,7 @@ def nested_generator():
     def inner_gen():
         yield 1
         raise StopIteration("inner")  # Should trigger
-    
+
     yield from inner_gen()
 
 
@@ -68,7 +69,7 @@ def generator_in_class():
         def generator_method(self):
             yield 1
             raise StopIteration("method")  # Should trigger
-    
+
     return MyClass
 
 
@@ -121,6 +122,7 @@ class CustomException(Exception):
 
 # Generator comprehensions should not be affected
 list_comp = [x for x in range(10)]  # Should not trigger
+
 
 # Lambda in generator context
 def generator_with_lambda():

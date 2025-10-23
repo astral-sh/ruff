@@ -11,9 +11,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Raising `StopIteration` in a generator function causes a `RuntimeError`
-/// at runtime (even in Python 3.7+, the earliest version we support). This
-/// breaks the abstraction between generators and iterators and will crash
-/// the program when the generator is iterated over.
+/// when the generator is iterated over.
 ///
 /// Instead of `raise StopIteration`, use `return` in generator functions.
 ///
