@@ -1514,6 +1514,11 @@ impl<'db> SatisfiedClauses<'db> {
         while self.simplify_one_round() {
             // Keep going
         }
+
+        // We can remove any clauses that have been simplified to the point where they are empty.
+        // (Clauses are intersections, so an empty clause is `false`, which does not contribute
+        // anything to the outer union.)
+        self.clauses.retain(|clause| !clause.constraints.is_empty());
     }
 
     fn simplify_one_round(&mut self) -> bool {
