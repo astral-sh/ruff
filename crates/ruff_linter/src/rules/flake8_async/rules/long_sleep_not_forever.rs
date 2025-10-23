@@ -39,7 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// This fix is marked as unsafe as it changes program behavior.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.4.6")]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct LongSleepNotForever {
     module: AsyncModule,
 }

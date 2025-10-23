@@ -39,7 +39,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__hash__` method](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.4.1")]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct InvalidHashReturnType;
 
 impl Violation for InvalidHashReturnType {

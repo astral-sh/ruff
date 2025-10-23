@@ -74,7 +74,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.4")]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {

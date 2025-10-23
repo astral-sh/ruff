@@ -34,7 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// y: Final = 42
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.4.7")]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct RedundantFinalLiteral {
     literal: SourceCodeSnippet,
 }

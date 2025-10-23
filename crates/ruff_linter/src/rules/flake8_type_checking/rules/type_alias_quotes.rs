@@ -49,7 +49,7 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.1")]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {

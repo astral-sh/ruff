@@ -32,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(letter)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.1.7")]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct UnnecessaryListIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryListIndexLookup {

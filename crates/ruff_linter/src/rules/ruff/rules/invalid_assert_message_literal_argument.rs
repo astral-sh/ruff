@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// assert len(fruits) == 2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.1")]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct InvalidAssertMessageLiteralArgument;
 
 impl Violation for InvalidAssertMessageLiteralArgument {
