@@ -5438,6 +5438,17 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
 
+            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new(
+                        [Parameter::positional_only(None).with_annotated_type(todo!())],
+                    ),
+                    Some(todo!()),
+                ),
+            )
+            .into(),
+
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
             }
@@ -6307,6 +6318,7 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::NewType(newtype) => todo!("ADD A VARIANT TO THE TYPE ENUM"),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7474,6 +7486,10 @@ pub enum KnownInstanceType<'db> {
     /// A constraint set, which is exposed in mdtests as an instance of
     /// `ty_extensions.ConstraintSet`.
     ConstraintSet(TrackedConstraintSet<'db>),
+
+    /// An identity function created with `typing.NewType(name, base)`, which behaves like a
+    /// subclass of `base` in type expressions. See `NewTypeInstance` for an example.
+    NewType(NewType<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7498,6 +7514,11 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::Field(field) => {
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
+            }
+        }
+        KnownInstanceType::NewType(newtype) => {
+            if let ClassType::Generic(generic_alias) = newtype.base_class_type(db) {
+                visitor.visit_generic_alias_type(db, generic_alias);
             }
         }
     }
@@ -7536,6 +7557,7 @@ impl<'db> KnownInstanceType<'db> {
                 // Nothing to normalize
                 Self::ConstraintSet(set)
             }
+            Self::NewType(newtype) => Self::NewType(newtype.normalized_impl(db, visitor)),
         }
     }
 
@@ -7550,6 +7572,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
+            Self::NewType(_) => KnownClass::NewType,
         }
     }
 
@@ -7628,6 +7651,9 @@ impl<'db> KnownInstanceType<'db> {
                                 constraints.display(self.db)
                             )
                         }
+                    }
+                    KnownInstanceType::NewType(declaration) => {
+                        write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
                     }
                 }
             }
@@ -8059,6 +8085,35 @@ pub struct NewType<'db> {
 
 impl get_size2::GetSize for NewType<'_> {}
 
+impl<'db> NewType<'db> {
+    // Walk the `NewTypeBase` chain to find the underlying `ClassType`.
+    fn base_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self.base(db) {
+            NewTypeBase::ClassType(base_class) => base_class,
+            NewTypeBase::NewType(base_newtype) => base_newtype.base_class_type(db),
+        }
+    }
+
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let normalized_base = match self.base(db) {
+            NewTypeBase::ClassType(base_class) => {
+                NewTypeBase::ClassType(base_class.normalized_impl(db, visitor))
+            }
+            NewTypeBase::NewType(base_newtype) => {
+                NewTypeBase::NewType(base_newtype.normalized_impl(db, visitor))
+            }
+        };
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.definition(db),
+            normalized_base,
+        )
+    }
+}
+
+/// `typing.NewType` typically wraps a class type, but it can also wrap another newtype. This
+/// recursive enum represents these two possibilities.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum NewTypeBase<'db> {
     ClassType(ClassType<'db>),
