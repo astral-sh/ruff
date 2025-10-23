@@ -246,19 +246,8 @@ impl<'db> ConstraintSet<'db> {
         Self::range(db, lower, typevar, upper).negate(db)
     }
 
-    /// Returns the domain (the set of allowed inputs) for a constraint set.
-    pub(crate) fn domain(self, db: &'db dyn Db) -> Self {
-        Self {
-            node: self.node.domain(db),
-        }
-    }
-
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify(db).display(db)
-    }
-
-    pub(crate) fn display_without_simplifying(self, db: &'db dyn Db) -> impl Display {
-        self.node.display(db)
     }
 }
 

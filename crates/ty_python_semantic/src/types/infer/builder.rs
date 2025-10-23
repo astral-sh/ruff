@@ -7806,14 +7806,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (
                 ast::UnaryOp::Invert,
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
             ) => {
-                let constraints = tracked.constraints(self.db());
+                let constraints = constraints.constraints(self.db());
                 let result = constraints.negate(self.db());
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
                     self.db(),
                     result,
-                    tracked.should_simplify(self.db()),
                 )))
             }
 
@@ -8169,38 +8168,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ),
 
             (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left_tracked)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right_tracked)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitAnd,
             ) => {
-                let left = left_tracked.constraints(self.db());
-                let right = right_tracked.constraints(self.db());
+                let left = left.constraints(self.db());
+                let right = right.constraints(self.db());
                 let result = left.and(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(
-                        self.db(),
-                        result,
-                        left_tracked.should_simplify(self.db())
-                            && right_tracked.should_simplify(self.db()),
-                    ),
+                    TrackedConstraintSet::new(self.db(), result),
                 )))
             }
 
             (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left_tracked)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right_tracked)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitOr,
             ) => {
-                let left = left_tracked.constraints(self.db());
-                let right = right_tracked.constraints(self.db());
+                let left = left.constraints(self.db());
+                let right = right.constraints(self.db());
                 let result = left.or(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(
-                        self.db(),
-                        result,
-                        left_tracked.should_simplify(self.db())
-                            && right_tracked.should_simplify(self.db()),
-                    ),
+                    TrackedConstraintSet::new(self.db(), result),
                 )))
             }
 
