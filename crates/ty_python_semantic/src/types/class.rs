@@ -745,17 +745,6 @@ impl<'db> ClassType<'db> {
                 })
         };
 
-        let synthesize_simple_tuple_method = |return_type| {
-            let parameters =
-                Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(Type::instance(db, self))]);
-
-            let synthesized_dunder_method =
-                CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
-
-            Member::definitely_declared(synthesized_dunder_method)
-        };
-
         match name {
             "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
@@ -765,16 +754,14 @@ impl<'db> ClassType<'db> {
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                synthesize_simple_tuple_method(return_type)
-            }
+                let parameters =
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(Type::instance(db, self))]);
 
-            "__bool__" if class_literal.is_tuple(db) => {
-                let return_type = specialization
-                    .and_then(|spec| spec.tuple(db))
-                    .map(|tuple| tuple.truthiness().into_type(db))
-                    .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
+                let synthesized_dunder_method =
+                    CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
 
-                synthesize_simple_tuple_method(return_type)
+                Member::definitely_declared(synthesized_dunder_method)
             }
 
             "__getitem__" if class_literal.is_tuple(db) => {
