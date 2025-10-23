@@ -77,15 +77,16 @@ impl serde::Serialize for NoqaCode {
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum RuleGroup {
-    /// The rule is stable.
-    Stable,
-    /// The rule is unstable, and preview mode must be enabled for usage.
-    Preview,
-    /// The rule has been deprecated, warnings will be displayed during selection in stable
-    /// and errors will be raised if used with preview mode enabled.
-    Deprecated,
-    /// The rule has been removed, errors will be displayed on use.
-    Removed,
+    /// The rule is stable since the provided Ruff version.
+    Stable { since: &'static str },
+    /// The rule has been unstable since the provided Ruff version, and preview mode must be enabled
+    /// for usage.
+    Preview { since: &'static str },
+    /// The rule has been deprecated since the provided Ruff version, warnings will be displayed
+    /// during selection in stable and errors will be raised if used with preview mode enabled.
+    Deprecated { since: &'static str },
+    /// The rule was removed in the provided Ruff version, and errors will be displayed on use.
+    Removed { since: &'static str },
 }
 
 #[ruff_macros::map_codes]

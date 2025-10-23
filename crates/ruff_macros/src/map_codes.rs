@@ -303,19 +303,19 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
 
             pub fn is_preview(&self) -> bool {
-                matches!(self.group(), RuleGroup::Preview)
+                matches!(self.group(), RuleGroup::Preview { .. })
             }
 
             pub(crate) fn is_stable(&self) -> bool {
-                matches!(self.group(), RuleGroup::Stable)
+                matches!(self.group(), RuleGroup::Stable { .. })
             }
 
             pub fn is_deprecated(&self) -> bool {
-                matches!(self.group(), RuleGroup::Deprecated)
+                matches!(self.group(), RuleGroup::Deprecated { .. })
             }
 
             pub fn is_removed(&self) -> bool {
-                matches!(self.group(), RuleGroup::Removed)
+                matches!(self.group(), RuleGroup::Removed { .. })
             }
         }
 
@@ -390,7 +390,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
-    let mut rule_version_match_arms = quote!();
     let mut rule_group_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
@@ -411,9 +410,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
-        rule_version_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::version(),},
-        );
         rule_group_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::group(),},
         );
@@ -457,10 +453,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             /// Returns the fix status of this rule.
             pub const fn fixable(&self) -> crate::FixAvailability {
                 match self { #rule_fixable_match_arms }
-            }
-
-            pub fn version(&self) -> Option<&'static str> {
-                match self { #rule_version_match_arms }
             }
 
             pub fn group(&self) -> crate::codes::RuleGroup {

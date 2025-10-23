@@ -36,9 +36,6 @@ pub trait ViolationMetadata {
     /// why it's bad, and what users should do instead.
     fn explain() -> Option<&'static str>;
 
-    /// Returns the Ruff version when a rule was first introduced, e.g. 0.1.2.
-    fn version() -> Option<&'static str>;
-
     /// Returns the rule group for this violation.
     fn group() -> RuleGroup;
 

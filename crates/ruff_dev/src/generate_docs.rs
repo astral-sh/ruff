@@ -32,26 +32,25 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
-            let version = rule.version().unwrap_or(env!("CARGO_PKG_VERSION"));
             let status_text = match rule.group() {
-                RuleGroup::Stable => {
+                RuleGroup::Stable { since } => {
                     format!(
-                        r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>"#
+                        r#"Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>"#
                     )
                 }
-                RuleGroup::Preview => {
+                RuleGroup::Preview { since } => {
                     format!(
-                        r#"Preview (version <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>)"#
+                        r#"Preview (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
                     )
                 }
-                RuleGroup::Deprecated => {
+                RuleGroup::Deprecated { since } => {
                     format!(
-                        r#"Deprecated (version <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>)"#
+                        r#"Deprecated (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
                     )
                 }
-                RuleGroup::Removed => {
+                RuleGroup::Removed { since } => {
                     format!(
-                        r#"Removed (version <a href="https://github.com/astral-sh/ty/releases/tag/{version}">{version}</a>)"#
+                        r#"Removed (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
                     )
                 }
             };

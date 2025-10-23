@@ -1,19 +1,14 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, TypePath};
+use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let (version, group) = get_nested_attrs(&input.attrs)?;
-    let version = match version {
-        Some(version) => quote!(Some(#version)),
-        None => quote!(None),
-    };
-    let Some(group) = group else {
+    let Some(group) = get_nested_attrs(&input.attrs)? else {
         return Err(Error::new_spanned(
             input,
-            "Missing required `group` metadata",
+            "Missing required rule group metadata",
         ));
     };
 
@@ -31,10 +26,6 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
             fn explain() -> Option<&'static str> {
                 Some(#docs)
-            }
-
-            fn version() -> Option<&'static str> {
-                #version
             }
 
             fn group() -> crate::codes::RuleGroup {
@@ -72,19 +63,26 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 }
 
 /// Extract the version attribute as a string.
-fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<(Option<String>, Option<TypePath>)> {
-    let mut version = None;
+fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
     let mut group = None;
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("version") {
+                if meta.path.is_ident("stable_since") {
                     let lit: LitStr = meta.value()?.parse()?;
-                    version = Some(lit.value());
+                    group = Some(quote!(RuleGroup::Stable { since: #lit }));
                     return Ok(());
-                } else if meta.path.is_ident("group") {
-                    let value: TypePath = meta.value()?.parse()?;
-                    group = Some(value);
+                } else if meta.path.is_ident("preview_since") {
+                    let lit: LitStr = meta.value()?.parse()?;
+                    group = Some(quote!(RuleGroup::Preview { since: #lit }));
+                    return Ok(());
+                } else if meta.path.is_ident("deprecated_since") {
+                    let lit: LitStr = meta.value()?.parse()?;
+                    group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
+                    return Ok(());
+                } else if meta.path.is_ident("removed_since") {
+                    let lit: LitStr = meta.value()?.parse()?;
+                    group = Some(quote!(RuleGroup::Removed { since: #lit }));
                     return Ok(());
                 }
                 Err(Error::new_spanned(
@@ -94,7 +92,7 @@ fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<(Option<String>, Option<
             })?;
         }
     }
-    Ok((version, group))
+    Ok(group)
 }
 
 fn parse_attr<'a, const LEN: usize>(
