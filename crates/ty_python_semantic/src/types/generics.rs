@@ -323,7 +323,6 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_fn=inferable_typevars_cycle_recover,
             cycle_initial=inferable_typevars_cycle_initial,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -624,15 +623,6 @@ impl<'db> GenericContext<'db> {
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
     }
-}
-
-fn inferable_typevars_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &FxHashSet<BoundTypeVarIdentity<'db>>,
-    _count: u32,
-    _self: GenericContext<'db>,
-) -> salsa::CycleRecoveryAction<FxHashSet<BoundTypeVarIdentity<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn inferable_typevars_cycle_initial<'db>(

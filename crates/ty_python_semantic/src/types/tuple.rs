@@ -201,7 +201,7 @@ impl<'db> TupleType<'db> {
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of a mypy_primer run! This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
-    #[salsa::tracked(cycle_fn=to_class_type_cycle_recover, cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
@@ -288,15 +288,6 @@ impl<'db> TupleType<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
-}
-
-fn to_class_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &ClassType<'db>,
-    _count: u32,
-    _self: TupleType<'db>,
-) -> salsa::CycleRecoveryAction<ClassType<'db>> {
-    salsa::CycleRecoveryAction::Iterate
 }
 
 fn to_class_type_cycle_initial<'db>(db: &'db dyn Db, self_: TupleType<'db>) -> ClassType<'db> {
