@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: The `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#nonlocal)
 /// - [PEP 3104 – Access to Names in Outer Scopes](https://peps.python.org/pep-3104/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.174")]
 pub(crate) struct NonlocalWithoutBinding {
     pub(crate) name: String,
 }

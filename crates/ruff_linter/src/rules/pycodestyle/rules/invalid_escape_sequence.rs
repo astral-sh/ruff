@@ -41,6 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.85")]
 pub(crate) struct InvalidEscapeSequence {
     ch: char,
     fix_title: FixTitle,

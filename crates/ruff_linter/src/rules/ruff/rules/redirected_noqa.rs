@@ -25,6 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// x = eval(command)  # noqa: S307
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct RedirectedNOQA {
     original: String,
     target: String,

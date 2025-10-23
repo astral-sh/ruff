@@ -29,6 +29,7 @@ use crate::{Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct MultipleStatementsOnOneLineColon;
 
 impl Violation for MultipleStatementsOnOneLineColon {
@@ -59,6 +60,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct MultipleStatementsOnOneLineSemicolon;
 
 impl Violation for MultipleStatementsOnOneLineSemicolon {
@@ -84,6 +86,7 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 /// do_four()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct UselessSemicolon;
 
 impl AlwaysFixableViolation for UselessSemicolon {

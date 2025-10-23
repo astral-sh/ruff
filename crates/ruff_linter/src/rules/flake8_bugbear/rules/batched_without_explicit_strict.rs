@@ -49,6 +49,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `batched`](https://docs.python.org/3/library/itertools.html#batched)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct BatchedWithoutExplicitStrict;
 
 impl Violation for BatchedWithoutExplicitStrict {

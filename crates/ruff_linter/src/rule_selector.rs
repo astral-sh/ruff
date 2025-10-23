@@ -209,15 +209,15 @@ impl RuleSelector {
         self.all_rules().filter(move |rule| {
             match rule.group() {
                 // Always include stable rules
-                RuleGroup::Stable => true,
+                RuleGroup::Stable { .. } => true,
                 // Enabling preview includes all preview rules unless explicit selection is turned on
-                RuleGroup::Preview => {
+                RuleGroup::Preview { .. } => {
                     preview_enabled && (self.is_exact() || !preview_require_explicit)
                 }
                 // Deprecated rules are excluded by default unless explicitly selected
-                RuleGroup::Deprecated => !preview_enabled && self.is_exact(),
+                RuleGroup::Deprecated { .. } => !preview_enabled && self.is_exact(),
                 // Removed rules are included if explicitly selected but will error downstream
-                RuleGroup::Removed => self.is_exact(),
+                RuleGroup::Removed { .. } => self.is_exact(),
             }
         })
     }
