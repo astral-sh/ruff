@@ -27,3 +27,12 @@ pub(crate) const fn is_blank_line_before_decorated_class_in_stub_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the
+/// [`remove_parens_around_except_types`](https://github.com/astral-sh/ruff/pull/20768) preview
+/// style is enabled.
+pub(crate) const fn is_remove_parens_around_except_types_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

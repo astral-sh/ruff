@@ -36,16 +36,6 @@ impl EnumMetadata<'_> {
     }
 }
 
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn enum_metadata_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<EnumMetadata<'db>>,
-    _count: u32,
-    _class: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<EnumMetadata<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 #[allow(clippy::unnecessary_wraps)]
 fn enum_metadata_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -56,7 +46,7 @@ fn enum_metadata_cycle_initial<'db>(
 
 /// List all members of an enum.
 #[allow(clippy::ref_option, clippy::unnecessary_wraps)]
-#[salsa::tracked(returns(as_ref), cycle_fn=enum_metadata_cycle_recover, cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -92,7 +82,7 @@ pub(crate) fn enum_metadata<'db>(
         let ignore_place = place_from_bindings(db, ignore_bindings);
 
         match ignore_place {
-            Place::Type(Type::StringLiteral(ignored_names), _) => {
+            Place::Defined(Type::StringLiteral(ignored_names), _, _) => {
                 Some(ignored_names.value(db).split_ascii_whitespace().collect())
             }
             // TODO: support the list-variant of `_ignore_`.
@@ -126,10 +116,10 @@ pub(crate) fn enum_metadata<'db>(
             let inferred = place_from_bindings(db, bindings);
 
             let value_ty = match inferred {
-                Place::Unbound => {
+                Place::Undefined => {
                     return None;
                 }
-                Place::Type(ty, _) => {
+                Place::Defined(ty, _, _) => {
                     let special_case = match ty {
                         Type::Callable(_) | Type::FunctionLiteral(_) => {
                             // Some types are specifically disallowed for enum members.
@@ -143,7 +133,7 @@ pub(crate) fn enum_metadata<'db>(
                             Some(KnownClass::Member) => Some(
                                 ty.member(db, "value")
                                     .place
-                                    .ignore_possibly_unbound()
+                                    .ignore_possibly_undefined()
                                     .unwrap_or(Type::unknown()),
                             ),
 
@@ -178,9 +168,9 @@ pub(crate) fn enum_metadata<'db>(
                             .place;
 
                         match dunder_get {
-                            Place::Unbound | Place::Type(Type::Dynamic(_), _) => ty,
+                            Place::Undefined | Place::Defined(Type::Dynamic(_), _, _) => ty,
 
-                            Place::Type(_, _) => {
+                            Place::Defined(_, _, _) => {
                                 // Descriptors are not considered members.
                                 return None;
                             }
@@ -215,17 +205,17 @@ pub(crate) fn enum_metadata<'db>(
 
             match declared {
                 PlaceAndQualifiers {
-                    place: Place::Type(Type::Dynamic(DynamicType::Unknown), _),
+                    place: Place::Defined(Type::Dynamic(DynamicType::Unknown), _, _),
                     qualifiers,
                 } if qualifiers.contains(TypeQualifiers::FINAL) => {}
                 PlaceAndQualifiers {
-                    place: Place::Unbound,
+                    place: Place::Undefined,
                     ..
                 } => {
                     // Undeclared attributes are considered members
                 }
                 PlaceAndQualifiers {
-                    place: Place::Type(Type::NominalInstance(instance), _),
+                    place: Place::Defined(Type::NominalInstance(instance), _, _),
                     ..
                 } if instance.has_known_class(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member

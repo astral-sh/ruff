@@ -22,7 +22,12 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
+///
+/// # Ordering
+/// Ordering is based on the definition's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the definition was garbage collected and recreated.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -704,13 +709,6 @@ impl DefinitionKind<'_> {
 
     pub(crate) const fn is_unannotated_assignment(&self) -> bool {
         matches!(self, DefinitionKind::Assignment(_))
-    }
-
-    pub(crate) fn as_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
-        match self {
-            DefinitionKind::TypeVar(type_var) => Some(type_var),
-            _ => None,
-        }
     }
 
     /// Returns the [`TextRange`] of the definition target.

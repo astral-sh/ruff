@@ -44,6 +44,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// (e.g., if it is missing a `.keys()` or `.values()` method, or if those
 /// methods behave differently than they do on standard mapping types).
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct IncorrectDictIterator {
     subset: DictSubset,
 }

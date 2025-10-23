@@ -38,6 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     text = text.removeprefix("pre")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
     affix_kind: AffixKind,
     stmt_or_expression: StmtOrExpr,

@@ -26,9 +26,7 @@ class C:
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
-
-# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 # There is no special handling of attributes that are (directly) assigned to a declared parameter,
 # which means we union with `Unknown` here, since the attribute itself is not declared. This is
@@ -177,8 +175,7 @@ c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
 
-# TODO: Should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
@@ -399,9 +396,19 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [... for self.a in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for self.d in IntIterable() for self.e in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
@@ -598,6 +605,8 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
+            # TODO: Should not emit this diagnostic
+            # error: [unresolved-attribute]
             self.e = e
 
 # TODO: this would ideally be `Unknown | Literal[1]`
@@ -685,7 +694,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # TODO: this should be an error
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self@method`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
@@ -828,6 +837,10 @@ class Base:
     redeclared_with_narrower_type: str | None
     redeclared_with_wider_type: str | None
 
+    redeclared_in_method_with_same_type: str | None
+    redeclared_in_method_with_narrower_type: str | None
+    redeclared_in_method_with_wider_type: str | None
+
     overwritten_in_subclass_body: str
     overwritten_in_subclass_method: str
 
@@ -873,11 +886,17 @@ class Intermediate(Base):
     undeclared = "intermediate"
 
     def set_attributes(self) -> None:
-        # TODO: This should be an `invalid-assignment` error
-        self.overwritten_in_subclass_method = None
+        self.redeclared_in_method_with_same_type: str | None = None
 
-        # TODO: This should be an `invalid-assignment` error
-        self.pure_overwritten_in_subclass_method = None
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_narrower_type: str = "foo"
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_wider_type: object = object()
+
+        self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
+
+        self.pure_overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
         self.pure_undeclared = "intermediate"
 
@@ -889,11 +908,13 @@ reveal_type(Derived().attribute)  # revealed: int | None
 reveal_type(Derived.redeclared_with_same_type)  # revealed: str | None
 reveal_type(Derived().redeclared_with_same_type)  # revealed: str | None
 
-# TODO: It would probably be more consistent if these were `str | None`
+# We infer the narrower type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
 reveal_type(Derived.redeclared_with_narrower_type)  # revealed: str
 reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
 
-# TODO: It would probably be more consistent if these were `str | None`
+# We infer the wider type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
 reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 
@@ -901,24 +922,34 @@ reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
 reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
 
-# TODO: Both of these should be `str`
+reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
+
+# TODO: both of these should be `str`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_narrower_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_narrower_type)  # revealed: str | None
+
+# TODO: both of these should be `object`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_wider_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_wider_type)  # revealed: object
+
 reveal_type(Derived.overwritten_in_subclass_method)  # revealed: str
-reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str | Unknown | None
+reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
 
 reveal_type(Derived().pure_attribute)  # revealed: str | None
 
 # TODO: This should be `str`
 reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: Unknown | None | str
 
-# TODO: This should be `str`
-reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: Unknown | None
+reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 
 # TODO: Both of these should be `Unknown | Literal["intermediate", "base"]`
 reveal_type(Derived.undeclared)  # revealed: Unknown | Literal["intermediate"]
 reveal_type(Derived().undeclared)  # revealed: Unknown | Literal["intermediate"]
 
-# TODO: This should be `Unknown | Literal["intermediate", "base"]`
-reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate"]
+reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate", "base"]
 ```
 
 ## Accessing attributes on class objects
@@ -1236,13 +1267,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1268,7 +1299,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1276,7 +1307,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1409,7 +1440,7 @@ def _(flag: bool):
     class C2: ...
     C = C1 if flag else C2
 
-    # error: [unresolved-attribute] "Type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
+    # error: [unresolved-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 
     # TODO: This should ideally be a `unresolved-attribute` error. We need better union
@@ -1747,7 +1778,7 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
 reveal_type(date.century)  # revealed: Unknown
 ```
 
@@ -1815,6 +1846,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
+        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
@@ -2165,7 +2197,7 @@ All attribute access on literal `bytes` types is currently delegated to `builtin
 ```py
 # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = EllipsisType, end: SupportsIndex | None = EllipsisType, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 
@@ -2339,6 +2371,55 @@ reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
 ```
 
+And cycles between many attributes:
+
+```py
+class ManyCycles:
+    def __init__(self: "ManyCycles"):
+        self.x1 = 0
+        self.x2 = 0
+        self.x3 = 0
+        self.x4 = 0
+        self.x5 = 0
+        self.x6 = 0
+        self.x7 = 1
+
+    def f1(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f2(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f3(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+        reveal_type(self.x1)  # revealed: Unknown | int
+        reveal_type(self.x2)  # revealed: Unknown | int
+        reveal_type(self.x3)  # revealed: Unknown | int
+        reveal_type(self.x4)  # revealed: Unknown | int
+        reveal_type(self.x5)  # revealed: Unknown | int
+        reveal_type(self.x6)  # revealed: Unknown | int
+        reveal_type(self.x7)  # revealed: Unknown | int
+```
+
 This case additionally tests our union/intersection simplification logic:
 
 ```py
@@ -2382,6 +2463,45 @@ class Counter:
         self.count = self.count + 1
 
 reveal_type(Counter().count)  # revealed: Unknown | int
+```
+
+We also handle infinitely nested generics:
+
+```py
+class NestedLists:
+    def __init__(self: "NestedLists"):
+        self.x = 1
+
+    def f(self: "NestedLists"):
+        self.x = [self.x]
+
+reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+
+class NestedMixed:
+    def f(self: "NestedMixed"):
+        self.x = [self.x]
+
+    def g(self: "NestedMixed"):
+        self.x = {self.x}
+
+reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent]
+```
+
+And cases where the types originate from annotations:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def make_list(value: T) -> list[T]:
+    return [value]
+
+class NestedLists2:
+    def f(self: "NestedLists2"):
+        self.x = make_list(self.x)
+
+reveal_type(NestedLists2().x)  # revealed: Unknown | list[Divergent]
 ```
 
 ### Builtin types attributes
@@ -2483,6 +2603,71 @@ class C:
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+This also works if the tuple is not constructed directly:
+
+```py
+from typing import TypeVar, Literal
+
+T = TypeVar("T")
+
+def make_tuple(x: T) -> tuple[T, Literal[1]]:
+    return (x, 1)
+
+class D:
+    def f(self, other: "D"):
+        self.x = make_tuple(other.x)
+
+reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+The tuple type may also expand exponentially "in breadth":
+
+```py
+def duplicate(x: T) -> tuple[T, T]:
+    return (x, x)
+
+class E:
+    def f(self: "E"):
+        self.x = duplicate(self.x)
+
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, Divergent]
+```
+
+And it also works for homogeneous tuples:
+
+```py
+def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
+    return (x, x)
+
+class E:
+    def f(self, other: "E"):
+        self.x = make_homogeneous_tuple(other.x)
+
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, ...]
+```
+
+## Attributes of standard library modules that aren't yet defined
+
+For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`main.py`:
+
+```py
+import datetime
+
+# error: [unresolved-attribute]
+reveal_type(datetime.UTC)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(datetime.fakenotreal)  # revealed: Unknown
 ```
 
 ## References

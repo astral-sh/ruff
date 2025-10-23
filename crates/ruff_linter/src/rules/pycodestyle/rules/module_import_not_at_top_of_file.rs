@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,
 }

@@ -30,3 +30,27 @@ class B: ...
 # error: "Operator `|` is unsupported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A | B)  # revealed: Unknown
 ```
+
+## Other binary operations resulting in `UnionType`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A: ...
+class B: ...
+
+def _(sub_a: type[A], sub_b: type[B]):
+    reveal_type(A | sub_b)  # revealed: UnionType
+    reveal_type(sub_a | B)  # revealed: UnionType
+    reveal_type(sub_a | sub_b)  # revealed: UnionType
+
+class C[T]: ...
+class D[T]: ...
+
+reveal_type(C | D)  # revealed: UnionType
+
+reveal_type(C[int] | D[str])  # revealed: UnionType
+```

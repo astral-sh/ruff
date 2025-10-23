@@ -533,6 +533,45 @@ static_assert(not is_subtype_of(int, Not[Literal[3]]))
 static_assert(not is_subtype_of(Literal[1], Intersection[int, Not[Literal[1]]]))
 ```
 
+## Intersections with non-fully-static negated elements
+
+A type can be a _subtype_ of an intersection containing negated elements only if the _top_
+materialization of that type is disjoint from the _top_ materialization of all negated elements in
+the intersection. This differs from assignability, which should do the disjointness check against
+the _bottom_ materialization of the negated elements.
+
+```py
+from typing_extensions import Any, Never, Sequence
+from ty_extensions import Not, is_subtype_of, static_assert
+
+# The top materialization of `tuple[Any]` is `tuple[object]`,
+# which is disjoint from `tuple[()]` but not `tuple[int]`,
+# so `tuple[()]` is a subtype of `~tuple[Any]` but `tuple[int]`
+# is not.
+static_assert(is_subtype_of(tuple[()], Not[tuple[Any]]))
+static_assert(not is_subtype_of(tuple[int], Not[tuple[Any]]))
+static_assert(not is_subtype_of(tuple[Any], Not[tuple[Any]]))
+
+# The top materialization of `tuple[Any, ...]` is `tuple[object, ...]`,
+# so no tuple type can be considered a subtype of `~tuple[Any, ...]`
+static_assert(not is_subtype_of(tuple[()], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[int], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[int, ...], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[object, ...], Not[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[Any, ...], Not[tuple[Any, ...]]))
+
+# Similarly, the top materialization of `Sequence[Any]` is `Sequence[object]`,
+# so no sequence type can be considered a subtype of `~Sequence[Any]`.
+static_assert(not is_subtype_of(tuple[()], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[int], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[int, ...], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[object, ...], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(tuple[Any, ...], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(list[Never], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(list[Any], Not[Sequence[Any]]))
+static_assert(not is_subtype_of(list[int], Not[Sequence[Any]]))
+```
+
 ## Special types
 
 ### `Never`
@@ -1596,18 +1635,17 @@ f(a)
 An instance type can be a subtype of a compatible callable type if the instance type's class has a
 callable `__call__` attribute.
 
-TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
-change for better compatibility with mypy/pyright.
-
 ```py
+from __future__ import annotations
+
 from typing import Callable
 from ty_extensions import static_assert, is_subtype_of
 
-def call_impl(a: int) -> str:
+def call_impl(a: A, x: int) -> str:
     return ""
 
 class A:
-    __call__: Callable[[int], str] = call_impl
+    __call__: Callable[[A, int], str] = call_impl
 
 static_assert(is_subtype_of(A, Callable[[int], str]))
 static_assert(not is_subtype_of(A, Callable[[int], int]))

@@ -12,6 +12,7 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use crate::types::TypeContext;
 use crate::{Db, FxOrderMap};
 
 use ordermap::OrderSet;
@@ -62,13 +63,17 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
         Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+            defining_class: self.defining_class.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
         }
     }
 }
@@ -321,27 +326,26 @@ fn validate_from_dict_literal<'db, 'ast>(
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
         // Validate dict entries
         for dict_item in &dict_expr.items {
-            if let Some(ref key_expr) = dict_item.key {
-                if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+            if let Some(ref key_expr) = dict_item.key
+                && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
                     value: key_value, ..
                 }) = key_expr
-                {
-                    let key_str = key_value.to_str();
-                    provided_keys.insert(key_str);
+            {
+                let key_str = key_value.to_str();
+                provided_keys.insert(key_str);
 
-                    // Get the already-inferred argument type
-                    let value_type = expression_type_fn(&dict_item.value);
-                    validate_typed_dict_key_assignment(
-                        context,
-                        typed_dict,
-                        key_str,
-                        value_type,
-                        error_node,
-                        key_expr,
-                        &dict_item.value,
-                        TypedDictAssignmentKind::Constructor,
-                    );
-                }
+                // Get the already-inferred argument type
+                let value_type = expression_type_fn(&dict_item.value);
+                validate_typed_dict_key_assignment(
+                    context,
+                    typed_dict,
+                    key_str,
+                    value_type,
+                    error_node,
+                    key_expr,
+                    &dict_item.value,
+                    TypedDictAssignmentKind::Constructor,
+                );
             }
         }
     }
@@ -387,36 +391,36 @@ fn validate_from_keywords<'db, 'ast>(
 
 /// Validates a `TypedDict` dictionary literal assignment,
 /// e.g. `person: Person = {"name": "Alice", "age": 30}`
-pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
-    context: &InferContext<'db, 'ast>,
+pub(super) fn validate_typed_dict_dict_literal<'db>(
+    context: &InferContext<'db, '_>,
     typed_dict: TypedDictType<'db>,
-    dict_expr: &'ast ast::ExprDict,
-    error_node: AnyNodeRef<'ast>,
+    dict_expr: &ast::ExprDict,
+    error_node: AnyNodeRef,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
-) -> Result<OrderSet<&'ast str>, OrderSet<&'ast str>> {
+) -> Result<OrderSet<&'db str>, OrderSet<&'db str>> {
     let mut valid = true;
     let mut provided_keys = OrderSet::new();
 
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
-        if let Some(key_expr) = &item.key {
-            if let ast::Expr::StringLiteral(key_literal) = key_expr {
-                let key_str = key_literal.value.to_str();
-                provided_keys.insert(key_str);
+        if let Some(key_expr) = &item.key
+            && let Type::StringLiteral(key_str) = expression_type_fn(key_expr)
+        {
+            let key_str = key_str.value(context.db());
+            provided_keys.insert(key_str);
 
-                let value_type = expression_type_fn(&item.value);
+            let value_type = expression_type_fn(&item.value);
 
-                valid &= validate_typed_dict_key_assignment(
-                    context,
-                    typed_dict,
-                    key_str,
-                    value_type,
-                    error_node,
-                    key_expr,
-                    &item.value,
-                    TypedDictAssignmentKind::Constructor,
-                );
-            }
+            valid &= validate_typed_dict_key_assignment(
+                context,
+                typed_dict,
+                key_str,
+                value_type,
+                error_node,
+                key_expr,
+                &item.value,
+                TypedDictAssignmentKind::Constructor,
+            );
         }
     }
 

@@ -694,6 +694,51 @@ def _(
     f1(*args10)  # error: [invalid-argument-type]
 ```
 
+A union of heterogeneous tuples provided to a variadic parameter:
+
+```py
+# Test inspired by ecosystem code at:
+# - <https://github.com/home-assistant/core/blob/bde4eb50111a72f9717fe73ee5929e50eb06911b/homeassistant/components/lovelace/websocket.py#L50-L59>
+# - <https://github.com/pydata/xarray/blob/3572f4e70f2b12ef9935c1f8c3c1b74045d2a092/xarray/tests/test_groupby.py#L3058-L3059>
+
+def f2(a: str, b: bool): ...
+def f3(coinflip: bool):
+    if coinflip:
+        args = "foo", True
+    else:
+        args = "bar", False
+
+    # revealed: tuple[Literal["foo"], Literal[True]] | tuple[Literal["bar"], Literal[False]]
+    reveal_type(args)
+    f2(*args)  # fine
+
+    if coinflip:
+        other_args = "foo", True
+    else:
+        other_args = "bar", (True,)
+
+    # revealed: tuple[Literal["foo"], Literal[True]] | tuple[Literal["bar"], tuple[Literal[True]]]
+    reveal_type(other_args)
+    # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `bool`, found `Literal[True] | tuple[Literal[True]]`"
+    f2(*other_args)
+
+def f4(a=None, b=None, c=None, d=None, e=None): ...
+
+my_args = ((1, 2), (3, 4), (5, 6))
+
+for tup in my_args:
+    f4(*tup, e=None)  # fine
+
+my_other_args = (
+    (1, 2, 3, 4, 5),
+    (6, 7, 8, 9, 10),
+)
+
+for tup in my_other_args:
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `e` of function `f4`"
+    f4(*tup, e=None)
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
@@ -773,6 +818,30 @@ def f(x: int = 1, y: str = "foo") -> int:
 # error: 15 [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `Literal[2]`"
 # error: 20 [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["bar"]`"
 reveal_type(f(y=2, x="bar"))  # revealed: int
+```
+
+### Diagnostics for union types where the union is not assignable
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Sized
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+def f(x: Sized): ...
+def g(
+    a: str | Foo,
+    b: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo,
+    c: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar,
+    d: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar | Baz,
+):
+    f(a)  # error: [invalid-argument-type]
+    f(b)  # error: [invalid-argument-type]
+    f(c)  # error: [invalid-argument-type]
+    f(d)  # error: [invalid-argument-type]
 ```
 
 ## Too many positional arguments

@@ -47,6 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Format String Syntax](https://docs.python.org/3/library/string.html#format-string-syntax)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct FormatLiterals;
 
 impl Violation for FormatLiterals {

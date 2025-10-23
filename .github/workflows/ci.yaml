@@ -12,13 +12,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.14"
+  NEXTEST_PROFILE: ci
 
 jobs:
   determine_changes:
@@ -142,7 +147,7 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- 'python/py_fuzzer/**' \
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- 'python/py-fuzzer/**' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -237,7 +242,7 @@ jobs:
 
   cargo-test-linux:
     name: "cargo test (linux)"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -271,11 +276,9 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        shell: bash
-        env:
-          NEXTEST_PROFILE: "ci"
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest
-
+      # Dogfood ty on py-fuzzer
+      - run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -299,9 +302,13 @@ jobs:
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
+    # release builds timeout on GitHub runners, so this job is just skipped on forks in the `if` check
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    if: |
+      github.repository == 'astral-sh/ruff' &&
+      !contains(github.event.pull_request.labels.*.name, 'no-test') &&
+      (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main')
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -325,14 +332,16 @@ jobs:
         with:
           enable-cache: "true"
       - name: "Run tests"
-        shell: bash
-        env:
-          NEXTEST_PROFILE: "ci"
         run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
 
-  cargo-test-windows:
-    name: "cargo test (windows)"
-    runs-on: depot-windows-2022-16
+  cargo-test-other:
+    strategy:
+      matrix:
+        platform:
+          - ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
+          - macos-latest
+    name: "cargo test (${{ matrix.platform }})"
+    runs-on: ${{ matrix.platform }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -352,11 +361,6 @@ jobs:
         with:
           enable-cache: "true"
       - name: "Run tests"
-        shell: bash
-        env:
-          NEXTEST_PROFILE: "ci"
-          # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
-          RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
           cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
@@ -391,26 +395,9 @@ jobs:
           cd crates/ty_wasm
           wasm-pack test --node
 
-  cargo-build-release:
-    name: "cargo build (release)"
-    runs-on: macos-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - name: "Install mold"
-        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-      - name: "Build"
-        run: cargo build --release --locked
-
   cargo-build-msrv:
     name: "cargo build (msrv)"
-    runs-on: depot-ubuntu-latest-8
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -431,7 +418,6 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Build tests"
-        shell: bash
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: cargo "+${MSRV}" test --no-run --all-features
@@ -452,7 +438,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@38e8f5e4c386b611d51e8aa997b9a06a3c8eb67a # v1.15.6
+        uses: cargo-bins/cargo-binstall@a66119fbb1c952daba62640c2609111fe0803621 # v1.15.7
       - name: "Install cargo-fuzz"
         # Download the latest version from quick install and not the github releases because github releases only has MUSL targets.
         run: cargo binstall cargo-fuzz --force  --disable-strategies crate-meta-data --no-confirm
@@ -487,9 +473,10 @@ jobs:
           chmod +x "${DOWNLOAD_PATH}/ruff"
 
           (
-            uvx \
+            uv run \
             --python="${PYTHON_VERSION}" \
-            --from=./python/py-fuzzer \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable="${DOWNLOAD_PATH}/ruff" \
             --bin=ruff \
@@ -507,6 +494,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -521,10 +509,15 @@ jobs:
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
+      # Lint/format/type-check py-fuzzer
+      # (dogfooding with ty is done in a separate job)
+      - run: uv run --directory=./python/py-fuzzer mypy
+      - run: uv run --directory=./python/py-fuzzer ruff format --check
+      - run: uv run --directory=./python/py-fuzzer ruff check
 
   ecosystem:
     name: "ecosystem"
-    runs-on: depot-ubuntu-latest-8
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
     needs:
       - cargo-test-linux
       - determine_changes
@@ -536,9 +529,11 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          # TODO: figure out why `ruff-ecosystem` crashes on Python 3.14
+          python-version: "3.13"
+          activate-environment: true
 
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         name: Download comparison Ruff binary
@@ -557,7 +552,7 @@ jobs:
 
       - name: Install ruff-ecosystem
         run: |
-          pip install ./python/ruff-ecosystem
+          uv pip install ./python/ruff-ecosystem
 
       - name: Run `ruff check` stable ecosystem check
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
@@ -649,13 +644,13 @@ jobs:
 
   fuzz-ty:
     name: "Fuzz for new ty panics"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs:
       - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
-    timeout-minutes: 20
+    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 5 || 20 }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -683,15 +678,16 @@ jobs:
           chmod +x "${PWD}/ty" "${NEW_TY}/ty"
 
           (
-            uvx \
+            uv run \
             --python="${PYTHON_VERSION}" \
-            --from=./python/py-fuzzer \
+            --project=./python/py-fuzzer \
+            --locked \
             fuzz \
             --test-executable="${NEW_TY}/ty" \
             --baseline-executable="${PWD}/ty" \
             --only-new-bugs \
             --bin=ty \
-            0-500
+            0-1000
           )
 
   cargo-shear:
@@ -703,13 +699,13 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@38e8f5e4c386b611d51e8aa997b9a06a3c8eb67a # v1.15.6
+      - uses: cargo-bins/cargo-binstall@a66119fbb1c952daba62640c2609111fe0803621 # v1.15.7
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear
 
   ty-completion-evaluation:
     name: "ty completion evaluation"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main' }}
     steps:
@@ -721,7 +717,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Run ty completion evaluation"
-        run: cargo run --release --package ty_completion_eval -- all --threshold 0.1 --tasks /tmp/completion-evaluation-tasks.csv
+        run: cargo run --release --package ty_completion_eval -- all --threshold 0.4 --tasks /tmp/completion-evaluation-tasks.csv
       - name: "Ensure there are no changes"
         run: diff ./crates/ty_completion_eval/completion-evaluation-tasks.csv /tmp/completion-evaluation-tasks.csv
 
@@ -755,7 +751,7 @@ jobs:
 
   pre-commit:
     name: "pre-commit"
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -792,9 +788,6 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
-        with:
-          python-version: "3.13"
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
@@ -805,12 +798,15 @@ jobs:
         run: rustup show
       - name: Install uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: 3.13
+          activate-environment: true
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        run: uv pip install -r docs/requirements-insiders.txt --system
+        run: uv pip install -r docs/requirements-insiders.txt
       - name: "Install dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: uv pip install -r docs/requirements.txt --system
+        run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
         run: python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
@@ -929,8 +925,12 @@ jobs:
     runs-on: ubuntu-24.04
     needs: determine_changes
     if: |
-      github.ref == 'refs/heads/main' ||
-      (needs.determine_changes.outputs.formatter == 'true' || needs.determine_changes.outputs.linter == 'true')
+      github.repository == 'astral-sh/ruff' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        needs.determine_changes.outputs.formatter == 'true' ||
+        needs.determine_changes.outputs.linter == 'true'
+      )
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
@@ -953,7 +953,7 @@ jobs:
         run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@3959e9e296ef25296e93e32afcc97196f966e57f # v4.1.0
+        uses: CodSpeedHQ/action@6b43a0cd438f6ca5ad26f9ed03ed159ed2df7da9 # v4.1.1
         with:
           mode: instrumentation
           run: cargo codspeed run
@@ -964,8 +964,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: determine_changes
     if: |
-      github.ref == 'refs/heads/main' ||
-      needs.determine_changes.outputs.ty == 'true'
+      github.repository == 'astral-sh/ruff' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        needs.determine_changes.outputs.ty == 'true'
+      )
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
@@ -988,19 +991,23 @@ jobs:
         run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark --bench ty
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@3959e9e296ef25296e93e32afcc97196f966e57f # v4.1.0
+        uses: CodSpeedHQ/action@6b43a0cd438f6ca5ad26f9ed03ed159ed2df7da9 # v4.1.1
         with:
           mode: instrumentation
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
 
   benchmarks-walltime:
+    name: "benchmarks walltime (${{ matrix.benchmarks }})"
     runs-on: codspeed-macro
     needs: determine_changes
     if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    env:
-      TY_LOG: ruff_benchmark=debug
+    strategy:
+      matrix:
+        benchmarks:
+          - "medium|multithreaded"
+          - "small|large"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -1022,7 +1029,7 @@ jobs:
         run: cargo codspeed build --features "codspeed,walltime" --no-default-features -p ruff_benchmark
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@3959e9e296ef25296e93e32afcc97196f966e57f # v4.1.0
+        uses: CodSpeedHQ/action@6b43a0cd438f6ca5ad26f9ed03ed159ed2df7da9 # v4.1.1
         env:
           # enabling walltime flamegraphs adds ~6 minutes to the CI time, and they don't
           # appear to provide much useful insight for our walltime benchmarks right now
@@ -1030,5 +1037,5 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: cargo codspeed run
+          run: cargo codspeed run --bench ty_walltime "${{ matrix.benchmarks }}"
           token: ${{ secrets.CODSPEED_TOKEN }}

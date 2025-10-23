@@ -67,7 +67,7 @@ class C:
     name: str
 ```
 
-## Types of decorators
+## Types of dataclass-transformers
 
 The examples from this section are straight from the Python documentation on
 [`typing.dataclass_transform`].
@@ -122,9 +122,6 @@ class CustomerModel(ModelBase):
     id: int
     name: str
 
-# TODO: this is not supported yet
-# error: [unknown-argument]
-# error: [unknown-argument]
 CustomerModel(id=1, name="Test")
 ```
 
@@ -216,11 +213,7 @@ class OrderedModelBase: ...
 class TestWithBase(OrderedModelBase):
     inner: int
 
-# TODO: No errors here, should reveal `bool`
-# error: [too-many-positional-arguments]
-# error: [too-many-positional-arguments]
-# error: [unsupported-operator]
-reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: Unknown
+reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: bool
 ```
 
 ### `kw_only_default`
@@ -277,8 +270,7 @@ class ModelBase: ...
 class TestBase(ModelBase):
     name: str
 
-# TODO: This should be `(self: TestBase, *, name: str) -> None`
-reveal_type(TestBase.__init__)  # revealed: def __init__(self) -> None
+reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
 ```
 
 ### `frozen_default`
@@ -333,12 +325,9 @@ class ModelBase: ...
 class TestMeta(ModelBase):
     name: str
 
-# TODO: no error here
-# error: [unknown-argument]
 t = TestMeta(name="test")
 
-# TODO: this should be an `invalid-assignment` error
-t.name = "new"
+t.name = "new"  # error: [invalid-assignment]
 ```
 
 ### Combining parameters
@@ -365,9 +354,310 @@ model.name = "new"  # No error
 model < model  # No error
 ```
 
-### `field_specifiers`
+### Overwriting of default parameters on the dataclass-like class
 
-To do
+#### Using function-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def default_frozen_model(*, frozen: bool = True): ...
+@default_frozen_model()
+class Frozen:
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+@default_frozen_model(frozen=False)
+class Mutable:
+    name: str
+
+m = Mutable(name="test")
+m.name = "new"  # No error
+```
+
+#### Using metaclass-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class DefaultFrozenMeta(type):
+    def __new__(
+        cls,
+        name,
+        bases,
+        namespace,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class DefaultFrozenModel(metaclass=DefaultFrozenMeta): ...
+
+class Frozen(DefaultFrozenModel):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+class Mutable(DefaultFrozenModel, frozen=False):
+    name: str
+
+m = Mutable(name="test")
+# TODO: no error here
+m.name = "new"  # error: [invalid-assignment]
+```
+
+#### Using base-class-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class DefaultFrozenModel:
+    def __init_subclass__(
+        cls,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class Frozen(DefaultFrozenModel):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+
+class Mutable(DefaultFrozenModel, frozen=False):
+    name: str
+
+m = Mutable(name="test")
+# TODO: This should not be an error
+m.name = "new"  # error: [invalid-assignment]
+```
+
+## `field_specifiers`
+
+The `field_specifiers` argument can be used to specify a list of functions that should be treated
+similar to `dataclasses.field` for normal dataclasses.
+
+The [`typing.dataclass_transform`] specification also allows classes (such as `dataclasses.Field`)
+to be listed in `field_specifiers`, but it is currently unclear how this should work, and other type
+checkers do not seem to support this either.
+
+### For function-based transformers
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field(init=False)
+    internal_name: str = fancy_field(alias="name")
+    age: int | None = fancy_field(kw_only=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
+
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.internal_name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
+
+### For metaclass-based transformers
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+class FancyMeta(type):
+    def __new__(cls, name, bases, namespace):
+        ...
+        return super().__new__(cls, name, bases, namespace)
+
+class FancyBase(metaclass=FancyMeta): ...
+
+class Person(FancyBase):
+    id: int = fancy_field(init=False)
+    internal_name: str = fancy_field(alias="name")
+    age: int | None = fancy_field(kw_only=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
+
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.internal_name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
+
+### For base-class-based transformers
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+class FancyBase:
+    def __init_subclass__(cls):
+        ...
+        super().__init_subclass__()
+
+class Person(FancyBase):
+    id: int = fancy_field(init=False)
+    internal_name: str = fancy_field(alias="name")
+    age: int | None = fancy_field(kw_only=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
+
+alice = Person("Alice", age=30)
+
+reveal_type(alice.id)  # revealed: int
+reveal_type(alice.internal_name)  # revealed: str
+reveal_type(alice.age)  # revealed: int | None
+```
+
+### With default arguments
+
+Field specifiers can have default arguments that should be respected:
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def fancy_field(*, init: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field()
+    name: str = fancy_field(init=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
+
+Person(name="Alice")
+```
+
+### Support for `alias`
+
+The `alias` parameter in field specifiers allows providing an alternative name for the parameter in
+the synthesized `__init__` method.
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field_with_alias(*, alias: str | None = None, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(field_with_alias,))
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model
+class Person:
+    internal_name: str = field_with_alias(alias="name")
+    internal_age: int = field_with_alias(alias="age", kw_only=True)
+```
+
+The synthesized `__init__` method uses the alias names instead of the actual attribute names:
+
+```py
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int) -> None
+```
+
+We can construct instances using the alias names:
+
+```py
+p = Person(name="Alice", age=30)
+```
+
+Passing the `name` parameter positionally also works:
+
+```py
+p = Person("Alice", age=30)
+```
+
+But the attributes are still accessed by their actual names:
+
+```py
+reveal_type(p.internal_name)  # revealed: str
+reveal_type(p.internal_age)  # revealed: int
+```
+
+Trying to use the actual attribute names in the constructor results in an error:
+
+```py
+# error: [unknown-argument] "Argument `internal_age` does not match any known parameter"
+# error: [missing-argument] "No argument provided for required parameter `age`"
+p = Person(name="Alice", internal_age=30)
+```
+
+### With overloaded field specifiers
+
+```py
+from typing_extensions import dataclass_transform, overload, Any
+
+@overload
+def fancy_field(*, init: bool = True) -> Any: ...
+@overload
+def fancy_field(*, kw_only: bool = False) -> Any: ...
+def fancy_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(fancy_field,))
+def fancy_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@fancy_model
+class Person:
+    id: int = fancy_field(init=False)
+    name: str = fancy_field()
+    age: int | None = fancy_field(kw_only=True)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
+```
+
+### Nested dataclass-transformers
+
+Make sure that models are only affected by the field specifiers of their own transformer:
+
+```py
+from typing_extensions import dataclass_transform, Any
+from dataclasses import field
+
+def outer_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(outer_field,))
+def outer_model[T](cls: type[T]) -> type[T]:
+    # ...
+    return cls
+
+def inner_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(inner_field,))
+def inner_model[T](cls: type[T]) -> type[T]:
+    # ...
+    return cls
+
+@outer_model
+class Outer:
+    @inner_model
+    class Inner:
+        inner_a: int = inner_field(init=False)
+        inner_b: str = outer_field(init=False)
+
+    outer_a: int = outer_field(init=False)
+    outer_b: str = inner_field(init=False)
+
+reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = Any) -> None
+reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = Any) -> None
+```
 
 ## Overloaded dataclass-like decorators
 

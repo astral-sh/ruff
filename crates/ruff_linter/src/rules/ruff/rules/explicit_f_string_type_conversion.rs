@@ -40,6 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// f"{a!r}"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.267")]
 pub(crate) struct ExplicitFStringTypeConversion;
 
 impl Violation for ExplicitFStringTypeConversion {

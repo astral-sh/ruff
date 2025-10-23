@@ -120,7 +120,11 @@ impl LspDiagnostics {
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
+pub(super) fn clear_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
+    if session.client_capabilities().supports_pull_diagnostics() {
+        return;
+    }
+
     let Some(uri) = key.to_url() else {
         // If we can't convert to URL, we can't clear diagnostics
         return;

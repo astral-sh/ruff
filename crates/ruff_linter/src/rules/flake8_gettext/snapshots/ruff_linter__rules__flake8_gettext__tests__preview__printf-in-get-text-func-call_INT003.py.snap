@@ -1,0 +1,162 @@
+---
+source: crates/ruff_linter/src/rules/flake8_gettext/mod.rs
+---
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+ --> INT003.py:1:3
+  |
+1 | _("%s" % "line")
+  |   ^^^^^^^^^^^^^
+2 | gettext("%s" % "line")
+3 | ngettext("%s" % "line", "%s" % "lines", 2)
+  |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+ --> INT003.py:2:9
+  |
+1 | _("%s" % "line")
+2 | gettext("%s" % "line")
+  |         ^^^^^^^^^^^^^
+3 | ngettext("%s" % "line", "%s" % "lines", 2)
+  |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+ --> INT003.py:3:10
+  |
+1 | _("%s" % "line")
+2 | gettext("%s" % "line")
+3 | ngettext("%s" % "line", "%s" % "lines", 2)
+  |          ^^^^^^^^^^^^^
+4 |
+5 | _gettext("%s" % "line")  # no lint
+  |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:18:21
+   |
+16 | name = "Guido"
+17 |
+18 | gettext_mod.gettext("Hello, %s!" % name)
+   |                     ^^^^^^^^^^^^^^^^^^^
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+20 | gettext_fn("Hello, %s!" % name)
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:19:22
+   |
+18 | gettext_mod.gettext("Hello, %s!" % name)
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |                      ^^^^^^^^^^^^^^^^^^^
+20 | gettext_fn("Hello, %s!" % name)
+21 | ngettext_fn("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:20:12
+   |
+18 | gettext_mod.gettext("Hello, %s!" % name)
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+20 | gettext_fn("Hello, %s!" % name)
+   |            ^^^^^^^^^^^^^^^^^^^
+21 | ngettext_fn("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:21:13
+   |
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+20 | gettext_fn("Hello, %s!" % name)
+21 | ngettext_fn("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |             ^^^^^^^^^^^^^^^^^^^
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:27:14
+   |
+25 | def _(message): return message
+26 |
+27 | animals = [_("%s" %"mollusk"),
+   |              ^^^^^^^^^^^^^^^
+28 |            _("%s" %"albatross"),
+29 |            _("%s" %"rat"),
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:28:14
+   |
+27 | animals = [_("%s" %"mollusk"),
+28 |            _("%s" %"albatross"),
+   |              ^^^^^^^^^^^^^^^^^
+29 |            _("%s" %"rat"),
+30 |            _("%s" %"penguin"),
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:29:14
+   |
+27 | animals = [_("%s" %"mollusk"),
+28 |            _("%s" %"albatross"),
+29 |            _("%s" %"rat"),
+   |              ^^^^^^^^^^^
+30 |            _("%s" %"penguin"),
+31 |            _("%s" %"python"),]
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:30:14
+   |
+28 |            _("%s" %"albatross"),
+29 |            _("%s" %"rat"),
+30 |            _("%s" %"penguin"),
+   |              ^^^^^^^^^^^^^^^
+31 |            _("%s" %"python"),]
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:31:14
+   |
+29 |            _("%s" %"rat"),
+30 |            _("%s" %"penguin"),
+31 |            _("%s" %"python"),]
+   |              ^^^^^^^^^^^^^^
+32 |
+33 | del _
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:37:13
+   |
+35 | for a in animals:
+36 |     print(_(a))
+37 |     print(_("%s" % a))
+   |             ^^^^^^^^
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:47:12
+   |
+45 | builtins.__dict__["gettext"] = gettext_fn
+46 |
+47 | builtins._("%s" % "line")
+   |            ^^^^^^^^^^^^^
+48 | builtins.gettext("%s" % "line")
+49 | builtins.ngettext("%s" % "line", "%s" % "lines", 2)
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:48:18
+   |
+47 | builtins._("%s" % "line")
+48 | builtins.gettext("%s" % "line")
+   |                  ^^^^^^^^^^^^^
+49 | builtins.ngettext("%s" % "line", "%s" % "lines", 2)
+   |
+
+INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  --> INT003.py:49:19
+   |
+47 | builtins._("%s" % "line")
+48 | builtins.gettext("%s" % "line")
+49 | builtins.ngettext("%s" % "line", "%s" % "lines", 2)
+   |                   ^^^^^^^^^^^^^
+   |

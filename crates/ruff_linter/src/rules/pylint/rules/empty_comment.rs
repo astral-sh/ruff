@@ -30,6 +30,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Pylint documentation](https://pylint.pycqa.org/en/latest/user_guide/messages/refactor/empty-comment.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct EmptyComment;
 
 impl Violation for EmptyComment {

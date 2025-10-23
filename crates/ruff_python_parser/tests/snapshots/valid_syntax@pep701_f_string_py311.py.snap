@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pep701_f_string_py311.
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..278,
+        range: 0..398,
         body: [
             Expr(
                 StmtExpr {
@@ -50,6 +50,7 @@ Module(
                                                                                 quote_style: Single,
                                                                                 prefix: Empty,
                                                                                 triple_quoted: false,
+                                                                                unclosed: false,
                                                                             },
                                                                         },
                                                                     ),
@@ -66,6 +67,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -134,6 +136,7 @@ Module(
                                                                                                     quote_style: Double,
                                                                                                     prefix: Empty,
                                                                                                     triple_quoted: false,
+                                                                                                    unclosed: false,
                                                                                                 },
                                                                                             },
                                                                                         ),
@@ -162,6 +165,7 @@ Module(
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -234,6 +238,7 @@ Module(
                                                                                                                                                         quote_style: Double,
                                                                                                                                                         prefix: Empty,
                                                                                                                                                         triple_quoted: false,
+                                                                                                                                                        unclosed: false,
                                                                                                                                                     },
                                                                                                                                                 },
                                                                                                                                             ),
@@ -250,6 +255,7 @@ Module(
                                                                                                                         quote_style: Single,
                                                                                                                         prefix: Regular,
                                                                                                                         triple_quoted: false,
+                                                                                                                        unclosed: false,
                                                                                                                     },
                                                                                                                 },
                                                                                                             ),
@@ -267,6 +273,7 @@ Module(
                                                                                     quote_style: Single,
                                                                                     prefix: Regular,
                                                                                     triple_quoted: true,
+                                                                                    unclosed: false,
                                                                                 },
                                                                             },
                                                                         ),
@@ -284,6 +291,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: true,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -420,6 +428,7 @@ Module(
                                                                                                                                                             quote_style: Double,
                                                                                                                                                             prefix: Regular,
                                                                                                                                                             triple_quoted: false,
+                                                                                                                                                            unclosed: false,
                                                                                                                                                         },
                                                                                                                                                     },
                                                                                                                                                 ),
@@ -444,6 +453,7 @@ Module(
                                                                                                                         quote_style: Single,
                                                                                                                         prefix: Regular,
                                                                                                                         triple_quoted: false,
+                                                                                                                        unclosed: false,
                                                                                                                     },
                                                                                                                 },
                                                                                                             ),
@@ -461,6 +471,7 @@ Module(
                                                                                     quote_style: Single,
                                                                                     prefix: Regular,
                                                                                     triple_quoted: true,
+                                                                                    unclosed: false,
                                                                                 },
                                                                             },
                                                                         ),
@@ -485,6 +496,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: true,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -545,6 +557,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -581,6 +594,131 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 278..289,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 278..289,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 278..289,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 280..288,
+                                                        node_index: NodeIndex(None),
+                                                        expression: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 281..282,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            InterpolatedStringFormatSpec {
+                                                                range: 283..287,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 283..287,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "d",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 330..342,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 330..342,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 330..342,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 332..341,
+                                                        node_index: NodeIndex(None),
+                                                        expression: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 333..334,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            InterpolatedStringFormatSpec {
+                                                                range: 335..340,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 335..340,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "\"d\"",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),

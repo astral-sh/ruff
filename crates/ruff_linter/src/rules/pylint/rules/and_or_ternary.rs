@@ -29,6 +29,7 @@ use crate::Violation;
 /// maximum = x if x >= y else y
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.2.0")]
 pub(crate) struct AndOrTernary;
 
 /// PLR1706

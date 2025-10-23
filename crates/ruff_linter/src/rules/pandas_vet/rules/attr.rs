@@ -34,6 +34,7 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// ## References
 /// - [Pandas documentation: Accessing the values in a Series or Index](https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.24.0.html#accessing-the-values-in-a-series-or-index)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotValues;
 
 impl Violation for PandasUseOfDotValues {

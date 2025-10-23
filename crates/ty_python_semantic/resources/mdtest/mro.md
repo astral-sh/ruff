@@ -241,8 +241,6 @@ find a union type in a class's bases, we infer the class's `__mro__` as being
 `[<class>, Unknown, object]`, the same as for MROs that cause errors at runtime.
 
 ```py
-from typing_extensions import reveal_type
-
 def returns_bool() -> bool:
     return True
 
@@ -391,8 +389,6 @@ class BadSub2(Bad2()): ...  # error: [invalid-base]
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]

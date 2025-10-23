@@ -7,7 +7,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
 };
 use crate::types::enums::is_enum_class;
-use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
@@ -22,7 +22,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let mut ty = self.infer_type_expression_no_store(expression);
-        let divergent = Type::divergent(self.scope());
+        let divergent = Type::divergent(Some(self.scope()));
         if ty.has_divergent_type(self.db(), divergent) {
             ty = divergent;
         }
@@ -588,7 +588,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(element_ty);
+                        element_types.push(element_ty.fallback_to_divergent(self.db()));
                     }
                 }
 
@@ -1156,26 +1156,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
-                let bindings = argument_type.bindings(db);
 
-                // SAFETY: This is enforced by the constructor methods on `Bindings` even in
-                // the case of a non-callable union.
-                let callable_binding = bindings
-                    .into_iter()
-                    .next()
-                    .expect("`Bindings` should have at least one `CallableBinding`");
-
-                let mut signature_iter = callable_binding.into_iter().map(|binding| {
-                    if let Some(bound_method) = argument_type.into_bound_method() {
-                        binding
-                            .signature
-                            .bind_self(self.db(), Some(bound_method.typing_self_type(db)))
-                    } else {
-                        binding.signature.clone()
-                    }
-                });
-
-                let Some(signature) = signature_iter.next() else {
+                let Some(callable_type) = argument_type.try_upcast_to_callable(db) else {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_TYPE_FORM, arguments_slice)
@@ -1193,14 +1175,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 };
 
-                let signature = CallableSignature::from_overloads(
-                    std::iter::once(signature).chain(signature_iter),
-                );
-                let callable_type_of = Type::Callable(CallableType::new(db, signature, false));
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, callable_type_of);
+                    self.store_expression_type(arguments_slice, callable_type);
                 }
-                callable_type_of
+                callable_type
             }
 
             SpecialFormType::ChainMap => self.infer_parameterized_legacy_typing_alias(
@@ -1451,7 +1429,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let ty = value_ty
                         .member(self.db(), &attr.id)
                         .place
-                        .ignore_possibly_unbound()
+                        .ignore_possibly_undefined()
                         .unwrap_or(Type::unknown());
                     self.store_expression_type(parameters, ty);
                     ty

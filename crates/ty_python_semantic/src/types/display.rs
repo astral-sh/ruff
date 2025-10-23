@@ -24,7 +24,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
     UnionType, WrapperDescriptorKind, visitor,
 };
@@ -38,7 +38,7 @@ pub struct DisplaySettings<'db> {
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
     pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
-    /// Whether long unions are displayed in full
+    /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
 }
 
@@ -560,9 +560,7 @@ impl Display for DisplayRepresentation<'_> {
                     .display_with(self.db, self.settings.clone()),
                 literal_name = enum_literal.name(self.db)
             ),
-            Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                bound_typevar.display(self.db).fmt(f)
-            }
+            Type::TypeVar(bound_typevar) => bound_typevar.identity(self.db).display(self.db).fmt(f),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
@@ -571,9 +569,7 @@ impl Display for DisplayRepresentation<'_> {
                     "<super: {pivot}, {owner}>",
                     pivot = Type::from(bound_super.pivot_class(self.db))
                         .display_with(self.db, self.settings.singleline()),
-                    owner = bound_super
-                        .owner(self.db)
-                        .into_type()
+                    owner = Type::from(bound_super.owner(self.db))
                         .display_with(self.db, self.settings.singleline())
                 )
             }
@@ -595,29 +591,37 @@ impl Display for DisplayRepresentation<'_> {
                 .0
                 .display_with(self.db, self.settings.clone())
                 .fmt(f),
-            Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
+            Type::TypeAlias(alias) => {
+                f.write_str(alias.name(self.db))?;
+                match alias.specialization(self.db) {
+                    None => Ok(()),
+                    Some(specialization) => specialization
+                        .display_short(self.db, TupleSpecialization::No, self.settings.clone())
+                        .fmt(f),
+                }
+            }
         }
     }
 }
 
-impl<'db> BoundTypeVarInstance<'db> {
+impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        DisplayBoundTypeVarInstance {
-            bound_typevar: self,
+        DisplayBoundTypeVarIdentity {
+            bound_typevar_identity: self,
             db,
         }
     }
 }
 
-struct DisplayBoundTypeVarInstance<'db> {
-    bound_typevar: BoundTypeVarInstance<'db>,
+struct DisplayBoundTypeVarIdentity<'db> {
+    bound_typevar_identity: BoundTypeVarIdentity<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayBoundTypeVarInstance<'_> {
+impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bound_typevar.typevar(self.db).name(self.db))?;
-        if let Some(binding_context) = self.bound_typevar.binding_context(self.db).name(self.db) {
+        f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
+        if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
             write!(f, "@{binding_context}")?;
         }
         Ok(())
@@ -810,6 +814,10 @@ impl Display for DisplayFunctionType<'_> {
 }
 
 impl<'db> GenericAlias<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayGenericAlias<'db> {
+        self.display_with(db, DisplaySettings::default())
+    }
+
     pub(crate) fn display_with(
         &'db self,
         db: &'db dyn Db,
@@ -1324,6 +1332,44 @@ impl Display for DisplayParameter<'_> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+struct TruncationPolicy {
+    max: usize,
+    max_when_elided: usize,
+}
+
+impl TruncationPolicy {
+    fn display_limit(self, total: usize, preserve_full: bool) -> usize {
+        if preserve_full {
+            return total;
+        }
+        let limit = if total > self.max {
+            self.max_when_elided
+        } else {
+            self.max
+        };
+        limit.min(total)
+    }
+}
+
+#[derive(Debug)]
+struct DisplayOmitted {
+    count: usize,
+    singular: &'static str,
+    plural: &'static str,
+}
+
+impl Display for DisplayOmitted {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let noun = if self.count == 1 {
+            self.singular
+        } else {
+            self.plural
+        };
+        write!(f, "... omitted {} {}", self.count, noun)
+    }
+}
+
 impl<'db> UnionType<'db> {
     fn display_with(
         &'db self,
@@ -1344,8 +1390,10 @@ struct DisplayUnionType<'db> {
     settings: DisplaySettings<'db>,
 }
 
-const MAX_DISPLAYED_UNION_ITEMS: usize = 5;
-const MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED: usize = 3;
+const UNION_POLICY: TruncationPolicy = TruncationPolicy {
+    max: 5,
+    max_when_elided: 3,
+};
 
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1375,16 +1423,8 @@ impl Display for DisplayUnionType<'_> {
 
         let mut join = f.join(" | ");
 
-        let display_limit = if self.settings.preserve_full_unions {
-            total_entries
-        } else {
-            let limit = if total_entries > MAX_DISPLAYED_UNION_ITEMS {
-                MAX_DISPLAYED_UNION_ITEMS_WHEN_ELIDED
-            } else {
-                MAX_DISPLAYED_UNION_ITEMS
-            };
-            limit.min(total_entries)
-        };
+        let display_limit =
+            UNION_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
 
         let mut condensed_types = Some(condensed_types);
         let mut displayed_entries = 0usize;
@@ -1416,8 +1456,10 @@ impl Display for DisplayUnionType<'_> {
         if !self.settings.preserve_full_unions {
             let omitted_entries = total_entries.saturating_sub(displayed_entries);
             if omitted_entries > 0 {
-                join.entry(&DisplayUnionOmitted {
+                join.entry(&DisplayOmitted {
                     count: omitted_entries,
+                    singular: "union element",
+                    plural: "union elements",
                 });
             }
         }
@@ -1433,38 +1475,45 @@ impl fmt::Debug for DisplayUnionType<'_> {
         Display::fmt(self, f)
     }
 }
-
-struct DisplayUnionOmitted {
-    count: usize,
-}
-
-impl Display for DisplayUnionOmitted {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let plural = if self.count == 1 {
-            "element"
-        } else {
-            "elements"
-        };
-        write!(f, "... omitted {} union {}", self.count, plural)
-    }
-}
-
 struct DisplayLiteralGroup<'db> {
     literals: Vec<Type<'db>>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
+const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
+    max: 7,
+    max_when_elided: 5,
+};
+
 impl Display for DisplayLiteralGroup<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("Literal[")?;
-        f.join(", ")
-            .entries(
-                self.literals
-                    .iter()
-                    .map(|ty| ty.representation(self.db, self.settings.singleline())),
-            )
-            .finish()?;
+
+        let total_entries = self.literals.len();
+
+        let display_limit =
+            LITERAL_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
+
+        let mut join = f.join(", ");
+
+        for lit in self.literals.iter().take(display_limit) {
+            let rep = lit.representation(self.db, self.settings.singleline());
+            join.entry(&rep);
+        }
+
+        if !self.settings.preserve_full_unions {
+            let omitted_entries = total_entries.saturating_sub(display_limit);
+            if omitted_entries > 0 {
+                join.entry(&DisplayOmitted {
+                    count: omitted_entries,
+                    singular: "literal",
+                    plural: "literals",
+                });
+            }
+        }
+
+        join.finish()?;
         f.write_str("]")
     }
 }
@@ -1715,7 +1764,7 @@ mod tests {
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
             .place
-            .ignore_possibly_unbound()
+            .ignore_possibly_undefined()
             .unwrap()
             .to_instance(&db)
             .unwrap()

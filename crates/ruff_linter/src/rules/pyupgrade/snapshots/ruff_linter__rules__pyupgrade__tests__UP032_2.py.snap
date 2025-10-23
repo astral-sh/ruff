@@ -385,6 +385,7 @@ help: Convert to f-string
 26 + f"{({1, 2}).real}"
 27 | "{.real}".format({1: 2, 3: 4})
 28 | "{}".format((i for i in range(2)))
+29 | 
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:27:1
@@ -402,6 +403,8 @@ help: Convert to f-string
    - "{.real}".format({1: 2, 3: 4})
 27 + f"{({1: 2, 3: 4}).real}"
 28 | "{}".format((i for i in range(2)))
+29 | 
+30 | # https://github.com/astral-sh/ruff/issues/21017
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:28:1
@@ -410,6 +413,8 @@ UP032 [*] Use f-string instead of `format` call
 27 | "{.real}".format({1: 2, 3: 4})
 28 | "{}".format((i for i in range(2)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 |
+30 | # https://github.com/astral-sh/ruff/issues/21017
    |
 help: Convert to f-string
 25 | "{.real}".format([1, 2])
@@ -417,3 +422,56 @@ help: Convert to f-string
 27 | "{.real}".format({1: 2, 3: 4})
    - "{}".format((i for i in range(2)))
 28 + f"{(i for i in range(2))}"
+29 | 
+30 | # https://github.com/astral-sh/ruff/issues/21017
+31 | "{.real}".format(1_2)
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_2.py:31:1
+   |
+30 | # https://github.com/astral-sh/ruff/issues/21017
+31 | "{.real}".format(1_2)
+   | ^^^^^^^^^^^^^^^^^^^^^
+32 | "{0.real}".format(1_2)
+33 | "{a.real}".format(a=1_2)
+   |
+help: Convert to f-string
+28 | "{}".format((i for i in range(2)))
+29 | 
+30 | # https://github.com/astral-sh/ruff/issues/21017
+   - "{.real}".format(1_2)
+31 + f"{(1_2).real}"
+32 | "{0.real}".format(1_2)
+33 | "{a.real}".format(a=1_2)
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_2.py:32:1
+   |
+30 | # https://github.com/astral-sh/ruff/issues/21017
+31 | "{.real}".format(1_2)
+32 | "{0.real}".format(1_2)
+   | ^^^^^^^^^^^^^^^^^^^^^^
+33 | "{a.real}".format(a=1_2)
+   |
+help: Convert to f-string
+29 | 
+30 | # https://github.com/astral-sh/ruff/issues/21017
+31 | "{.real}".format(1_2)
+   - "{0.real}".format(1_2)
+32 + f"{(1_2).real}"
+33 | "{a.real}".format(a=1_2)
+
+UP032 [*] Use f-string instead of `format` call
+  --> UP032_2.py:33:1
+   |
+31 | "{.real}".format(1_2)
+32 | "{0.real}".format(1_2)
+33 | "{a.real}".format(a=1_2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to f-string
+30 | # https://github.com/astral-sh/ruff/issues/21017
+31 | "{.real}".format(1_2)
+32 | "{0.real}".format(1_2)
+   - "{a.real}".format(a=1_2)
+33 + f"{(1_2).real}"

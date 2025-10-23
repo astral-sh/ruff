@@ -38,6 +38,8 @@ types_requiring_crate_prefix = {
     "WithItem",
     "MatchCase",
     "Alias",
+    "Singleton",
+    "PatternArguments",
 }
 
 

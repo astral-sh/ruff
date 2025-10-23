@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 /// - [Requests documentation: Timeouts](https://requests.readthedocs.io/en/latest/user/advanced/#timeouts)
 /// - [httpx documentation: Timeouts](https://www.python-httpx.org/advanced/timeouts/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct RequestWithoutTimeout {
     implicit: bool,
     module: String,

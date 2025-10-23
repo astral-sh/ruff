@@ -170,6 +170,7 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
     reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
@@ -758,16 +759,16 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-missing-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `non_data` on type `PossiblyUnbound` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
-    # error: [possibly-missing-attribute] "Attribute `data` on type `PossiblyUnbound` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().data)  # revealed: int
 ```
 

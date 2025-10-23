@@ -3,7 +3,7 @@
 use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTString, ExprTuple, StmtClassDef,
+    ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -735,6 +735,8 @@ pub trait StringFlags: Copy {
 
     fn prefix(self) -> AnyStringPrefix;
 
+    fn is_unclosed(self) -> bool;
+
     /// Is the string triple-quoted, i.e.,
     /// does it begin and end with three consecutive quote characters?
     fn is_triple_quoted(self) -> bool {
@@ -779,6 +781,7 @@ pub trait StringFlags: Copy {
 
     fn as_any_string_flags(self) -> AnyStringFlags {
         AnyStringFlags::new(self.prefix(), self.quote_style(), self.triple_quotes())
+            .with_unclosed(self.is_unclosed())
     }
 
     fn display_contents(self, contents: &str) -> DisplayFlags<'_> {
@@ -829,6 +832,10 @@ bitflags! {
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
         const R_PREFIX_UPPER = 1 << 3;
+
+        /// The f-string is unclosed, meaning it is missing a closing quote.
+        /// For example: `f"{bar`
+        const UNCLOSED = 1 << 4;
     }
 }
 
@@ -884,6 +891,12 @@ impl FStringFlags {
             InterpolatedStringFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
         );
+        self
+    }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(InterpolatedStringFlagsInner::UNCLOSED, unclosed);
         self
     }
 
@@ -985,6 +998,12 @@ impl TStringFlags {
     }
 
     #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(InterpolatedStringFlagsInner::UNCLOSED, unclosed);
+        self
+    }
+
+    #[must_use]
     pub fn with_prefix(mut self, prefix: TStringPrefix) -> Self {
         match prefix {
             TStringPrefix::Regular => Self(
@@ -1051,6 +1070,10 @@ impl StringFlags for FStringFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Format(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(InterpolatedStringFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for FStringFlags {
@@ -1059,6 +1082,7 @@ impl fmt::Debug for FStringFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1090,6 +1114,10 @@ impl StringFlags for TStringFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Template(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(InterpolatedStringFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for TStringFlags {
@@ -1098,6 +1126,7 @@ impl fmt::Debug for TStringFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1427,6 +1456,9 @@ bitflags! {
 
         /// The string was deemed invalid by the parser.
         const INVALID = 1 << 5;
+
+        /// The string literal misses the matching closing quote(s).
+        const UNCLOSED = 1 << 6;
     }
 }
 
@@ -1476,6 +1508,12 @@ impl StringLiteralFlags {
             StringLiteralFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
         );
+        self
+    }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(StringLiteralFlagsInner::UNCLOSED, unclosed);
         self
     }
 
@@ -1560,6 +1598,10 @@ impl StringFlags for StringLiteralFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Regular(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(StringLiteralFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for StringLiteralFlags {
@@ -1568,6 +1610,7 @@ impl fmt::Debug for StringLiteralFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1846,6 +1889,9 @@ bitflags! {
 
         /// The bytestring was deemed invalid by the parser.
         const INVALID = 1 << 4;
+
+        /// The byte string misses the matching closing quote(s).
+        const UNCLOSED = 1 << 5;
     }
 }
 
@@ -1894,6 +1940,12 @@ impl BytesLiteralFlags {
             BytesLiteralFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
         );
+        self
+    }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(BytesLiteralFlagsInner::UNCLOSED, unclosed);
         self
     }
 
@@ -1959,6 +2011,10 @@ impl StringFlags for BytesLiteralFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Bytes(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(BytesLiteralFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for BytesLiteralFlags {
@@ -1967,6 +2023,7 @@ impl fmt::Debug for BytesLiteralFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -2028,7 +2085,7 @@ bitflags! {
     /// prefix flags is by calling the `as_flags()` method on the
     /// `StringPrefix` enum.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-    struct AnyStringFlagsInner: u8 {
+    struct AnyStringFlagsInner: u16 {
         /// The string uses double quotes (`"`).
         /// If this flag is not set, the string uses single quotes (`'`).
         const DOUBLE = 1 << 0;
@@ -2071,6 +2128,9 @@ bitflags! {
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
         const R_PREFIX_UPPER = 1 << 7;
+
+        /// String without matching closing quote(s).
+        const UNCLOSED = 1 << 8;
     }
 }
 
@@ -2166,6 +2226,12 @@ impl AnyStringFlags {
             .set(AnyStringFlagsInner::TRIPLE_QUOTED, triple_quotes.is_yes());
         self
     }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(AnyStringFlagsInner::UNCLOSED, unclosed);
+        self
+    }
 }
 
 impl StringFlags for AnyStringFlags {
@@ -2234,6 +2300,10 @@ impl StringFlags for AnyStringFlags {
         }
         AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(AnyStringFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for AnyStringFlags {
@@ -2242,6 +2312,7 @@ impl fmt::Debug for AnyStringFlags {
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .field("quote_style", &self.quote_style())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -2258,6 +2329,7 @@ impl From<AnyStringFlags> for StringLiteralFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2279,6 +2351,7 @@ impl From<AnyStringFlags> for BytesLiteralFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(bytestring_prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2300,6 +2373,7 @@ impl From<AnyStringFlags> for FStringFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2321,6 +2395,7 @@ impl From<AnyStringFlags> for TStringFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2773,58 +2848,10 @@ pub enum IrrefutablePatternKind {
     Wildcard,
 }
 
-/// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchValue {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub value: Box<Expr>,
-}
-
-/// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchSingleton {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub value: Singleton,
-}
-
-/// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchSequence {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
-}
-
-/// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchMapping {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
-    pub rest: Option<Identifier>,
-}
-
-/// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchClass {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub cls: Box<Expr>,
-    pub arguments: PatternArguments,
-}
-
-/// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the arguments to a [`crate::PatternMatchClass`], i.e., the
 /// parenthesized contents in `case Point(1, x=0, y=0)`.
 ///
-/// Like [`Arguments`], but for [`PatternMatchClass`].
+/// Like [`Arguments`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternArguments {
@@ -2834,10 +2861,10 @@ pub struct PatternArguments {
     pub keywords: Vec<PatternKeyword>,
 }
 
-/// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
 /// `x=0` and `y=0` in `case Point(x=0, y=0)`.
 ///
-/// Like [`Keyword`], but for [`PatternMatchClass`].
+/// Like [`Keyword`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternKeyword {
@@ -2845,34 +2872,6 @@ pub struct PatternKeyword {
     pub node_index: AtomicNodeIndex,
     pub attr: Identifier,
     pub pattern: Pattern,
-}
-
-/// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchStar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Option<Identifier>,
-}
-
-/// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchAs {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub pattern: Option<Box<Pattern>>,
-    pub name: Option<Identifier>,
-}
-
-/// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchOr {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
 }
 
 impl TypeParam {
@@ -2891,37 +2890,6 @@ impl TypeParam {
             Self::TypeVarTuple(x) => x.default.as_deref(),
         }
     }
-}
-
-/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub bound: Option<Box<Expr>>,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamParamSpec {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVarTuple {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
 }
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
