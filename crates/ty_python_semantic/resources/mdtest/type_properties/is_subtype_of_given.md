@@ -6,8 +6,8 @@ python-version = "3.12"
 ```
 
 This file tests the _constraint implication_ relationship between types, aka `is_subtype_of_given`,
-which tests whether one type is a [subtype][] of another _assuming that the constraints in a
-particular constraint set hold_.
+which tests whether one type is a [subtype][subtyping] of another _assuming that the constraints in
+a particular constraint set hold_.
 
 ## Concrete types
 
