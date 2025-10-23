@@ -507,13 +507,14 @@ impl<'db> Node<'db> {
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         match self {
-            Node::AlwaysTrue => return true,
-            Node::AlwaysFalse => return false,
-            _ => {}
+            Node::AlwaysTrue => true,
+            Node::AlwaysFalse => false,
+            Node::Interior(_) => {
+                let domain = self.domain(db);
+                let restricted = self.and(db, domain);
+                restricted == domain
+            }
         }
-        let domain = self.domain(db);
-        let restricted = self.and(db, domain);
-        restricted == domain
     }
 
     /// Returns whether this BDD represent the constant function `false`.
