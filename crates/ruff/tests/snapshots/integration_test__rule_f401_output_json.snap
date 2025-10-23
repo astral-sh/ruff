@@ -29,6 +29,10 @@ exit_code: 0
     "Stable": {
       "since": "v0.0.18"
     }
+  },
+  "source_location": {
+    "file": "crates/ruff_linter/src/rules/pyflakes/rules/unused_import.rs",
+    "line": 145
   }
 }
 ----- stderr -----
