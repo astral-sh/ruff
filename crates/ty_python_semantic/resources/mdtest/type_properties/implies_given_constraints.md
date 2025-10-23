@@ -145,15 +145,11 @@ from ty_extensions import implies_given_constraints, range_constraint, static_as
 
 def given_constraints[T]():
     given_int = range_constraint(Never, T, int)
-    # TODO: no static-assert-error
-    # error: [static-assert-error]
     static_assert(implies_given_constraints(given_int, T, int))
     static_assert(not implies_given_constraints(given_int, T, bool))
     static_assert(not implies_given_constraints(given_int, T, str))
 
     given_bool = range_constraint(Never, T, bool)
-    # TODO: no static-assert-error
-    # error: [static-assert-error]
     static_assert(implies_given_constraints(given_bool, T, int))
     static_assert(implies_given_constraints(given_bool, T, bool))
     static_assert(not implies_given_constraints(given_bool, T, str))
