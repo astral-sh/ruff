@@ -66,7 +66,7 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 ///
 /// These attributes look like:
 ///
-/// ```
+/// ```ignore
 /// #[violation_metadata(stable_since = "1.2.3")]
 /// struct MyRule;
 /// ```
