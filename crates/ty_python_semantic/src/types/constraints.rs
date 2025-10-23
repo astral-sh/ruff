@@ -271,6 +271,13 @@ impl<'db> ConstraintSet<'db> {
         inferable: InferableTypeVars<'_, 'db>,
     ) -> Self {
         match (lhs, rhs) {
+            // When checking subtyping involving a typevar, we project the BDD so that it only
+            // contains that typevar, and any other typevars that could be its upper/lower bound.
+            // (That is, other typevars that are "earlier" in our arbitrary ordering of typevars.)
+            //
+            // Having done that, we can turn the subtyping check into a constraint (i.e, "is `T` a
+            // subtype of `int` becomes the constraint `T ≤ int`), and then check when the BDD
+            // implies that constraint.
             (Type::TypeVar(bound_typevar), _) => {
                 let constrained_typevar = match rhs {
                     Type::TypeVar(rhs_bound_typevar) if rhs_bound_typevar > bound_typevar => {
@@ -301,6 +308,7 @@ impl<'db> ConstraintSet<'db> {
                 projected.implies(db, || constraint)
             }
 
+            // If neither type is a typevar, then we fall back on a normal subtyping check.
             _ => lhs.when_subtype_of(db, rhs, inferable),
         }
     }
@@ -353,7 +361,7 @@ impl<'db> ConstraintSet<'db> {
         self.negate(db).or(db, || self.and(db, other))
     }
 
-    /// Returns a new constraints that only includes constraints on the given typevar, and any
+    /// Returns a new constraint sets that only includes constraints on the given typevar, and any
     /// other typevars that can be the lower or upper bound of that typevar.
     pub(crate) fn project_typevar(
         self,
