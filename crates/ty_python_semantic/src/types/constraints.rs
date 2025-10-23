@@ -198,57 +198,9 @@ impl<'db> ConstraintSet<'db> {
             ),
         };
 
-        // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
-        // typevars, we have to ensure that the bounds are "earlier" according to that order than
-        // the typevar being constrained.
-        //
-        // In the comments below, we use brackets to indicate which typevar is "larger", and
-        // therefore the typevar that the constraint applies to.
-        let node = match (lower, upper) {
-            // L ≤ T ≤ L == (T ≤ [L] ≤ T)
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
-                let (bound, typevar) = if lower < typevar {
-                    (lower, typevar)
-                } else {
-                    (typevar, lower)
-                };
-                ConstrainedTypeVar::new_node(
-                    db,
-                    Type::TypeVar(bound),
-                    typevar,
-                    Type::TypeVar(bound),
-                )
-            }
-
-            // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
-                let lower =
-                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
-                let upper =
-                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
-                lower.and(db, upper)
-            }
-
-            // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            (Type::TypeVar(lower), _) if lower > typevar => {
-                let lower =
-                    ConstrainedTypeVar::new_node(db, Type::Never, lower, Type::TypeVar(typevar));
-                let upper = ConstrainedTypeVar::new_node(db, Type::Never, typevar, upper);
-                lower.and(db, upper)
-            }
-
-            // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            (_, Type::TypeVar(upper)) if upper > typevar => {
-                let lower = ConstrainedTypeVar::new_node(db, lower, typevar, Type::object());
-                let upper =
-                    ConstrainedTypeVar::new_node(db, Type::TypeVar(typevar), upper, Type::object());
-                lower.and(db, upper)
-            }
-
-            _ => ConstrainedTypeVar::new_node(db, lower, typevar, upper),
-        };
-
-        Self { node }
+        Self {
+            node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
+        }
     }
 
     /// Returns whether this constraint set never holds
@@ -362,8 +314,8 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// Panics if `lower` and `upper` are not both fully static.
     fn new_node(
         db: &'db dyn Db,
-        lower: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
@@ -383,7 +335,67 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         let lower = lower.normalized(db);
         let upper = upper.normalized(db);
-        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
+
+        // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
+        // typevars, we have to ensure that the bounds are "earlier" according to that order than
+        // the typevar being constrained.
+        //
+        // In the comments below, we use brackets to indicate which typevar is "larger", and
+        // therefore the typevar that the constraint applies to.
+        match (lower, upper) {
+            // L ≤ T ≤ L == (T ≤ [L] ≤ T)
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
+                let (bound, typevar) = if lower < typevar {
+                    (lower, typevar)
+                } else {
+                    (typevar, lower)
+                };
+                Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(
+                        db,
+                        typevar,
+                        Type::TypeVar(bound),
+                        Type::TypeVar(bound),
+                    ),
+                )
+            }
+
+            // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower > typevar && upper > typevar => {
+                let lower = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
+                );
+                let upper = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
+                );
+                lower.and(db, upper)
+            }
+
+            // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
+            (Type::TypeVar(lower), _) if lower > typevar => {
+                let lower = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
+                );
+                let upper = Self::new_node(db, typevar, Type::Never, upper);
+                lower.and(db, upper)
+            }
+
+            // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
+            (_, Type::TypeVar(upper)) if upper > typevar => {
+                let lower = Self::new_node(db, typevar, lower, Type::object());
+                let upper = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
+                );
+                lower.and(db, upper)
+            }
+
+            _ => Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper)),
+        }
     }
 
     fn when_true(self) -> ConstraintAssignment<'db> {
@@ -714,14 +726,14 @@ impl<'db> Node<'db> {
                     _ => bound_typevar,
                 };
                 let projected = self.project_typevar(db, constrained_typevar.identity(db));
-                let constraint = ConstrainedTypeVar::new_node(db, Type::Never, bound_typevar, rhs);
+                let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
                 projected.implies(db, constraint)
             }
 
             (_, Type::TypeVar(bound_typevar)) => {
                 let projected = self.project_typevar(db, bound_typevar.identity(db));
                 let constraint =
-                    ConstrainedTypeVar::new_node(db, lhs, bound_typevar, Type::object());
+                    ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
                 projected.implies(db, constraint)
             }
 
