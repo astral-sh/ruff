@@ -1,0 +1,37 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: new_types.md - NewType - Trying to subclass a `NewType` produces an error matching CPython
+mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/new_types.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import NewType
+2 | 
+3 | X = NewType("X", int)
+4 | 
+5 | class Foo(X): ...  # error: [invalid-base]
+```
+
+# Diagnostics
+
+```
+error[invalid-base]: Cannot subclass an instance of NewType
+ --> src/mdtest_snippet.py:5:11
+  |
+3 | X = NewType("X", int)
+4 |
+5 | class Foo(X): ...  # error: [invalid-base]
+  |           ^
+  |
+info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
+info: Definition of class `Foo` will raise `TypeError` at runtime
+info: rule `invalid-base` is enabled by default
+
+```

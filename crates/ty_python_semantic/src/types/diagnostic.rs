@@ -12,6 +12,7 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table};
 use crate::suppression::FileSuppressionId;
+use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
@@ -65,6 +66,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
+    registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
@@ -922,6 +924,30 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
         summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::stable("0.0.1-alpha.6"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `NewType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `NewType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NewType
+    ///
+    /// def get_name() -> str: ...
+    ///
+    /// Foo = NewType("Foo", int)        # okay
+    /// Bar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal
+    /// Baz = NewType("Baz", int | str)  # error: invalid base for `typing.NewType`
+    /// ```
+    pub(crate) static INVALID_NEWTYPE = {
+        summary: "detects invalid NewType definitions",
+        status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
@@ -2895,6 +2921,24 @@ pub(crate) fn report_invalid_or_unsupported_base(
 
     if base_type.is_assignable_to(db, instance_of_type) {
         report_unsupported_base(context, base_node, base_type, class);
+        return;
+    }
+
+    if let Type::KnownInstance(KnownInstanceType::NewType(newtype)) = base_type {
+        let Some(builder) = context.report_lint(&INVALID_BASE, base_node) else {
+            return;
+        };
+        let mut diagnostic = builder.into_diagnostic("Cannot subclass an instance of NewType");
+        diagnostic.info(format_args!(
+            "Perhaps you were looking for: `{} = NewType('{}', {})`",
+            class.name(context.db()),
+            class.name(context.db()),
+            newtype.name(context.db()),
+        ));
+        diagnostic.info(format_args!(
+            "Definition of class `{}` will raise `TypeError` at runtime",
+            class.name(context.db())
+        ));
         return;
     }
 
