@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
+use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, TypePath};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
@@ -38,7 +38,7 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
             }
 
             fn group() -> crate::codes::RuleGroup {
-                #group
+                crate::codes::#group
             }
 
             fn file() -> &'static str {
@@ -72,7 +72,7 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 }
 
 /// Extract the version attribute as a string.
-fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<(Option<String>, Option<String>)> {
+fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<(Option<String>, Option<TypePath>)> {
     let mut version = None;
     let mut group = None;
     for attr in attrs {
@@ -83,8 +83,8 @@ fn get_nested_attrs(attrs: &[Attribute]) -> syn::Result<(Option<String>, Option<
                     version = Some(lit.value());
                     return Ok(());
                 } else if meta.path.is_ident("group") {
-                    let lit: LitStr = meta.value()?.parse()?;
-                    group = Some(lit.value());
+                    let value: TypePath = meta.value()?.parse()?;
+                    group = Some(value);
                     return Ok(());
                 }
                 Err(Error::new_spanned(
