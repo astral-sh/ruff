@@ -3527,28 +3527,23 @@ impl<'db> BindingError<'db> {
                         .filter(|element| !element.is_assignable_to(context.db(), *expected_ty))
                         .copied()
                         .collect();
+                    let first_invalid_element = invalid_elements[0].display(context.db());
                     if invalid_elements.len() < union_elements.len() {
-                        let (first, rest) = invalid_elements
-                            .split_first()
-                            .expect("There must be at least one invalid union element");
-
-                        match rest {
+                        match &invalid_elements[1..] {
                             [] => diag.info(format_args!(
-                                "Element `{}` of this union is not assignable to `{}`",
-                                first.display(context.db()),
-                                expected_ty_display,
+                                "Element `{first_invalid_element}` of this union \
+                                is not assignable to `{expected_ty_display}`",
                             )),
                             [single] => diag.info(format_args!(
-                                "Union elements `{}` and `{}` are not assignable to `{}`",
-                                first.display(context.db()),
+                                "Union elements `{first_invalid_element}` and `{}` \
+                                are not assignable to `{expected_ty_display}`",
                                 single.display(context.db()),
-                                expected_ty_display,
                             )),
-                            _ => diag.info(format_args!(
-                                "Union element `{}`, and {} more union elements, are not assignable to `{}`",
-                                first.display(context.db()),
+                            rest => diag.info(format_args!(
+                                "Union element `{first_invalid_element}`, \
+                                and {} more union elements, \
+                                are not assignable to `{expected_ty_display}`",
                                 rest.len(),
-                                expected_ty_display,
                             )),
                         }
                     }
