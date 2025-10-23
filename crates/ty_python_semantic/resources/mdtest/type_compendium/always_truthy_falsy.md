@@ -17,7 +17,7 @@ Here, we give a few examples of values that belong to these types:
 
 ```py
 from ty_extensions import AlwaysTruthy, AlwaysFalsy
-from typing_extensions import Literal, final
+from typing_extensions import Literal
 
 class CustomAlwaysTruthyType:
     def __bool__(self) -> Literal[True]:

@@ -4510,9 +4510,11 @@ impl<'db> Type<'db> {
                     // We only consider `__len__` for tuples and `@final` types,
                     // since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
-                    // With regards to tuple types, we intend to emit a diagnostic
+                    //
+                    // TODO: with regards to tuple types, we intend to emit a diagnostic
                     // if a tuple subclass defines a `__bool__` method with a return type
-                    // that is inconsistent with the tuple's length.
+                    // that is inconsistent with the tuple's length. Otherwise, the special
+                    // handling for tuples here isn't sound.
                     if let Some(instance) = self.into_nominal_instance() {
                         if let Some(tuple_spec) = instance.tuple_spec(db) {
                             Ok(tuple_spec.truthiness())
