@@ -78,7 +78,7 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import Literal
+from typing import Literal, final
 
 reveal_type(bool(1))  # revealed: Literal[True]
 reveal_type(bool((0,)))  # revealed: Literal[True]
@@ -116,11 +116,28 @@ reveal_type(EmptyTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def 
 
 # revealed: bound method EmptyTupleSubclassWithDunderBoolOverride.__bool__() -> Literal[True]
 reveal_type(EmptyTupleSubclassWithDunderBoolOverride().__bool__)
+
+@final
+class FinalClassOverridingLenAndNotBool:
+    def __len__(self) -> Literal[42]:
+        return 42
+
+reveal_type(bool(FinalClassOverridingLenAndNotBool()))  # revealed: Literal[True]
+
+@final
+class FinalClassWithNoLenOrBool: ...
+
+reveal_type(bool(FinalClassWithNoLenOrBool()))  # revealed: Literal[True]
+
+def f(x: SingleElementTupleSubclass | FinalClassOverridingLenAndNotBool | FinalClassWithNoLenOrBool):
+    reveal_type(bool(x))  # revealed: Literal[True]
 ```
 
 ## Falsy values
 
 ```py
+from typing import final, Literal
+
 reveal_type(bool(0))  # revealed: Literal[False]
 reveal_type(bool(()))  # revealed: Literal[False]
 reveal_type(bool(None))  # revealed: Literal[False]
@@ -131,11 +148,23 @@ reveal_type(bool())  # revealed: Literal[False]
 class EmptyTupleSubclass(tuple[()]): ...
 
 reveal_type(bool(EmptyTupleSubclass()))  # revealed: Literal[False]
+
+@final
+class FinalClassOverridingLenAndNotBool:
+    def __len__(self) -> Literal[0]:
+        return 0
+
+reveal_type(bool(FinalClassOverridingLenAndNotBool()))  # revealed: Literal[False]
+
+def f(x: EmptyTupleSubclass | FinalClassOverridingLenAndNotBool):
+    reveal_type(bool(x))  # revealed: Literal[False]
 ```
 
 ## Ambiguous values
 
 ```py
+from typing import Literal
+
 reveal_type(bool([]))  # revealed: bool
 reveal_type(bool({}))  # revealed: bool
 reveal_type(bool(set()))  # revealed: bool
@@ -144,6 +173,15 @@ class VariadicTupleSubclass(tuple[int, ...]): ...
 
 def f(x: tuple[int, ...], y: VariadicTupleSubclass):
     reveal_type(bool(x))  # revealed: bool
+
+class NonFinalOverridingLenAndNotBool:
+    def __len__(self) -> Literal[42]:
+        return 42
+
+# We cannot consider `__len__` for a non-`@final` type,
+# because a subclass might override `__bool__`,
+# and `__bool__` takes precedence over `__len__`
+reveal_type(bool(NonFinalOverridingLenAndNotBool()))  # revealed: bool
 ```
 
 ## `__bool__` returning `NoReturn`
