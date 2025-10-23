@@ -49,32 +49,6 @@ impl Violation for StopIterationReturn {
     }
 }
 
-/// Check if a statement list contains any yield statements
-fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
-    struct YieldFinder {
-        found: bool,
-    }
-
-    impl Visitor<'_> for YieldFinder {
-        fn visit_expr(&mut self, expr: &ast::Expr) {
-            if matches!(expr, ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
-                self.found = true;
-            } else {
-                walk_expr(self, expr);
-            }
-        }
-    }
-
-    let mut finder = YieldFinder { found: false };
-    for stmt in body {
-        walk_stmt(&mut finder, stmt);
-        if finder.found {
-            return true;
-        }
-    }
-    false
-}
-
 /// PLR1708
 pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRaise) {
     // Fast-path: only continue if this is `raise StopIteration` (with or without args)
@@ -108,6 +82,32 @@ fn in_generator_context(checker: &Checker) -> bool {
             if contains_yield_statement(&function_def.body) {
                 return true;
             }
+        }
+    }
+    false
+}
+
+/// Check if a statement list contains any yield statements
+fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
+    struct YieldFinder {
+        found: bool,
+    }
+
+    impl Visitor<'_> for YieldFinder {
+        fn visit_expr(&mut self, expr: &ast::Expr) {
+            if matches!(expr, ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+                self.found = true;
+            } else {
+                walk_expr(self, expr);
+            }
+        }
+    }
+
+    let mut finder = YieldFinder { found: false };
+    for stmt in body {
+        walk_stmt(&mut finder, stmt);
+        if finder.found {
+            return true;
         }
     }
     false
