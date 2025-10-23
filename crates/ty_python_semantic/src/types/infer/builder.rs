@@ -3,7 +3,7 @@ use std::{iter, mem};
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -83,7 +83,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
     enclosing_generic_contexts, typing_self,
 };
-use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
+use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -2543,45 +2543,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameter: &ast::Parameter,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let scope_id = self.scope();
-        let file = scope_id.file(db);
-        let function_scope = scope_id.scope(db);
-        let method = function_scope.node().as_function()?;
+        let file = self.file();
 
-        let parent_scope_id = function_scope.parent()?;
-        let parent_scope = self.index.scope(parent_scope_id);
-        parent_scope.node().as_class()?;
+        let function_scope_id = self.scope();
+        let function_scope = function_scope_id.scope(db);
+        let function = function_scope.node().as_function()?;
 
-        let method_definition = self.index.expect_single_definition(method);
+        let parent_file_scope_id = function_scope.parent()?;
+        let mut parent_scope_id = parent_file_scope_id.to_scope_id(db, file);
+
+        // Skip type parameter scopes, if the method itself is generic.
+        if parent_scope_id.is_annotation(db) {
+            let parent_scope = parent_scope_id.scope(db);
+            parent_scope_id = parent_scope.parent()?.to_scope_id(db, file);
+        }
+
+        // Return early if this is not a method inside a class.
+        let class = parent_scope_id.scope(db).node().as_class()?;
+
+        let method_definition = self.index.expect_single_definition(function);
         let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
             return None;
         };
 
-        let func_type = infer_definition_types(db, method_definition)
-            .declaration_type(method_definition)
-            .inner_type()
-            .as_function_literal()?;
-
-        let module = parsed_module(db, file).load(db);
         if function_definition
-            .node(&module)
+            .node(self.module())
             .parameters
             .index(parameter.name())
-            .is_some_and(|index| index != 0)
+            .is_none_or(|index| index != 0)
         {
             return None;
         }
 
-        if func_type.is_classmethod(db) {
+        let method = infer_definition_types(db, method_definition)
+            .declaration_type(method_definition)
+            .inner_type()
+            .as_function_literal()?;
+
+        if method.is_classmethod(db) {
             // TODO: set the type for `cls` argument
             return None;
-        } else if func_type.is_staticmethod(db) {
+        } else if method.is_staticmethod(db) {
             return None;
         }
 
-        let class = nearest_enclosing_class(db, self.index, scope_id).unwrap();
+        let class_definition = self.index.expect_single_definition(class);
+        let class_literal = infer_definition_types(db, class_definition)
+            .declaration_type(class_definition)
+            .inner_type()
+            .as_class_literal()?;
 
-        typing_self(db, self.scope(), Some(method_definition), class)
+        typing_self(db, self.scope(), Some(method_definition), class_literal)
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.

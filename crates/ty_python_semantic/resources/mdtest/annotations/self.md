@@ -56,7 +56,7 @@ In instance methods, the first parameter (regardless of its name) is assumed to 
 
 ```toml
 [environment]
-python-version = "3.11"
+python-version = "3.12"
 ```
 
 ```py
@@ -68,11 +68,26 @@ class A:
 
         return self
 
-    def a_method(self) -> int:
-        def first_arg_is_not_self(a: int) -> int:
+    def implicit_self_generic[T](self, x: T) -> T:
+        reveal_type(self)  # revealed: Self@implicit_self_generic
+
+        return x
+
+    def method_a(self) -> None:
+        def first_param_is_not_self(a: int):
             reveal_type(a)  # revealed: int
-            return a
-        return first_arg_is_not_self(1)
+            reveal_type(self)  # revealed: Self@method_a
+
+        def first_param_is_not_self_unannotated(a):
+            reveal_type(a)  # revealed: Unknown
+            reveal_type(self)  # revealed: Self@method_a
+
+        def first_param_is_also_not_self(self) -> None:
+            reveal_type(self)  # revealed: Unknown
+
+        def first_param_is_explicit_self(this: Self) -> None:
+            reveal_type(this)  # revealed: Self@method_a
+            reveal_type(self)  # revealed: Self@method_a
 
     @classmethod
     def a_classmethod(cls) -> Self:
