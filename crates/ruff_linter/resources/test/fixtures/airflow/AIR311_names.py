@@ -108,7 +108,15 @@ BaseSensorOperator()
 PokeReturnValue()
 poke_mode_only()
 
-from airflow.models.param import Param
+from airflow.models.param import DagParam, Param, ParamsDict
 
 # airflow.models
 Param()
+DagParam()
+ParamsDict()
+
+from airflow.models import DagParam, ParamsDict
+
+# airflow.models
+DagParam()
+ParamsDict()
