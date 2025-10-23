@@ -1044,6 +1044,12 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
+    /// Returns a simplified version of a BDD, along with the BDD's domain.
+    ///
+    /// Both are calculated by looking at the relationships that exist between the constraints that
+    /// are mentioned in the BDD. For instance, if one constraint implies another (`x → y`), then
+    /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
+    /// can rewrite any occurrences of `x ∨ y` into `y`.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
