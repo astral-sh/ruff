@@ -645,8 +645,6 @@ def f[T]():
     implication = ~t_bool | t_int
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(implication)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(implication)
 
     # revealed: ty_extensions.ConstraintSet[always]

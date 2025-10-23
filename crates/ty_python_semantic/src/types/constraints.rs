@@ -181,8 +181,8 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns whether this constraint set always holds
-    pub(crate) fn is_always_satisfied(self, _db: &'db dyn Db) -> bool {
-        self.node.is_always_satisfied()
+    pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
+        self.node.is_always_satisfied(db)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -494,8 +494,13 @@ impl<'db> Node<'db> {
     }
 
     /// Returns whether this BDD represent the constant function `true`.
-    fn is_always_satisfied(self) -> bool {
-        matches!(self, Node::AlwaysTrue)
+    fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
+        if matches!(self, Node::AlwaysTrue) {
+            return true;
+        }
+        let domain = self.domain(db);
+        let restricted = self.and(db, domain);
+        restricted == domain
     }
 
     /// Returns whether this BDD represent the constant function `false`.
