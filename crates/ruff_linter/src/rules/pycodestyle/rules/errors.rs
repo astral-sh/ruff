@@ -66,7 +66,7 @@ impl Violation for IOError {
 /// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "E999 has been removed")]
-#[violation_metadata(removed_since = "v0.0.39")]
+#[violation_metadata(removed_since = "0.8.0")]
 pub(crate) struct SyntaxError;
 
 #[expect(deprecated)]

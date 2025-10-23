@@ -838,7 +838,7 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 /// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "v0.0.258")]
+#[violation_metadata(removed_since = "0.12.0")]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
 impl Violation for SuspiciousXMLETreeUsage {
