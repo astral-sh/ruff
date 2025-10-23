@@ -129,7 +129,7 @@ where
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         for child in self {
-            if result.union(db, f(child)).is_always_satisfied() {
+            if result.union(db, f(child)).is_always_satisfied(db) {
                 return result;
             }
         }
@@ -143,7 +143,7 @@ where
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::always();
         for child in self {
-            if result.intersect(db, f(child)).is_never_satisfied() {
+            if result.intersect(db, f(child)).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -176,12 +176,12 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns whether this constraint set never holds
-    pub(crate) fn is_never_satisfied(self) -> bool {
+    pub(crate) fn is_never_satisfied(self, _db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied()
     }
 
     /// Returns whether this constraint set always holds
-    pub(crate) fn is_always_satisfied(self) -> bool {
+    pub(crate) fn is_always_satisfied(self, _db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied()
     }
 
@@ -208,7 +208,7 @@ impl<'db> ConstraintSet<'db> {
     /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
     /// constraint set is already saturated.
     pub(crate) fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
-        if !self.is_never_satisfied() {
+        if !self.is_never_satisfied(db) {
             self.intersect(db, other());
         }
         self
@@ -218,7 +218,7 @@ impl<'db> ConstraintSet<'db> {
     /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
     /// already saturated.
     pub(crate) fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
-        if !self.is_always_satisfied() {
+        if !self.is_always_satisfied(db) {
             self.union(db, other());
         }
         self

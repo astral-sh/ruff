@@ -1473,7 +1473,7 @@ impl<'db> CallableBinding<'db> {
                         .unwrap_or(Type::unknown());
                     if argument_type
                         .when_assignable_to(db, parameter_type, overload.inferable_typevars)
-                        .is_always_satisfied()
+                        .is_always_satisfied(db)
                     {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
@@ -1706,7 +1706,7 @@ impl<'db> CallableBinding<'db> {
                                 current_parameter_type,
                                 overload.inferable_typevars,
                             )
-                            .is_always_satisfied()
+                            .is_always_satisfied(db)
                         {
                             participating_parameter_indexes.insert(parameter_index);
                         }
@@ -1829,7 +1829,7 @@ impl<'db> CallableBinding<'db> {
                             first_overload_return_type,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied()
+                        .is_always_satisfied(db)
                 })
             } else {
                 // No matching overload
@@ -2704,7 +2704,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // building them in an earlier separate step.
             if argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-                .is_never_satisfied()
+                .is_never_satisfied(self.db)
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
@@ -2838,7 +2838,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     KnownClass::Str.to_instance(self.db),
                     self.inferable_typevars,
                 )
-                .is_always_satisfied()
+                .is_always_satisfied(self.db)
             {
                 self.errors.push(BindingError::InvalidKeyType {
                     argument_index: adjusted_argument_index,
