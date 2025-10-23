@@ -1,0 +1,135 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: function.md - Call expression - Wrong argument type - Diagnostics for union types where the union is not assignable
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/function.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Sized
+ 2 | 
+ 3 | class Foo: ...
+ 4 | class Bar: ...
+ 5 | class Baz: ...
+ 6 | 
+ 7 | def f(x: Sized): ...
+ 8 | def g(
+ 9 |     a: str | Foo,
+10 |     b: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo,
+11 |     c: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar,
+12 |     d: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar | Baz,
+13 | ):
+14 |     f(a)  # error: [invalid-argument-type]
+15 |     f(b)  # error: [invalid-argument-type]
+16 |     f(c)  # error: [invalid-argument-type]
+17 |     f(d)  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:14:7
+   |
+12 |     d: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar | Baz,
+13 | ):
+14 |     f(a)  # error: [invalid-argument-type]
+   |       ^ Expected `Sized`, found `str | Foo`
+15 |     f(b)  # error: [invalid-argument-type]
+16 |     f(c)  # error: [invalid-argument-type]
+   |
+info: Element `Foo` of this union is not assignable to `Sized`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | class Baz: ...
+6 |
+7 | def f(x: Sized): ...
+  |     ^ -------- Parameter declared here
+8 | def g(
+9 |     a: str | Foo,
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:7
+   |
+13 | ):
+14 |     f(a)  # error: [invalid-argument-type]
+15 |     f(b)  # error: [invalid-argument-type]
+   |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 5 union elements`
+16 |     f(c)  # error: [invalid-argument-type]
+17 |     f(d)  # error: [invalid-argument-type]
+   |
+info: Element `Foo` of this union is not assignable to `Sized`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | class Baz: ...
+6 |
+7 | def f(x: Sized): ...
+  |     ^ -------- Parameter declared here
+8 | def g(
+9 |     a: str | Foo,
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:16:7
+   |
+14 |     f(a)  # error: [invalid-argument-type]
+15 |     f(b)  # error: [invalid-argument-type]
+16 |     f(c)  # error: [invalid-argument-type]
+   |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 6 union elements`
+17 |     f(d)  # error: [invalid-argument-type]
+   |
+info: Union elements `Foo` and `Bar` are not assignable to `Sized`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | class Baz: ...
+6 |
+7 | def f(x: Sized): ...
+  |     ^ -------- Parameter declared here
+8 | def g(
+9 |     a: str | Foo,
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:17:7
+   |
+15 |     f(b)  # error: [invalid-argument-type]
+16 |     f(c)  # error: [invalid-argument-type]
+17 |     f(d)  # error: [invalid-argument-type]
+   |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 7 union elements`
+   |
+info: Union element `Foo`, and 2 more union elements, are not assignable to `Sized`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | class Baz: ...
+6 |
+7 | def f(x: Sized): ...
+  |     ^ -------- Parameter declared here
+8 | def g(
+9 |     a: str | Foo,
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
