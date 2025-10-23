@@ -17,6 +17,7 @@ use ruff_source_file::LineEnding;
 use super::stylist::{Indentation, Stylist};
 
 mod precedence {
+    pub(crate) const MIN: u8 = 0;
     pub(crate) const NAMED_EXPR: u8 = 1;
     pub(crate) const ASSIGN: u8 = 3;
     pub(crate) const ANN_ASSIGN: u8 = 5;
@@ -70,6 +71,8 @@ pub struct Generator<'a> {
     line_ending: LineEnding,
     /// Preferred quote style to use. For more info see [`Generator::with_preferred_quote`].
     preferred_quote: Option<Quote>,
+    /// Whether or not to force tuple parentheses. For more info see [`Generator::with_forced_tuple_parentheses`].
+    forced_tuple_parentheses: bool,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -82,6 +85,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
             preferred_quote: None,
+            forced_tuple_parentheses: false,
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -97,6 +101,7 @@ impl<'a> Generator<'a> {
             indent,
             line_ending,
             preferred_quote: None,
+            forced_tuple_parentheses: false,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
@@ -112,6 +117,18 @@ impl<'a> Generator<'a> {
     #[must_use]
     pub fn with_preferred_quote(mut self, quote: Option<Quote>) -> Self {
         self.preferred_quote = quote;
+        self
+    }
+
+    /// Sets whether tuple expressions should be enclosed in parentheses during unparsing.
+    ///
+    /// When set to true this forces tuple nodes to always include parentheses,
+    /// even in contexts where they might otherwise be optional (e.g., a single-element tuple).
+    ///
+    /// When set to false (the default), parentheses are emitted only when syntactically required.
+    #[must_use]
+    pub fn with_forced_tuple_parentheses(mut self, forced: bool) -> Self {
+        self.forced_tuple_parentheses = forced;
         self
     }
 
@@ -1303,7 +1320,13 @@ impl<'a> Generator<'a> {
                 if tuple.is_empty() {
                     self.p("()");
                 } else {
-                    group_if!(precedence::TUPLE, {
+                    let lvl = if self.forced_tuple_parentheses {
+                        precedence::MIN
+                    } else {
+                        precedence::TUPLE
+                    };
+
+                    group_if!(lvl, {
                         let mut first = true;
                         for item in tuple {
                             self.p_delim(&mut first, ", ");
@@ -1605,16 +1628,18 @@ mod tests {
     }
 
     /// Like [`round_trip`] but configure the [`Generator`] with the requested
-    /// `indentation`, `line_ending` and `preferred_quote` settings.
+    /// `indentation`, `line_ending`, `preferred_quote` and `forced_tuple_parentheses` settings.
     fn round_trip_with(
         indentation: &Indentation,
         line_ending: LineEnding,
         preferred_quote: Option<Quote>,
+        forced_tuple_parentheses: bool,
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator =
-            Generator::new(indentation, line_ending).with_preferred_quote(preferred_quote);
+        let mut generator = Generator::new(indentation, line_ending)
+            .with_preferred_quote(preferred_quote)
+            .with_forced_tuple_parentheses(forced_tuple_parentheses);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -2001,6 +2026,7 @@ if True:
                 &Indentation::new("    ".to_string()),
                 LineEnding::default(),
                 None,
+                false,
                 r"
 if True:
   pass
@@ -2019,6 +2045,7 @@ if True:
                 &Indentation::new("  ".to_string()),
                 LineEnding::default(),
                 None,
+                false,
                 r"
 if True:
   pass
@@ -2037,6 +2064,7 @@ if True:
                 &Indentation::new("\t".to_string()),
                 LineEnding::default(),
                 None,
+                false,
                 r"
 if True:
   pass
@@ -2059,6 +2087,7 @@ if True:
                 &Indentation::default(),
                 LineEnding::Lf,
                 None,
+                false,
                 "if True:\n    print(42)",
             ),
             "if True:\n    print(42)",
@@ -2069,6 +2098,7 @@ if True:
                 &Indentation::default(),
                 LineEnding::CrLf,
                 None,
+                false,
                 "if True:\n    print(42)",
             ),
             "if True:\r\n    print(42)",
@@ -2079,6 +2109,7 @@ if True:
                 &Indentation::default(),
                 LineEnding::Cr,
                 None,
+                false,
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",
@@ -2102,6 +2133,22 @@ if True:
             &Indentation::default(),
             LineEnding::default(),
             Some(quote),
+            false,
+            inp,
+        );
+        assert_eq!(got, out);
+    }
+
+    #[test_case::test_case("a,", "(a,)" ; "basic single")]
+    #[test_case::test_case("a, b", "(a, b)" ; "basic multi")]
+    #[test_case::test_case("x = a,", "x = (a,)" ; "basic assign single")]
+    #[test_case::test_case("x = a, b", "x = (a, b)" ; "basic assign multi")]
+    fn forced_tuple_parentheses(inp: &str, out: &str) {
+        let got = round_trip_with(
+            &Indentation::default(),
+            LineEnding::default(),
+            None,
+            true,
             inp,
         );
         assert_eq!(got, out);
