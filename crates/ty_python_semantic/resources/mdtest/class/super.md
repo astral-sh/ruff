@@ -66,7 +66,7 @@ synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`obje
 
 ```py
 import types
-from typing_extensions import Callable, TypeIs, Literal, TypedDict
+from typing_extensions import Callable, TypeIs, Literal, NewType, TypedDict
 
 def f(): ...
 
@@ -80,6 +80,8 @@ type Alias = int
 class SomeTypedDict(TypedDict):
     x: int
     y: bytes
+
+N = NewType("N", int)
 
 # revealed: <super: <class 'object'>, FunctionType>
 reveal_type(super(object, f))
@@ -95,6 +97,8 @@ reveal_type(super(object, Alias))
 reveal_type(super(object, Foo().method))
 # revealed: <super: <class 'object'>, property>
 reveal_type(super(object, Foo.some_property))
+# revealed: <super: <class 'object'>, int>
+reveal_type(super(object, N(42)))
 
 def g(x: object) -> TypeIs[list[object]]:
     return isinstance(x, list)

@@ -358,6 +358,14 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Return a `ClassType` representing the class `builtins.object`
+    pub(super) fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object
+            .to_class_literal(db)
+            .to_class_type(db)
+            .unwrap()
+    }
+
     pub(super) const fn is_generic(self) -> bool {
         matches!(self, Self::Generic(_))
     }
