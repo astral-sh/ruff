@@ -86,7 +86,6 @@ def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
 
 def is_singleton(ty: Any) -> bool:
     """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""
-    """
 
 def is_single_valued(ty: Any) -> bool:
     """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
