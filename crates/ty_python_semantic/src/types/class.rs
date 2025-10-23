@@ -19,7 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
+use crate::types::diagnostic::{INVALID_NEWTYPE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{
@@ -35,10 +35,10 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
-    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
-    infer_definition_types,
+    MaterializationKind, NewType, NewTypeBase, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
+    exceeds_max_specialization_depth, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -5298,6 +5298,70 @@ impl KnownClass {
                         containing_assignment,
                         value,
                     )),
+                )));
+            }
+
+            KnownClass::NewType => {
+                let assigned_to = index
+                    .try_expression(ast::ExprRef::from(call_expression))
+                    .and_then(|expr| expr.assigned_to(db));
+
+                dbg!();
+                let Some(target) = assigned_to.as_ref().and_then(|assigned_to| {
+                    match assigned_to.node(module).targets.as_slice() {
+                        [ast::Expr::Name(target)] => Some(target),
+                        _ => None,
+                    }
+                }) else {
+                    if let Some(builder) = context.report_lint(&INVALID_NEWTYPE, call_expression) {
+                        builder.into_diagnostic(
+                            "A `typing.NewType` must be immediately assigned to a variable",
+                        );
+                    }
+                    return;
+                };
+                let definition = index.expect_single_definition(target);
+
+                let [Some(name), Some(supertype), ..] = overload.parameter_types() else {
+                    return;
+                };
+
+                let Some(name) = name.as_string_literal() else {
+                    if let Some(builder) = context.report_lint(&INVALID_NEWTYPE, call_expression) {
+                        builder.into_diagnostic(
+                            "The name of a `typing.NewType` must be a string literal",
+                        );
+                    }
+                    return;
+                };
+
+                let newtype_base = match supertype {
+                    Type::ClassLiteral(class_literal) => {
+                        NewTypeBase::ClassType(class_literal.default_specialization(db))
+                    }
+                    Type::GenericAlias(alias) => NewTypeBase::ClassType(ClassType::Generic(*alias)),
+                    Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
+                        NewTypeBase::NewType(*newtype)
+                    }
+                    _ => {
+                        if let Some(builder) =
+                            context.report_lint(&INVALID_NEWTYPE, call_expression)
+                        {
+                            builder.into_diagnostic(
+                                "The second argument to `typing.NewType` must be a class or another `NewType`",
+                            );
+                        }
+                        return;
+                    }
+                };
+
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::NewType(
+                    NewType::new(
+                        db,
+                        ast::name::Name::new(name.value(db)),
+                        definition,
+                        newtype_base,
+                    ),
                 )));
             }
 
