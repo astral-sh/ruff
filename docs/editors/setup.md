@@ -469,36 +469,12 @@ You can configure Ruff to fix lint violations and/or organize imports on-save by
 {
   "languages": {
     "Python": {
-      "formatter": [
-        // Fix all auto-fixable lint violations
-        { "code_action": "source.fixAll.ruff" },
+      "code_actions_on_format": {
         // Organize imports
-        { "code_action": "source.organizeImports.ruff" }
-      ]
-    }
-  }
-}
-```
-
-Taken together, you can configure Ruff to format, fix, and organize imports on-save via the
-following `settings.json`:
-
-!!! note
-
-    For this configuration, it is important to use the correct order of the code action and
-    formatter language server settings. The code actions should be defined before the formatter to
-    ensure that the formatter takes care of any remaining style issues after the code actions have
-    been applied.
-
-```json
-{
-  "languages": {
-    "Python": {
-      "formatter": [
-        { "code_action": "source.fixAll.ruff" },
-        { "code_action": "source.organizeImports.ruff" },
-        { "language_server": { "name": "ruff" } }
-      ]
+        "source.organizeImports.ruff" = true,
+        // Fix all auto-fixable lint violations
+        "source.fixAll.ruff" = true
+      }
     }
   }
 }
