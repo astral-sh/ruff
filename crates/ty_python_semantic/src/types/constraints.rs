@@ -65,9 +65,7 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
-use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType,
-};
+use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -740,13 +738,13 @@ impl<'db> Node<'db> {
                     Type::TypeVar(rhs) if bound_typevar.can_be_bound_for(db, rhs) => rhs,
                     _ => bound_typevar,
                 };
-                let projected = self.project_typevar(db, constrained_typevar.identity(db));
+                let projected = self.project_typevar(db, constrained_typevar);
                 let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
                 projected.and(db, constraint).iff(db, projected)
             }
 
             (_, Type::TypeVar(bound_typevar)) => {
-                let projected = self.project_typevar(db, bound_typevar.identity(db));
+                let projected = self.project_typevar(db, bound_typevar);
                 let constraint =
                     ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
                 projected.and(db, constraint).iff(db, projected)
@@ -759,7 +757,7 @@ impl<'db> Node<'db> {
 
     /// Returns a new BDD that only includes constraints on the given typevar, and any other
     /// typevars that can be the lower or upper bound of that typevar.
-    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Self {
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
@@ -1183,11 +1181,11 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let if_true = self.if_true(db).project_typevar(db, typevar);
         let if_false = self.if_false(db).project_typevar(db, typevar);
-        if self_constraint.typevar(db).identity(db) > typevar {
+        if typevar.can_be_bound_for(db, self_constraint.typevar(db)) {
             if_true.or(db, if_false)
         } else {
             Node::new(db, self_constraint, if_true, if_false)
