@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: Starred expression cannot be used here
+ --> resources/test/fixtures/semantic_errors/invalid_star_expression.py:2:12
+  |
+1 | def func():
+2 |     return *x
+  |            ^^
+3 |
+4 | for *x in range(10):
+  |
+
+invalid-syntax: Starred expression cannot be used here
+ --> resources/test/fixtures/semantic_errors/invalid_star_expression.py:4:5
+  |
+2 |     return *x
+3 |
+4 | for *x in range(10):
+  |     ^^
+5 |     pass
+  |
+
+invalid-syntax: Starred expression cannot be used here
+ --> resources/test/fixtures/semantic_errors/invalid_star_expression.py:8:11
+  |
+7 | def func():
+8 |     yield *x
+  |           ^^
+  |
