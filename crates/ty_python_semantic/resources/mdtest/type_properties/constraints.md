@@ -602,6 +602,62 @@ def _[T, U]() -> None:
     reveal_type(~union | union)
 ```
 
+## Typevar ordering
+
+Constraints can relate two typevars — i.e., `S ≤ T`. We could encode that in one of two ways:
+`Never ≤ S ≤ T` or `S ≤ T ≤ object`. In other words, we can decide whether `S` or `T` is the typevar
+being constrained. The other is then the lower or upper bound of the constraint.
+
+To handle this, we enforce an arbitrary ordering on typevars, and always place the constraint on the
+"earlier" typevar. For the example above, that does not change how the constraint is displayed,
+since we always hide `Never` lower bounds and `object` upper bounds.
+
+```py
+from typing import Never
+from ty_extensions import range_constraint
+
+def f[S, T]():
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(Never, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(S, T, object))
+
+def f[T, S]():
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(Never, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(S, T, object))
+```
+
+Equivalence constraints are similar; internally we arbitrarily choose the "earlier" typevar to be
+the constraint, and the other the bound. But we display the result the same way no matter what.
+
+```py
+def f[S, T]():
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(T, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(S, T, S))
+
+def f[T, S]():
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(T, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(S, T, S))
+```
+
+But in the case of `S ≤ T ≤ U`, we end up with an ambiguity. Depending on the typevar ordering, that
+might display as `S ≤ T ≤ U`, or as `(S ≤ T) ∧ (T ≤ U)`.
+
+```py
+def f[S, T, U]():
+    # Could be either of:
+    #   ty_extensions.ConstraintSet[(S@f ≤ T@f ≤ U@f)]
+    #   ty_extensions.ConstraintSet[(S@f ≤ T@f) ∧ (T@f ≤ U@f)]
+    # reveal_type(range_constraint(S, T, U))
+    ...
+```
+
 ## Other simplifications
 
 ### Displaying constraint sets

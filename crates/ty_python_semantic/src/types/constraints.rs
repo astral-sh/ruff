@@ -64,7 +64,8 @@ use rustc_hash::FxHashSet;
 use salsa::plumbing::AsId;
 
 use crate::Db;
-use crate::types::{BoundTypeVarIdentity, IntersectionType, Type, UnionType};
+use crate::types::generics::InferableTypeVars;
+use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -175,6 +176,31 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+        relation: TypeRelation,
+    ) -> Self {
+        let (lower, upper) = match relation {
+            // TODO: Is this the correct constraint for redundancy?
+            TypeRelation::Subtyping | TypeRelation::Redundancy => (
+                lower.top_materialization(db),
+                upper.bottom_materialization(db),
+            ),
+            TypeRelation::Assignability => (
+                lower.bottom_materialization(db),
+                upper.top_materialization(db),
+            ),
+        };
+
+        Self {
+            node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
+        }
+    }
+
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self, _db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied()
@@ -183,6 +209,20 @@ impl<'db> ConstraintSet<'db> {
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db)
+    }
+
+    /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
+    /// constraints in this constraint set hold.
+    pub(crate) fn when_subtype_of_given(
+        self,
+        db: &'db dyn Db,
+        lhs: Type<'db>,
+        rhs: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> Self {
+        Self {
+            node: self.node.when_subtype_of_given(db, lhs, rhs, inferable),
+        }
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -227,20 +267,16 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        let lower = lower.bottom_materialization(db);
-        let upper = upper.top_materialization(db);
-        Self {
-            node: ConstrainedTypeVar::new_node(db, lower, typevar, upper),
-        }
+        Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
     }
 
     pub(crate) fn negated_range(
         db: &'db dyn Db,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         Self::range(db, lower, typevar, upper).negate(db)
@@ -257,11 +293,26 @@ impl From<bool> for ConstraintSet<'_> {
     }
 }
 
+impl<'db> BoundTypeVarInstance<'db> {
+    /// Returns whether this typevar can be the lower or upper bound of another typevar in a
+    /// constraint set.
+    ///
+    /// We enforce an (arbitrary) ordering on typevars, and ensure that the bounds of a constraint
+    /// are "later" according to that order than the typevar being constrained. Having an order
+    /// ensures that we can build up transitive relationships between constraints without incurring
+    /// any cycles. This particular ordering plays nicely with how we are ordering constraints
+    /// within a BDD — it means that if a typevar has another typevar as a bound, all of the
+    /// constraints that apply to the bound will appear lower in the BDD.
+    fn can_be_bound_for(self, db: &'db dyn Db, typevar: Self) -> bool {
+        self.identity(db) > typevar.identity(db)
+    }
+}
+
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarIdentity<'db>,
+    typevar: BoundTypeVarInstance<'db>,
     lower: Type<'db>,
     upper: Type<'db>,
 }
@@ -276,8 +327,8 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// Panics if `lower` and `upper` are not both fully static.
     fn new_node(
         db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
         upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
@@ -297,7 +348,69 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         let lower = lower.normalized(db);
         let upper = upper.normalized(db);
-        Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper))
+
+        // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
+        // typevars, we have to ensure that the bounds are "later" according to that order than the
+        // typevar being constrained.
+        //
+        // In the comments below, we use brackets to indicate which typevar is "earlier", and
+        // therefore the typevar that the constraint applies to.
+        match (lower, upper) {
+            // L ≤ T ≤ L == (T ≤ [L] ≤ T)
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
+                let (bound, typevar) = if lower.can_be_bound_for(db, typevar) {
+                    (lower, typevar)
+                } else {
+                    (typevar, lower)
+                };
+                Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(
+                        db,
+                        typevar,
+                        Type::TypeVar(bound),
+                        Type::TypeVar(bound),
+                    ),
+                )
+            }
+
+            // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
+            (Type::TypeVar(lower), Type::TypeVar(upper))
+                if typevar.can_be_bound_for(db, lower) && typevar.can_be_bound_for(db, upper) =>
+            {
+                let lower = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
+                );
+                let upper = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
+                );
+                lower.and(db, upper)
+            }
+
+            // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
+            (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, lower) => {
+                let lower = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
+                );
+                let upper = Self::new_node(db, typevar, Type::Never, upper);
+                lower.and(db, upper)
+            }
+
+            // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
+            (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, upper) => {
+                let lower = Self::new_node(db, typevar, lower, Type::object());
+                let upper = Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
+                );
+                lower.and(db, upper)
+            }
+
+            _ => Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper)),
+        }
     }
 
     fn when_true(self) -> ConstraintAssignment<'db> {
@@ -306,14 +419,6 @@ impl<'db> ConstrainedTypeVar<'db> {
 
     fn when_false(self) -> ConstraintAssignment<'db> {
         ConstraintAssignment::Negative(self)
-    }
-
-    fn contains(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db) != other.typevar(db) {
-            return false;
-        }
-        self.lower(db).is_subtype_of(db, other.lower(db))
-            && other.upper(db).is_subtype_of(db, self.upper(db))
     }
 
     /// Defines the ordering of the variables in a constraint set BDD.
@@ -329,16 +434,20 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (self.typevar(db), self.as_id())
+        (self.typevar(db).identity(db), self.as_id())
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
     /// satisfies this constraint also satisfies `other`.
     ///
-    /// This is used (among other places) to simplify how we display constraint sets, by removing
-    /// redundant constraints from a clause.
+    /// This is used to simplify how we display constraint sets, by removing redundant constraints
+    /// from a clause.
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
-        other.contains(db, self)
+        if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
+            return false;
+        }
+        other.lower(db).is_subtype_of(db, self.lower(db))
+            && self.upper(db).is_subtype_of(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -376,11 +485,32 @@ impl<'db> ConstrainedTypeVar<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let lower = self.constraint.lower(self.db);
                 let upper = self.constraint.upper(self.db);
+                let typevar = self.constraint.typevar(self.db);
                 if lower.is_equivalent_to(self.db, upper) {
+                    // If this typevar is equivalent to another, output the constraint in a
+                    // consistent alphabetical order, regardless of the salsa ordering that we are
+                    // using the in BDD.
+                    if let Type::TypeVar(bound) = lower {
+                        let bound = bound.identity(self.db).display(self.db).to_string();
+                        let typevar = typevar.identity(self.db).display(self.db).to_string();
+                        let (smaller, larger) = if bound < typevar {
+                            (bound, typevar)
+                        } else {
+                            (typevar, bound)
+                        };
+                        return write!(
+                            f,
+                            "({} {} {})",
+                            smaller,
+                            if self.negated { "≠" } else { "=" },
+                            larger,
+                        );
+                    }
+
                     return write!(
                         f,
                         "({} {} {})",
-                        self.constraint.typevar(self.db).display(self.db),
+                        typevar.identity(self.db).display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
                     );
@@ -393,7 +523,7 @@ impl<'db> ConstrainedTypeVar<'db> {
                 if !lower.is_never() {
                     write!(f, "{} ≤ ", lower.display(self.db))?;
                 }
-                self.constraint.typevar(self.db).display(self.db).fmt(f)?;
+                typevar.identity(self.db).display(self.db).fmt(f)?;
                 if !upper.is_object() {
                     write!(f, " ≤ {}", upper.display(self.db))?;
                 }
@@ -586,6 +716,53 @@ impl<'db> Node<'db> {
     fn ite(self, db: &'db dyn Db, then_node: Self, else_node: Self) -> Self {
         self.and(db, then_node)
             .or(db, self.negate(db).and(db, else_node))
+    }
+
+    fn when_subtype_of_given(
+        self,
+        db: &'db dyn Db,
+        lhs: Type<'db>,
+        rhs: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> Self {
+        match (lhs, rhs) {
+            // When checking subtyping involving a typevar, we project the BDD so that it only
+            // contains that typevar, and any other typevars that could be its upper/lower bound.
+            // (That is, other typevars that are "later" in our arbitrary ordering of typevars.)
+            //
+            // Having done that, we can turn the subtyping check into a constraint (i.e, "is `T` a
+            // subtype of `int` becomes the constraint `T ≤ int`), and then check when the BDD
+            // implies that constraint.
+            (Type::TypeVar(bound_typevar), _) => {
+                let constrained_typevar = match rhs {
+                    Type::TypeVar(rhs) if bound_typevar.can_be_bound_for(db, rhs) => rhs,
+                    _ => bound_typevar,
+                };
+                let projected = self.project_typevar(db, constrained_typevar);
+                let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
+                projected.and(db, constraint).iff(db, projected)
+            }
+
+            (_, Type::TypeVar(bound_typevar)) => {
+                let projected = self.project_typevar(db, bound_typevar);
+                let constraint =
+                    ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
+                projected.and(db, constraint).iff(db, projected)
+            }
+
+            // If neither type is a typevar, then we fall back on a normal subtyping check.
+            _ => lhs.when_subtype_of(db, rhs, inferable).node,
+        }
+    }
+
+    /// Returns a new BDD that only includes constraints on the given typevar, and any other
+    /// typevars that can be the lower or upper bound of that typevar.
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.project_typevar(db, typevar),
+        }
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
@@ -1004,6 +1181,18 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        let if_true = self.if_true(db).project_typevar(db, typevar);
+        let if_false = self.if_false(db).project_typevar(db, typevar);
+        if typevar.can_be_bound_for(db, self_constraint.typevar(db)) {
+            if_true.or(db, if_false)
+        } else {
+            Node::new(db, self_constraint, if_true, if_false)
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
         db: &'db dyn Db,
@@ -1079,10 +1268,10 @@ impl<'db> InteriorNode<'db> {
 
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.
-            let larger_smaller = if left_constraint.contains(db, right_constraint) {
-                Some((left_constraint, right_constraint))
-            } else if right_constraint.contains(db, left_constraint) {
+            let larger_smaller = if left_constraint.implies(db, right_constraint) {
                 Some((right_constraint, left_constraint))
+            } else if right_constraint.implies(db, left_constraint) {
+                Some((left_constraint, right_constraint))
             } else {
                 None
             };
@@ -1313,8 +1502,8 @@ impl<'db> ConstraintAssignment<'db> {
     /// Returns whether this constraint implies another — i.e., whether every type that
     /// satisfies this constraint also satisfies `other`.
     ///
-    /// This is used (among other places) to simplify how we display constraint sets, by removing
-    /// redundant constraints from a clause.
+    /// This is used to simplify how we display constraint sets, by removing redundant constraints
+    /// from a clause.
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
         match (self, other) {
             // For two positive constraints, one range has to fully contain the other; the smaller
@@ -1641,10 +1830,10 @@ mod tests {
         let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
-        let t_str = ConstraintSet::range(&db, str_type, t.identity(&db), str_type);
-        let t_bool = ConstraintSet::range(&db, bool_type, t.identity(&db), bool_type);
-        let u_str = ConstraintSet::range(&db, str_type, u.identity(&db), str_type);
-        let u_bool = ConstraintSet::range(&db, bool_type, u.identity(&db), bool_type);
+        let t_str = ConstraintSet::range(&db, str_type, t, str_type);
+        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
+        let u_str = ConstraintSet::range(&db, str_type, u, str_type);
+        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
         let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);

@@ -1299,6 +1299,8 @@ pub enum KnownFunction {
     IsEquivalentTo,
     /// `ty_extensions.is_subtype_of`
     IsSubtypeOf,
+    /// `ty_extensions.is_subtype_of_given`
+    IsSubtypeOfGiven,
     /// `ty_extensions.is_assignable_to`
     IsAssignableTo,
     /// `ty_extensions.is_disjoint_from`
@@ -1389,6 +1391,7 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
+            | Self::IsSubtypeOfGiven
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
@@ -1701,7 +1704,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
+                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1714,8 +1717,7 @@ impl KnownFunction {
                     return;
                 };
 
-                let constraints =
-                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
+                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1810,6 +1812,7 @@ pub(crate) mod tests {
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
+                | KnownFunction::IsSubtypeOfGiven
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers

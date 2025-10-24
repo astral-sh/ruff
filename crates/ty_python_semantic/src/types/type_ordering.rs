@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use salsa::plumbing::AsId;
+
 use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
@@ -137,7 +139,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.as_id().cmp(&right.as_id()),
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
 
