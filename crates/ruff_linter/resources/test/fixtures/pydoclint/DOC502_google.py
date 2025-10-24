@@ -81,3 +81,55 @@ def calculate_speed(distance: float, time: float) -> float:
     except TypeError:
         print("Not a number? Shame on you!")
         raise
+
+
+# This should NOT trigger DOC502 because OSError is explicitly re-raised
+def f():
+    """Do nothing.
+
+    Raises:
+        OSError: If the OS errors.
+    """
+    try:
+        pass
+    except OSError as e:
+        raise e
+
+
+# This should NOT trigger DOC502 because OSError is explicitly re-raised with from None
+def g():
+    """Do nothing.
+
+    Raises:
+        OSError: If the OS errors.
+    """
+    try:
+        pass
+    except OSError as e:
+        raise e from None
+
+
+# This should NOT trigger DOC502 because ValueError is explicitly re-raised from tuple exception
+def h():
+    """Do nothing.
+
+    Raises:
+        ValueError: If something goes wrong.
+    """
+    try:
+        pass
+    except (ValueError, TypeError) as e:
+        raise e
+
+
+# This should NOT trigger DOC502 because TypeError is explicitly re-raised from tuple exception
+def i():
+    """Do nothing.
+
+    Raises:
+        TypeError: If something goes wrong.
+    """
+    try:
+        pass
+    except (ValueError, TypeError) as e:
+        raise e
