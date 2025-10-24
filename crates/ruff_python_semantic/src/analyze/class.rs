@@ -325,106 +325,81 @@ impl IsMetaclass {
 /// 3. Third parameter annotated with a `tuple` type
 /// 4. Fourth parameter annotated with a `dict` type
 /// 5. Fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
 fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     // Look for a __new__ method in the class body
     for stmt in &class_def.body {
-        if let ast::Stmt::FunctionDef(func_def) = stmt {
-            if func_def.name.as_str() == "__new__" {
-                let parameters = &func_def.parameters;
+        let ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+            name, parameters, ..
+        }) = stmt
+        else {
+            continue;
+        };
 
-                // Check if we have exactly 5 parameters (cls + 4 others)
-                // Note: **kwargs is not counted in args, it's a separate field
-                let total_params = parameters.posonlyargs.len()
-                    + parameters.args.len()
-                    + parameters.kwonlyargs.len()
-                    + usize::from(parameters.kwarg.is_some());
-
-                if total_params != 5 {
-                    continue;
-                }
-
-                // Check if the last parameter is keyword-variadic
-                if parameters.kwarg.is_none() {
-                    continue;
-                }
-
-                // Check parameter annotations
-                let mut param_iter = parameters.args.iter();
-
-                // Skip the first parameter (cls)
-                if param_iter.next().is_none() {
-                    continue;
-                }
-
-                // Check second parameter (name: str)
-                let second_param = param_iter.next();
-                if !second_param
-                    .and_then(|param| param.annotation())
-                    .map(|annotation| is_str_annotation(annotation, semantic))
-                    .unwrap_or(false)
-                {
-                    continue;
-                }
-
-                // Check third parameter (bases: tuple[...])
-                let third_param = param_iter.next();
-                if !third_param
-                    .and_then(|param| param.annotation())
-                    .map(|annotation| is_tuple_annotation(annotation, semantic))
-                    .unwrap_or(false)
-                {
-                    continue;
-                }
-
-                // Check fourth parameter (attrs: dict[...])
-                let fourth_param = param_iter.next();
-                if !fourth_param
-                    .and_then(|param| param.annotation())
-                    .map(|annotation| is_dict_annotation(annotation, semantic))
-                    .unwrap_or(false)
-                {
-                    continue;
-                }
-
-                return true;
-            }
+        if name != "__new__" {
+            continue;
         }
+
+        // Check if we have exactly 5 parameters (cls + 4 others)
+        if parameters.len() != 5 {
+            continue;
+        }
+
+        // Check that there is no variadic parameter
+        if parameters.vararg.is_some() {
+            continue;
+        }
+
+        // Check that the last parameter is keyword-variadic (**kwargs)
+        if parameters.kwarg.is_none() {
+            continue;
+        }
+
+        // Check parameter annotations, skipping the first parameter (cls)
+        let mut param_iter = parameters.iter().skip(1);
+
+        // Check second parameter (name: str)
+        let Some(second_param) = param_iter.next() else {
+            continue;
+        };
+        if !second_param
+            .annotation()
+            .is_some_and(|annotation| semantic.match_builtin_expr(map_subscript(annotation), "str"))
+        {
+            continue;
+        }
+
+        // Check third parameter (bases: tuple[...])
+        let Some(third_param) = param_iter.next() else {
+            continue;
+        };
+        if !third_param.annotation().is_some_and(|annotation| {
+            semantic.match_builtin_expr(map_subscript(annotation), "tuple")
+        }) {
+            continue;
+        }
+
+        // Check fourth parameter (attrs: dict[...])
+        let Some(fourth_param) = param_iter.next() else {
+            continue;
+        };
+        if !fourth_param.annotation().is_some_and(|annotation| {
+            semantic.match_builtin_expr(map_subscript(annotation), "dict")
+        }) {
+            continue;
+        }
+
+        return true;
     }
 
     false
-}
-
-/// Check if an annotation is a `str` type
-fn is_str_annotation(annotation: &ast::Expr, semantic: &SemanticModel) -> bool {
-    match annotation {
-        ast::Expr::Name(name) => name.id.as_str() == "str",
-        ast::Expr::Attribute(_) => semantic.match_builtin_expr(annotation, "str"),
-        _ => false,
-    }
-}
-
-/// Check if an annotation is a `tuple` type
-fn is_tuple_annotation(annotation: &ast::Expr, semantic: &SemanticModel) -> bool {
-    match annotation {
-        ast::Expr::Name(name) => name.id.as_str() == "tuple",
-        ast::Expr::Subscript(subscript) => {
-            semantic.match_builtin_expr(subscript.value.as_ref(), "tuple")
-        }
-        ast::Expr::Attribute(_) => semantic.match_builtin_expr(annotation, "tuple"),
-        _ => false,
-    }
-}
-
-/// Check if an annotation is a `dict` type
-fn is_dict_annotation(annotation: &ast::Expr, semantic: &SemanticModel) -> bool {
-    match annotation {
-        ast::Expr::Name(name) => name.id.as_str() == "dict",
-        ast::Expr::Subscript(subscript) => {
-            semantic.match_builtin_expr(subscript.value.as_ref(), "dict")
-        }
-        ast::Expr::Attribute(_) => semantic.match_builtin_expr(annotation, "dict"),
-        _ => false,
-    }
 }
 
 /// Returns `IsMetaclass::Yes` if the given class is definitely a metaclass,
@@ -456,14 +431,20 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
             }),
     });
 
-    // Check if the class has a metaclass-like __new__ method signature
-    let has_metaclass_new_signature = has_metaclass_new_signature(class_def, semantic);
-
-    match (is_base_class, maybe, has_metaclass_new_signature) {
-        (true, true, _) => IsMetaclass::Maybe,
-        (true, false, _) => IsMetaclass::Yes,
-        (false, _, true) => IsMetaclass::Maybe,
-        (false, _, false) => IsMetaclass::No,
+    match (is_base_class, maybe) {
+        (true, true) => IsMetaclass::Maybe,
+        (true, false) => IsMetaclass::Yes,
+        (false, _) => {
+            // If it has >1 base class and a metaclass-like signature for `__new__`,
+            // then it might be a metaclass.
+            if class_def.bases().is_empty() {
+                IsMetaclass::No
+            } else if has_metaclass_new_signature(class_def, semantic) {
+                IsMetaclass::Maybe
+            } else {
+                IsMetaclass::No
+            }
+        }
     }
 }
 

@@ -259,3 +259,21 @@ class MetaclassInWhichSelfCannotBeUsed5(type(Protocol)):
     def __new__(
         cls, name: str, bases: tuple[type[Any], ...], attrs: dict[str, Any], **kwargs: Any
     ) -> MetaclassInWhichSelfCannotBeUsed5: ...
+
+
+import django.db.models.base
+
+
+class MetaclassInWhichSelfCannotBeUsed6(django.db.models.base.ModelBase):
+    def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> "MyMetaclass":
+        ...
+
+
+class MetaclassInWhichSelfCannotBeUsed7(django.db.models.base.ModelBase):
+    def __new__(cls, /, name: str, bases: tuple[object, ...], attrs: dict[str, object], **kwds: object) -> "MyMetaclass":
+        ...
+
+
+class MetaclassInWhichSelfCannotBeUsed8(django.db.models.base.ModelBase):
+    def __new__(cls, name: builtins.str, bases: tuple, attributes: dict, /, **kw) -> "MyMetaclass":
+        ...
