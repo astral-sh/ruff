@@ -24,17 +24,15 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::message::create_syntax_error_diagnostic;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
-use crate::preview::is_py314_support_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
 
@@ -442,14 +440,6 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
-        && !is_py314_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
-        );
-    }
-
     let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
@@ -505,15 +495,15 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| {
-            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error)
+            Diagnostic::invalid_syntax(source_file.clone(), syntax_error, syntax_error)
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| create_syntax_error_diagnostic(source_file.clone(), error, error)),
+                .map(|error| Diagnostic::invalid_syntax(source_file.clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             if let Some(range) = diagnostic.range() {
@@ -550,14 +540,6 @@ pub fn lint_fix<'a>(
     let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
-
-    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
-        && !is_py314_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
-        );
-    }
 
     // Continuously fix until the source code stabilizes.
     loop {
@@ -1057,6 +1039,42 @@ mod tests {
         ",
         PythonVersion::PY310,
         "DuplicateMatchKey"
+    )]
+    #[test_case(
+        "global_parameter",
+        "
+        def f(a):
+            global a
+
+        def g(a):
+            if True:
+                global a 
+
+        def h(a):
+            def inner():
+                global a 
+
+        def i(a):
+            try:
+                global a 
+            except Exception:
+                pass
+
+        def f(a):
+            a = 1
+            global a
+        
+        def f(a):
+            a = 1
+            a = 2
+            global a
+        
+        def f(a):
+            class Inner:
+                global a   # ok
+        ",
+        PythonVersion::PY310,
+        "GlobalParameter"
     )]
     #[test_case(
         "duplicate_match_class_attribute",

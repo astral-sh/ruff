@@ -86,7 +86,7 @@ class B:
     reveal_type(a.x)  # revealed: Literal["a"]
 
 def f():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
 
@@ -96,7 +96,7 @@ class C:
     reveal_type(a.x)  # revealed: str | None
 
 def g():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: str | None
 
@@ -109,7 +109,7 @@ class D:
     reveal_type(a.x)  # revealed: Literal["a"]
 
 def h():
-    reveal_type(a.x)  # revealed: Unknown | str | None
+    reveal_type(a.x)  # revealed: str | None
 
 # TODO: should be `str | None`
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
@@ -190,7 +190,7 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
@@ -206,7 +206,7 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
@@ -310,13 +310,13 @@ no longer valid in the inner lazy scope.
 def f(l: list[str | None]):
     if l[0] is not None:
         def _():
-            reveal_type(l[0])  # revealed: str | None | Unknown
+            reveal_type(l[0])  # revealed: str | None
         l = [None]
 
 def f(l: list[str | None]):
     l[0] = "a"
     def _():
-        reveal_type(l[0])  # revealed: str | None | Unknown
+        reveal_type(l[0])  # revealed: str | None
     l = [None]
 
 def f(l: list[str | None]):
@@ -382,12 +382,12 @@ def f():
     if a.x is not None:
         def _():
             # Lazy nested scope narrowing is not performed on attributes/subscripts because it's difficult to track their changes.
-            reveal_type(a.x)  # revealed: Unknown | str | None
+            reveal_type(a.x)  # revealed: str | None
 
         class D:
-            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
+            reveal_type(a.x)  # revealed: str
 
-        [reveal_type(a.x) for _ in range(1)]  # revealed: (Unknown & ~None) | str
+        [reveal_type(a.x) for _ in range(1)]  # revealed: str
 
     if l[0] is not None:
         def _():
@@ -473,11 +473,11 @@ def f():
         if a.x is not None:
             def _():
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1]) | str | None
+                    reveal_type(a.x)  # revealed: str | None
 
             class D:
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1] & ~None) | str
+                    reveal_type(a.x)  # revealed: str
 
         if l[0] is not None:
             def _():

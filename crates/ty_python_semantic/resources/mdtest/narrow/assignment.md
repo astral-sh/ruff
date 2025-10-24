@@ -34,7 +34,7 @@ class _:
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
-    reveal_type(a.x)  # revealed: Unknown | int | None
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
@@ -75,7 +75,7 @@ class _:
 
     if cond():
         a = A()
-    reveal_type(a.x)  # revealed: int | None | Unknown
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
@@ -206,8 +206,7 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-# TODO: should be ChainMap[int, int]
-reveal_type(cm)  # revealed: ChainMap[@Todo(dict literal key type), @Todo(dict literal value type)]
+reveal_type(cm)  # revealed: ChainMap[Unknown | int, Unknown | int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
@@ -296,10 +295,10 @@ class C:
 
 def _():
     # error: [possibly-missing-attribute]
-    reveal_type(b.a.x[0])  # revealed: Unknown | int | None
+    reveal_type(b.a.x[0])  # revealed: int | None
     # error: [possibly-missing-attribute]
-    reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
-    reveal_type(b.a)  # revealed: Unknown | A | None
+    reveal_type(b.a.x)  # revealed: list[int | None]
+    reveal_type(b.a)  # revealed: A | None
 ```
 
 ## Invalid assignments are not used for narrowing

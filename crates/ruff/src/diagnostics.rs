@@ -13,7 +13,6 @@ use log::{debug, warn};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
-use ruff_linter::message::create_syntax_error_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -103,11 +102,7 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![create_syntax_error_diagnostic(
-                        dummy,
-                        err,
-                        TextRange::default(),
-                    )],
+                    vec![Diagnostic::invalid_syntax(dummy, err, TextRange::default())],
                     FxHashMap::default(),
                 )
             }

@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::tuple::{Tuple, TupleLength, TupleType};
+use crate::types::tuple::{Tuple, TupleType};
 
 use super::Type;
 
@@ -17,7 +17,7 @@ pub(crate) enum Argument<'a> {
     /// A positional argument.
     Positional,
     /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
-    Variadic(TupleLength),
+    Variadic,
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
@@ -41,7 +41,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
-        db: &'db dyn Db,
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
     ) -> Self {
@@ -51,11 +50,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(Some(arg), value);
-                        let length = ty
-                            .try_iterate(db)
-                            .map(|tuple| tuple.len())
-                            .unwrap_or(TupleLength::unknown());
-                        (Argument::Variadic(length), Some(ty))
+                        (Argument::Variadic, Some(ty))
                     }
                     _ => (Argument::Positional, None),
                 },
@@ -203,25 +198,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     for subtype in &expanded_types {
                         let mut new_expanded_types = pre_expanded_types.to_vec();
                         new_expanded_types[index] = Some(*subtype);
-
-                        // Update the arguments list to handle variadic argument expansion
-                        let mut new_arguments = self.arguments.clone();
-                        if let Argument::Variadic(_) = self.arguments[index] {
-                            // If the argument corresponding to this type is variadic, we need to
-                            // update the tuple length because expanding could change the length.
-                            // For example, in `tuple[int] | tuple[int, int]`, the length of the
-                            // first type is 1, while the length of the second type is 2.
-                            if let Some(expanded_type) = new_expanded_types[index] {
-                                let length = expanded_type
-                                    .try_iterate(db)
-                                    .map(|tuple| tuple.len())
-                                    .unwrap_or(TupleLength::unknown());
-                                new_arguments[index] = Argument::Variadic(length);
-                            }
-                        }
-
-                        expanded_arguments
-                            .push(CallArguments::new(new_arguments, new_expanded_types));
+                        expanded_arguments.push(CallArguments::new(
+                            self.arguments.clone(),
+                            new_expanded_types,
+                        ));
                     }
                 }
 

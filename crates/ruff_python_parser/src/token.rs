@@ -486,7 +486,7 @@ impl TokenKind {
     ///
     /// [`as_unary_operator`]: TokenKind::as_unary_operator
     #[inline]
-    pub(crate) const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
+    pub const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
         Some(match self {
             TokenKind::Plus => UnaryOp::UAdd,
             TokenKind::Minus => UnaryOp::USub,
@@ -501,7 +501,7 @@ impl TokenKind {
     ///
     /// [`as_unary_arithmetic_operator`]: TokenKind::as_unary_arithmetic_operator
     #[inline]
-    pub(crate) const fn as_unary_operator(self) -> Option<UnaryOp> {
+    pub const fn as_unary_operator(self) -> Option<UnaryOp> {
         Some(match self {
             TokenKind::Plus => UnaryOp::UAdd,
             TokenKind::Minus => UnaryOp::USub,
@@ -514,7 +514,7 @@ impl TokenKind {
     /// Returns the [`BoolOp`] that corresponds to this token kind, if it is a boolean operator,
     /// otherwise return [None].
     #[inline]
-    pub(crate) const fn as_bool_operator(self) -> Option<BoolOp> {
+    pub const fn as_bool_operator(self) -> Option<BoolOp> {
         Some(match self {
             TokenKind::And => BoolOp::And,
             TokenKind::Or => BoolOp::Or,
@@ -528,7 +528,7 @@ impl TokenKind {
     /// Use [`as_augmented_assign_operator`] to match against an augmented assignment token.
     ///
     /// [`as_augmented_assign_operator`]: TokenKind::as_augmented_assign_operator
-    pub(crate) const fn as_binary_operator(self) -> Option<Operator> {
+    pub const fn as_binary_operator(self) -> Option<Operator> {
         Some(match self {
             TokenKind::Plus => Operator::Add,
             TokenKind::Minus => Operator::Sub,
@@ -550,7 +550,7 @@ impl TokenKind {
     /// Returns the [`Operator`] that corresponds to this token kind, if it is
     /// an augmented assignment operator, or [`None`] otherwise.
     #[inline]
-    pub(crate) const fn as_augmented_assign_operator(self) -> Option<Operator> {
+    pub const fn as_augmented_assign_operator(self) -> Option<Operator> {
         Some(match self {
             TokenKind::PlusEqual => Operator::Add,
             TokenKind::MinusEqual => Operator::Sub,
@@ -729,7 +729,7 @@ impl fmt::Display for TokenKind {
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct TokenFlags: u8 {
+    pub(crate) struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
         const DOUBLE_QUOTES = 1 << 0;
         /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
@@ -748,9 +748,12 @@ bitflags! {
         const RAW_STRING_LOWERCASE = 1 << 6;
         /// The token is a raw string and the prefix character is in uppercase.
         const RAW_STRING_UPPERCASE = 1 << 7;
+        /// String without matching closing quote(s)
+        const UNCLOSED_STRING = 1 << 8;
 
         /// The token is a raw string i.e., prefixed with `r` or `R`
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
+
     }
 }
 
@@ -807,6 +810,10 @@ impl StringFlags for TokenFlags {
         } else {
             AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
         }
+    }
+
+    fn is_unclosed(self) -> bool {
+        self.intersects(TokenFlags::UNCLOSED_STRING)
     }
 }
 

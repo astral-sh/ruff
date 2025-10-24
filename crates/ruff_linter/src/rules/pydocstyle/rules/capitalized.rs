@@ -30,6 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.69")]
 pub(crate) struct FirstWordUncapitalized {
     first_word: String,
     capitalized_word: String,

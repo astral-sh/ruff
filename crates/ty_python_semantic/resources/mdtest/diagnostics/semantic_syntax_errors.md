@@ -355,3 +355,25 @@ def f():
     x = 1
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
+
+## `break` and `continue` outside a loop
+
+<!-- snapshot-diagnostics -->
+
+```py
+break  # error: [invalid-syntax]
+continue  # error: [invalid-syntax]
+
+for x in range(42):
+    break  # fine
+    continue  # fine
+
+    def _():
+        break  # error: [invalid-syntax]
+        continue  # error: [invalid-syntax]
+
+    class Fine:
+        # this is invalid syntax despite it being in an eager-nested scope!
+        break  # error: [invalid-syntax]
+        continue  # error: [invalid-syntax]
+```

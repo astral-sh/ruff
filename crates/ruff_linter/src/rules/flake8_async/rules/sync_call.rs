@@ -38,6 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as adding an `await` to a function
 /// call changes its semantics and runtime behavior.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct TrioSyncCall {
     method_name: MethodName,
 }

@@ -19,6 +19,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-nested-blocks`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.15")]
 pub(crate) struct TooManyNestedBlocks {
     nested_blocks: usize,
     max_nested_blocks: usize,

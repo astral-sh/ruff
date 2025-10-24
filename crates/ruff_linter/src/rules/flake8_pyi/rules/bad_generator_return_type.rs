@@ -59,6 +59,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// unsafe for any `__iter__` or `__aiter__` method in a `.py` file that has
 /// more than two statements (including docstrings) in its body.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct GeneratorReturnFromIterMethod {
     return_type: Iterator,
     method: Method,

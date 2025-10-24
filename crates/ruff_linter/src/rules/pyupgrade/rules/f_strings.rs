@@ -6,7 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -40,6 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.224")]
 pub(crate) struct FString;
 
 impl Violation for FString {
@@ -145,7 +146,6 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             Expr::BinOp(_)
             | Expr::UnaryOp(_)
             | Expr::BoolOp(_)
-            | Expr::Named(_)
             | Expr::Compare(_)
             | Expr::If(_)
             | Expr::Lambda(_)
@@ -161,12 +161,17 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
                 value: ast::Number::Int(..),
                 ..
             }),
-        ) => text.chars().all(|c| c.is_ascii_digit()),
+        ) => text
+            .chars()
+            // Ignore digit separators so decimal literals like `1_2` still count as pure digits.
+            .filter(|c| *c != '_')
+            .all(|c| c.is_ascii_digit()),
         // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
         (
             _,
             Expr::Generator(_)
             | Expr::Dict(_)
+            | Expr::Named(_)
             | Expr::Set(_)
             | Expr::SetComp(_)
             | Expr::DictComp(_),
@@ -430,7 +435,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 // dot is the start of an attribute access.
                 break token.start();
             }
-            TokenKind::String => {
+            TokenKind::String if !token.unwrap_string_flags().is_unclosed() => {
                 match FStringConversion::try_convert(token.range(), &mut summary, checker.locator())
                 {
                     // If the format string contains side effects that would need to be repeated,

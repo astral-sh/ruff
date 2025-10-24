@@ -28,14 +28,8 @@ UP037 [*] Remove quotes from type annotation
    |    ^^^^^^^^^^^^^^^^^
    |
 help: Remove quotes
-1  + from __future__ import annotations
-2  | from typing import TYPE_CHECKING
-3  | 
-4  | if TYPE_CHECKING:
---------------------------------------------------------------------------------
+11 | 
 12 | 
-13 | 
-14 | # OK
+13 | # OK
    - X: "Tuple[int, int]" = (0, 0)
-15 + X: Tuple[int, int] = (0, 0)
-note: This is an unsafe fix and may change runtime behavior
+14 + X: Tuple[int, int] = (0, 0)

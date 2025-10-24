@@ -952,8 +952,50 @@ fn rule_f401() {
 }
 
 #[test]
+fn rule_f401_output_json() {
+    insta::with_settings!({filters => vec![
+        (r#"("file": ")[^"]+(",)"#, "$1<FILE>$2"),
+    ]}, {
+        assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "json"]));
+    });
+}
+
+#[test]
+fn rule_f401_output_text() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "text"]));
+}
+
+#[test]
 fn rule_invalid_rule_name() {
     assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]'
+
+    For more information, try '--help'.
+    ");
+}
+
+#[test]
+fn rule_invalid_rule_name_output_json() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "json"]), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]'
+
+    For more information, try '--help'.
+    ");
+}
+
+#[test]
+fn rule_invalid_rule_name_output_text() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "text"]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1686,6 +1728,27 @@ fn check_input_from_argfile() -> Result<()> {
     });
 
     Ok(())
+}
+
+#[test]
+// Regression test for https://github.com/astral-sh/ruff/issues/20655
+fn missing_argfile_reports_error() {
+    let mut cmd = RuffCheck::default().filename("@!.txt").build();
+    insta::with_settings!({filters => vec![
+        ("The system cannot find the file specified.", "No such file or directory")
+    ]}, {
+        assert_cmd_snapshot!(cmd, @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to read CLI arguments from files
+      Cause: failed to open file `!.txt`
+      Cause: No such file or directory (os error 2)
+    ");
+    });
 }
 
 #[test]

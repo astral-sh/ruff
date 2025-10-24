@@ -1165,10 +1165,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
-        // We only handle assignments to names and unpackings here, other targets like
-        // attribute and subscript are handled separately as they don't create a new
-        // definition.
-
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
@@ -1628,10 +1624,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 self.visit_expr(&node.value);
-                let value = self.add_standalone_assigned_expression(&node.value, node);
 
-                for target in &node.targets {
-                    self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
+                // Optimization for the common case: if there's just one target, and it's not an
+                // unpacking, and the target is a simple name, we don't need the RHS to be a
+                // standalone expression at all.
+                if let [target] = &node.targets[..]
+                    && target.is_name_expr()
+                {
+                    self.push_assignment(CurrentAssignment::Assign { node, unpack: None });
+                    self.visit_expr(target);
+                    self.pop_assignment();
+                } else {
+                    let value = self.add_standalone_assigned_expression(&node.value, node);
+
+                    for target in &node.targets {
+                        self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
+                    }
                 }
             }
             ast::Stmt::AnnAssign(node) => {
@@ -2272,7 +2280,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
                 //
                 // We also only add these inside function scopes, since considering module-level
-                // constraints can affect the the type of imported symbols, leading to a lot more
+                // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
                 if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                     if !self.source_type.is_stub() && self.in_function_scope() {
@@ -2776,6 +2784,13 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
+    }
+
+    fn in_loop_context(&self) -> bool {
+        self.current_scope_info().current_loop.is_some()
+    }
+    fn is_bound_parameter(&self, _name: &str) -> bool {
+        false
     }
 }
 

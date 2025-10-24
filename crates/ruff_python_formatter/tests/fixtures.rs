@@ -1,10 +1,15 @@
 use crate::normalizer::Normalizer;
-use itertools::Itertools;
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+    DisplayDiagnostics, DummyFileResolver, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_formatter::FormatOptions;
+use ruff_python_ast::Mod;
 use ruff_python_ast::comparable::ComparableMod;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
-use ruff_python_parser::{ParseOptions, UnsupportedSyntaxError, parse};
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_python_parser::{ParseOptions, Parsed, UnsupportedSyntaxError, parse};
+use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
@@ -103,7 +108,8 @@ fn black_compatibility() {
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
-        ensure_unchanged_ast(&content, &formatted_code, &options, input_path);
+        let unsupported_syntax_errors =
+            ensure_unchanged_ast(&content, &formatted_code, &options, input_path);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -158,6 +164,20 @@ fn black_compatibility() {
             write!(snapshot, "{}", Header::new("Black Output")).unwrap();
             write!(snapshot, "{}", CodeFrame::new("python", &expected_output)).unwrap();
 
+            if !unsupported_syntax_errors.is_empty() {
+                write!(snapshot, "{}", Header::new("New Unsupported Syntax Errors")).unwrap();
+                writeln!(
+                    snapshot,
+                    "{}",
+                    DisplayDiagnostics::new(
+                        &DummyFileResolver,
+                        &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                        &unsupported_syntax_errors
+                    )
+                )
+                .unwrap();
+            }
+
             insta::with_settings!({
                 omit_expression => true,
                 input_file => input_path,
@@ -193,7 +213,8 @@ fn format() {
             writeln!(snapshot, "## Outputs").unwrap();
 
             for (i, options) in options.into_iter().enumerate() {
-                let formatted_code = format_file(&content, &options, input_path);
+                let (formatted_code, unsupported_syntax_errors) =
+                    format_file(&content, &options, input_path);
 
                 writeln!(
                     snapshot,
@@ -210,7 +231,7 @@ fn format() {
 
                 // We want to capture the differences in the preview style in our fixtures
                 let options_preview = options.with_preview(PreviewMode::Enabled);
-                let formatted_preview = format_file(&content, &options_preview, input_path);
+                let (formatted_preview, _) = format_file(&content, &options_preview, input_path);
 
                 if formatted_code != formatted_preview {
                     // Having both snapshots makes it hard to see the difference, so we're keeping only
@@ -227,14 +248,28 @@ fn format() {
                     )
                     .unwrap();
                 }
+
+                if !unsupported_syntax_errors.is_empty() {
+                    writeln!(
+                        snapshot,
+                        "### Unsupported Syntax Errors\n{}",
+                        DisplayDiagnostics::new(
+                            &DummyFileResolver,
+                            &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                            &unsupported_syntax_errors
+                        )
+                    )
+                    .unwrap();
+                }
             }
         } else {
             // We want to capture the differences in the preview style in our fixtures
             let options = PyFormatOptions::from_extension(input_path);
-            let formatted_code = format_file(&content, &options, input_path);
+            let (formatted_code, unsupported_syntax_errors) =
+                format_file(&content, &options, input_path);
 
             let options_preview = options.with_preview(PreviewMode::Enabled);
-            let formatted_preview = format_file(&content, &options_preview, input_path);
+            let (formatted_preview, _) = format_file(&content, &options_preview, input_path);
 
             if formatted_code == formatted_preview {
                 writeln!(
@@ -259,6 +294,19 @@ fn format() {
                 )
                 .unwrap();
             }
+
+            if !unsupported_syntax_errors.is_empty() {
+                writeln!(
+                    snapshot,
+                    "## Unsupported Syntax Errors\n{}",
+                    DisplayDiagnostics::new(
+                        &DummyFileResolver,
+                        &DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full),
+                        &unsupported_syntax_errors
+                    )
+                )
+                .unwrap();
+            }
         }
 
         insta::with_settings!({
@@ -277,7 +325,11 @@ fn format() {
     );
 }
 
-fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> String {
+fn format_file(
+    source: &str,
+    options: &PyFormatOptions,
+    input_path: &Path,
+) -> (String, Vec<Diagnostic>) {
     let (unformatted, formatted_code) = if source.contains("<RANGE_START>") {
         let mut content = source.to_string();
         let without_markers = content
@@ -337,9 +389,10 @@ fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> St
         (Cow::Borrowed(source), formatted_code)
     };
 
-    ensure_unchanged_ast(&unformatted, &formatted_code, options, input_path);
+    let unsupported_syntax_errors =
+        ensure_unchanged_ast(&unformatted, &formatted_code, options, input_path);
 
-    formatted_code
+    (formatted_code, unsupported_syntax_errors)
 }
 
 /// Format another time and make sure that there are no changes anymore
@@ -351,10 +404,18 @@ fn ensure_stability_when_formatting_twice(
     let reformatted = match format_module_source(formatted_code, options.clone()) {
         Ok(reformatted) => reformatted,
         Err(err) => {
+            let mut diag = Diagnostic::from(&err);
+            if let Some(range) = err.range() {
+                let file =
+                    SourceFileBuilder::new(input_path.to_string_lossy(), formatted_code).finish();
+                let span = Span::from(file).with_range(range);
+                diag.annotate(Annotation::primary(span));
+            }
             panic!(
                 "Expected formatted code of {} to be valid syntax: {err}:\
-                    \n---\n{formatted_code}---\n",
-                input_path.display()
+                    \n---\n{formatted_code}---\n{}",
+                input_path.display(),
+                diag.display(&DummyFileResolver, &DisplayDiagnosticConfig::default()),
             );
         }
     };
@@ -391,12 +452,23 @@ Formatted twice:
 /// Like Black, there are a few exceptions to this "invariant" which are encoded in
 /// [`NormalizedMod`] and related structs. Namely, formatting can change indentation within strings,
 /// and can also flatten tuples within `del` statements.
+///
+/// Returns any new [`UnsupportedSyntaxError`]s in the formatted code as [`Diagnostic`]s for
+/// snapshotting.
+///
+/// As noted in the sub-diagnostic message, new syntax errors should only be accepted when they are
+/// the result of an existing syntax error in the input. For example, the formatter knows that
+/// escapes in f-strings are only allowed after Python 3.12, so it can replace escaped quotes with
+/// reused outer quote characters, which are also valid after 3.12, even if the configured Python
+/// version is lower. Such cases disrupt the fingerprint filter because the syntax error, and thus
+/// its fingerprint, is different from the input syntax error. More typical cases like using a
+/// t-string before 3.14 will be filtered out and not included in snapshots.
 fn ensure_unchanged_ast(
     unformatted_code: &str,
     formatted_code: &str,
     options: &PyFormatOptions,
     input_path: &Path,
-) {
+) -> Vec<Diagnostic> {
     let source_type = options.source_type();
 
     // Parse the unformatted code.
@@ -407,7 +479,7 @@ fn ensure_unchanged_ast(
     .expect("Unformatted code to be valid syntax");
 
     let unformatted_unsupported_syntax_errors =
-        collect_unsupported_syntax_errors(unformatted_parsed.unsupported_syntax_errors());
+        collect_unsupported_syntax_errors(&unformatted_parsed);
     let mut unformatted_ast = unformatted_parsed.into_syntax();
 
     Normalizer.visit_module(&mut unformatted_ast);
@@ -422,29 +494,31 @@ fn ensure_unchanged_ast(
 
     // Assert that there are no new unsupported syntax errors
     let mut formatted_unsupported_syntax_errors =
-        collect_unsupported_syntax_errors(formatted_parsed.unsupported_syntax_errors());
+        collect_unsupported_syntax_errors(&formatted_parsed);
 
     formatted_unsupported_syntax_errors
         .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
 
-    if !formatted_unsupported_syntax_errors.is_empty() {
-        let index = LineIndex::from_source_text(formatted_code);
-        panic!(
-            "Formatted code `{}` introduced new unsupported syntax errors:\n---\n{}\n---",
-            input_path.display(),
-            formatted_unsupported_syntax_errors
-                .into_values()
-                .map(|error| {
-                    let location = index.line_column(error.start(), formatted_code);
-                    format!(
-                        "{row}:{col} {error}",
-                        row = location.line,
-                        col = location.column
-                    )
-                })
-                .join("\n")
-        );
-    }
+    let file = SourceFileBuilder::new(
+        input_path.file_name().unwrap().to_string_lossy(),
+        formatted_code,
+    )
+    .finish();
+    let diagnostics = formatted_unsupported_syntax_errors
+        .values()
+        .map(|error| {
+            let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, error);
+            let span = Span::from(file.clone()).with_range(error.range());
+            diag.annotate(Annotation::primary(span));
+            let sub = SubDiagnostic::new(
+                SubDiagnosticSeverity::Warning,
+                "Only accept new syntax errors if they are also present in the input. \
+                    The formatter should not introduce syntax errors.",
+            );
+            diag.sub(sub);
+            diag
+        })
+        .collect::<Vec<_>>();
 
     let mut formatted_ast = formatted_parsed.into_syntax();
     Normalizer.visit_module(&mut formatted_ast);
@@ -466,6 +540,8 @@ fn ensure_unchanged_ast(
             input_path.display(),
         );
     }
+
+    diagnostics
 }
 
 struct Header<'a> {
@@ -537,14 +613,56 @@ source_type                = {source_type:?}"#,
     }
 }
 
+/// A visitor to collect a sequence of node IDs for fingerprinting [`UnsupportedSyntaxError`]s.
+///
+/// It visits each statement in the AST in source order and saves its range. The index of the node
+/// enclosing a syntax error's range can then be retrieved with the `node_id` method. This `node_id`
+/// should be stable across formatting runs since the formatter won't add or remove statements.
+struct StmtVisitor {
+    nodes: Vec<TextRange>,
+}
+
+impl StmtVisitor {
+    fn new(parsed: &Parsed<Mod>) -> Self {
+        let mut visitor = Self { nodes: Vec::new() };
+        visitor.visit_mod(parsed.syntax());
+        visitor
+    }
+
+    /// Return the index of the statement node that contains `range`.
+    fn node_id(&self, range: TextRange) -> usize {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, node)| node.contains_range(range))
+            .min_by_key(|(_, node)| node.len())
+            .expect("Expected an enclosing node in the AST")
+            .0
+    }
+}
+
+impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
+    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
+        self.nodes.push(stmt.range());
+        ruff_python_ast::visitor::source_order::walk_stmt(self, stmt);
+    }
+}
+
 /// Collects the unsupported syntax errors and assigns a unique hash to each error.
 fn collect_unsupported_syntax_errors(
-    errors: &[UnsupportedSyntaxError],
+    parsed: &Parsed<Mod>,
 ) -> FxHashMap<u64, UnsupportedSyntaxError> {
     let mut collected = FxHashMap::default();
 
-    for error in errors {
-        let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, 0);
+    if parsed.unsupported_syntax_errors().is_empty() {
+        return collected;
+    }
+
+    let visitor = StmtVisitor::new(parsed);
+
+    for error in parsed.unsupported_syntax_errors() {
+        let node_id = visitor.node_id(error.range);
+        let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, node_id, 0);
 
         // Make sure that we do not get a fingerprint that is already in use
         // by adding in the previously generated one.
@@ -552,7 +670,7 @@ fn collect_unsupported_syntax_errors(
             match collected.entry(error_fingerprint) {
                 Entry::Occupied(_) => {
                     error_fingerprint =
-                        fingerprint_unsupported_syntax_error(error, error_fingerprint);
+                        fingerprint_unsupported_syntax_error(error, node_id, error_fingerprint);
                 }
                 Entry::Vacant(entry) => {
                     entry.insert(error.clone());
@@ -565,7 +683,11 @@ fn collect_unsupported_syntax_errors(
     collected
 }
 
-fn fingerprint_unsupported_syntax_error(error: &UnsupportedSyntaxError, salt: u64) -> u64 {
+fn fingerprint_unsupported_syntax_error(
+    error: &UnsupportedSyntaxError,
+    node_id: usize,
+    salt: u64,
+) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     let UnsupportedSyntaxError {
@@ -579,6 +701,7 @@ fn fingerprint_unsupported_syntax_error(error: &UnsupportedSyntaxError, salt: u6
     salt.hash(&mut hasher);
     kind.hash(&mut hasher);
     target_version.hash(&mut hasher);
+    node_id.hash(&mut hasher);
 
     hasher.finish()
 }

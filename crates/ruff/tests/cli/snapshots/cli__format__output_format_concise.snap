@@ -1,0 +1,20 @@
+---
+source: crates/ruff/tests/cli/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--preview"
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+input.py:1:1: unformatted: File would be reformatted
+1 file would be reformatted
+
+----- stderr -----

@@ -39,6 +39,7 @@ use crate::rules::pyflakes::format::FormatSummary;
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatInvalidFormat {
     pub(crate) message: String,
 }
@@ -78,6 +79,7 @@ impl Violation for PercentFormatInvalidFormat {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatExpectedMapping;
 
 impl Violation for PercentFormatExpectedMapping {
@@ -114,6 +116,7 @@ impl Violation for PercentFormatExpectedMapping {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatExpectedSequence;
 
 impl Violation for PercentFormatExpectedSequence {
@@ -153,6 +156,7 @@ impl Violation for PercentFormatExpectedSequence {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
 }
@@ -193,6 +197,7 @@ impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatMissingArgument {
     missing: Vec<String>,
 }
@@ -233,6 +238,7 @@ impl Violation for PercentFormatMissingArgument {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatMixedPositionalAndNamed;
 
 impl Violation for PercentFormatMixedPositionalAndNamed {
@@ -263,6 +269,7 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatPositionalCountMismatch {
     wanted: usize,
     got: usize,
@@ -301,6 +308,7 @@ impl Violation for PercentFormatPositionalCountMismatch {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatStarRequiresSequence;
 
 impl Violation for PercentFormatStarRequiresSequence {
@@ -331,6 +339,7 @@ impl Violation for PercentFormatStarRequiresSequence {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatUnsupportedFormatCharacter {
     pub(crate) char: char,
 }
@@ -362,6 +371,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.138")]
 pub(crate) struct StringDotFormatInvalidFormat {
     pub(crate) message: String,
 }
@@ -404,6 +414,7 @@ impl Violation for StringDotFormatInvalidFormat {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatExtraNamedArguments {
     missing: Vec<Name>,
 }
@@ -455,6 +466,7 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
 }
@@ -498,6 +510,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatMissingArguments {
     missing: Vec<String>,
 }
@@ -536,6 +549,7 @@ impl Violation for StringDotFormatMissingArguments {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatMixingAutomatic;
 
 impl Violation for StringDotFormatMixingAutomatic {

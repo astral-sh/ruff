@@ -208,8 +208,7 @@ class SuperUser(User):
     def now_called_robert(self):
         self.name = "Robert"  # fine because overridden with a mutable attribute
 
-        # TODO: this should cause us to emit an error as we're assigning to a read-only property
-        # inherited from the `NamedTuple` superclass (requires https://github.com/astral-sh/ty/issues/159)
+        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
         self.nickname = "Bob"
 
 james = SuperUser(0, "James", 42, "Jimmy")
@@ -278,8 +277,7 @@ reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support implicit type of `self`
-reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
@@ -296,8 +294,7 @@ class Box(NamedTuple, Generic[T]):
 class IntBox(Box[int]):
     pass
 
-# TODO: should be `IntBox` once we support the implicit type of `self`
-reveal_type(IntBox(1)._replace(content=42))  # revealed: Unknown
+reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```
 
 ## `collections.namedtuple`

@@ -31,3 +31,6 @@ map(lambda x, y: x + y, [1, 2, 3], cycle([1, 2, 3]))
 map(lambda x, y: x + y, [1, 2, 3], repeat(1))
 map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=None))
 map(lambda x, y: x + y, [1, 2, 3], count())
+
+# Regression https://github.com/astral-sh/ruff/issues/20997
+map(f, *lots_of_iterators)

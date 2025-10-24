@@ -25,13 +25,16 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as the use of a `set` literal will
-/// error at runtime if the sequence contains unhashable elements (like lists
-/// or dictionaries). While Ruff will attempt to infer the hashability of the
-/// elements, it may not always be able to do so.
+/// error at runtime if either the element being tested for membership (the
+/// left-hand side) or any element of the sequence (the right-hand side)
+/// is unhashable (like lists or dictionaries). While Ruff will attempt to
+/// infer the hashability of both sides and skip the fix when it can determine
+/// that either side is unhashable, it may not always be able to do so.
 ///
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.1")]
 pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {

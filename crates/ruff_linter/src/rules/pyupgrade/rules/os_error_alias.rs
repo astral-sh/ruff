@@ -35,6 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.206")]
 pub(crate) struct OSErrorAlias {
     name: Option<String>,
 }

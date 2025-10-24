@@ -1,10 +1,9 @@
 use std::cmp::Ordering;
 
-use crate::db::Db;
+use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
-    subclass_of::SubclassOfInner,
+    DynamicType, TodoType, Type, TypeIsType, class_base::ClassBase, subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -84,15 +83,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
         (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
 
-        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => left.cmp(right),
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
-        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => left.cmp(right),
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 
@@ -141,10 +136,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         }
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
-
-        (Type::NonInferableTypeVar(left), Type::NonInferableTypeVar(right)) => left.cmp(right),
-        (Type::NonInferableTypeVar(_), _) => Ordering::Less,
-        (_, Type::NonInferableTypeVar(_)) => Ordering::Greater,
 
         (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
         (Type::TypeVar(_), _) => Ordering::Less,

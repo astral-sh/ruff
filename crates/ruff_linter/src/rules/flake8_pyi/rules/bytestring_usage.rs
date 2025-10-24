@@ -28,6 +28,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct ByteStringUsage {
     origin: ByteStringOrigin,
 }
@@ -74,7 +75,8 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
         ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,
         _ => return,
     };
-    checker.report_diagnostic(ByteStringUsage { origin }, attribute.range());
+    let mut diagnostic = checker.report_diagnostic(ByteStringUsage { origin }, attribute.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 }
 
 /// PYI057
@@ -94,7 +96,9 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImport
 
     for name in names {
         if name.name.as_str() == "ByteString" {
-            checker.report_diagnostic(ByteStringUsage { origin }, name.range());
+            let mut diagnostic =
+                checker.report_diagnostic(ByteStringUsage { origin }, name.range());
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         }
     }
 }

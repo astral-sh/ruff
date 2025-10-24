@@ -50,24 +50,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
             }
         }
-        Stmt::Break(_) => {
-            if checker.is_rule_enabled(Rule::BreakOutsideLoop) {
-                pyflakes::rules::break_outside_loop(
-                    checker,
-                    stmt,
-                    &mut checker.semantic.current_statements().skip(1),
-                );
-            }
-        }
-        Stmt::Continue(_) => {
-            if checker.is_rule_enabled(Rule::ContinueOutsideLoop) {
-                pyflakes::rules::continue_outside_loop(
-                    checker,
-                    stmt,
-                    &mut checker.semantic.current_statements().skip(1),
-                );
-            }
-        }
         Stmt::FunctionDef(
             function_def @ ast::StmtFunctionDef {
                 is_async,
@@ -803,11 +785,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             for alias in names {
-                if let Some("__future__") = module {
-                    if checker.is_rule_enabled(Rule::FutureFeatureNotDefined) {
-                        pyflakes::rules::future_feature_not_defined(checker, alias);
-                    }
-                } else if &alias.name == "*" {
+                if module != Some("__future__") && &alias.name == "*" {
                     // F403
                     checker.report_diagnostic_if_enabled(
                         pyflakes::rules::UndefinedLocalWithImportStar {
@@ -972,6 +950,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::MisplacedBareRaise) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
+            }
+            if checker.is_rule_enabled(Rule::StopIterationReturn) {
+                pylint::rules::stop_iteration_return(checker, raise);
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
