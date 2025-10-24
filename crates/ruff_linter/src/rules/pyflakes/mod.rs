@@ -528,6 +528,38 @@ mod tests {
         import a",
         "f401_use_in_between_imports"
     )]
+    #[test_case(
+        r"
+        if cond:
+            import a
+            import a.b
+            a.foo()
+        ",
+        "f401_same_branch"
+    )]
+    #[test_case(
+        r"
+        try:
+            import a.b.c
+        except ImportError:
+            import argparse
+            import a
+            a.b = argparse.Namespace()
+        ",
+        "f401_different_branch"
+    )]
+    #[test_case(
+        r"
+        import mlflow.pyfunc.loaders.chat_agent
+        import mlflow.pyfunc.loaders.chat_model
+        import mlflow.pyfunc.loaders.code_model
+        from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
+
+        if IS_PYDANTIC_V2_OR_NEWER:
+            import mlflow.pyfunc.loaders.responses_agent
+        ",
+        "f401_type_checking"
+    )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
             &SourceKind::Python(dedent(contents).to_string()),

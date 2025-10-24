@@ -1684,6 +1684,48 @@ impl<'a> SemanticModel<'a> {
         left == right
     }
 
+    /// Returns `true` if any execution path to `node` passes through `dominator`.
+    ///
+    /// More precisely, it returns true if the path of branches leading
+    /// to `dominator` is a prefix of the path of branches leading to `node`.
+    ///
+    /// In this code snippet:
+    ///
+    /// ```python
+    /// if cond:
+    ///     dominator
+    ///     if other_cond:
+    ///         node
+    /// else:
+    ///     other_node
+    /// ```
+    ///
+    /// we have that `node` is dominated by `dominator` but that
+    /// `other_node` is not dominated by `dominator`.
+    ///
+    /// This implementation assumes that the statements are in the same scope.
+    pub fn dominates(&self, dominator: NodeId, node: NodeId) -> bool {
+        // Collect the branch path for the left statement.
+        let dominator = self
+            .nodes
+            .branch_id(dominator)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Collect the branch path for the right statement.
+        let node = self
+            .nodes
+            .branch_id(node)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Note that the paths are in "reverse" order -
+        // from most nested to least nested.
+        node.ends_with(&dominator)
+    }
+
     /// Returns `true` if the given expression is an unused variable, or consists solely of
     /// references to other unused variables. This method is conservative in that it considers a
     /// variable to be "used" if it's shadowed by another variable with usages.
