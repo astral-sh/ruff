@@ -115,9 +115,9 @@ impl<'a> Generator<'a> {
 
     /// Sets the mode when unparsing code.
     ///
-    /// The generated unparsed code formating based on the mode:
+    /// The generated unparsed code formatting based on the mode:
     /// - [`Default`](`UnparseMode::Default`): Ruff's default unparsing behaviour.
-    /// - [`Ast`](`UnparseMode::Ast`): simillar to the behaviour of [`ast.unparse`](https://docs.python.org/3/library/ast.html#ast.unparse).
+    /// - [`Ast`](`UnparseMode::Ast`): similar to the behaviour of [`ast.unparse`](https://docs.python.org/3/library/ast.html#ast.unparse).
     #[must_use]
     pub fn with_unparse_mode(mut self, mode: UnparseMode) -> Self {
         self.unparse_mode = mode;
