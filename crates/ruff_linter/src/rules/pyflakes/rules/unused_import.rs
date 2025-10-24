@@ -916,9 +916,31 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
         if i > 0 && shadowed_binding.is_used() {
             return false;
         }
+        // We want to allow a situation like this:
+        //
+        // ```python
+        // import a.b
+        // if TYPE_CHECKING:
+        //     import a.b.c
+        // ```
+        // but bail in a situation like this:
+        //
+        // ```python
+        // try:
+        //     import a.b
+        // except ImportError:
+        //     import argparse
+        //     import a
+        //     a.b = argparse.Namespace()
+        // ```
+        //
+        // So we require that all the shadowed bindings dominate the
+        // last live binding for the import. That is: if the last live
+        // binding is executed it should imply that all the shadowed
+        // bindings were executed as well.
         if shadowed_binding
             .source
-            .is_none_or(|node_id| !semantic.same_branch(node_id, binding_node))
+            .is_none_or(|node_id| !semantic.dominates(node_id, binding_node))
         {
             return false;
         }
