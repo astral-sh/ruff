@@ -189,34 +189,34 @@ DOC102 Documented parameter `a` is not in the function's signature
 help: Remove the extraneous parameter from the docstring
 
 DOC102 Documented parameter `x1` is not in the function's signature
-   --> DOC102_numpy.py:381:5
+   --> DOC102_numpy.py:380:5
     |
-379 |     Parameters
-380 |     ----------
-381 |     x1, x2 : object
+378 |     Parameters
+379 |     ----------
+380 |     x1, x2 : object
     |     ^^
-382 |         Objects.
+381 |         Objects.
     |
 help: Remove the extraneous parameter from the docstring
 
 DOC102 Documented parameter `x2` is not in the function's signature
-   --> DOC102_numpy.py:381:9
+   --> DOC102_numpy.py:380:9
     |
-379 |     Parameters
-380 |     ----------
-381 |     x1, x2 : object
+378 |     Parameters
+379 |     ----------
+380 |     x1, x2 : object
     |         ^^
-382 |         Objects.
+381 |         Objects.
     |
 help: Remove the extraneous parameter from the docstring
 
 DOC102 Documented parameter `extra_param` is not in the function's signature
-   --> DOC102_numpy.py:419:5
+   --> DOC102_numpy.py:418:5
     |
-417 |     x1, x2 : str
-418 |         String parameters for processing.
-419 |     extra_param : str
+416 |     x1, x2 : str
+417 |         String parameters for processing.
+418 |     extra_param : str
     |     ^^^^^^^^^^^
-420 |         Extra parameter not in signature.
+419 |         Extra parameter not in signature.
     |
 help: Remove the extraneous parameter from the docstring
