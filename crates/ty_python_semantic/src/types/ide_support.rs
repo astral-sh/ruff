@@ -983,11 +983,24 @@ pub fn definitions_for_unary_op<'db>(
         Ok(bindings) => bindings,
         Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
-            operand_ty
-                .try_call_dunder(db, "__len__", CallArguments::none(), TypeContext::default())
-                .ok()?
+            match operand_ty.try_call_dunder(
+                db,
+                "__len__",
+                CallArguments::none(),
+                TypeContext::default(),
+            ) {
+                Ok(bindings) => bindings,
+                Err(CallDunderError::MethodNotAvailable) => return None,
+                Err(
+                    CallDunderError::PossiblyUnbound(bindings)
+                    | CallDunderError::CallError(_, bindings),
+                ) => *bindings,
+            }
         }
-        Err(_) => return None,
+        Err(CallDunderError::MethodNotAvailable) => return None,
+        Err(
+            CallDunderError::PossiblyUnbound(bindings) | CallDunderError::CallError(_, bindings),
+        ) => *bindings,
     };
 
     let callable_type = promote_literals_for_self(db, bindings.callable_type());
