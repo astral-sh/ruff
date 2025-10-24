@@ -4463,18 +4463,15 @@ impl<'db> Type<'db> {
         visitor: &TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let type_to_truthiness = |ty| {
-            if let Type::BooleanLiteral(bool_val) = ty {
-                Truthiness::from(bool_val)
-            } else {
-                Truthiness::Ambiguous
+            match ty {
+                Type::BooleanLiteral(bool_val) => Truthiness::from(bool_val),
+                Type::IntLiteral(int_val) => Truthiness::from(int_val != 0),
+                // anything else is handled lower down
+                _ => Truthiness::Ambiguous,
             }
         };
 
-        let try_dunder_bool = || {
-            // We only check the `__bool__` method for truth testing, even though at
-            // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
-            // and a subclass could add a `__bool__` method.
-
+        let try_dunders = || {
             match self.try_call_dunder(
                 db,
                 "__bool__",
@@ -4509,18 +4506,67 @@ impl<'db> Type<'db> {
                     Ok(Truthiness::Ambiguous)
                 }
 
-                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
+                Err(CallDunderError::MethodNotAvailable) => {
+                    // We only consider `__len__` for tuples and `@final` types,
+                    // since `__bool__` takes precedence
+                    // and a subclass could add a `__bool__` method.
+                    //
+                    // TODO: with regards to tuple types, we intend to emit a diagnostic
+                    // if a tuple subclass defines a `__bool__` method with a return type
+                    // that is inconsistent with the tuple's length. Otherwise, the special
+                    // handling for tuples here isn't sound.
+                    if let Some(instance) = self.into_nominal_instance() {
+                        if let Some(tuple_spec) = instance.tuple_spec(db) {
+                            Ok(tuple_spec.truthiness())
+                        } else if instance.class(db).is_final(db) {
+                            match self.try_call_dunder(
+                                db,
+                                "__len__",
+                                CallArguments::none(),
+                                TypeContext::default(),
+                            ) {
+                                Ok(outcome) => {
+                                    let return_type = outcome.return_type(db);
+                                    if return_type.is_assignable_to(
+                                        db,
+                                        KnownClass::SupportsIndex.to_instance(db),
+                                    ) {
+                                        Ok(type_to_truthiness(return_type))
+                                    } else {
+                                        // TODO: should report a diagnostic similar to if return type of `__bool__`
+                                        // is not assignable to `bool`
+                                        Ok(Truthiness::Ambiguous)
+                                    }
+                                }
+                                // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
+                                Err(CallDunderError::MethodNotAvailable) => {
+                                    Ok(Truthiness::AlwaysTrue)
+                                }
+                                // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
+                                // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
+                                Err(_) => Ok(Truthiness::Ambiguous),
+                            }
+                        } else {
+                            Ok(Truthiness::Ambiguous)
+                        }
+                    } else {
+                        Ok(Truthiness::Ambiguous)
+                    }
+                }
+
                 Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
                     Err(BoolError::IncorrectArguments {
                         truthiness: type_to_truthiness(bindings.return_type(db)),
                         not_boolable_type: *self,
                     })
                 }
+
                 Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
                     Err(BoolError::NotCallable {
                         not_boolable_type: *self,
                     })
                 }
+
                 Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
                     Err(BoolError::Other {
                         not_boolable_type: *self,
@@ -4635,9 +4681,9 @@ impl<'db> Type<'db> {
                 .known_class(db)
                 .and_then(KnownClass::bool)
                 .map(Ok)
-                .unwrap_or_else(try_dunder_bool)?,
+                .unwrap_or_else(try_dunders)?,
 
-            Type::ProtocolInstance(_) => try_dunder_bool()?,
+            Type::ProtocolInstance(_) => try_dunders()?,
 
             Type::Union(union) => try_union(*union)?,
 
