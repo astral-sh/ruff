@@ -1,4 +1,4 @@
-use camino::{Utf8Component, Utf8PathBuf};
+use camino::{Utf8Component, Utf8PathBuf, Utf8Prefix};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
@@ -180,11 +180,18 @@ impl System for MdtestSystem {
             .canonicalize_path(&self.normalize_path(path))?;
 
         if let MdtestSystemInner::Os { os_system, .. } = &*self.0 {
-            // Make the path relative to the current directory
-            Ok(canonicalized
-                .strip_prefix(os_system.current_directory())
-                .unwrap()
-                .to_owned())
+            // Make the path relative to the current directory if the path doesn't require
+            // UNC gunk (`//?/`) to be valid (`strip_prefix` gets really messy otherwise).
+            if let Some(Utf8Component::Prefix(prefix)) = canonicalized.components().next()
+                && let Utf8Prefix::VerbatimDisk(_) = prefix.kind()
+            {
+                Ok(canonicalized)
+            } else {
+                Ok(canonicalized
+                    .strip_prefix(os_system.current_directory())
+                    .unwrap()
+                    .to_owned())
+            }
         } else {
             Ok(canonicalized)
         }

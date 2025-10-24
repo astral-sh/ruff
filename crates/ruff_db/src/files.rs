@@ -190,7 +190,10 @@ impl Files {
         let roots = self.inner.roots.read().unwrap();
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        roots.at(&absolute)
+        // We need to resolve away symlinks here to avoid getting confused about subdirectories.
+        let canonicalized = db.system().canonicalize_path(&absolute).unwrap_or(absolute);
+
+        roots.at(&canonicalized)
     }
 
     /// The same as [`Self::root`] but panics if no root is found.
@@ -211,7 +214,10 @@ impl Files {
         let mut roots = self.inner.roots.write().unwrap();
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        roots.try_add(db, absolute, kind)
+        // We need to resolve away symlinks here to avoid getting confused about subdirectories.
+        let canonicalized = db.system().canonicalize_path(&absolute).unwrap_or(absolute);
+
+        roots.try_add(db, canonicalized, kind)
     }
 
     /// Updates the revision of the root for `path`.
