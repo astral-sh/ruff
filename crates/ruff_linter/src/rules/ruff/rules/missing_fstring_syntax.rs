@@ -2,7 +2,7 @@ use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
@@ -116,7 +116,7 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
         return;
     }
 
-    if should_be_fstring(literal, checker.locator(), semantic) {
+    if should_be_fstring(literal, checker.locator(), semantic, checker) {
         checker
             .report_diagnostic(MissingFStringSyntax, literal.range())
             .set_fix(fix_fstring_syntax(literal.range()));
@@ -180,8 +180,15 @@ fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
+    checker: &Checker,
 ) -> bool {
     if !has_brackets(&literal.value) {
+        return false;
+    }
+
+    // Check if the string contains backslashes and target Python version is < 3.12
+    // F-strings with backslashes are only valid in Python 3.12+
+    if literal.value.contains('\\') && checker.target_version() < PythonVersion::PY312 {
         return false;
     }
 
