@@ -5961,6 +5961,9 @@ impl<'db> Type<'db> {
     /// Given a class literal or non-dynamic `SubclassOf` type, try calling it (creating an instance)
     /// and return the resulting instance type.
     ///
+    /// The `infer_argument_types` closure should be invoked with the signatures of `__new__` and
+    /// `__init__`, such that the argument types can be inferred with the correct type context.
+    ///
     /// Models `type.__call__` behavior.
     /// TODO: model metaclass `__call__`.
     ///
@@ -6053,8 +6056,7 @@ impl<'db> Type<'db> {
             (Some(Place::Defined(new_method, ..)), Place::Undefined) => Some(
                 new_method
                     .bindings(db)
-                    // Inject a synthetic `cls` argument.
-                    .map(|binding| binding.with_bound_type(Type::unknown())),
+                    .map(|binding| binding.with_bound_type(self_type)),
             ),
 
             (Some(Place::Undefined) | None, Place::Defined(init_method, ..)) => {
@@ -6069,8 +6071,7 @@ impl<'db> Type<'db> {
 
                 let new_method_bindings = new_method
                     .bindings(db)
-                    // Inject a synthetic `cls` argument.
-                    .map(|binding| binding.with_bound_type(Type::unknown()));
+                    .map(|binding| binding.with_bound_type(self_type));
 
                 Some(Bindings::from_union(
                     callable,
@@ -6080,6 +6081,7 @@ impl<'db> Type<'db> {
 
             _ => None,
         };
+
         let argument_types = infer_argument_types(bindings);
 
         let new_call_outcome = new_method.and_then(|new_method| {
