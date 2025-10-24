@@ -280,7 +280,7 @@ impl MainLoop {
 
                         match salsa::Cancelled::catch(|| {
                             db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish();
+                            reporter.bar.finish_and_clear();
                             reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
