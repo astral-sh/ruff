@@ -1864,7 +1864,7 @@ C.<CURSOR>
         __instancecheck__ :: bound method <class 'C'>.__instancecheck__(instance: Any, /) -> bool
         __itemsize__ :: int
         __module__ :: str
-        __mro__ :: tuple[<class 'C'>, <class 'object'>]
+        __mro__ :: tuple[type, ...]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
         __new__ :: def __new__(cls) -> Self@__new__
@@ -1933,7 +1933,7 @@ Meta.<CURSOR>
                 __instancecheck__ :: def __instancecheck__(self, instance: Any, /) -> bool
                 __itemsize__ :: int
                 __module__ :: str
-                __mro__ :: tuple[<class 'Meta'>, <class 'type'>, <class 'object'>]
+                __mro__ :: tuple[type, ...]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
                 __or__ :: def __or__[Self](self: Self@__or__, value: Any, /) -> UnionType | Self@__or__
@@ -2061,7 +2061,7 @@ Quux.<CURSOR>
         __instancecheck__ :: bound method <class 'Quux'>.__instancecheck__(instance: Any, /) -> bool
         __itemsize__ :: int
         __module__ :: str
-        __mro__ :: tuple[<class 'Quux'>, <class 'object'>]
+        __mro__ :: tuple[type, ...]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
         __new__ :: def __new__(cls) -> Self@__new__
@@ -2138,7 +2138,7 @@ Answer.<CURSOR>
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Unknown]
                 __module__ :: str
-                __mro__ :: tuple[<class 'Answer'>, <class 'Enum'>, <class 'object'>]
+                __mro__ :: tuple[type, ...]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
                 __new__ :: def __new__(cls, value: object) -> Self@__new__
