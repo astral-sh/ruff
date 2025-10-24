@@ -102,6 +102,10 @@ impl Violation for MissingTodoAuthor {
 ///
 /// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
+///
+/// # TODO(charlie): PROJ-123 this comment has a Jira-style issue ID on the same line
+///
+/// # TODO(charlie): Fix bug ABC-456 another Jira-style example
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.269")]
@@ -251,6 +255,9 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"\s*(http|https)://.*", // issue link
         r"\s*#\d+.*",            // issue code - like "#003"
+        r"\s*[A-Z]{2,}-\d+\s*$", // Jira-style issue code at end of line - like "RFFU-6877"
+        r"\s*\([A-Z]{2,}-\d+\)", // Jira-style issue code in parentheses - like "(RFFU-6877)"
+        r"\s*[A-Z]{2,}-\d+\s*:", // Jira-style issue code followed by colon - like "RFFU-6877:"
     ])
     .unwrap()
 });
