@@ -252,7 +252,11 @@ impl ClauseHeader<'_> {
                     .or_else(|| header.body.last().map(AnyNodeRef::from))
                     .unwrap();
 
-                find_keyword(last_statement.end(), SimpleTokenKind::Finally, source)
+                find_keyword(
+                    after_optional_semicolon(last_statement.end(), source),
+                    SimpleTokenKind::Finally,
+                    source,
+                )
             }
             ClauseHeader::Match(header) => {
                 find_keyword(header.start(), SimpleTokenKind::Match, source)
@@ -289,12 +293,18 @@ impl ClauseHeader<'_> {
                         .or_else(|| try_stmt.body.last().map(AnyNodeRef::from))
                         .unwrap();
 
-                    find_keyword(last_statement.end(), SimpleTokenKind::Else, source)
+                    find_keyword(
+                        after_optional_semicolon(last_statement.end(), source),
+                        SimpleTokenKind::Else,
+                        source,
+                    )
                 }
                 ElseClause::For(StmtFor { body, .. })
-                | ElseClause::While(StmtWhile { body, .. }) => {
-                    find_keyword(body.last().unwrap().end(), SimpleTokenKind::Else, source)
-                }
+                | ElseClause::While(StmtWhile { body, .. }) => find_keyword(
+                    after_optional_semicolon(body.last().unwrap().end(), source),
+                    SimpleTokenKind::Else,
+                    source,
+                ),
             },
         }
     }
@@ -434,7 +444,7 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
     }
 }
 
-/// Finds the range of `keyword` starting the search at `start_position`. Expects only comments and `(` between
+/// Finds the range of `keyword` starting the search at `start_position`. Expects only trivia between
 /// the `start_position` and the `keyword` token.
 fn find_keyword(
     start_position: TextSize,
@@ -463,6 +473,18 @@ fn find_keyword(
                 "Expected the case header keyword token but reached the end of the source instead.",
             ))
         }
+    }
+}
+
+fn after_optional_semicolon(end_of_statement: TextSize, source: &str) -> TextSize {
+    let mut tokenizer = SimpleTokenizer::starts_at(end_of_statement, source);
+
+    if let Some(tok) = tokenizer.next()
+        && tok.kind() == SimpleTokenKind::Semi
+    {
+        tok.end()
+    } else {
+        end_of_statement
     }
 }
 
