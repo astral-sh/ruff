@@ -205,3 +205,27 @@ def func():
     if a.endswith("foo"):
         a = a[: -len("foo")]
     print(a)
+
+
+class Seq:
+    def __init__(self, inner):
+        self.inner = inner
+
+    def startswith(self, prefix):
+        return tuple(self.inner[: len(prefix)]) == tuple(prefix)
+
+    def __getitem__(self, item):
+        return type(self)(self.inner[item])
+
+
+def tuple_affix_should_be_suppressed(text: str) -> str:
+    prefix = ("123",)
+    if text.startswith(prefix):
+        text = text[len(prefix):]
+    return text
+
+
+def custom_sequence_fix_is_unsafe(seq: Seq) -> Seq:
+    if seq.startswith("123"):
+        seq = seq[3:]
+    return seq

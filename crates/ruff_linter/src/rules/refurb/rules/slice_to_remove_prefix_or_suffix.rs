@@ -1,6 +1,8 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::{find_binding_value, is_bytes, is_string};
+use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -79,6 +81,10 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
+            let Some(applicability) = affix_applicability(&removal_data, checker.semantic()) else {
+                return;
+            };
+
             let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
@@ -89,11 +95,8 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_expr.start(),
-                if_expr.end(),
-            )));
+            let edit = Edit::replacement(replacement, if_expr.start(), if_expr.end());
+            diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
 }
@@ -107,6 +110,10 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
         if affix_matches_slice_bound(&removal_data, checker.semantic()) {
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
+
+            let Some(applicability) = affix_applicability(&removal_data, checker.semantic()) else {
+                return;
+            };
 
             let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
@@ -122,11 +129,8 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_stmt.start(),
-                if_stmt.end(),
-            )));
+            let edit = Edit::replacement(replacement, if_stmt.start(), if_stmt.end());
+            diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
 }
@@ -500,4 +504,91 @@ struct RemoveAffixData<'a> {
     bound: &'a ast::Expr,
     /// Contains the prefix or suffix used in `text.startswith(prefix)` or `text.endswith(suffix)`
     affix_query: AffixQuery<'a>,
+}
+
+/// Determines the applicability of the affix removal fix based on type information.
+///
+/// Returns:
+/// - `None` if the fix should be suppressed (incompatible types like tuple affixes)
+/// - `Some(Applicability::Safe)` if both text and affix are deterministically typed as str or bytes
+/// - `Some(Applicability::Unsafe)` if type information is unknown or uncertain
+fn affix_applicability(data: &RemoveAffixData, semantic: &SemanticModel) -> Option<Applicability> {
+    // Check for tuple affixes - these should be suppressed
+    if is_tuple_affix(data.affix_query.affix, semantic) {
+        return None;
+    }
+
+    let text_is_str = is_expr_string(data.text, semantic);
+    let text_is_bytes = is_expr_bytes(data.text, semantic);
+    let affix_is_str = is_expr_string(data.affix_query.affix, semantic);
+    let affix_is_bytes = is_expr_bytes(data.affix_query.affix, semantic);
+
+    match (text_is_str, text_is_bytes, affix_is_str, affix_is_bytes) {
+        // Both are deterministically str
+        (true, false, true, false) => Some(Applicability::Safe),
+        // Both are deterministically bytes
+        (false, true, false, true) => Some(Applicability::Safe),
+        // Type mismatch - suppress the fix
+        (true, false, false, true) | (false, true, true, false) => None,
+        // Unknown or ambiguous types - mark as unsafe
+        _ => Some(Applicability::Unsafe),
+    }
+}
+
+/// Check if an expression is a tuple or a variable bound to a tuple.
+fn is_tuple_affix(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    if matches!(expr, ast::Expr::Tuple(_)) {
+        return true;
+    }
+
+    if let ast::Expr::Name(name) = expr {
+        if let Some(binding_id) = semantic.only_binding(name) {
+            let binding = semantic.binding(binding_id);
+            if let Some(value) = find_binding_value(binding, semantic) {
+                return matches!(value, ast::Expr::Tuple(_));
+            }
+        }
+    }
+
+    false
+}
+
+/// Check if an expression is deterministically a string literal or a variable bound to a string.
+fn is_expr_string(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    is_expr_type(
+        expr,
+        semantic,
+        |expr| expr.is_string_literal_expr() || expr.is_f_string_expr(),
+        is_string,
+    )
+}
+
+/// Check if an expression is deterministically a bytes literal or a variable bound to bytes.
+fn is_expr_bytes(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    is_expr_type(
+        expr,
+        semantic,
+        |expr| matches!(expr, ast::Expr::BytesLiteral(_)),
+        is_bytes,
+    )
+}
+
+fn is_expr_type(
+    expr: &ast::Expr,
+    semantic: &SemanticModel,
+    literal_check: impl Fn(&ast::Expr) -> bool,
+    binding_check: impl Fn(&Binding, &SemanticModel) -> bool,
+) -> bool {
+    if literal_check(expr) {
+        return true;
+    }
+
+    if let ast::Expr::Name(name) = expr {
+        if let Some(binding_id) = semantic.only_binding(name) {
+            let binding = semantic.binding(binding_id);
+            return binding_check(binding, semantic);
+        }
+    }
+
+    false
 }
