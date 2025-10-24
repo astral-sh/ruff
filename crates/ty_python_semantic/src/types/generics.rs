@@ -225,6 +225,7 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
+#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     fn from_variables(
         db: &'db dyn Db,
@@ -1386,7 +1387,7 @@ impl<'db> SpecializationBuilder<'db> {
             && !actual.is_never()
             && actual
                 .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied()
+                .satisfies_all_typevars(self.db, self.inferable)
         {
             return Ok(());
         }
@@ -1470,10 +1471,18 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty
-                            .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied()
-                        {
+                        let when = ty.when_assignable_to(self.db, bound, self.inferable);
+                        eprintln!("==> infer");
+                        eprintln!("    formal    {}", formal.display(self.db));
+                        eprintln!("    actual    {}", actual.display(self.db));
+                        eprintln!(
+                            "    typevar   {}",
+                            bound_typevar.identity(self.db).display(self.db)
+                        );
+                        eprintln!("    bound     {}", bound.display(self.db));
+                        eprintln!("    inferable {}", self.inferable.display(self.db));
+                        eprintln!("    when      {}", when.display(self.db));
+                        if !when.is_always_satisfied() {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,
@@ -1482,19 +1491,38 @@ impl<'db> SpecializationBuilder<'db> {
                         self.add_type_mapping(bound_typevar, ty);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // If the type is assignable to _all_ of the constraints, then we
+                        // specialize the typevar to the type itself. If the type is assignable to
+                        // some but not all of them, we specialize the typevar to the "smallest"
+                        // constraint that the type is assignable to. Otherwise it's a
+                        // specialization error.
+                        let mut when_all_assignable = ConstraintSet::from(true);
+                        let mut smallest_assignable = None;
                         for constraint in constraints.elements(self.db) {
-                            if ty
-                                .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied()
-                            {
-                                self.add_type_mapping(bound_typevar, *constraint);
-                                return Ok(());
+                            let when_assignable: ConstraintSet =
+                                ty.when_assignable_to(self.db, *constraint, self.inferable);
+                            if when_assignable.satisfies_all_typevars(self.db, self.inferable) {
+                                // If the type is assignable to this constraint individually. We
+                                // only track the smallest such constraint.
+                                if let Some(existing) = smallest_assignable.replace(*constraint) {
+                                    if existing.is_assignable_to(self.db, *constraint) {
+                                        smallest_assignable.replace(existing);
+                                    }
+                                }
                             }
+                            when_all_assignable.intersect(self.db, when_assignable);
                         }
-                        return Err(SpecializationError::MismatchedConstraint {
-                            bound_typevar,
-                            argument: ty,
-                        });
+
+                        if when_all_assignable.satisfies_all_typevars(self.db, self.inferable) {
+                            self.add_type_mapping(bound_typevar, ty);
+                        } else if let Some(smallest_assignable) = smallest_assignable {
+                            self.add_type_mapping(bound_typevar, smallest_assignable);
+                        } else {
+                            return Err(SpecializationError::MismatchedConstraint {
+                                bound_typevar,
+                                argument: ty,
+                            });
+                        }
                     }
                     _ => {
                         self.add_type_mapping(bound_typevar, ty);

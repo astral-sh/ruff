@@ -8185,24 +8185,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-                ast::Operator::BitAnd,
+                ast::Operator::BitAnd | ast::Operator::BitOr,
             ) => {
                 let left = left.constraints(self.db());
                 let right = right.constraints(self.db());
-                let result = left.and(self.db(), || *right);
-                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), result),
-                )))
-            }
-
-            (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-                ast::Operator::BitOr,
-            ) => {
-                let left = left.constraints(self.db());
-                let right = right.constraints(self.db());
-                let result = left.or(self.db(), || *right);
+                let result = match op {
+                    ast::Operator::BitAnd => left.and(self.db(), || *right),
+                    ast::Operator::BitOr => left.or(self.db(), || *right),
+                    _ => unreachable!("operator should only be BitAnd or BitOr"),
+                };
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))

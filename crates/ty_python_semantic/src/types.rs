@@ -1234,7 +1234,7 @@ impl<'db> Type<'db> {
         self.filter_union(db, |elem| {
             !elem
                 .when_disjoint_from(db, target, inferable)
-                .is_always_satisfied()
+                .satisfies_all_typevars(db, inferable)
         })
     }
 
@@ -1519,14 +1519,27 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is a subtype of type `target`.
+    /// Return true if this type is a subtype of type `target`, when no typevars mentioned in
+    /// either type are inferable.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_subtype_of(db, target, InferableTypeVars::None)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
+    /// Return the constraints under which this type is a subtype of type `target`.
+    ///
+    /// If neither type contains any bound typevars (inferable or not), the result will either be
+    /// [always][ConstraintSet::is_always_satisfied] or [never][ConstraintSet::is_never_satisfied].
+    /// Otherwise, the result will describe which types those typevars must be specialized to for
+    /// subtyping to hold. Note that the result will not enforce that the typevars can only be
+    /// specialized to _valid_ specializations (those that satisfy the typevar's upper bound or
+    /// constraints), nor will it ensure that subtyping holds for _all_ valid specializations. We
+    /// leave that up to the caller to check, so that you can use this method to obtain "partial"
+    /// results and build up a more complete constraint set over several subtyping checks.
+    ///
+    /// See [`TypeRelation::Subtyping`] for more details.
     fn when_subtype_of(
         self,
         db: &'db dyn Db,
@@ -1536,14 +1549,28 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
     }
 
-    /// Return true if this type is assignable to type `target`.
+    /// Return true if this type is assignable to type `target`, when no typevars mentioned in
+    /// either type are inferable.
     ///
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target, InferableTypeVars::None)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
+    /// Returns the constraints under which this type is [assignable to] type `target`.
+    ///
+    /// If neither type contains any bound typevars (inferable or not), the result will either be
+    /// [always][ConstraintSet::is_always_satisfied] or [never][ConstraintSet::is_never_satisfied].
+    /// Otherwise, the result will describe which types those typevars must be specialized to for
+    /// assignability to hold. Note that the result will not enforce that the typevars can only be
+    /// specialized to _valid_ specializations (those that satisfy the typevar's upper bound or
+    /// constraints), nor will it ensure that assignability holds for _all_ valid specializations.
+    /// We leave that up to the caller to check, so that you can use this method to obtain
+    /// "partial" results and build up a more complete constraint set over several assignability
+    /// checks.
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     fn when_assignable_to(
         self,
         db: &'db dyn Db,
@@ -1559,7 +1586,7 @@ impl<'db> Type<'db> {
     #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     fn has_relation_to(
@@ -1598,6 +1625,34 @@ impl<'db> Type<'db> {
         }
 
         match (self, target) {
+            // A non-inferable typevar satisfies a relation when...it satisfies the relation. Yes
+            // that's a tautology! We're moving the caller's subtyping/assignability requirement
+            // into a constraint set. If the typevar has an upper bound or constraints, then the
+            // relation only has to hold when the typevar has a valid specialization (i.e., one
+            // that satisfies the upper bound/constraints).
+            (Type::TypeVar(bound_typevar), _) if !bound_typevar.is_inferable(db, inferable) => {
+                bound_typevar.valid_specializations(db).and(db, || {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        bound_typevar,
+                        Type::Never,
+                        target,
+                        relation,
+                    )
+                })
+            }
+            (_, Type::TypeVar(bound_typevar)) if !bound_typevar.is_inferable(db, inferable) => {
+                bound_typevar.valid_specializations(db).implies(db, || {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        bound_typevar,
+                        self,
+                        Type::object(),
+                        relation,
+                    )
+                })
+            }
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object() => {
                 ConstraintSet::from(true)
@@ -1729,82 +1784,6 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
-            // A fully static typevar is a subtype of its upper bound, and to something similar to
-            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled above).
-            (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, inferable)
-                    && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
-            {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound
-                        .has_relation_to_impl(
-                            db,
-                            target,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().when_all(db, |constraint| {
-                            constraint.has_relation_to_impl(
-                                db,
-                                target,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
-                    }
-                }
-            }
-
-            // If the typevar is constrained, there must be multiple constraints, and the typevar
-            // might be specialized to any one of them. However, the constraints do not have to be
-            // disjoint, which means an lhs type might be a subtype of all of the constraints.
-            (_, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, inferable)
-                    && !bound_typevar
-                        .typevar(db)
-                        .constraints(db)
-                        .when_some_and(|constraints| {
-                            constraints.iter().when_all(db, |constraint| {
-                                self.has_relation_to_impl(
-                                    db,
-                                    *constraint,
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
-                        })
-                        .is_never_satisfied() =>
-            {
-                // TODO: The repetition here isn't great, but we really need the fallthrough logic,
-                // where this arm only engages if it returns true (or in the world of constraints,
-                // not false). Once we're using real constraint sets instead of bool, we should be
-                // able to simplify the typevar logic.
-                bound_typevar
-                    .typevar(db)
-                    .constraints(db)
-                    .when_some_and(|constraints| {
-                        constraints.iter().when_all(db, |constraint| {
-                            self.has_relation_to_impl(
-                                db,
-                                *constraint,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
-                    })
-            }
-
             (Type::TypeVar(bound_typevar), _)
                 if bound_typevar.is_inferable(db, inferable) && relation.is_assignability() =>
             {
@@ -1815,9 +1794,6 @@ impl<'db> Type<'db> {
 
                 ConstraintSet::from(true)
             }
-
-            // `Never` is the bottom type, the empty set.
-            (_, Type::Never) => ConstraintSet::from(false),
 
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
                 elem_ty.has_relation_to_impl(
@@ -1903,14 +1879,10 @@ impl<'db> Type<'db> {
                 })
             }
 
-            // Other than the special cases checked above, no other types are a subtype of a
-            // typevar, since there's no guarantee what type the typevar will be specialized to.
-            // (If the typevar is bounded, it might be specialized to a smaller type than the
-            // bound. This is true even if the bound is a final class, since the typevar can still
-            // be specialized to `Never`.)
-            (_, Type::TypeVar(bound_typevar)) if !bound_typevar.is_inferable(db, inferable) => {
-                ConstraintSet::from(false)
-            }
+            // `Never` is the bottom type, the empty set.
+            // Other than one unlikely edge case (TypeVars bound to `Never`),
+            // no other type is a subtype of or assignable to `Never`.
+            (_, Type::Never) => ConstraintSet::from(false),
 
             (_, Type::TypeVar(typevar))
                 if typevar.is_inferable(db, inferable)
@@ -2405,7 +2377,7 @@ impl<'db> Type<'db> {
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_equivalent_to(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     fn when_equivalent_to(
@@ -2528,7 +2500,7 @@ impl<'db> Type<'db> {
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_disjoint_from(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .satisfies_all_typevars(db, InferableTypeVars::None)
     }
 
     fn when_disjoint_from(
@@ -4629,10 +4601,11 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
-                let constraints = tracked_set.constraints(db);
-                Truthiness::from(constraints.is_always_satisfied())
-            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => Truthiness::from(
+                tracked_set
+                    .constraints(db)
+                    .satisfies_all_typevars(db, InferableTypeVars::None),
+            ),
 
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -7443,7 +7416,7 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
+// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
 /// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
 /// constraint sets to check things like assignability; they're only used as a debugging aid in
 /// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
@@ -7645,6 +7618,17 @@ impl<'db> KnownInstanceType<'db> {
                         Ok(())
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
+                        /*
+                        eprintln!(
+                            "==> constraints {}",
+                            tracked_set.constraints(self.db).display(self.db)
+                        );
+                        if let Some(vs) = tracked_set.valid_specializations(self.db) {
+                            let combined = tracked_set.constraints(self.db).and(self.db, || *vs);
+                            eprintln!("==> valid specs {}", vs.display(self.db));
+                            eprintln!("==> combined    {}", combined.display(self.db));
+                        }
+                        */
                         let constraints = tracked_set.constraints(self.db);
                         if constraints.is_always_satisfied() {
                             f.write_str("ty_extensions.ConstraintSet[always]")
