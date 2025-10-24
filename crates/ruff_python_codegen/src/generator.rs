@@ -89,7 +89,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
-            unparse_mode: Default::default(),
+            unparse_mode: UnparseMode::default(),
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
