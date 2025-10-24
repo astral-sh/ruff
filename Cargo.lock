@@ -4521,7 +4521,6 @@ name = "ty_test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.9.4",
  "camino",
  "colored 3.0.0",
  "insta",

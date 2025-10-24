@@ -287,8 +287,8 @@ opt-level = 3
 [profile.dev.package.similar]
 opt-level = 3
 
-#[profile.dev.package.salsa]
-#opt-level = 3
+[profile.dev.package.salsa]
+opt-level = 3
 
 # Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
