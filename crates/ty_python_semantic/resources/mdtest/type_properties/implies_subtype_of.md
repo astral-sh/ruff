@@ -180,16 +180,12 @@ This might require propagating constraints from other typevars.
 def mutually_constrained[T, U]():
     # If [T = U ∧ U ≤ int], then [T ≤ int] must be true as well.
     given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
-    # TODO: no static-assert-error
-    # error: [static-assert-error]
     static_assert(given_int.implies_subtype_of(T, int))
     static_assert(not given_int.implies_subtype_of(T, bool))
     static_assert(not given_int.implies_subtype_of(T, str))
 
     # If [T ≤ U ∧ U ≤ int], then [T ≤ int] must be true as well.
     given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
-    # TODO: no static-assert-error
-    # error: [static-assert-error]
     static_assert(given_int.implies_subtype_of(T, int))
     static_assert(not given_int.implies_subtype_of(T, bool))
     static_assert(not given_int.implies_subtype_of(T, str))

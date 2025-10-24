@@ -1258,13 +1258,98 @@ impl<'db> InteriorNode<'db> {
         let mut simplified = Node::Interior(self);
         let mut domain = Node::AlwaysTrue;
         while let Some((left_constraint, right_constraint)) = to_visit.pop() {
-            // If the constraints refer to different typevars, they trivially cannot be compared.
-            // TODO: We might need to consider when one constraint's upper or lower bound refers to
-            // the other constraint's typevar.
-            let typevar = left_constraint.typevar(db);
-            if typevar != right_constraint.typevar(db) {
+            // If the constraints refer to different typevars, the only simplifications we can make
+            // are of the form `S ≤ T ∧ T ≤ int → S ≤ int`.
+            let left_typevar = left_constraint.typevar(db);
+            let right_typevar = right_constraint.typevar(db);
+            if !left_typevar.is_same_typevar_as(db, right_typevar) {
+                let positive_left_node =
+                    Node::new_satisfied_constraint(db, left_constraint.when_true());
+                let positive_right_node =
+                    Node::new_satisfied_constraint(db, right_constraint.when_true());
+                let mut add_implication = |node: Node<'db>| {
+                    let lhs = positive_left_node.and(db, positive_right_node);
+                    let implication = lhs.implies(db, node);
+                    domain = domain.and(db, implication);
+
+                    let intersection = node.ite(db, lhs, Node::AlwaysFalse);
+                    simplified = simplified.and(db, intersection);
+                };
+
+                let (bound_typevar, bound_constraint, constrained_typevar, constrained_constraint) =
+                    if left_typevar.can_be_bound_for(db, right_typevar) {
+                        (
+                            left_typevar,
+                            left_constraint,
+                            right_typevar,
+                            right_constraint,
+                        )
+                    } else {
+                        (
+                            right_typevar,
+                            right_constraint,
+                            left_typevar,
+                            left_constraint,
+                        )
+                    };
+
+                match (
+                    constrained_constraint.lower(db),
+                    constrained_constraint.upper(db),
+                ) {
+                    (Type::TypeVar(lower_bound), Type::TypeVar(upper_bound))
+                        if lower_bound.is_same_typevar_as(db, bound_typevar)
+                            && upper_bound.is_same_typevar_as(db, bound_typevar) =>
+                    {
+                        // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
+                        add_implication(Node::new_constraint(
+                            db,
+                            ConstrainedTypeVar::new(
+                                db,
+                                constrained_typevar,
+                                bound_constraint.lower(db),
+                                bound_constraint.upper(db),
+                            ),
+                        ));
+                    }
+
+                    (lower, Type::TypeVar(upper_bound))
+                        if upper_bound.is_same_typevar_as(db, bound_typevar) =>
+                    {
+                        // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
+                        add_implication(Node::new_constraint(
+                            db,
+                            ConstrainedTypeVar::new(
+                                db,
+                                constrained_typevar,
+                                lower,
+                                bound_constraint.upper(db),
+                            ),
+                        ));
+                    }
+
+                    (Type::TypeVar(lower_bound), upper)
+                        if lower_bound.is_same_typevar_as(db, bound_typevar) =>
+                    {
+                        // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
+                        add_implication(Node::new_constraint(
+                            db,
+                            ConstrainedTypeVar::new(
+                                db,
+                                constrained_typevar,
+                                bound_constraint.lower(db),
+                                upper,
+                            ),
+                        ));
+                    }
+
+                    _ => {}
+                }
+
                 continue;
             }
+
+            // From here on out we know that both constraints constrain the same typevar.
 
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.
