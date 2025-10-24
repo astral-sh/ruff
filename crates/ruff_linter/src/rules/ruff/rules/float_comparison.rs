@@ -87,7 +87,9 @@ fn has_float(expr: &Expr) -> bool {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
             matches!(value, ast::Number::Float(_))
         }
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => has_float(left) || has_float(right),
+        Expr::BinOp(ast::ExprBinOp {
+            left, right, op, ..
+        }) => matches!(op, ast::Operator::Div) || has_float(left) || has_float(right),
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand),
         _ => false,
     }
