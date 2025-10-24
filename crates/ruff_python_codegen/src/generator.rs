@@ -93,7 +93,7 @@ pub struct Generator<'a> {
     /// The line ending to use.
     line_ending: LineEnding,
     /// Unparsed code style. See [`Mode`] for more info.
-    unparse_mode: Mode,
+    mode: Mode,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -105,7 +105,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
-            unparse_mode: Mode::default(),
+            mode: Mode::default(),
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -120,7 +120,7 @@ impl<'a> Generator<'a> {
             // Style preferences.
             indent,
             line_ending,
-            unparse_mode: Mode::Default,
+            mode: Mode::Default,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
@@ -131,8 +131,8 @@ impl<'a> Generator<'a> {
 
     /// Sets the mode for code unparsing.
     #[must_use]
-    pub fn with_unparse_mode(mut self, mode: Mode) -> Self {
-        self.unparse_mode = mode;
+    pub fn with_mode(mut self, mode: Mode) -> Self {
+        self.mode = mode;
         self
     }
 
@@ -194,7 +194,7 @@ impl<'a> Generator<'a> {
                 return;
             }
         }
-        let quote_style = self.unparse_mode.quote_style(flags);
+        let quote_style = self.mode.quote_style(flags);
         let escape = AsciiEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -214,7 +214,7 @@ impl<'a> Generator<'a> {
         }
         self.p(flags.prefix().as_str());
 
-        let quote_style = self.unparse_mode.quote_style(flags);
+        let quote_style = self.mode.quote_style(flags);
         let escape = UnicodeEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -1324,7 +1324,7 @@ impl<'a> Generator<'a> {
                 if tuple.is_empty() {
                     self.p("()");
                 } else {
-                    let lvl = match self.unparse_mode {
+                    let lvl = match self.mode {
                         Mode::Default => precedence::TUPLE,
                         Mode::AstUnparse => precedence::MIN,
                     };
@@ -1550,7 +1550,7 @@ impl<'a> Generator<'a> {
             return;
         }
 
-        let quote_style = self.unparse_mode.quote_style(flags);
+        let quote_style = self.mode.quote_style(flags);
         let escape = UnicodeEscape::with_preferred_quote(&s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -1577,7 +1577,7 @@ impl<'a> Generator<'a> {
     ) {
         self.p(flags.prefix().as_str());
 
-        let quote_style = self.unparse_mode.quote_style(flags);
+        let quote_style = self.mode.quote_style(flags);
         let flags = flags.with_quote_style(quote_style);
         self.p(flags.quote_str());
         self.unparse_interpolated_string_body(values, flags);
@@ -1637,8 +1637,7 @@ mod tests {
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator =
-            Generator::new(indentation, line_ending).with_unparse_mode(unparse_mode);
+        let mut generator = Generator::new(indentation, line_ending).with_mode(unparse_mode);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
