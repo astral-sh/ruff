@@ -1307,7 +1307,7 @@ help: Replace with list literal
     131 |+print(["  x"])
 132 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
 133 133 | 
-134 134 | # https://github.com/astral-sh/ruff/issues/19610
+134 134 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
 
 SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:132:7
@@ -1317,7 +1317,7 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 133 |
-134 | # https://github.com/astral-sh/ruff/issues/19610
+134 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
     |
 help: Replace with list literal
 
@@ -1328,266 +1328,261 @@ help: Replace with list literal
 132     |-print("  x  ".rsplit(sep=None, maxsplit=0))
     132 |+print(["  x"])
 133 133 | 
-134 134 | # https://github.com/astral-sh/ruff/issues/19610
-135 135 | r"1" "\n".split("1")  # [r"", "\n"]
+134 134 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
+135 135 | r"""simple@example.com
 
 SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:135:1
     |
-134 | # https://github.com/astral-sh/ruff/issues/19610
-135 | r"1" "\n".split("1")  # [r"", "\n"]
-    | ^^^^^^^^^^^^^^^^^^^^
-136 | r"" "\"".split("1")  # ['"']
-137 | r"1" """
+134 |   # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
+135 | / r"""simple@example.com
+136 | | very.common@example.com
+137 | | FirstName.LastName@EasierReading.org
+138 | | x@example.com
+139 | | long.email-address-with-hyphens@and.subdomains.example.com
+140 | | user.name+tag+sorting@example.com
+141 | | name/surname@example.com
+142 | | xample@s.example
+143 | | " "@example.org
+144 | | "john..doe"@example.org
+145 | | mailhost!username@example.org
+146 | | "very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
+147 | | user%example.com@example.org
+148 | | user-@example.org
+149 | | I❤️CHOCOLATE@example.com
+150 | | this\ still\"not\\allowed@example.com
+151 | | stellyamburrr985@example.com
+152 | | Abc.123@example.com
+153 | | user+mailbox/department=shipping@example.com
+154 | | !#$%&'*+-/=?^_`.{|}~@example.com
+155 | | "Abc@def"@example.com
+156 | | "Fred\ Bloggs"@example.com
+157 | | "Joe.\\Blow"@example.com""".split("\n")
+    | |_______________________________________^
     |
 help: Replace with list literal
 
 ℹ Safe fix
 132 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
 133 133 | 
-134 134 | # https://github.com/astral-sh/ruff/issues/19610
-135     |-r"1" "\n".split("1")  # [r"", "\n"]
-    135 |+[r"", '\n']  # [r"", "\n"]
-136 136 | r"" "\"".split("1")  # ['"']
-137 137 | r"1" """
-138 138 | """.split("1")  # [r"", "\n"]
+134 134 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
+135     |-r"""simple@example.com
+136     |-very.common@example.com
+137     |-FirstName.LastName@EasierReading.org
+138     |-x@example.com
+139     |-long.email-address-with-hyphens@and.subdomains.example.com
+140     |-user.name+tag+sorting@example.com
+141     |-name/surname@example.com
+142     |-xample@s.example
+143     |-" "@example.org
+144     |-"john..doe"@example.org
+145     |-mailhost!username@example.org
+146     |-"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
+147     |-user%example.com@example.org
+148     |-user-@example.org
+149     |-I❤️CHOCOLATE@example.com
+150     |-this\ still\"not\\allowed@example.com
+151     |-stellyamburrr985@example.com
+152     |-Abc.123@example.com
+153     |-user+mailbox/department=shipping@example.com
+154     |-!#$%&'*+-/=?^_`.{|}~@example.com
+155     |-"Abc@def"@example.com
+156     |-"Fred\ Bloggs"@example.com
+157     |-"Joe.\\Blow"@example.com""".split("\n")
+    135 |+[r"simple@example.com", r"very.common@example.com", r"FirstName.LastName@EasierReading.org", r"x@example.com", r"long.email-address-with-hyphens@and.subdomains.example.com", r"user.name+tag+sorting@example.com", r"name/surname@example.com", r"xample@s.example", r'" "@example.org', r'"john..doe"@example.org', r"mailhost!username@example.org", r'"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com', r"user%example.com@example.org", r"user-@example.org", r"I❤️CHOCOLATE@example.com", r'this\ still\"not\\allowed@example.com', r"stellyamburrr985@example.com", r"Abc.123@example.com", r"user+mailbox/department=shipping@example.com", r"!#$%&'*+-/=?^_`.{|}~@example.com", r'"Abc@def"@example.com', r'"Fred\ Bloggs"@example.com', r'"Joe.\\Blow"@example.com']
+158 136 | 
+159 137 | 
+160 138 | r"""first
 
 SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:136:1
+   --> SIM905.py:160:1
     |
-134 | # https://github.com/astral-sh/ruff/issues/19610
-135 | r"1" "\n".split("1")  # [r"", "\n"]
-136 | r"" "\"".split("1")  # ['"']
-    | ^^^^^^^^^^^^^^^^^^^
-137 | r"1" """
-138 | """.split("1")  # [r"", "\n"]
-    |
-help: Replace with list literal
-
-ℹ Safe fix
-133 133 | 
-134 134 | # https://github.com/astral-sh/ruff/issues/19610
-135 135 | r"1" "\n".split("1")  # [r"", "\n"]
-136     |-r"" "\"".split("1")  # ['"']
-    136 |+[r'"']  # ['"']
-137 137 | r"1" """
-138 138 | """.split("1")  # [r"", "\n"]
-139 139 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
-
-SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:137:1
-    |
-135 |   r"1" "\n".split("1")  # [r"", "\n"]
-136 |   r"" "\"".split("1")  # ['"']
-137 | / r"1" """
-138 | | """.split("1")  # [r"", "\n"]
-    | |______________^
-139 |   r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
-    |
-help: Replace with list literal
-
-ℹ Safe fix
-134 134 | # https://github.com/astral-sh/ruff/issues/19610
-135 135 | r"1" "\n".split("1")  # [r"", "\n"]
-136 136 | r"" "\"".split("1")  # ['"']
-137     |-r"1" """
-138     |-""".split("1")  # [r"", "\n"]
-    137 |+[r"", '\n']  # [r"", "\n"]
-139 138 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
-140 139 | 
-141 140 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
-
-SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:139:1
-    |
-137 | r"1" """
-138 | """.split("1")  # [r"", "\n"]
-139 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^
-140 |
-141 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
-    |
-help: Replace with list literal
-
-ℹ Safe fix
-136 136 | r"" "\"".split("1")  # ['"']
-137 137 | r"1" """
-138 138 | """.split("1")  # [r"", "\n"]
-139     |-r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
-    139 |+['\\n\n\'"']  # ["\\n\n'\""]
-140 140 | 
-141 141 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
-142 142 | r"""simple@example.com
-
-SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:142:1
-    |
-141 |   # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
-142 | / r"""simple@example.com
-143 | | very.common@example.com
-144 | | FirstName.LastName@EasierReading.org
-145 | | x@example.com
-146 | | long.email-address-with-hyphens@and.subdomains.example.com
-147 | | user.name+tag+sorting@example.com
-148 | | name/surname@example.com
-149 | | xample@s.example
-150 | | " "@example.org
-151 | | "john..doe"@example.org
-152 | | mailhost!username@example.org
-153 | | "very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
-154 | | user%example.com@example.org
-155 | | user-@example.org
-156 | | I❤️CHOCOLATE@example.com
-157 | | this\ still\"not\\allowed@example.com
-158 | | stellyamburrr985@example.com
-159 | | Abc.123@example.com
-160 | | user+mailbox/department=shipping@example.com
-161 | | !#$%&'*+-/=?^_`.{|}~@example.com
-162 | | "Abc@def"@example.com
-163 | | "Fred\ Bloggs"@example.com
-164 | | "Joe.\\Blow"@example.com""".split("\n")
+160 | / r"""first
+161 | | 'no need' to escape
+162 | | "swap" quote style
+163 | | "use' ugly triple quotes""".split("\n")
     | |_______________________________________^
+164 |
+165 |   # https://github.com/astral-sh/ruff/issues/19845
     |
 help: Replace with list literal
 
 ℹ Safe fix
-139 139 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
-140 140 | 
-141 141 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
-142     |-r"""simple@example.com
-143     |-very.common@example.com
-144     |-FirstName.LastName@EasierReading.org
-145     |-x@example.com
-146     |-long.email-address-with-hyphens@and.subdomains.example.com
-147     |-user.name+tag+sorting@example.com
-148     |-name/surname@example.com
-149     |-xample@s.example
-150     |-" "@example.org
-151     |-"john..doe"@example.org
-152     |-mailhost!username@example.org
-153     |-"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
-154     |-user%example.com@example.org
-155     |-user-@example.org
-156     |-I❤️CHOCOLATE@example.com
-157     |-this\ still\"not\\allowed@example.com
-158     |-stellyamburrr985@example.com
-159     |-Abc.123@example.com
-160     |-user+mailbox/department=shipping@example.com
-161     |-!#$%&'*+-/=?^_`.{|}~@example.com
-162     |-"Abc@def"@example.com
-163     |-"Fred\ Bloggs"@example.com
-164     |-"Joe.\\Blow"@example.com""".split("\n")
-    142 |+[r"simple@example.com", r"very.common@example.com", r"FirstName.LastName@EasierReading.org", r"x@example.com", r"long.email-address-with-hyphens@and.subdomains.example.com", r"user.name+tag+sorting@example.com", r"name/surname@example.com", r"xample@s.example", r'" "@example.org', r'"john..doe"@example.org', r"mailhost!username@example.org", r'"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com', r"user%example.com@example.org", r"user-@example.org", r"I❤️CHOCOLATE@example.com", r'this\ still\"not\\allowed@example.com', r"stellyamburrr985@example.com", r"Abc.123@example.com", r"user+mailbox/department=shipping@example.com", r"!#$%&'*+-/=?^_`.{|}~@example.com", r'"Abc@def"@example.com', r'"Fred\ Bloggs"@example.com', r'"Joe.\\Blow"@example.com']
-165 143 | 
-166 144 | 
-167 145 | r"""first
+157 157 | "Joe.\\Blow"@example.com""".split("\n")
+158 158 | 
+159 159 | 
+160     |-r"""first
+161     |-'no need' to escape
+162     |-"swap" quote style
+163     |-"use' ugly triple quotes""".split("\n")
+    160 |+[r"first", r"'no need' to escape", r'"swap" quote style', '"use\' ugly triple quotes']
+164 161 | 
+165 162 | # https://github.com/astral-sh/ruff/issues/19845
+166 163 | print("S\x1cP\x1dL\x1eI\x1fT".split())
 
 SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:167:1
+   --> SIM905.py:166:7
     |
-167 | / r"""first
-168 | | 'no need' to escape
-169 | | "swap" quote style
-170 | | "use' ugly triple quotes""".split("\n")
-    | |_______________________________________^
-171 |
-172 |   # https://github.com/astral-sh/ruff/issues/19845
-    |
-help: Replace with list literal
-
-ℹ Safe fix
-164 164 | "Joe.\\Blow"@example.com""".split("\n")
-165 165 | 
-166 166 | 
-167     |-r"""first
-168     |-'no need' to escape
-169     |-"swap" quote style
-170     |-"use' ugly triple quotes""".split("\n")
-    167 |+[r"first", r"'no need' to escape", r'"swap" quote style', '"use\' ugly triple quotes']
-171 168 | 
-172 169 | # https://github.com/astral-sh/ruff/issues/19845
-173 170 | print("S\x1cP\x1dL\x1eI\x1fT".split())
-
-SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:173:7
-    |
-172 | # https://github.com/astral-sh/ruff/issues/19845
-173 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+165 | # https://github.com/astral-sh/ruff/issues/19845
+166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-174 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
-175 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
     |
 help: Replace with list literal
 
 ℹ Safe fix
-170 170 | "use' ugly triple quotes""".split("\n")
-171 171 | 
-172 172 | # https://github.com/astral-sh/ruff/issues/19845
-173     |-print("S\x1cP\x1dL\x1eI\x1fT".split())
-    173 |+print(["S", "P", "L", "I", "T"])
-174 174 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
-175 175 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
-176 176 | 
+163 163 | "use' ugly triple quotes""".split("\n")
+164 164 | 
+165 165 | # https://github.com/astral-sh/ruff/issues/19845
+166     |-print("S\x1cP\x1dL\x1eI\x1fT".split())
+    166 |+print(["S", "P", "L", "I", "T"])
+167 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
 
 SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:174:7
+   --> SIM905.py:167:7
     |
-172 | # https://github.com/astral-sh/ruff/issues/19845
-173 | print("S\x1cP\x1dL\x1eI\x1fT".split())
-174 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+165 | # https://github.com/astral-sh/ruff/issues/19845
+166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-175 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
     |
 help: Replace with list literal
 
 ℹ Safe fix
-171 171 | 
-172 172 | # https://github.com/astral-sh/ruff/issues/19845
-173 173 | print("S\x1cP\x1dL\x1eI\x1fT".split())
-174     |-print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
-    174 |+print([">"])
-175 175 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
-176 176 | 
-177 177 | # leading/trailing whitespace should not count towards maxsplit
+164 164 | 
+165 165 | # https://github.com/astral-sh/ruff/issues/19845
+166 166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167     |-print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+    167 |+print([">"])
+168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
 
 SIM905 [*] Consider using a list literal instead of `str.split`
-   --> SIM905.py:175:7
+   --> SIM905.py:168:7
     |
-173 | print("S\x1cP\x1dL\x1eI\x1fT".split())
-174 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
-175 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-176 |
-177 | # leading/trailing whitespace should not count towards maxsplit
+169 |
+170 | # leading/trailing whitespace should not count towards maxsplit
     |
 help: Replace with list literal
 
 ℹ Safe fix
-172 172 | # https://github.com/astral-sh/ruff/issues/19845
-173 173 | print("S\x1cP\x1dL\x1eI\x1fT".split())
-174 174 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
-175     |-print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
-    175 |+print(["<"])
-176 176 | 
-177 177 | # leading/trailing whitespace should not count towards maxsplit
-178 178 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+165 165 | # https://github.com/astral-sh/ruff/issues/19845
+166 166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168     |-print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+    168 |+print(["<"])
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 
 SIM905 Consider using a list literal instead of `str.split`
-   --> SIM905.py:178:1
+   --> SIM905.py:171:1
     |
-177 | # leading/trailing whitespace should not count towards maxsplit
-178 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-179 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
     |
 help: Replace with list literal
 
 SIM905 Consider using a list literal instead of `str.split`
+   --> SIM905.py:172:1
+    |
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 |
+174 | # https://github.com/astral-sh/ruff/issues/19610
+    |
+help: Replace with list literal
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:175:1
+    |
+174 | # https://github.com/astral-sh/ruff/issues/19610
+175 | r"1" "\n".split("1")  # [r"", "\n"]
+    | ^^^^^^^^^^^^^^^^^^^^
+176 | r"" "\"".split("1")  # ['"']
+177 | r"1" """
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+172 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 173 | 
+174 174 | # https://github.com/astral-sh/ruff/issues/19610
+175     |-r"1" "\n".split("1")  # [r"", "\n"]
+    175 |+[r"", '\n']  # [r"", "\n"]
+176 176 | r"" "\"".split("1")  # ['"']
+177 177 | r"1" """
+178 178 | """.split("1")  # [r"", "\n"]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:176:1
+    |
+174 | # https://github.com/astral-sh/ruff/issues/19610
+175 | r"1" "\n".split("1")  # [r"", "\n"]
+176 | r"" "\"".split("1")  # ['"']
+    | ^^^^^^^^^^^^^^^^^^^
+177 | r"1" """
+178 | """.split("1")  # [r"", "\n"]
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+173 173 | 
+174 174 | # https://github.com/astral-sh/ruff/issues/19610
+175 175 | r"1" "\n".split("1")  # [r"", "\n"]
+176     |-r"" "\"".split("1")  # ['"']
+    176 |+[r'"']  # ['"']
+177 177 | r"1" """
+178 178 | """.split("1")  # [r"", "\n"]
+179 179 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:177:1
+    |
+175 |   r"1" "\n".split("1")  # [r"", "\n"]
+176 |   r"" "\"".split("1")  # ['"']
+177 | / r"1" """
+178 | | """.split("1")  # [r"", "\n"]
+    | |______________^
+179 |   r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+174 174 | # https://github.com/astral-sh/ruff/issues/19610
+175 175 | r"1" "\n".split("1")  # [r"", "\n"]
+176 176 | r"" "\"".split("1")  # ['"']
+177     |-r"1" """
+178     |-""".split("1")  # [r"", "\n"]
+    177 |+[r"", '\n']  # [r"", "\n"]
+179 178 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:179:1
     |
-177 | # leading/trailing whitespace should not count towards maxsplit
-178 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
-179 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+177 | r"1" """
+178 | """.split("1")  # [r"", "\n"]
+179 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace with list literal
+
+ℹ Safe fix
+176 176 | r"" "\"".split("1")  # ['"']
+177 177 | r"1" """
+178 178 | """.split("1")  # [r"", "\n"]
+179     |-r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    179 |+['\\n\n\'"']  # ["\\n\n'\""]

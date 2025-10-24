@@ -135,27 +135,27 @@ fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
     // 'single'quoted
     // """.split() # -> [r"itemA",r"'single'quoted'"]
     // ```
-
     if !flags.prefix().is_raw() {
-        return flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
-    }
-
-    if elt.contains('\n') || elt.contains('\r') {
-        return StringLiteralFlags::empty()
-            .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
-    }
-
-    if elt.contains(flags.quote_style().as_char()) {
+        flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
+    } else if elt.contains(['\n', '\r']) {
+        // If the element contains newlines or carriage returns, we need to use
+        // default flags (no raw prefix) to avoid syntax errors
+        StringLiteralFlags::empty()
+    } else if elt.contains(flags.quote_style().as_char()) {
+        // If we have a raw string containing a quotation mark of the same style,
+        // then we have to swap the style of quotation marks used
         if elt.contains(flags.quote_style().opposite().as_char()) {
-            return StringLiteralFlags::empty()
-                .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
+            // If both types of quotes are used in the raw string, then
+            // we are forced to use default flags to avoid syntax errors
+            StringLiteralFlags::empty()
+        } else {
+            flags
+                .with_quote_style(flags.quote_style().opposite())
+                .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
         }
-        return flags
-            .with_quote_style(flags.quote_style().opposite())
-            .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
+    } else {
+        flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
     }
-
-    flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
 }
 
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
