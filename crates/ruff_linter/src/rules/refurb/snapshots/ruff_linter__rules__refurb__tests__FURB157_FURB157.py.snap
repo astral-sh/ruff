@@ -176,7 +176,6 @@ help: Replace with `1_000`
 24 | Decimal("__1____000") 
 25 | 
 26 | # Ok
-note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:24:9
@@ -197,7 +196,6 @@ help: Replace with `1_000`
 25 | 
 26 | # Ok
 27 | Decimal("2e-4")
-note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:48:9
@@ -556,7 +554,6 @@ help: Replace with `15_000_000`
 76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
 77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
-note: This is an unsafe fix and may change runtime behavior
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:76:9
@@ -576,7 +573,7 @@ help: Replace with `1_234_567`
 76 + Decimal(1_234_567)   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
 77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
-note: This is an unsafe fix and may change runtime behavior
+79 | 
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:77:9
@@ -594,7 +591,8 @@ help: Replace with `-5_000`
    - Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 77 + Decimal(-5_000)      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
-note: This is an unsafe fix and may change runtime behavior
+79 | 
+80 | # Test cases for non-thousands separators
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:78:9
@@ -603,6 +601,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
    |         ^^^^^^^^
+79 |
+80 | # Test cases for non-thousands separators
    |
 help: Replace with `+9_999`
 75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
@@ -610,4 +610,37 @@ help: Replace with `+9_999`
 77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
    - Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
 78 + Decimal(+9_999)      # Safe fix: normalizes separators, becomes Decimal(+9_999)
-note: This is an unsafe fix and may change runtime behavior
+79 | 
+80 | # Test cases for non-thousands separators
+81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:81:9
+   |
+80 | # Test cases for non-thousands separators
+81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+   |         ^^^^^^^^^^^^^
+82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+   |
+help: Replace with `12_34_56_78`
+78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+79 | 
+80 | # Test cases for non-thousands separators
+   - Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+81 + Decimal(12_34_56_78)  # Safe fix: preserves non-thousands separators
+82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:82:9
+   |
+80 | # Test cases for non-thousands separators
+81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+   |         ^^^^^^^^^^^
+   |
+help: Replace with `1234_5678`
+79 | 
+80 | # Test cases for non-thousands separators
+81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+   - Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+82 + Decimal(1234_5678)    # Safe fix: preserves non-thousands separators

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
@@ -8,6 +9,7 @@ use std::borrow::Cow;
 use crate::checkers::ast::Checker;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
@@ -132,7 +134,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 
             // If the original string had digit separators, normalize them
             let replacement = if has_digit_separators {
-                normalize_digit_separators(original_str, unary, rest)
+                normalize_digit_separators(original_str, unary)
             } else {
                 format!("{unary}{rest}")
             };
@@ -144,19 +146,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 value.range(),
             );
 
-            // Mark the fix as unsafe if the original string had digit separators
-            // because the replacement might not preserve the original formatting
-            if has_digit_separators {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    replacement,
-                    value.range(),
-                )));
-            } else {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    replacement,
-                    value.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(replacement, value.range()),
+                Applicability::Safe,
+            ));
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -206,7 +199,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 /// - Stripping leading and trailing underscores
 /// - Collapsing medial underscore sequences to single underscores
 /// - Do not force thousands separators
-fn normalize_digit_separators(original_str: &str, unary: &str, _numeric_part: &str) -> String {
+fn normalize_digit_separators(original_str: &str, unary: &str) -> String {
     // Remove the unary sign from the original string to work with the numeric part
     let without_unary = if original_str.starts_with('+') || original_str.starts_with('-') {
         &original_str[1..]
@@ -217,43 +210,11 @@ fn normalize_digit_separators(original_str: &str, unary: &str, _numeric_part: &s
     // Strip leading and trailing underscores
     let trimmed = without_unary.trim_matches('_');
 
-    // If the trimmed string is empty or all underscores, return just the unary sign
-    if trimmed.is_empty() {
-        return format!("{unary}0");
-    }
-
-    // Extract only digits from the trimmed string
-    let digits: String = trimmed.chars().filter(char::is_ascii_digit).collect();
-
-    // If no digits found, return 0
-    if digits.is_empty() {
-        return format!("{unary}0");
-    }
-
-    let mut result = String::new();
-    let chars: Vec<char> = trimmed.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-        if chars[i].is_ascii_digit() {
-            result.push(chars[i]);
-        } else if chars[i] == '_' {
-            // Only add underscore if the previous character was a digit
-            // and we haven't already added an underscore
-            if !result.is_empty() && !result.ends_with('_') {
-                result.push('_');
-            }
-        }
-        i += 1;
-    }
-
-    // Remove trailing underscores
-    result = result.trim_end_matches('_').to_string();
-
-    // If result is empty after processing, return 0
-    if result.is_empty() {
-        return format!("{unary}0");
-    }
+    // Collapse medial underscore sequences to single underscores
+    let result = trimmed
+        .chars()
+        .dedup_by(|a, b| *a == '_' && a == b)
+        .collect::<String>();
 
     // Return the formatted result with unary sign
     format!("{unary}{result}")

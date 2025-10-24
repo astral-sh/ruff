@@ -76,3 +76,7 @@ Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000
 Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
 Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+
+# Test cases for non-thousands separators
+Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
