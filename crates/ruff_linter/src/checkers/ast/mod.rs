@@ -2116,7 +2116,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
                 self.analyze.scopes.push(self.semantic.scope_id);
-                self.semantic.pop_scope();
+                self.semantic.pop_scope(); // Lambda/Generator/Comprehension scope
             }
             _ => {}
         }
@@ -3041,7 +3041,35 @@ impl<'a> Checker<'a> {
                 if let Some(parameters) = parameters {
                     self.visit_parameters(parameters);
                 }
+
+                // Here we add the implicit scope surrounding a lambda which allows code in the
+                // lambda to access `__class__` at runtime when the lambda is defined within a class.
+                // See the `ScopeKind::DunderClassCell` docs for more information.
+                let added_dunder_class_scope = if self
+                    .semantic
+                    .current_scopes()
+                    .any(|scope| scope.kind.is_class())
+                {
+                    self.semantic.push_scope(ScopeKind::DunderClassCell);
+                    let binding_id = self.semantic.push_binding(
+                        TextRange::default(),
+                        BindingKind::DunderClassCell,
+                        BindingFlags::empty(),
+                    );
+                    self.semantic
+                        .current_scope_mut()
+                        .add("__class__", binding_id);
+                    true
+                } else {
+                    false
+                };
+
                 self.visit_expr(body);
+
+                // Pop the DunderClassCell scope if it was added
+                if added_dunder_class_scope {
+                    self.semantic.pop_scope();
+                }
             }
         }
         self.semantic.restore(snapshot);
