@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
@@ -8,6 +9,7 @@ use std::borrow::Cow;
 use crate::checkers::ast::Checker;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
@@ -91,8 +93,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // using this regex:
             // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
             // _after_ trimming whitespace from the string and removing all occurrences of "_".
-            let mut trimmed = Cow::from(str_literal.to_str().trim_whitespace());
-            if memchr::memchr(b'_', trimmed.as_bytes()).is_some() {
+            let original_str = str_literal.to_str().trim_whitespace();
+            let mut trimmed = Cow::from(original_str);
+            let has_digit_separators = memchr::memchr(b'_', trimmed.as_bytes()).is_some();
+            if has_digit_separators {
                 trimmed = Cow::from(trimmed.replace('_', ""));
             }
             // Extract the unary sign, if any.
@@ -129,7 +133,13 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 _ => rest,
             };
 
-            let replacement = format!("{unary}{rest}");
+            // If the original string had digit separators, normalize them
+            let replacement = if has_digit_separators {
+                normalize_digit_separators(original_str, unary)
+            } else {
+                format!("{unary}{rest}")
+            };
+
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
@@ -137,10 +147,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                value.range(),
-            )));
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(replacement, value.range()),
+                Applicability::Safe,
+            ));
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -184,6 +194,31 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
         }
         _ => {}
     }
+}
+
+/// Normalizes digit separators in a numeric string by:
+/// - Stripping leading and trailing underscores
+/// - Collapsing medial underscore sequences to single underscores
+/// - Do not force thousands separators
+fn normalize_digit_separators(original_str: &str, unary: &str) -> String {
+    // Remove the unary sign from the original string to work with the numeric part
+    let without_unary = if original_str.starts_with('+') || original_str.starts_with('-') {
+        &original_str[1..]
+    } else {
+        original_str
+    };
+
+    // Strip leading and trailing underscores
+    let trimmed = without_unary.trim_matches('_');
+
+    // Collapse medial underscore sequences to single underscores
+    let result = trimmed
+        .chars()
+        .dedup_by(|a, b| *a == '_' && a == b)
+        .collect::<String>();
+
+    // Return the formatted result with unary sign
+    format!("{unary}{result}")
 }
 
 // ```console
