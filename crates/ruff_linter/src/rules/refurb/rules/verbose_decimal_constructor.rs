@@ -205,7 +205,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 /// Normalizes digit separators in a numeric string by:
 /// - Stripping leading and trailing underscores
 /// - Collapsing medial underscore sequences to single underscores
-/// - Adding proper thousand separators every 3 digits from the right
+/// - Do not force thousands separators
 fn normalize_digit_separators(original_str: &str, unary: &str, _numeric_part: &str) -> String {
     // Remove the unary sign from the original string to work with the numeric part
     let without_unary = if original_str.starts_with('+') || original_str.starts_with('-') {
@@ -230,17 +230,29 @@ fn normalize_digit_separators(original_str: &str, unary: &str, _numeric_part: &s
         return format!("{unary}0");
     }
 
-    // Add thousand separators every 3 digits from the right
     let mut result = String::new();
-    let chars: Vec<char> = digits.chars().collect();
-    let mut i = chars.len();
+    let chars: Vec<char> = trimmed.chars().collect();
+    let mut i = 0;
 
-    while i > 0 {
-        i -= 1;
-        result.insert(0, chars[i]);
-        if i > 0 && (chars.len() - i).is_multiple_of(3) {
-            result.insert(0, '_');
+    while i < chars.len() {
+        if chars[i].is_ascii_digit() {
+            result.push(chars[i]);
+        } else if chars[i] == '_' {
+            // Only add underscore if the previous character was a digit
+            // and we haven't already added an underscore
+            if !result.is_empty() && !result.ends_with('_') {
+                result.push('_');
+            }
         }
+        i += 1;
+    }
+
+    // Remove trailing underscores
+    result = result.trim_end_matches('_').to_string();
+
+    // If result is empty after processing, return 0
+    if result.is_empty() {
+        return format!("{unary}0");
     }
 
     // Return the formatted result with unary sign
