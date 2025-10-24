@@ -295,6 +295,21 @@ impl From<bool> for ConstraintSet<'_> {
     }
 }
 
+impl<'db> BoundTypeVarInstance<'db> {
+    /// Returns whether this typevar can be the lower or upper bound of another typevar in a
+    /// constraint set.
+    ///
+    /// We enforce an (arbitrary) ordering on typevars, and ensure that the bounds of a constraint
+    /// are "later" according to that order than the typevar being constrained. Having an order
+    /// ensures that we can build up transitive relationships between constraints without incurring
+    /// any cycles. This particular ordering plays nicely with how we are ordering constraints
+    /// within a BDD — it means that if a typevar has another typevar as a bound, all of the
+    /// constraints that apply to the bound will appear lower in the BDD.
+    fn can_be_bound_for(self, db: &'db dyn Db, typevar: Self) -> bool {
+        self.identity(db) > typevar.identity(db)
+    }
+}
+
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -337,15 +352,15 @@ impl<'db> ConstrainedTypeVar<'db> {
         let upper = upper.normalized(db);
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
-        // typevars, we have to ensure that the bounds are "earlier" according to that order than
-        // the typevar being constrained.
+        // typevars, we have to ensure that the bounds are "later" according to that order than the
+        // typevar being constrained.
         //
-        // In the comments below, we use brackets to indicate which typevar is "larger", and
+        // In the comments below, we use brackets to indicate which typevar is "earlier", and
         // therefore the typevar that the constraint applies to.
         match (lower, upper) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
-                let (bound, typevar) = if lower.identity(db) < typevar.identity(db) {
+                let (bound, typevar) = if lower.can_be_bound_for(db, typevar) {
                     (lower, typevar)
                 } else {
                     (typevar, lower)
@@ -363,8 +378,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
             (Type::TypeVar(lower), Type::TypeVar(upper))
-                if lower.identity(db) > typevar.identity(db)
-                    && upper.identity(db) > typevar.identity(db) =>
+                if typevar.can_be_bound_for(db, lower) && typevar.can_be_bound_for(db, upper) =>
             {
                 let lower = Node::new_constraint(
                     db,
@@ -378,7 +392,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            (Type::TypeVar(lower), _) if lower.identity(db) > typevar.identity(db) => {
+            (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, lower) => {
                 let lower = Node::new_constraint(
                     db,
                     ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
@@ -388,7 +402,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            (_, Type::TypeVar(upper)) if upper.identity(db) > typevar.identity(db) => {
+            (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, upper) => {
                 let lower = Self::new_node(db, typevar, lower, Type::object());
                 let upper = Node::new_constraint(
                     db,
@@ -716,18 +730,14 @@ impl<'db> Node<'db> {
         match (lhs, rhs) {
             // When checking subtyping involving a typevar, we project the BDD so that it only
             // contains that typevar, and any other typevars that could be its upper/lower bound.
-            // (That is, other typevars that are "earlier" in our arbitrary ordering of typevars.)
+            // (That is, other typevars that are "later" in our arbitrary ordering of typevars.)
             //
             // Having done that, we can turn the subtyping check into a constraint (i.e, "is `T` a
             // subtype of `int` becomes the constraint `T ≤ int`), and then check when the BDD
             // implies that constraint.
             (Type::TypeVar(bound_typevar), _) => {
                 let constrained_typevar = match rhs {
-                    Type::TypeVar(rhs_bound_typevar)
-                        if rhs_bound_typevar.identity(db) > bound_typevar.identity(db) =>
-                    {
-                        rhs_bound_typevar
-                    }
+                    Type::TypeVar(rhs) if bound_typevar.can_be_bound_for(db, rhs) => rhs,
                     _ => bound_typevar,
                 };
                 let projected = self.project_typevar(db, constrained_typevar.identity(db));

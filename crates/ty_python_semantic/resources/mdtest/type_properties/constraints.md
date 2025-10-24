@@ -609,8 +609,8 @@ Constraints can relate two typevars — i.e., `S ≤ T`. We could encode that in
 being constrained. The other is then the lower or upper bound of the constraint.
 
 To handle this, we enforce an arbitrary ordering on typevars, and always place the constraint on the
-"later" typevar. For the example above, that does not change how the constraint is displayed, since
-we always hide `Never` lower bounds and `object` upper bounds.
+"earlier" typevar. For the example above, that does not change how the constraint is displayed,
+since we always hide `Never` lower bounds and `object` upper bounds.
 
 ```py
 from typing import Never
@@ -629,8 +629,8 @@ def f[T, S]():
     reveal_type(range_constraint(S, T, object))
 ```
 
-Equivalence constraints are similar; internally we arbitrarily choose the "later" typevar to be the
-constraint, and the other the bound. But we display the result the same way no matter what.
+Equivalence constraints are similar; internally we arbitrarily choose the "earlier" typevar to be
+the constraint, and the other the bound. But we display the result the same way no matter what.
 
 ```py
 def f[S, T]():
