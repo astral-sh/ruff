@@ -661,15 +661,12 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                         let param_name = param_part_trimmed.trim_start_matches('*');
                         if is_identifier(param_name) {
                             // Calculate the position of this specific parameter part within the line
-                            let param_start_in_line =
-                                param_line.find(param_part_trimmed).unwrap_or(0);
+                            // Safety: searching for a substring we just split above
+                            let param_start_in_line = param_line.find(param_part_trimmed).unwrap();
                             let param_start = line_start
                                 + indentation.text_len()
-                                + TextSize::from(u32::try_from(param_start_in_line).unwrap_or(0));
-                            let param_end = param_start
-                                + TextSize::from(
-                                    u32::try_from(param_part_trimmed.len()).unwrap_or(0),
-                                );
+                                + TextSize::try_from(param_start_in_line).unwrap();
+                            let param_end = param_start + param_part_trimmed.text_len();
 
                             entries.push(ParameterEntry {
                                 name: param_name,
