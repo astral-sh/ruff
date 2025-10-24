@@ -50,6 +50,25 @@ use ruff_text_size::Ranged;
 /// 1. `__aiter__` methods that return `AsyncIterator`, despite the class
 ///    inheriting directly from `AsyncIterator`.
 ///
+/// Metaclasses are an exception for `__new__`. As mentioned in [PEP 673],
+/// `Self` is disallowed in metaclasses. The heuristic used to identify a
+/// metaclass-like `__new__` method signature is that has:
+///
+/// 1. Exactly 5 parameters (including `cls`)
+/// 1. Second parameter annotated with `str`
+/// 1. Third parameter annotated with a `tuple` type
+/// 1. Fourth parameter annotated with a `dict` type
+/// 1. Fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example, the following class would be detected as a metaclass, disabling
+/// the rule:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
+///
 /// ## Example
 ///
 /// ```pyi
@@ -87,6 +106,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
+///
+/// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
