@@ -23,6 +23,7 @@ use ruff_db::files::File;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use ty_project::{Db, ProgressReporter};
 
@@ -199,13 +200,13 @@ impl RetriableRequestHandler for WorkspaceDiagnosticRequestHandler {
 /// Diagnostics are only streamed if the client sends a partial result token.
 struct WorkspaceDiagnosticsProgressReporter<'a> {
     work_done: LazyWorkDoneProgress,
-    state: std::sync::Mutex<ProgressReporterState<'a>>,
+    state: Mutex<ProgressReporterState<'a>>,
 }
 
 impl<'a> WorkspaceDiagnosticsProgressReporter<'a> {
     fn new(work_done: LazyWorkDoneProgress, response: ResponseWriter<'a>) -> Self {
         Self {
-            state: std::sync::Mutex::new(ProgressReporterState {
+            state: Mutex::new(ProgressReporterState {
                 total_files: 0,
                 checked_files: 0,
                 last_response_sent: Instant::now(),
