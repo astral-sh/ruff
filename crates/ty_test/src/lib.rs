@@ -1,5 +1,3 @@
-extern crate core;
-
 use crate::config::Log;
 use crate::db::Db;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
@@ -412,12 +410,11 @@ fn run_test(
                 .to_string();
 
             if let Some(expected_message) = expected_message {
-                if !message.contains(&expected_message) {
-                    panic!(
-                        "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
-                        test.name()
-                    );
-                }
+                assert!(
+                    message.contains(expected_message),
+                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    test.name()
+                );
             }
         }
         None => {
@@ -427,7 +424,7 @@ fn run_test(
                         "Test `{}` is expected to panic with `{message}`, but it didn't.",
                         test.name()
                     );
-                };
+                }
                 panic!("Test `{}` is expected to panic but it didn't.", test.name());
             }
         }
@@ -655,7 +652,7 @@ struct AttemptTestError<'a> {
     test_file: &'a TestFile,
 }
 
-impl<'a> AttemptTestError<'a> {
+impl AttemptTestError<'_> {
     fn into_file_failures(
         self,
         db: &Db,
