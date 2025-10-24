@@ -471,9 +471,9 @@ You can configure Ruff to fix lint violations and/or organize imports on-save by
     "Python": {
       "code_actions_on_format": {
         // Organize imports
-        "source.organizeImports.ruff" = true,
+        "source.organizeImports.ruff": true,
         // Fix all auto-fixable lint violations
-        "source.fixAll.ruff" = true
+        "source.fixAll.ruff": true
       }
     }
   }
