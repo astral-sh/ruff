@@ -30,7 +30,7 @@ pub use all_symbols::{AllSymbolInfo, all_symbols};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
-pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use goto::{find_goto_target, goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;
 pub use hover::hover;
 pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
