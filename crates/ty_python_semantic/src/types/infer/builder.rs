@@ -8189,7 +8189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let left = left.constraints(self.db());
                 let right = right.constraints(self.db());
-                let result = left.and(self.db(), || *right);
+                let result = left.and(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -8202,7 +8202,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let left = left.constraints(self.db());
                 let right = right.constraints(self.db());
-                let result = left.or(self.db(), || *right);
+                let result = left.or(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -8928,6 +8928,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Ok(ty) => ty,
                     Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
                 }))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+            ) => match op {
+                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()) == right.constraints(self.db())
+                ))),
+                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()) != right.constraints(self.db())
+                ))),
+                _ => None,
             }
 
             (

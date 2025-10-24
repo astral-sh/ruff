@@ -1234,7 +1234,7 @@ impl<'db> Type<'db> {
         self.filter_union(db, |elem| {
             !elem
                 .when_disjoint_from(db, target, inferable)
-                .is_always_satisfied()
+                .is_always_satisfied(db)
         })
     }
 
@@ -1524,7 +1524,7 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_subtype_of(db, target, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_subtype_of(
@@ -1541,7 +1541,7 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_assignable_to(
@@ -1559,7 +1559,7 @@ impl<'db> Type<'db> {
     #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn has_relation_to(
@@ -1782,7 +1782,7 @@ impl<'db> Type<'db> {
                                 )
                             })
                         })
-                        .is_never_satisfied() =>
+                        .is_never_satisfied(db) =>
             {
                 // TODO: The repetition here isn't great, but we really need the fallthrough logic,
                 // where this arm only engages if it returns true (or in the world of constraints,
@@ -1925,7 +1925,7 @@ impl<'db> Type<'db> {
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                            .is_never_satisfied()
+                            .is_never_satisfied(db)
                     }) =>
             {
                 // TODO: record the unification constraints
@@ -2405,7 +2405,7 @@ impl<'db> Type<'db> {
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_equivalent_to(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_equivalent_to(
@@ -2528,7 +2528,7 @@ impl<'db> Type<'db> {
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_disjoint_from(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_disjoint_from(
@@ -4631,7 +4631,7 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = tracked_set.constraints(db);
-                Truthiness::from(constraints.is_always_satisfied())
+                Truthiness::from(constraints.is_always_satisfied(db))
             }
 
             Type::FunctionLiteral(_)
@@ -7450,7 +7450,6 @@ impl<'db> TypeMapping<'_, 'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TrackedConstraintSet<'db> {
-    #[returns(ref)]
     constraints: ConstraintSet<'db>,
 }
 
@@ -7646,17 +7645,11 @@ impl<'db> KnownInstanceType<'db> {
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
                         let constraints = tracked_set.constraints(self.db);
-                        if constraints.is_always_satisfied() {
-                            f.write_str("ty_extensions.ConstraintSet[always]")
-                        } else if constraints.is_never_satisfied() {
-                            f.write_str("ty_extensions.ConstraintSet[never]")
-                        } else {
-                            write!(
-                                f,
-                                "ty_extensions.ConstraintSet[{}]",
-                                constraints.display(self.db)
-                            )
-                        }
+                        write!(
+                            f,
+                            "ty_extensions.ConstraintSet[{}]",
+                            constraints.display(self.db)
+                        )
                     }
                 }
             }

@@ -429,7 +429,7 @@ impl<'db> NominalInstanceType<'db> {
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied() {
+                if result.union(db, compatible).is_always_satisfied(db) {
                     return result;
                 }
             }
@@ -659,7 +659,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),
                 )
-                .is_always_satisfied()
+                .is_always_satisfied(db)
         }
 
         fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
