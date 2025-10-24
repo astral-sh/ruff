@@ -34,6 +34,7 @@ pub(crate) enum Command {
 }
 
 #[derive(Debug, Parser)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct CheckCommand {
     /// List of files or directories to check.
     #[clap(
