@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+invalid-syntax: Expected an indented block after `if` statement
+  --> RUF067.py:22:18
+   |
+20 | print(x == 3.0 == 3.0)
+21 |
+22 | if 1.0 == x == 2:
+   |                  ^
+   |

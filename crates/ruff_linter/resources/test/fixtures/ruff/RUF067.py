@@ -2,11 +2,13 @@ a = 1.0
 b = 2.0
 x = 99
 
+# ok
 if a is None: ...
 if a == 1: ...
 if a != b: ...
 if a > 1.0: ...
 
+# errors
 assert x == 0.0
 print(3.14 != a)
 if x == 0.3: ...
@@ -16,3 +18,5 @@ def foo(a, b):
     return a == b - 0.1
 
 print(x == 3.0 == 3.0)
+
+1.0 == x == 2: ...
