@@ -4692,10 +4692,10 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::EnumLiteral(_) => {
-                // We currently make no attempt to infer the precise truthiness, but it's not impossible to do so.
-                // Note that custom `__bool__` or `__len__` methods on the class or superclasses affect the outcome.
-                Truthiness::Ambiguous
+            Type::EnumLiteral(enum_type) => {
+                enum_type
+                    .enum_class_instance(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)?
             }
 
             Type::IntLiteral(num) => Truthiness::from(*num != 0),
