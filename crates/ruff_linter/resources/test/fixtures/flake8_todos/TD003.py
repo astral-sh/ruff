@@ -44,15 +44,17 @@ def foo(x):
 
 # Valid Jira-style patterns (should pass)
 # TODO: Move this part to the other place RFFU-6877
+# TODO: Fix this (AIRFLOW-123)
+# TODO: Update config (SUPERSET-456)
+# TODO: PROJ-123: Another Jira-style example with colon
+# TODO: ABC-456: Fix bug with colon
+
+# Invalid patterns that should still trigger TD003 (should fail)
 # TODO: PROJ-123 Another Jira-style example
 # TODO: Fix bug ABC-123
 # TODO: Implement feature XYZ-456
 # TODO: Update documentation DEF-789
 # TODO: Refactor code GHI-101112
-# TODO: Fix this (AIRFLOW-123)
-# TODO: Update config (SUPERSET-456)
-
-# Invalid patterns that should still trigger TD003 (should fail)
 # TODO: Single letter project key A-1
 # TODO: No hyphen pattern ABC123
 # TODO: Lowercase project key abc-123
