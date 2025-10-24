@@ -310,6 +310,37 @@ reveal_type(s)  # revealed: list[Literal[1]]
 reveal_type(s)  # revealed: list[Literal[1]]
 ```
 
+## Generic constructor annotations are understood
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class X[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+a: X[int] = X(1)
+reveal_type(a)  # revealed: X[int]
+
+b: X[int | None] = X(1)
+reveal_type(b)  # revealed: X[int | None]
+
+c: X[int | None] | None = X(1)
+reveal_type(c)  # revealed: X[int | None]
+
+def _[T](d: X[T]):
+    _: X[T | int] = X(d.value)
+
+e: X[Any] = X(1)
+# TODO: Prefer the declared type here.
+reveal_type(e)  # revealed: X[int | Any]
+```
+
 ## PEP-604 annotations are supported
 
 ```py
