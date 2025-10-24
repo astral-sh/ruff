@@ -145,3 +145,80 @@ def h[T](x: T, cond: bool) -> T | list[T]:
 def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
+
+## Type context sources
+
+Type context is sourced from various places, including annotated assignments:
+
+```py
+from typing import Literal
+
+a: Literal["x"] = "x"
+```
+
+Function parameter annotations:
+
+```py
+def b(x: Literal["x"]): ...
+
+b("x")
+```
+
+Bound method parameter annotations:
+
+```py
+class C:
+    def __init__(self, x: Literal["x"]): ...
+    def foo(self, x: Literal["x"]): ...
+
+C("x").foo("x")
+```
+
+Declared variable types:
+
+```py
+d: Literal["x"]
+d = "x"
+```
+
+Declared attribute types:
+
+```py
+class E:
+    e: Literal["x"]
+
+def _(e: E):
+    e.e = "x"
+```
+
+Function return types:
+
+```py
+def f() -> Literal["x"]:
+    return "x"
+```
+
+## Class constructor parameters
+
+The parameters of both `__init__` and `__new__` are used as type context sources for constructor
+calls:
+
+```py
+from typing import TypedDict
+
+class T1(TypedDict):
+    x: int
+
+class T2(TypedDict):
+    x: int
+
+class A:
+    def __new__(cls, value: T1):
+        return super().__new__(cls, value)
+
+    def __init__(self, value: T2): ...
+
+A({"x": 1})
+# TODO: This should error once we implement typed-dict subtyping.
+A({"x": "1"})
+```

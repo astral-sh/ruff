@@ -100,6 +100,14 @@ impl<'db> Bindings<'db> {
         self.elements.iter()
     }
 
+    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type,
+            argument_forms: self.argument_forms,
+            elements: self.elements.into_iter().map(f).collect(),
+        }
+    }
+
     /// Match the arguments of a call site against the parameters of a collection of possibly
     /// unioned, possibly overloaded signatures.
     ///
