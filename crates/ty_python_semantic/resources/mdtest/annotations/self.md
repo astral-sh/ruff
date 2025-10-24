@@ -508,4 +508,22 @@ def _(c: CallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 
+## Final classes
+
+For final classes, we simplify `Self` to an instance of the class:
+
+```py
+from typing import final, Self
+
+@final
+class FinalClass:
+    def implicit_self(self) -> Self:
+        reveal_type(self)  # revealed: FinalClass
+        return self
+
+    def explicit_self(self: Self) -> Self:
+        reveal_type(self)  # revealed: FinalClass
+        return self
+```
+
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
