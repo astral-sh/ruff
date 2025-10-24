@@ -257,4 +257,25 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 75 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
 76 | 
 77 | # Non-errors.
-78 |
+78 | 
+
+FURB103 [*] `open` and `write` should be replaced by `Path("test.json")....`
+   --> FURB103.py:154:6
+    |
+152 | data = {"price": 100}
+153 |
+154 | with open("test.json", "wb") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+155 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
+    |
+help: Replace with `Path("test.json")....`
+148 | 
+149 | # See: https://github.com/astral-sh/ruff/issues/20785
+150 | import json
+151 + import pathlib
+152 | 
+153 | data = {"price": 100}
+154 | 
+    - with open("test.json", "wb") as f:
+    -     f.write(json.dumps(data, indent=4).encode("utf-8"))
+155 + pathlib.Path("test.json").write_bytes(json.dumps(data, indent=4).encode("utf-8"))
