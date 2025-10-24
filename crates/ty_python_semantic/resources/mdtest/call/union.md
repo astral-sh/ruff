@@ -284,6 +284,8 @@ def _(flag: bool):
 
 Diagnostics unrelated to the type-context are only reported once:
 
+`expression.py`:
+
 ```py
 def f[T](x: T) -> list[T]:
     return [x]
@@ -306,4 +308,19 @@ def _(x: int):
 
     # error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
     y(f(True), [z])
+```
+
+`standalone_expression.py`:
+
+```py
+def f(_: str): ...
+def g(_: str): ...
+def _(a: object, b: object, flag: bool):
+    if flag:
+        x = f
+    else:
+        x = g
+
+    # error: [unsupported-operator] "Operator `>` is not supported for types `object` and `object`"
+    x(f"{'a' if a > b else 'b'}")
 ```
