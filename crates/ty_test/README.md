@@ -180,6 +180,20 @@ snapshotting.
 At present, there is no way to do inline snapshotting or to request more granular
 snapshotting of specific diagnostics.
 
+## Expected panics
+
+It is possible to write tests that expect the type checker to panic during checking. Ideally, we'd fix those panics
+but being able to add regression tests even before is useful.
+
+To mark a test as expecting a panic, add an HTML comment like this:
+
+```markdown
+<!-- expect-panic: assertion `left == right` failed: Can't merge cycle heads -->
+```
+
+The text after `expect-panic:` is a substring that must appear in the panic message. The message is optional;
+but it is recommended to avoid false positives.
+
 ## Multi-file tests
 
 Some tests require multiple files, with imports from one file into another. For this purpose,

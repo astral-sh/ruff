@@ -3563,7 +3563,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=d38145c29574758de7ffbe8a13cd4584c3b09161#d38145c29574758de7ffbe8a13cd4584c3b09161"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=25b3ef146cfa2615f4ec82760bd0c22b454d0a12#25b3ef146cfa2615f4ec82760bd0c22b454d0a12"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3587,12 +3587,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=d38145c29574758de7ffbe8a13cd4584c3b09161#d38145c29574758de7ffbe8a13cd4584c3b09161"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=25b3ef146cfa2615f4ec82760bd0c22b454d0a12#25b3ef146cfa2615f4ec82760bd0c22b454d0a12"
 
 [[package]]
 name = "salsa-macros"
 version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=d38145c29574758de7ffbe8a13cd4584c3b09161#d38145c29574758de7ffbe8a13cd4584c3b09161"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=25b3ef146cfa2615f4ec82760bd0c22b454d0a12#25b3ef146cfa2615f4ec82760bd0c22b454d0a12"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4521,7 +4521,6 @@ name = "ty_test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.9.4",
  "camino",
  "colored 3.0.0",
  "insta",
