@@ -443,7 +443,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// This is used to simplify how we display constraint sets, by removing redundant constraints
     /// from a clause.
     fn implies(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db).identity(db) != other.typevar(db).identity(db) {
+        if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
             return false;
         }
         other.lower(db).is_subtype_of(db, self.lower(db))

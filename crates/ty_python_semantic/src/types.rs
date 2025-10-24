@@ -1724,7 +1724,7 @@ impl<'db> Type<'db> {
             // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
                 if !lhs_bound_typevar.is_inferable(db, inferable)
-                    && lhs_bound_typevar.identity(db) == rhs_bound_typevar.identity(db) =>
+                    && lhs_bound_typevar.is_same_typevar_as(db, rhs_bound_typevar) =>
             {
                 ConstraintSet::from(true)
             }
@@ -2621,7 +2621,7 @@ impl<'db> Type<'db> {
             // constraints, which are handled below.
             (Type::TypeVar(self_bound_typevar), Type::TypeVar(other_bound_typevar))
                 if !self_bound_typevar.is_inferable(db, inferable)
-                    && self_bound_typevar.identity(db) == other_bound_typevar.identity(db) =>
+                    && self_bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
             {
                 ConstraintSet::from(false)
             }
@@ -8542,6 +8542,12 @@ impl<'db> BoundTypeVarInstance<'db> {
             identity: self.typevar(db).identity(db),
             binding_context: self.binding_context(db),
         }
+    }
+
+    /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
+    /// differences in their bounds or constraints due to materialization.
+    pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
+        self.identity(db) == other.identity(db)
     }
 
     /// Create a new PEP 695 type variable that can be used in signatures
