@@ -52,7 +52,7 @@ use ruff_text_size::Ranged;
 ///
 /// Metaclasses are an exception for `__new__`. As mentioned in [PEP 673],
 /// `Self` is disallowed in metaclasses. The heuristic used to identify a
-/// metaclass-like `__new__` method signature is that has:
+/// metaclass-like `__new__` method signature is that it has:
 ///
 /// 1. Exactly 5 parameters (including `cls`)
 /// 1. Second parameter annotated with `str`
