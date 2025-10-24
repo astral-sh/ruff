@@ -2981,7 +2981,11 @@ impl<'a> Checker<'a> {
                 // Here we add the implicit scope surrounding a lambda which allows code in the
                 // lambda to access `__class__` at runtime when the lambda is defined within a class.
                 // See the `ScopeKind::DunderClassCell` docs for more information.
-                let added_dunder_class_scope = if self.semantic.current_scopes().any(|scope| scope.kind.is_class()) {
+                let added_dunder_class_scope = if self
+                    .semantic
+                    .current_scopes()
+                    .any(|scope| scope.kind.is_class())
+                {
                     self.semantic.push_scope(ScopeKind::DunderClassCell);
                     let binding_id = self.semantic.push_binding(
                         TextRange::default(),
