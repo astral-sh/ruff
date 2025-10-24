@@ -71,7 +71,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
-    let printer = Printer::default().with_verbosity(verbosity);
+    let printer = Printer::new(verbosity, args.no_progress);
 
     tracing::debug!("Version: {}", version::version());
 
