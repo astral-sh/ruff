@@ -817,8 +817,8 @@ struct BodyVisitor<'a> {
     currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
-    /// Maps exception variable names to their exception types in the current except clause
-    exception_variables: FxHashMap<&'a str, QualifiedName<'a>>,
+    /// Maps exception variable names to their exception expressions in the current except clause
+    exception_variables: FxHashMap<&'a str, &'a ast::Expr>,
 }
 
 impl<'a> BodyVisitor<'a> {
@@ -871,21 +871,9 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         // Track exception variable bindings
         if let Some(name) = handler_inner.name.as_ref() {
             if let Some(exceptions) = self.currently_suspended_exceptions {
-                let mut store_exception_variable = |exception| {
-                    if let Some(qualified_name) = self.semantic.resolve_qualified_name(exception) {
-                        self.exception_variables
-                            .insert(name.id.as_str(), qualified_name);
-                    }
-                };
-
-                if let ast::Expr::Tuple(tuple) = exceptions {
-                    // For tuple exceptions, we'll store the first one
-                    if let Some(first_exception) = tuple.elts.first() {
-                        store_exception_variable(first_exception);
-                    }
-                } else {
-                    store_exception_variable(exceptions);
-                }
+                // Store the exception expression(s) for later resolution
+                self.exception_variables
+                    .insert(name.id.as_str(), exceptions);
             }
         }
 
@@ -909,12 +897,31 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                         });
                     } else if let ast::Expr::Name(name) = exc.as_ref() {
                         // If it's a variable name, check if it's bound to an exception in the current except clause
-                        if let Some(qualified_name) = self.exception_variables.get(name.id.as_str())
+                        if let Some(exception_expr) = self.exception_variables.get(name.id.as_str())
                         {
-                            self.raised_exceptions.push(ExceptionEntry {
-                                qualified_name: qualified_name.clone(),
-                                range: exc.range(),
-                            });
+                            // Use the same logic as currently_suspended_exceptions to handle tuples
+                            let mut maybe_store_exception = |exception| {
+                                let Some(qualified_name) =
+                                    self.semantic.resolve_qualified_name(exception)
+                                else {
+                                    return;
+                                };
+                                if is_exception_or_base_exception(&qualified_name) {
+                                    return;
+                                }
+                                self.raised_exceptions.push(ExceptionEntry {
+                                    qualified_name,
+                                    range: exc.range(),
+                                });
+                            };
+
+                            if let ast::Expr::Tuple(tuple) = exception_expr {
+                                for exception in tuple {
+                                    maybe_store_exception(exception);
+                                }
+                            } else {
+                                maybe_store_exception(exception_expr);
+                            }
                         }
                     }
                 } else if let Some(exceptions) = self.currently_suspended_exceptions {

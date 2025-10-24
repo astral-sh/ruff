@@ -81,6 +81,26 @@ DOC501 Raised exception `ZeroDivisionError` missing from docstring
    |
 help: Add `ZeroDivisionError` to the docstring
 
+DOC501 Raised exception `ValueError` missing from docstring
+  --> DOC501_google.py:88:5
+   |
+86 |   # DOC501
+87 |   def calculate_speed(distance: float, time: float) -> float:
+88 | /     """Calculate speed as distance divided by time.
+89 | |
+90 | |     Args:
+91 | |         distance: Distance traveled.
+92 | |         time: Time spent traveling.
+93 | |
+94 | |     Returns:
+95 | |         Speed as distance divided by time.
+96 | |     """
+   | |_______^
+97 |       try:
+98 |           return distance / time
+   |
+help: Add `ValueError` to the docstring
+
 DOC501 Raised exception `ZeroDivisionError` missing from docstring
   --> DOC501_google.py:88:5
    |
