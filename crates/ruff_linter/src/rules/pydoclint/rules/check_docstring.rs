@@ -861,6 +861,20 @@ impl<'a> BodyVisitor<'a> {
             raised_exceptions,
         }
     }
+
+    /// Store `exception` if its qualified name does not correspond to one of the exempt types.
+    fn maybe_store_exception(&mut self, exception: &'a Expr, range: TextRange) {
+        let Some(qualified_name) = self.semantic.resolve_qualified_name(exception) else {
+            return;
+        };
+        if is_exception_or_base_exception(&qualified_name) {
+            return;
+        }
+        self.raised_exceptions.push(ExceptionEntry {
+            qualified_name,
+            range,
+        });
+    }
 }
 
 impl<'a> Visitor<'a> for BodyVisitor<'a> {
@@ -896,55 +910,26 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                             range: exc.range(),
                         });
                     } else if let ast::Expr::Name(name) = exc.as_ref() {
-                        // If it's a variable name, check if it's bound to an exception in the current except clause
+                        // If it's a variable name, check if it's bound to an exception in the
+                        // current except clause
                         if let Some(exception_expr) = self.exception_variables.get(name.id.as_str())
                         {
-                            // Use the same logic as currently_suspended_exceptions to handle tuples
-                            let mut maybe_store_exception = |exception| {
-                                let Some(qualified_name) =
-                                    self.semantic.resolve_qualified_name(exception)
-                                else {
-                                    return;
-                                };
-                                if is_exception_or_base_exception(&qualified_name) {
-                                    return;
-                                }
-                                self.raised_exceptions.push(ExceptionEntry {
-                                    qualified_name,
-                                    range: exc.range(),
-                                });
-                            };
-
                             if let ast::Expr::Tuple(tuple) = exception_expr {
                                 for exception in tuple {
-                                    maybe_store_exception(exception);
+                                    self.maybe_store_exception(exception, stmt.range());
                                 }
                             } else {
-                                maybe_store_exception(exception_expr);
+                                self.maybe_store_exception(exception_expr, stmt.range());
                             }
                         }
                     }
                 } else if let Some(exceptions) = self.currently_suspended_exceptions {
-                    let mut maybe_store_exception = |exception| {
-                        let Some(qualified_name) = self.semantic.resolve_qualified_name(exception)
-                        else {
-                            return;
-                        };
-                        if is_exception_or_base_exception(&qualified_name) {
-                            return;
-                        }
-                        self.raised_exceptions.push(ExceptionEntry {
-                            qualified_name,
-                            range: stmt.range(),
-                        });
-                    };
-
                     if let ast::Expr::Tuple(tuple) = exceptions {
                         for exception in tuple {
-                            maybe_store_exception(exception);
+                            self.maybe_store_exception(exception, stmt.range());
                         }
                     } else {
-                        maybe_store_exception(exceptions);
+                        self.maybe_store_exception(exceptions, stmt.range());
                     }
                 }
             }
