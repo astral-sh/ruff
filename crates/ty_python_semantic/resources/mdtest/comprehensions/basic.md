@@ -151,3 +151,25 @@ async def _():
     # revealed: Unknown
     [reveal_type(x) async for x in Iterable()]
 ```
+
+## Comprehension expression types
+
+The type of the comprehension expression itself should reflect the inferred element type:
+
+```py
+# revealed: list[int]
+reveal_type([x for x in range(10)])
+
+# revealed: set[int]
+reveal_type({x for x in range(10)})
+
+# revealed: dict[int, str]
+reveal_type({x: str(x) for x in range(10)})
+
+# revealed: list[tuple[int, Unknown | str]]
+reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
+
+xs: list[int] = [x**2 for x in [1, 2, 3]]
+# TODO: ?
+reveal_type(xs)  # revealed: list[Unknown | int]
+```
