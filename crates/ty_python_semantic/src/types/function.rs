@@ -121,6 +121,8 @@ bitflags! {
         const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
+        /// `@typing.type_check_only`
+        const TYPE_CHECK_ONLY = 1 << 7;
     }
 }
 
@@ -135,6 +137,7 @@ impl FunctionDecorators {
                 Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
                 Some(KnownFunction::Final) => FunctionDecorators::FINAL,
                 Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                Some(KnownFunction::TypeCheckOnly) => FunctionDecorators::TYPE_CHECK_ONLY,
                 _ => FunctionDecorators::empty(),
             },
             Type::ClassLiteral(class) => match class.known(db) {
@@ -1256,6 +1259,8 @@ pub enum KnownFunction {
     DisjointBase,
     /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+    /// `typing(_extensions).type_check_only`
+    TypeCheckOnly,
 
     /// `typing(_extensions).assert_type`
     AssertType,
@@ -1340,7 +1345,7 @@ impl KnownFunction {
             .then_some(candidate)
     }
 
-    /// Return `true` if `self` is defined in `module` at runtime.
+    /// Return `true` if `self` is defined in `module`
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::IsInstance
@@ -1394,6 +1399,8 @@ impl KnownFunction {
             | Self::NegatedRangeConstraint
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+
+            Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
         }
     }
 
@@ -1798,6 +1805,8 @@ pub(crate) mod tests {
                 | KnownFunction::DataclassTransform
                 | KnownFunction::DisjointBase
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
+
+                KnownFunction::TypeCheckOnly => KnownModule::Typing,
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf

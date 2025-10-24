@@ -53,8 +53,8 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionSpans, FunctionType,
-    KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
+    FunctionType, KnownFunction,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
@@ -866,6 +866,17 @@ impl<'db> Type<'db> {
 
     const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
+    }
+
+    /// Is a value of this type only usable in typing contexts?
+    pub(crate) fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
+            Type::FunctionLiteral(f) => {
+                f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
+            }
+            _ => false,
+        }
     }
 
     // If the type is a specialized instance of the given `KnownClass`, returns the specialization.
@@ -6761,7 +6772,11 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, || alias.value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.
+                // In the case of recursive type aliases, this leads to infinite recursion.
+                // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
+                let value_type = visitor.visit(self, || alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
             Type::ModuleLiteral(_)
@@ -10705,31 +10720,12 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    #[salsa::tracked(cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let value_type = self.raw_value_type(db);
-
-        if let Some(generic_context) = self.generic_context(db) {
-            let specialization = self
-                .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None));
-
-            value_type.apply_specialization(db, specialization)
-        } else {
-            value_type
-        }
+        self.apply_function_specialization(db, self.raw_value_type(db))
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the type alias. This means that if the
-    /// calling query is not in the same file as this type alias is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
-    /// This method also calls the type inference functions, and since type aliases can have recursive structures,
-    /// we should be careful not to create infinite recursions in this method (or make it tracked if necessary).
+    #[salsa::tracked(cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -10737,6 +10733,17 @@ impl<'db> PEP695TypeAliasType<'db> {
         let definition = self.definition(db);
 
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+    }
+
+    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        if let Some(generic_context) = self.generic_context(db) {
+            let specialization = self
+                .specialization(db)
+                .unwrap_or_else(|| generic_context.default_specialization(db, None));
+            ty.apply_specialization(db, specialization)
+        } else {
+            ty
+        }
     }
 
     pub(crate) fn apply_specialization(
@@ -10925,6 +10932,13 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
             TypeAliasType::ManualPEP695(_) => None,
+        }
+    }
+
+    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
+            TypeAliasType::ManualPEP695(_) => ty,
         }
     }
 
@@ -11788,6 +11802,9 @@ type CovariantAlias[T] = Covariant[T]
 type ContravariantAlias[T] = Contravariant[T]
 type InvariantAlias[T] = Invariant[T]
 type BivariantAlias[T] = Bivariant[T]
+
+type RecursiveAlias[T] = None | list[RecursiveAlias[T]]
+type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
 "#,
         )
         .unwrap();
@@ -11817,6 +11834,20 @@ type BivariantAlias[T] = Bivariant[T]
             KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
                 .variance_of(&db, get_bound_typevar(&db, bivariant)),
             TypeVarVariance::Bivariant
+        );
+
+        let recursive = get_type_alias(&db, "RecursiveAlias");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
+                .variance_of(&db, get_bound_typevar(&db, recursive)),
+            TypeVarVariance::Bivariant
+        );
+
+        let recursive2 = get_type_alias(&db, "RecursiveAlias2");
+        assert_eq!(
+            KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
+                .variance_of(&db, get_bound_typevar(&db, recursive2)),
+            TypeVarVariance::Invariant
         );
     }
 }

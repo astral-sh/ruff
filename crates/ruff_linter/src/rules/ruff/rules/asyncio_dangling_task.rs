@@ -53,6 +53,7 @@ use crate::checkers::ast::Checker;
 /// - [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.247")]
 pub(crate) struct AsyncioDanglingTask {
     expr: String,
     method: Method,

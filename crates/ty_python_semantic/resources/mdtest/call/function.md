@@ -820,6 +820,30 @@ def f(x: int = 1, y: str = "foo") -> int:
 reveal_type(f(y=2, x="bar"))  # revealed: int
 ```
 
+### Diagnostics for union types where the union is not assignable
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Sized
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+def f(x: Sized): ...
+def g(
+    a: str | Foo,
+    b: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo,
+    c: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar,
+    d: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar | Baz,
+):
+    f(a)  # error: [invalid-argument-type]
+    f(b)  # error: [invalid-argument-type]
+    f(c)  # error: [invalid-argument-type]
+    f(d)  # error: [invalid-argument-type]
+```
+
 ## Too many positional arguments
 
 ### One too many

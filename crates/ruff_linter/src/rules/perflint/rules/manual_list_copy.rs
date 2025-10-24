@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// filtered = list(original)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct ManualListCopy;
 
 impl Violation for ManualListCopy {

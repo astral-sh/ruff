@@ -31,6 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 /// # TODO(ruff): this is now fixed!
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct InvalidTodoTag {
     pub tag: String,
 }
@@ -61,6 +62,7 @@ impl Violation for InvalidTodoTag {
 /// # TODO(charlie): now an author is assigned
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoAuthor;
 
 impl Violation for MissingTodoAuthor {
@@ -102,6 +104,7 @@ impl Violation for MissingTodoAuthor {
 /// # SIXCHR-003
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoLink;
 
 impl Violation for MissingTodoLink {
@@ -131,6 +134,7 @@ impl Violation for MissingTodoLink {
 /// # TODO(charlie): colon fixed
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoColon;
 
 impl Violation for MissingTodoColon {
@@ -158,6 +162,7 @@ impl Violation for MissingTodoColon {
 /// # TODO(charlie): fix some issue
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoDescription;
 
 impl Violation for MissingTodoDescription {
@@ -185,6 +190,7 @@ impl Violation for MissingTodoDescription {
 /// # TODO(charlie): this is capitalized
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct InvalidTodoCapitalization {
     tag: String,
 }
@@ -222,6 +228,7 @@ impl AlwaysFixableViolation for InvalidTodoCapitalization {
 /// # TODO(charlie): fix this
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingSpaceAfterTodoColon;
 
 impl Violation for MissingSpaceAfterTodoColon {
