@@ -65,10 +65,26 @@ mod precedence {
 }
 
 #[derive(Default)]
-pub enum UnparseMode {
+pub enum Mode {
+    /// Ruff's default unparsing behaviour.
     #[default]
     Default,
-    Ast,
+    /// Emits same output as [`ast.unparse`](https://docs.python.org/3/library/ast.html#ast.unparse).
+    AstUnparse,
+}
+
+impl Mode {
+    /// Quote style to use.
+    ///
+    /// - [`Default`](`Mode::Default`): Output of `[AnyStringFlags.quote_style`].
+    /// - [`AstUnparse`](`Mode::AstUnparse`): Always return [`Quote::Single`].
+    #[must_use]
+    fn quote_style(&self, flags: impl StringFlags) -> Quote {
+        match self {
+            Self::Default => flags.quote_style(),
+            Self::AstUnparse => Quote::Single,
+        }
+    }
 }
 
 pub struct Generator<'a> {
@@ -76,8 +92,8 @@ pub struct Generator<'a> {
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
-    /// Decides the code styling to use. See [`Generator::with_unparse_mode`] for more info.
-    unparse_mode: UnparseMode,
+    /// Unparsed code style. See [`Mode`] for more info.
+    unparse_mode: Mode,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -89,7 +105,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
-            unparse_mode: UnparseMode::default(),
+            unparse_mode: Mode::default(),
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -104,7 +120,7 @@ impl<'a> Generator<'a> {
             // Style preferences.
             indent,
             line_ending,
-            unparse_mode: UnparseMode::Default,
+            unparse_mode: Mode::Default,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
@@ -113,13 +129,9 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// Sets the mode when unparsing code.
-    ///
-    /// The generated unparsed code formatting based on the mode:
-    /// - [`Default`](`UnparseMode::Default`): Ruff's default unparsing behaviour.
-    /// - [`Ast`](`UnparseMode::Ast`): similar to the behaviour of [`ast.unparse`](https://docs.python.org/3/library/ast.html#ast.unparse).
+    /// Sets the mode for code unparsing.
     #[must_use]
-    pub fn with_unparse_mode(mut self, mode: UnparseMode) -> Self {
+    pub fn with_unparse_mode(mut self, mode: Mode) -> Self {
         self.unparse_mode = mode;
         self
     }
@@ -182,10 +194,7 @@ impl<'a> Generator<'a> {
                 return;
             }
         }
-        let quote_style = match self.unparse_mode {
-            UnparseMode::Default => flags.quote_style(),
-            UnparseMode::Ast => Quote::Single,
-        };
+        let quote_style = self.unparse_mode.quote_style(flags);
         let escape = AsciiEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -205,10 +214,7 @@ impl<'a> Generator<'a> {
         }
         self.p(flags.prefix().as_str());
 
-        let quote_style = match self.unparse_mode {
-            UnparseMode::Default => flags.quote_style(),
-            UnparseMode::Ast => Quote::Single,
-        };
+        let quote_style = self.unparse_mode.quote_style(flags);
         let escape = UnicodeEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -1319,8 +1325,8 @@ impl<'a> Generator<'a> {
                     self.p("()");
                 } else {
                     let lvl = match self.unparse_mode {
-                        UnparseMode::Default => precedence::TUPLE,
-                        UnparseMode::Ast => precedence::MIN,
+                        Mode::Default => precedence::TUPLE,
+                        Mode::AstUnparse => precedence::MIN,
                     };
                     group_if!(lvl, {
                         let mut first = true;
@@ -1544,10 +1550,7 @@ impl<'a> Generator<'a> {
             return;
         }
 
-        let quote_style = match self.unparse_mode {
-            UnparseMode::Default => flags.quote_style(),
-            UnparseMode::Ast => Quote::Single,
-        };
+        let quote_style = self.unparse_mode.quote_style(flags);
         let escape = UnicodeEscape::with_preferred_quote(&s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -1574,10 +1577,7 @@ impl<'a> Generator<'a> {
     ) {
         self.p(flags.prefix().as_str());
 
-        let quote_style = match self.unparse_mode {
-            UnparseMode::Default => flags.quote_style(),
-            UnparseMode::Ast => Quote::Single,
-        };
+        let quote_style = self.unparse_mode.quote_style(flags);
         let flags = flags.with_quote_style(quote_style);
         self.p(flags.quote_str());
         self.unparse_interpolated_string_body(values, flags);
@@ -1617,7 +1617,7 @@ mod tests {
 
     use crate::stylist::Indentation;
 
-    use super::{Generator, UnparseMode};
+    use super::{Generator, Mode as UnparseMode};
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
@@ -2121,7 +2121,7 @@ if True:
         let got = round_trip_with(
             &Indentation::default(),
             LineEnding::default(),
-            UnparseMode::Ast,
+            UnparseMode::AstUnparse,
             inp,
         );
         assert_eq!(got, out);
@@ -2136,7 +2136,7 @@ if True:
         let got = round_trip_with(
             &Indentation::default(),
             LineEnding::default(),
-            UnparseMode::Ast,
+            UnparseMode::AstUnparse,
             inp,
         );
         assert_eq!(got, out);
