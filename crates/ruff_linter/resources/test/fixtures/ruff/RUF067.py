@@ -22,7 +22,6 @@ print(x == 3.0 == 3.0)
 print(1.0 == x == 2)
 
 assert x == float(1)
-assert x == math.sqrt(4)
 assert (a + b) == 1.0
 assert -x == 1.0
 assert -x == 1.0
@@ -35,3 +34,6 @@ assert (y := x + 1.0) == 2.0
 
 assert x / 2 == 1
 assert (x / 2) == (y / 3)
+
+# ok
+assert Path(__file__).parent / ".txt" == 1

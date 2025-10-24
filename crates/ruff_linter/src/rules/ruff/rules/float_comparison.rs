@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -62,13 +63,14 @@ impl Violation for FloatComparison {
 /// RUF067
 pub(crate) fn float_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let locator = checker.locator();
+    let semantic = checker.semantic();
 
     for (left, right, operand) in std::iter::once(&*compare.left)
         .chain(&compare.comparators)
         .tuple_windows()
         .zip(&compare.ops)
         .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
-        .filter(|((left, right), _)| has_float(left) || has_float(right))
+        .filter(|((left, right), _)| has_float(left, semantic) || has_float(right, semantic))
         .map(|((left, right), op)| (left, right, op))
     {
         checker.report_diagnostic(
@@ -82,15 +84,33 @@ pub(crate) fn float_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     }
 }
 
-fn has_float(expr: &Expr) -> bool {
+fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
             matches!(value, ast::Number::Float(_))
         }
         Expr::BinOp(ast::ExprBinOp {
             left, right, op, ..
-        }) => matches!(op, ast::Operator::Div) || has_float(left) || has_float(right),
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand),
+        }) => {
+            if matches!(op, ast::Operator::Div) {
+                is_numeric_expr(left) || is_numeric_expr(right)
+            } else {
+                has_float(left, semantic) || has_float(right, semantic)
+            }
+        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand, semantic),
+        Expr::Call(ast::ExprCall { func, .. }) => semantic.match_builtin_expr(func, "float"),
+        _ => false,
+    }
+}
+
+fn is_numeric_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::NumberLiteral(_) => true,
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            is_numeric_expr(left) || is_numeric_expr(right)
+        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
         _ => false,
     }
 }
