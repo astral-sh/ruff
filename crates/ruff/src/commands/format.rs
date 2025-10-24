@@ -879,19 +879,7 @@ impl From<&FormatCommandError> for Diagnostic {
             | FormatCommandError::Write(_, source_error) => {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
             }
-            FormatCommandError::Format(_, format_module_error) => match format_module_error {
-                FormatModuleError::ParseError(parse_error) => Diagnostic::new(
-                    DiagnosticId::InternalError,
-                    Severity::Error,
-                    &parse_error.error,
-                ),
-                FormatModuleError::FormatError(format_error) => {
-                    Diagnostic::new(DiagnosticId::InternalError, Severity::Error, format_error)
-                }
-                FormatModuleError::PrintError(print_error) => {
-                    Diagnostic::new(DiagnosticId::InternalError, Severity::Error, print_error)
-                }
-            },
+            FormatCommandError::Format(_, format_module_error) => format_module_error.into(),
             FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
                 DiagnosticId::InvalidCliOption,
                 Severity::Error,

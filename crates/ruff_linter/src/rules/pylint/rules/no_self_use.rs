@@ -39,6 +39,7 @@ use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_v
 ///         print("Greetings friend!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.286")]
 pub(crate) struct NoSelfUse {
     method_name: String,
 }

@@ -65,6 +65,9 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
+    /// Whether this item only exists for type checking purposes and
+    /// will be missing at runtime
+    pub is_type_check_only: bool,
     /// The documentation associated with this item, if
     /// available.
     pub documentation: Option<Docstring>,
@@ -79,6 +82,7 @@ impl<'db> Completion<'db> {
             .ty
             .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
+        let is_type_check_only = semantic.is_type_check_only(db);
         Completion {
             name: semantic.name,
             insert: None,
@@ -87,6 +91,7 @@ impl<'db> Completion<'db> {
             module_name: None,
             import: None,
             builtin: semantic.builtin,
+            is_type_check_only,
             documentation,
         }
     }
@@ -294,6 +299,7 @@ fn add_keyword_value_completions<'db>(
             kind: None,
             module_name: None,
             import: None,
+            is_type_check_only: false,
             builtin: true,
             documentation: None,
         });
@@ -339,6 +345,8 @@ fn add_unimported_completions<'db>(
             module_name: Some(symbol.module.name(db)),
             import: import_action.import().cloned(),
             builtin: false,
+            // TODO: `is_type_check_only` requires inferring the type of the symbol
+            is_type_check_only: false,
             documentation: None,
         });
     }
@@ -608,7 +616,7 @@ struct ScopedTarget<'t> {
     node: ast::AnyNodeRef<'t>,
 }
 
-/// Returns a slice of tokens that all start before or at the given
+/// Returns a slice of tokens that all start before the given
 /// [`TextSize`] offset.
 ///
 /// If the given offset is between two tokens, the returned slice will end just
@@ -620,11 +628,9 @@ struct ScopedTarget<'t> {
 /// range (including if it's at the very beginning), then that token will be
 /// included in the slice returned.
 fn tokens_start_before(tokens: &Tokens, offset: TextSize) -> &[Token] {
-    let idx = match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
-        Ok(idx) => idx,
-        Err(idx) => idx,
-    };
-    &tokens[..idx]
+    let partition_point = tokens.partition_point(|token| token.start() < offset);
+
+    &tokens[..partition_point]
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
@@ -839,16 +845,21 @@ fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
     })
 }
 
-/// Order completions lexicographically, with these exceptions:
+/// Order completions according to the following rules:
 ///
-/// 1) A `_[^_]` prefix sorts last and
-/// 2) A `__` prefix sorts last except before (1)
+/// 1) Names with no underscore prefix
+/// 2) Names starting with `_` but not dunders
+/// 3) `__dunder__` names
+///
+/// Among each category, type-check-only items are sorted last,
+/// and otherwise completions are sorted lexicographically.
 ///
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
     let (kind1, kind2) = (NameKind::classify(&c1.name), NameKind::classify(&c2.name));
-    kind1.cmp(&kind2).then_with(|| c1.name.cmp(&c2.name))
+
+    (kind1, c1.is_type_check_only, &c1.name).cmp(&(kind2, c2.is_type_check_only, &c2.name))
 }
 
 #[cfg(test)]
@@ -1453,6 +1464,21 @@ def frob(): ...
         ");
     }
 
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1392>
+    ///
+    /// This test ensures completions work when the cursor is at the
+    /// start of a zero-length token.
+    #[test]
+    fn completion_at_eof() {
+        let test = cursor_test("def f(msg: str):\n    msg.<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_include("capitalize");
+
+        let test = cursor_test("def f(msg: str):\n    msg.u<CURSOR>");
+        test.assert_completions_include("upper");
+        test.assert_completions_do_not_include("capitalize");
+    }
+
     #[test]
     fn list_comprehension1() {
         let test = cursor_test(
@@ -1944,14 +1970,34 @@ class Quux:
 ",
         );
 
-        // FIXME: This should list completions on `self`, which should
-        // include, at least, `foo` and `bar`. At time of writing
-        // (2025-06-04), the type of `self` is inferred as `Unknown` in
-        // this context. This in turn prevents us from getting a list
-        // of available attributes.
-        //
-        // See: https://github.com/astral-sh/ty/issues/159
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        assert_snapshot!(test.completions_without_builtins(), @r"
+        bar
+        baz
+        foo
+        __annotations__
+        __class__
+        __delattr__
+        __dict__
+        __dir__
+        __doc__
+        __eq__
+        __format__
+        __getattribute__
+        __getstate__
+        __hash__
+        __init__
+        __init_subclass__
+        __module__
+        __ne__
+        __new__
+        __reduce__
+        __reduce_ex__
+        __repr__
+        __setattr__
+        __sizeof__
+        __str__
+        __subclasshook__
+        ");
     }
 
     #[test]
@@ -3363,6 +3409,65 @@ from os.<CURSOR>
                 .any(|completion| completion.name == expected),
             "Expected completions to include `{expected}`"
         );
+    }
+
+    #[test]
+    fn import_type_check_only_lowers_ranking() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import foo
+                foo.A<CURSOR>
+                "#,
+            )
+            .source(
+                "foo/__init__.py",
+                r#"
+                from typing import type_check_only
+
+                @type_check_only
+                class Apple: pass
+
+                class Banana: pass
+                class Cat: pass
+                class Azorubine: pass
+                "#,
+            )
+            .build();
+
+        let settings = CompletionSettings::default();
+        let completions = completion(&test.db, &settings, test.cursor.file, test.cursor.offset);
+
+        let [apple_pos, banana_pos, cat_pos, azo_pos, ann_pos] =
+            ["Apple", "Banana", "Cat", "Azorubine", "__annotations__"].map(|name| {
+                completions
+                    .iter()
+                    .position(|comp| comp.name == name)
+                    .unwrap()
+            });
+
+        assert!(completions[apple_pos].is_type_check_only);
+        assert!(apple_pos > banana_pos.max(cat_pos).max(azo_pos));
+        assert!(ann_pos > apple_pos);
+    }
+
+    #[test]
+    fn type_check_only_is_type_check_only() {
+        // `@typing.type_check_only` is a function that's unavailable at runtime
+        // and so should be the last "non-underscore" completion in `typing`
+        let test = cursor_test("from typing import t<CURSOR>");
+
+        let settings = CompletionSettings::default();
+        let completions = completion(&test.db, &settings, test.cursor.file, test.cursor.offset);
+        let last_nonunderscore = completions
+            .into_iter()
+            .filter(|c| !c.name.starts_with('_'))
+            .next_back()
+            .unwrap();
+
+        assert_eq!(&last_nonunderscore.name, "type_check_only");
+        assert!(last_nonunderscore.is_type_check_only);
     }
 
     #[test]

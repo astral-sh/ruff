@@ -28,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// logger.info("Foobar")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct RootLoggerCall {
     attr: String,
 }

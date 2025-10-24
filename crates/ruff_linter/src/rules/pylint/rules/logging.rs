@@ -37,6 +37,7 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 ///     raise
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooFewArgs;
 
 impl Violation for LoggingTooFewArgs {
@@ -74,6 +75,7 @@ impl Violation for LoggingTooFewArgs {
 ///     raise
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooManyArgs;
 
 impl Violation for LoggingTooManyArgs {

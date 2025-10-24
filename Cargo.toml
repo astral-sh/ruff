@@ -146,13 +146,13 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "ef9f9329be6923acd050c8dddd172e3bc93e8051", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "25b3ef146cfa2615f4ec82760bd0c22b454d0a12", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
     "inventory",
 ] }
-schemars = { version = "0.8.16" }
+schemars = { version = "1.0.4" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.4" }

@@ -81,7 +81,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
-    enclosing_generic_contexts,
+    enclosing_generic_contexts, typing_self,
 };
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
@@ -2207,6 +2207,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let known_function =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
+        // `type_check_only` is itself not available at runtime
+        if known_function == Some(KnownFunction::TypeCheckOnly) {
+            function_decorators |= FunctionDecorators::TYPE_CHECK_ONLY;
+        }
+
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Function(function))
@@ -2495,6 +2500,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+            } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
+                ty
             } else {
                 Type::unknown()
             };
@@ -2533,6 +2540,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::homogeneous_tuple(builder.db(), Type::unknown())
             });
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_parameter_type(
+        &mut self,
+        parameter: &ast::Parameter,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let file = self.file();
+
+        let function_scope_id = self.scope();
+        let function_scope = function_scope_id.scope(db);
+        let function = function_scope.node().as_function()?;
+
+        let parent_file_scope_id = function_scope.parent()?;
+        let mut parent_scope_id = parent_file_scope_id.to_scope_id(db, file);
+
+        // Skip type parameter scopes, if the method itself is generic.
+        if parent_scope_id.is_annotation(db) {
+            let parent_scope = parent_scope_id.scope(db);
+            parent_scope_id = parent_scope.parent()?.to_scope_id(db, file);
+        }
+
+        // Return early if this is not a method inside a class.
+        let class = parent_scope_id.scope(db).node().as_class()?;
+
+        let method_definition = self.index.expect_single_definition(function);
+        let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
+            return None;
+        };
+
+        if function_definition
+            .node(self.module())
+            .parameters
+            .index(parameter.name())
+            .is_none_or(|index| index != 0)
+        {
+            return None;
+        }
+
+        let method = infer_definition_types(db, method_definition)
+            .declaration_type(method_definition)
+            .inner_type()
+            .as_function_literal()?;
+
+        if method.is_classmethod(db) {
+            // TODO: set the type for `cls` argument
+            return None;
+        } else if method.is_staticmethod(db) {
+            return None;
+        }
+
+        let class_definition = self.index.expect_single_definition(class);
+        let class_literal = infer_definition_types(db, class_definition)
+            .declaration_type(class_definition)
+            .inner_type()
+            .as_class_literal()?;
+
+        typing_self(db, self.scope(), Some(method_definition), class_literal)
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
@@ -2588,6 +2654,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = class_node;
 
         let mut deprecated = None;
+        let mut type_check_only = false;
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
         for decorator in decorator_list {
@@ -2609,6 +2676,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 decorator_ty
             {
                 deprecated = Some(deprecated_inst);
+                continue;
+            }
+
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::TypeCheckOnly))
+            {
+                type_check_only = true;
                 continue;
             }
 
@@ -2660,6 +2735,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 body_scope,
                 maybe_known_class,
                 deprecated,
+                type_check_only,
                 dataclass_params,
                 dataclass_transformer_params,
             )),
@@ -5950,7 +6026,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
                 self.db(),
-                KnownClass::Tuple.to_instance(self.db()),
+                Type::homogeneous_tuple(self.db(), Type::unknown()),
                 inferable,
             )
         });
@@ -5968,16 +6044,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut annotated_elt_tys = annotated_tuple.as_ref().map(Tuple::all_elements);
 
         let db = self.db();
-        let divergent = Type::divergent(self.scope());
         let element_types = elts.iter().map(|element| {
             let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
-            let element_type = self.infer_expression(element, TypeContext::new(annotated_elt_ty));
-
-            if element_type.has_divergent_type(self.db(), divergent) {
-                divergent
-            } else {
-                element_type
-            }
+            self.infer_expression(element, TypeContext::new(annotated_elt_ty))
         });
 
         Type::heterogeneous_tuple(db, element_types)
@@ -6508,7 +6577,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6521,7 +6591,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6538,7 +6609,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut parameter = Parameter::keyword_only(param.name().id.clone());
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default()),
+                            self.infer_expression(default, TypeContext::default())
+                                .replace_parameter_defaults(self.db()),
                         );
                     }
                     parameter
@@ -6726,9 +6798,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_class_type(self.db())
                     .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
-                let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
-
                 if matches!(
                     class.known(self.db()),
                     Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
@@ -6747,8 +6816,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
+                let db = self.db();
+                let infer_call_arguments = |bindings: Option<Bindings<'db>>| {
+                    if let Some(bindings) = bindings {
+                        let bindings = bindings.match_parameters(self.db(), &call_arguments);
+                        self.infer_all_argument_types(arguments, &mut call_arguments, &bindings);
+                    } else {
+                        let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+                        self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
+                    }
+
+                    call_arguments
+                };
+
                 return callable_type
-                    .try_call_constructor(self.db(), call_arguments, tcx)
+                    .try_call_constructor(db, infer_call_arguments, tcx)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, callable_type, call_expression.into());
                         err.return_type()
@@ -8117,7 +8199,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let left = left.constraints(self.db());
                 let right = right.constraints(self.db());
-                let result = left.and(self.db(), || *right);
+                let result = left.and(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -8130,7 +8212,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let left = left.constraints(self.db());
                 let right = right.constraints(self.db());
-                let result = left.or(self.db(), || *right);
+                let result = left.or(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     TrackedConstraintSet::new(self.db(), result),
                 )))
@@ -8213,80 +8295,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
                 op,
-            ) => {
-                // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
-                // the Python spec [1] is:
-                //
-                //   - If rhs is a (proper) subclass of lhs, and it provides a different
-                //     implementation of __rop__, use that.
-                //   - Otherwise, if lhs implements __op__, use that.
-                //   - Otherwise, if lhs and rhs are different types, and rhs implements __rop__,
-                //     use that.
-                //
-                // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
-
-                // Technically we don't have to check left_ty != right_ty here, since if the types
-                // are the same, they will trivially have the same implementation of the reflected
-                // dunder, and so we'll fail the inner check. But the type equality check will be
-                // faster for the common case, and allow us to skip the (two) class member lookups.
-                let left_class = left_ty.to_meta_type(self.db());
-                let right_class = right_ty.to_meta_type(self.db());
-                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
-                    let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right_class.member(self.db(), reflected_dunder).place;
-                    // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
-                    // Bindings together
-                    if !rhs_reflected.is_undefined()
-                        && rhs_reflected != left_class.member(self.db(), reflected_dunder).place
-                    {
-                        return right_ty
-                            .try_call_dunder(
-                                self.db(),
-                                reflected_dunder,
-                                CallArguments::positional([left_ty]),
-                                TypeContext::default(),
-                            )
-                            .map(|outcome| outcome.return_type(self.db()))
-                            .or_else(|_| {
-                                left_ty
-                                    .try_call_dunder(
-                                        self.db(),
-                                        op.dunder(),
-                                        CallArguments::positional([right_ty]),
-                                        TypeContext::default(),
-                                    )
-                                    .map(|outcome| outcome.return_type(self.db()))
-                            })
-                            .ok();
-                    }
-                }
-
-                let call_on_left_instance = left_ty
-                    .try_call_dunder(
-                        self.db(),
-                        op.dunder(),
-                        CallArguments::positional([right_ty]),
-                        TypeContext::default(),
-                    )
-                    .map(|outcome| outcome.return_type(self.db()))
-                    .ok();
-
-                call_on_left_instance.or_else(|| {
-                    if left_ty == right_ty {
-                        None
-                    } else {
-                        right_ty
-                            .try_call_dunder(
-                                self.db(),
-                                op.reflected_dunder(),
-                                CallArguments::positional([left_ty]),
-                                TypeContext::default(),
-                            )
-                            .map(|outcome| outcome.return_type(self.db()))
-                            .ok()
-                    }
-                })
-            }
+            ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
+                .map(|outcome| outcome.return_type(self.db()))
+                .ok(),
         }
     }
 
@@ -8927,6 +8938,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Ok(ty) => ty,
                     Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
                 }))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+            ) => match op {
+                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()) == right.constraints(self.db())
+                ))),
+                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()) != right.constraints(self.db())
+                ))),
+                _ => None,
             }
 
             (

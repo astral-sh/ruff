@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 20..29,
                                     node_index: NodeIndex(None),
+                                    range: 20..29,
                                     value: Attribute(
                                         ExprAttribute {
                                             node_index: NodeIndex(None),
@@ -73,8 +73,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 44..52,
                                     node_index: NodeIndex(None),
+                                    range: 44..52,
                                     value: Attribute(
                                         ExprAttribute {
                                             node_index: NodeIndex(None),
@@ -118,8 +118,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 67..75,
                                     node_index: NodeIndex(None),
+                                    range: 67..75,
                                     value: Attribute(
                                         ExprAttribute {
                                             node_index: NodeIndex(None),
@@ -163,8 +163,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 90..125,
                                     node_index: NodeIndex(None),
+                                    range: 90..125,
                                     value: Attribute(
                                         ExprAttribute {
                                             node_index: NodeIndex(None),

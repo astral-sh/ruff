@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-assertion_line: 112
 ---
 B912 [*] `map()` without an explicit `strict=` parameter
  --> B912.py:5:1
@@ -146,4 +145,19 @@ help: Add explicit value for parameter `strict=`
 18 | 
 19 | # OK
 20 | map(lambda x: x, [1, 2, 3], strict=True)
+note: This is an unsafe fix and may change runtime behavior
+
+B912 [*] `map()` without an explicit `strict=` parameter
+  --> B912.py:36:1
+   |
+35 | # Regression https://github.com/astral-sh/ruff/issues/20997
+36 | map(f, *lots_of_iterators)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Add explicit value for parameter `strict=`
+33 | map(lambda x, y: x + y, [1, 2, 3], count())
+34 | 
+35 | # Regression https://github.com/astral-sh/ruff/issues/20997
+   - map(f, *lots_of_iterators)
+36 + map(f, *lots_of_iterators, strict=False)
 note: This is an unsafe fix and may change runtime behavior

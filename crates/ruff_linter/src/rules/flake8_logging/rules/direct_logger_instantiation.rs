@@ -42,6 +42,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [Logger Objects]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct DirectLoggerInstantiation;
 
 impl Violation for DirectLoggerInstantiation {

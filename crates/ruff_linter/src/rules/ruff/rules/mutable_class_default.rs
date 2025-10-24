@@ -84,6 +84,7 @@ use crate::rules::ruff::helpers::{
 ///
 /// [ClassVar]: https://docs.python.org/3/library/typing.html#typing.ClassVar
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct MutableClassDefault;
 
 impl Violation for MutableClassDefault {

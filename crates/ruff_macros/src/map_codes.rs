@@ -20,8 +20,6 @@ struct Rule {
     linter: Ident,
     /// The code associated with the rule, e.g., `"E112"`.
     code: LitStr,
-    /// The rule group identifier, e.g., `RuleGroup::Preview`.
-    group: Path,
     /// The path to the struct implementing the rule, e.g.
     /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
     path: Path,
@@ -104,7 +102,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             linter,
             rules
                 .iter()
-                .map(|(code, Rule { group, attrs, .. })| (code.as_str(), group, attrs)),
+                .map(|(code, Rule { attrs, .. })| (code.as_str(), attrs)),
         ));
 
         output.extend(quote! {
@@ -254,7 +252,6 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     }
 
     let mut rule_noqa_code_match_arms = quote!();
-    let mut rule_group_match_arms = quote!();
 
     for (rule, codes) in rule_to_codes {
         let rule_name = rule.segments.last().unwrap();
@@ -279,7 +276,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
         let Rule {
             linter,
             code,
-            group,
             attrs,
             ..
         } = codes
@@ -290,10 +286,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
-        });
-
-        rule_group_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => #group,
         });
     }
 
@@ -307,28 +299,20 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 }
             }
 
-            pub fn group(&self) -> RuleGroup {
-                use crate::registry::RuleNamespace;
-
-                match self {
-                    #rule_group_match_arms
-                }
-            }
-
             pub fn is_preview(&self) -> bool {
-                matches!(self.group(), RuleGroup::Preview)
+                matches!(self.group(), RuleGroup::Preview { .. })
             }
 
             pub(crate) fn is_stable(&self) -> bool {
-                matches!(self.group(), RuleGroup::Stable)
+                matches!(self.group(), RuleGroup::Stable { .. })
             }
 
             pub fn is_deprecated(&self) -> bool {
-                matches!(self.group(), RuleGroup::Deprecated)
+                matches!(self.group(), RuleGroup::Deprecated { .. })
             }
 
             pub fn is_removed(&self) -> bool {
-                matches!(self.group(), RuleGroup::Removed)
+                matches!(self.group(), RuleGroup::Removed { .. })
             }
         }
 
@@ -403,6 +387,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
+    let mut rule_group_match_arms = quote!();
+    let mut rule_file_match_arms = quote!();
+    let mut rule_line_match_arms = quote!();
 
     for Rule {
         name, attrs, path, ..
@@ -420,6 +407,15 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
+        rule_group_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::group(),},
+        );
+        rule_file_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
+        );
+        rule_line_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::line(),},
+        );
     }
 
     quote! {
@@ -455,12 +451,24 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             pub const fn fixable(&self) -> crate::FixAvailability {
                 match self { #rule_fixable_match_arms }
             }
+
+            pub fn group(&self) -> crate::codes::RuleGroup {
+                match self { #rule_group_match_arms }
+            }
+
+            pub fn file(&self) -> &'static str {
+                match self { #rule_file_match_arms }
+            }
+
+            pub fn line(&self) -> u32 {
+                match self { #rule_line_match_arms }
+            }
         }
     }
 }
 
 impl Parse for Rule {
-    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+    /// Parses a match arm such as `(Pycodestyle, "E112") => rules::pycodestyle::rules::logical_lines::NoIndentedBlock,`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;
@@ -469,18 +477,13 @@ impl Parse for Rule {
         let _: Token!(,) = pat_tuple.parse()?;
         let code: LitStr = pat_tuple.parse()?;
         let _: Token!(=>) = input.parse()?;
-        let pat_tuple;
-        parenthesized!(pat_tuple in input);
-        let group: Path = pat_tuple.parse()?;
-        let _: Token!(,) = pat_tuple.parse()?;
-        let rule_path: Path = pat_tuple.parse()?;
+        let rule_path: Path = input.parse()?;
         let _: Token!(,) = input.parse()?;
         let rule_name = rule_path.segments.last().unwrap().ident.clone();
         Ok(Rule {
             name: rule_name,
             linter,
             code,
-            group,
             path: rule_path,
             attrs,
         })

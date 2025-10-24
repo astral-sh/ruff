@@ -96,6 +96,18 @@ impl<'db> Bindings<'db> {
         &self.argument_forms.values
     }
 
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableBinding<'db>> {
+        self.elements.iter()
+    }
+
+    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type,
+            argument_forms: self.argument_forms,
+            elements: self.elements.into_iter().map(f).collect(),
+        }
+    }
+
     /// Match the arguments of a call site against the parameters of a collection of possibly
     /// unioned, possibly overloaded signatures.
     ///
@@ -997,6 +1009,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.body_scope(db),
                                     class_literal.known(db),
                                     class_literal.deprecated(db),
+                                    class_literal.type_check_only(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                 )));
@@ -1178,7 +1191,16 @@ impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
     type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.elements.iter()
+        self.iter()
+    }
+}
+
+impl<'db> IntoIterator for Bindings<'db> {
+    type Item = CallableBinding<'db>;
+    type IntoIter = smallvec::IntoIter<[CallableBinding<'db>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.into_iter()
     }
 }
 
@@ -1460,7 +1482,7 @@ impl<'db> CallableBinding<'db> {
                         .unwrap_or(Type::unknown());
                     if argument_type
                         .when_assignable_to(db, parameter_type, overload.inferable_typevars)
-                        .is_always_satisfied()
+                        .is_always_satisfied(db)
                     {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
@@ -1693,7 +1715,7 @@ impl<'db> CallableBinding<'db> {
                                 current_parameter_type,
                                 overload.inferable_typevars,
                             )
-                            .is_always_satisfied()
+                            .is_always_satisfied(db)
                         {
                             participating_parameter_indexes.insert(parameter_index);
                         }
@@ -1816,7 +1838,7 @@ impl<'db> CallableBinding<'db> {
                             first_overload_return_type,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied()
+                        .is_always_satisfied(db)
                 })
             } else {
                 // No matching overload
@@ -2103,6 +2125,15 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.overloads.iter()
+    }
+}
+
+impl<'db> IntoIterator for CallableBinding<'db> {
+    type Item = Binding<'db>;
+    type IntoIter = smallvec::IntoIter<[Binding<'db>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.overloads.into_iter()
     }
 }
 
@@ -2682,7 +2713,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // building them in an earlier separate step.
             if argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-                .is_never_satisfied()
+                .is_never_satisfied(self.db)
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
@@ -2816,7 +2847,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     KnownClass::Str.to_instance(self.db),
                     self.inferable_typevars,
                 )
-                .is_always_satisfied()
+                .is_always_satisfied(self.db)
             {
                 self.errors.push(BindingError::InvalidKeyType {
                     argument_index: adjusted_argument_index,
@@ -3496,6 +3527,36 @@ impl<'db> BindingError<'db> {
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
+
+                if let Type::Union(union) = provided_ty {
+                    let union_elements = union.elements(context.db());
+                    let invalid_elements: Vec<Type<'db>> = union
+                        .elements(context.db())
+                        .iter()
+                        .filter(|element| !element.is_assignable_to(context.db(), *expected_ty))
+                        .copied()
+                        .collect();
+                    let first_invalid_element = invalid_elements[0].display(context.db());
+                    if invalid_elements.len() < union_elements.len() {
+                        match &invalid_elements[1..] {
+                            [] => diag.info(format_args!(
+                                "Element `{first_invalid_element}` of this union \
+                                is not assignable to `{expected_ty_display}`",
+                            )),
+                            [single] => diag.info(format_args!(
+                                "Union elements `{first_invalid_element}` and `{}` \
+                                are not assignable to `{expected_ty_display}`",
+                                single.display(context.db()),
+                            )),
+                            rest => diag.info(format_args!(
+                                "Union element `{first_invalid_element}`, \
+                                and {} more union elements, \
+                                are not assignable to `{expected_ty_display}`",
+                                rest.len(),
+                            )),
+                        }
+                    }
+                }
 
                 if let Some(matching_overload) = matching_overload {
                     if let Some((name_span, parameter_span)) =

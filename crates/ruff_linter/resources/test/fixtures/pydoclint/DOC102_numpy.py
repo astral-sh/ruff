@@ -371,7 +371,6 @@ class Foo:
         """
         return
 
-
 # DOC102 - Test case from issue #20959: comma-separated parameters
 def leq(x: object, y: object) -> bool:
     """Compare two objects for loose equality.
@@ -425,3 +424,23 @@ def process_data(data, x1: str, x2: str) -> str:
         Processed result.
     """
     return f"{x1}{x2}{len(data)}"
+
+
+# OK
+def baz(x: int) -> int:
+    """
+    Show a `Warnings` DOC102 false positive.
+
+    Parameters
+    ----------
+    x : int
+
+    Warnings
+    --------
+    This function demonstrates a DOC102 false positive
+
+    Returns
+    -------
+    int
+    """
+    return x

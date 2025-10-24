@@ -35,6 +35,7 @@ use crate::{FixAvailability, Violation};
 /// fab_auth_manager_app = FabAuthManager().get_fastapi_app()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct Airflow3MovedToProvider<'a> {
     deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,

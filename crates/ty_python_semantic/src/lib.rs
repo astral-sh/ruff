@@ -27,8 +27,9 @@ pub use semantic_model::{
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
 pub use types::DisplaySettings;
 pub use types::ide_support::{
-    ImportAliasResolution, ResolvedDefinition, definitions_for_attribute,
-    definitions_for_imported_symbol, definitions_for_name, map_stub_definition,
+    ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
+    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
+    map_stub_definition,
 };
 
 pub mod ast_node_ref;

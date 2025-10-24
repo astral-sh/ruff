@@ -9,7 +9,7 @@ use crate::rules::flake8_bugbear::helpers::any_infinite_iterables;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
-/// Checks for `zip` calls without an explicit `strict` parameter.
+/// Checks for `zip` calls without an explicit `strict` parameter when called with two or more iterables, or any starred argument.
 ///
 /// ## Why is this bad?
 /// By default, if the iterables passed to `zip` are of different lengths, the
@@ -39,6 +39,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.167")]
 pub(crate) struct ZipWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
@@ -58,6 +59,12 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
 
     if semantic.match_builtin_expr(&call.func, "zip")
         && call.arguments.find_keyword("strict").is_none()
+        && (
+            // at least 2 iterables
+            call.arguments.args.len() >= 2
+            // or a starred argument
+            || call.arguments.args.iter().any(ast::Expr::is_starred_expr)
+        )
         && !any_infinite_iterables(call.arguments.args.iter(), semantic)
     {
         checker

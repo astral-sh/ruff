@@ -72,7 +72,10 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements.into_iter().map(Into::into),
+            elements
+                .into_iter()
+                .map(Into::into)
+                .map(|element| element.fallback_to_divergent(db)),
         ))
     }
 
@@ -83,16 +86,6 @@ impl<'db> Type<'db> {
     /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
     fn tuple_instance(tuple: TupleType<'db>) -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
-    }
-
-    /// **Private** helper function to create a `Type::NominalInstance` from a class that
-    /// is known not to be `Any`, a protocol class, or a typed dict class.
-    fn non_tuple_instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.is_known(db, KnownClass::Object) {
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-        } else {
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
-        }
     }
 
     pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
@@ -353,9 +346,9 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.normalized_impl(db, visitor))
             }
-            NominalInstanceInner::NonTuple(class) => {
-                Type::non_tuple_instance(db, class.normalized_impl(db, visitor))
-            }
+            NominalInstanceInner::NonTuple(class) => Type::NominalInstance(NominalInstanceType(
+                NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
+            )),
             NominalInstanceInner::Object => Type::object(),
         }
     }
@@ -436,7 +429,7 @@ impl<'db> NominalInstanceType<'db> {
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied() {
+                if result.union(db, compatible).is_always_satisfied(db) {
                     return result;
                 }
             }
@@ -488,10 +481,11 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            NominalInstanceInner::NonTuple(class) => Type::non_tuple_instance(
-                db,
-                class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
+            NominalInstanceInner::NonTuple(class) => {
+                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(
+                    class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
             NominalInstanceInner::Object => Type::object(),
         }
     }
@@ -654,7 +648,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_fn=recover, cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
         fn inner<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>, _: ()) -> bool {
             Type::object()
                 .satisfies_protocol(
@@ -665,18 +659,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),
                 )
-                .is_always_satisfied()
-        }
-
-        #[expect(clippy::trivially_copy_pass_by_ref)]
-        fn recover<'db>(
-            _db: &'db dyn Db,
-            _result: &bool,
-            _count: u32,
-            _value: ProtocolInstanceType<'db>,
-            _: (),
-        ) -> salsa::CycleRecoveryAction<bool> {
-            salsa::CycleRecoveryAction::Iterate
+                .is_always_satisfied(db)
         }
 
         fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
