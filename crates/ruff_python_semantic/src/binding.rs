@@ -446,7 +446,7 @@ impl Ranged for Binding<'_> {
 /// ID uniquely identifying a [Binding] in a program.
 ///
 /// Using a `u32` to identify [Binding]s should be sufficient because Ruff only supports documents with a
-/// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
+/// size smaller than or equal to `u32::MAX`. A document with the size of `u32::MAX` must have fewer than `u32::MAX`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
@@ -672,6 +672,24 @@ pub enum BindingKind<'a> {
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.
     UnboundException(Option<BindingId>),
+
+    /// A binding to `__class__` in the implicit closure created around every method in a class
+    /// body, if any method refers to either `__class__` or `super`.
+    ///
+    /// ```python
+    /// class C:
+    ///     __class__  # NameError: name '__class__' is not defined
+    ///
+    ///     def f():
+    ///         print(__class__)  # allowed
+    ///
+    ///     def g():
+    ///         nonlocal __class__  # also allowed because the scope is *not* the function scope
+    /// ```
+    ///
+    /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object> for more
+    /// details.
+    DunderClassCell,
 }
 
 bitflags! {

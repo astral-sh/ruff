@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr, helpers::is_empty_f_string};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -25,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// print("got it!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.11.9")]
 pub(crate) struct InEmptyCollection;
 
 impl Violation for InEmptyCollection {
@@ -75,10 +76,7 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Dict(ast::ExprDict { items, .. }) => items.is_empty(),
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-        Expr::FString(s) => s
-            .value
-            .elements()
-            .all(|elt| elt.as_literal().is_some_and(|elt| elt.is_empty())),
+        Expr::FString(s) => is_empty_f_string(s),
         Expr::Call(ast::ExprCall {
             func,
             arguments,

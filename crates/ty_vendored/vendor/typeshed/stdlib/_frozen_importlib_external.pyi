@@ -18,7 +18,7 @@ from _typeshed.importlib import LoaderProtocol
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableSequence, Sequence
 from importlib.machinery import ModuleSpec
 from importlib.metadata import DistributionFinder, PathDistribution
-from typing import Any, Literal
+from typing import Any, Final, Literal
 from typing_extensions import Self, deprecated
 
 if sys.version_info >= (3, 10):
@@ -33,7 +33,7 @@ else:
     path_sep: Literal["/"]
     path_sep_tuple: tuple[Literal["/"]]
 
-MAGIC_NUMBER: bytes
+MAGIC_NUMBER: Final[bytes]
 
 def cache_from_source(path: StrPath, debug_override: bool | None = None, *, optimization: Any | None = None) -> str:
     """Given the path to a .py file, return the path to its .pyc file.
@@ -89,7 +89,7 @@ def spec_from_file_location(
     """
 
 @deprecated(
-    "Deprecated as of Python 3.6: Use site configuration instead. "
+    "Deprecated since Python 3.6. Use site configuration instead. "
     "Future versions of Python may not enable this finder by default."
 )
 class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
@@ -167,11 +167,11 @@ class PathFinder(importlib.abc.MetaPathFinder):
 
             """
 
-SOURCE_SUFFIXES: list[str]
-DEBUG_BYTECODE_SUFFIXES: list[str]
-OPTIMIZED_BYTECODE_SUFFIXES: list[str]
-BYTECODE_SUFFIXES: list[str]
-EXTENSION_SUFFIXES: list[str]
+SOURCE_SUFFIXES: Final[list[str]]
+DEBUG_BYTECODE_SUFFIXES: Final = [".pyc"]
+OPTIMIZED_BYTECODE_SUFFIXES: Final = [".pyc"]
+BYTECODE_SUFFIXES: Final = [".pyc"]
+EXTENSION_SUFFIXES: Final[list[str]]
 
 class FileFinder(importlib.abc.PathEntryFinder):
     """File-based finder.
@@ -251,7 +251,7 @@ class SourceLoader(_LoaderBasics):
         """
 
     def source_to_code(
-        self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath
+        self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath
     ) -> types.CodeType:
         """Return the code object compiled from source.
 
@@ -281,10 +281,10 @@ class FileLoader:
     def get_data(self, path: str) -> bytes:
         """Return the data from path as raw bytes."""
 
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
-    def load_module(self, name: str | None = None) -> types.ModuleType:
+    def load_module(self, fullname: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.
@@ -311,7 +311,7 @@ class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.Sourc
     def source_to_code(  # type: ignore[override]  # incompatible with InspectLoader.source_to_code
         self,
         data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
-        path: ReadableBuffer | StrPath,
+        path: bytes | StrPath,
         *,
         _optimize: int = -1,
     ) -> types.CodeType:
@@ -335,7 +335,7 @@ class ExtensionFileLoader(FileLoader, _LoaderBasics, importlib.abc.ExecutionLoad
     """
 
     def __init__(self, name: str, path: str) -> None: ...
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
     def get_source(self, fullname: str) -> None:
@@ -365,7 +365,7 @@ if sys.version_info >= (3, 11):
             """Use default semantics for module creation."""
 
         def exec_module(self, module: types.ModuleType) -> None: ...
-        @deprecated("load_module() is deprecated; use exec_module() instead")
+        @deprecated("Deprecated since Python 3.10; will be removed in Python 3.15. Use `exec_module()` instead.")
         def load_module(self, fullname: str) -> types.ModuleType:
             """Load a namespace module.
 
@@ -400,14 +400,15 @@ else:
             """Use default semantics for module creation."""
 
         def exec_module(self, module: types.ModuleType) -> None: ...
-        @deprecated("load_module() is deprecated; use exec_module() instead")
-        def load_module(self, fullname: str) -> types.ModuleType:
-            """Load a namespace module.
-
-            This method is deprecated.  Use exec_module() instead.
-
-            """
         if sys.version_info >= (3, 10):
+            @deprecated("Deprecated since Python 3.10; will be removed in Python 3.15. Use `exec_module()` instead.")
+            def load_module(self, fullname: str) -> types.ModuleType:
+                """Load a namespace module.
+
+                This method is deprecated.  Use exec_module() instead.
+
+                """
+
             @staticmethod
             @deprecated(
                 "Deprecated since Python 3.4; removed in Python 3.12. "
@@ -422,6 +423,13 @@ else:
 
             def get_resource_reader(self, module: types.ModuleType) -> importlib.readers.NamespaceReader: ...
         else:
+            def load_module(self, fullname: str) -> types.ModuleType:
+                """Load a namespace module.
+
+                This method is deprecated.  Use exec_module() instead.
+
+                """
+
             @classmethod
             @deprecated(
                 "Deprecated since Python 3.4; removed in Python 3.12. "

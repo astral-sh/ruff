@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::{cmp, fmt};
 
 pub use self::changes::ChangeResult;
+use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
-use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
@@ -455,7 +455,11 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        &DEFAULT_LINT_REGISTRY
+        ty_python_semantic::default_lint_registry()
+    }
+
+    fn verbose(&self) -> bool {
+        self.project().verbose(self)
     }
 }
 
@@ -518,7 +522,6 @@ pub(crate) mod tests {
     use ty_python_semantic::Program;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 
-    use crate::DEFAULT_LINT_REGISTRY;
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
 
@@ -608,7 +611,11 @@ pub(crate) mod tests {
         }
 
         fn lint_registry(&self) -> &LintRegistry {
-            &DEFAULT_LINT_REGISTRY
+            ty_python_semantic::default_lint_registry()
+        }
+
+        fn verbose(&self) -> bool {
+            false
         }
     }
 

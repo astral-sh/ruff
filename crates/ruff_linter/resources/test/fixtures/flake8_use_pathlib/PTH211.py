@@ -13,3 +13,11 @@ Path("tmp/python").symlink_to("usr/bin/python", target_is_directory=True)  # Ok
 fd = os.open(".", os.O_RDONLY)
 os.symlink("source.txt", "link.txt", dir_fd=fd)  # Ok: dir_fd is not supported by pathlib
 os.close(fd)
+
+os.symlink(src="usr/bin/python", dst="tmp/python", unknown=True)
+os.symlink("usr/bin/python",  dst="tmp/python", target_is_directory=False)
+
+os.symlink(src="usr/bin/python", dst="tmp/python", dir_fd=None)
+
+os.symlink("usr/bin/python",  dst="tmp/python", target_is_directory=     True    )
+os.symlink("usr/bin/python",  dst="tmp/python", target_is_directory="nonboolean")

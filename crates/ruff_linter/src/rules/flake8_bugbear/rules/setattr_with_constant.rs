@@ -31,6 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.111")]
 pub(crate) struct SetAttrWithConstant;
 
 impl AlwaysFixableViolation for SetAttrWithConstant {
@@ -53,11 +54,11 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
             attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })],
         value: Box::new(value.clone()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
     generator.stmt(&stmt)
 }

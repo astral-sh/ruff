@@ -38,6 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct AssertWithPrintMessage;
 
 impl AlwaysFixableViolation for AssertWithPrintMessage {
@@ -68,7 +69,7 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
                     test: stmt.test.clone(),
                     msg: print_arguments::to_expr(&call.arguments, checker).map(Box::new),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
                 // We have to replace the entire statement,
                 // as the `print` could be empty and thus `call.range()`
@@ -114,7 +115,7 @@ mod print_arguments {
                     InterpolatedStringElement::Literal(InterpolatedStringLiteralElement {
                         value: part.value.clone(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     })
                 })
                 .collect(),
@@ -131,7 +132,7 @@ mod print_arguments {
                     conversion: ConversionFlag::None,
                     format_spec: None,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
             )],
         }
@@ -154,7 +155,7 @@ mod print_arguments {
                     value: literal.value.clone(),
                     flags,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 });
                 Some(acc)
             } else {
@@ -212,7 +213,7 @@ mod print_arguments {
             value: combined_string.into(),
             flags,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }))
     }
 
@@ -246,10 +247,10 @@ mod print_arguments {
                 elements: InterpolatedStringElements::from(fstring_elements),
                 flags,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }))
     }
 
@@ -285,7 +286,7 @@ mod print_arguments {
                 vec![InterpolatedStringElement::Literal(
                     InterpolatedStringLiteralElement {
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         value: " ".into(),
                     },
                 )]

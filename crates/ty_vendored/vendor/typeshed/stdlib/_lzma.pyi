@@ -16,7 +16,7 @@ CHECK_CRC64: Final = 4
 CHECK_SHA256: Final = 10
 CHECK_ID_MAX: Final = 15
 CHECK_UNKNOWN: Final = 16
-FILTER_LZMA1: int  # v big number
+FILTER_LZMA1: Final[int]  # v big number
 FILTER_LZMA2: Final = 33
 FILTER_DELTA: Final = 3
 FILTER_X86: Final = 4
@@ -33,7 +33,7 @@ MF_BT4: Final = 20
 MODE_FAST: Final = 1
 MODE_NORMAL: Final = 2
 PRESET_DEFAULT: Final = 6
-PRESET_EXTREME: int  # v big number
+PRESET_EXTREME: Final[int]  # v big number
 
 @final
 class LZMADecompressor:
@@ -58,9 +58,9 @@ class LZMADecompressor:
     """
 
     if sys.version_info >= (3, 12):
-        def __new__(cls, format: int | None = ..., memlimit: int | None = ..., filters: _FilterChain | None = ...) -> Self: ...
+        def __new__(cls, format: int = 0, memlimit: int | None = None, filters: _FilterChain | None = None) -> Self: ...
     else:
-        def __init__(self, format: int | None = ..., memlimit: int | None = ..., filters: _FilterChain | None = ...) -> None: ...
+        def __init__(self, format: int = 0, memlimit: int | None = None, filters: _FilterChain | None = None) -> None: ...
 
     def decompress(self, data: ReadableBuffer, max_length: int = -1) -> bytes:
         """Decompress *data*, returning uncompressed data as bytes.
@@ -127,11 +127,11 @@ class LZMACompressor:
 
     if sys.version_info >= (3, 12):
         def __new__(
-            cls, format: int | None = ..., check: int = ..., preset: int | None = ..., filters: _FilterChain | None = ...
+            cls, format: int = 1, check: int = -1, preset: int | None = None, filters: _FilterChain | None = None
         ) -> Self: ...
     else:
         def __init__(
-            self, format: int | None = ..., check: int = ..., preset: int | None = ..., filters: _FilterChain | None = ...
+            self, format: int = 1, check: int = -1, preset: int | None = None, filters: _FilterChain | None = None
         ) -> None: ...
 
     def compress(self, data: ReadableBuffer, /) -> bytes:

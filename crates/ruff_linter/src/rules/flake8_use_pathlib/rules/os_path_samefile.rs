@@ -1,6 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_samefile_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_two_arg_calls;
+use crate::rules::flake8_use_pathlib::helpers::{
+    check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
+};
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
@@ -40,10 +42,11 @@ use ruff_python_ast::ExprCall;
 /// - [Python documentation: `Path.samefile`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.samefile)
 /// - [Python documentation: `os.path.samefile`](https://docs.python.org/3/library/os.path.html#os.path.samefile)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct OsPathSamefile;
 
 impl Violation for OsPathSamefile {
@@ -65,13 +68,16 @@ pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&
         return;
     }
 
+    let fix_enabled = is_fix_os_path_samefile_enabled(checker.settings())
+        && !has_unknown_keywords_or_starred_expr(&call.arguments, &["f1", "f2"]);
+
     check_os_pathlib_two_arg_calls(
         checker,
         call,
         "samefile",
         "f1",
         "f2",
-        is_fix_os_path_samefile_enabled(checker.settings()),
+        fix_enabled,
         OsPathSamefile,
     );
 }

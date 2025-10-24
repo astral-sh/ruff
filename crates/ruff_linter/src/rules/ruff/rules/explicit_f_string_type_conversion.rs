@@ -40,6 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// f"{a!r}"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.267")]
 pub(crate) struct ExplicitFStringTypeConversion;
 
 impl Violation for ExplicitFStringTypeConversion {
@@ -110,16 +111,16 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             return;
         }
 
-        let mut diagnostic =
-            checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
-
-        // Don't support fixing f-string with debug text.
+        // Don't report diagnostic for f-string with debug text.
         if element
             .as_interpolation()
             .is_some_and(|interpolation| interpolation.debug_text.is_some())
         {
             return;
         }
+
+        let mut diagnostic =
+            checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
 
         diagnostic.try_set_fix(|| {
             convert_call_to_conversion_flag(checker, conversion, f_string, index, arg)

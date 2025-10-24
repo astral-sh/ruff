@@ -213,3 +213,55 @@ async def get_id_pydantic_full(
 async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 @app.get("/{my_id}")
 async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+
+@app.get("/things/{ thing_id }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+@app.get("/things/{ thing_id : path }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+@app.get("/things/{ thing_id : str }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+# https://github.com/astral-sh/ruff/issues/20680
+# These should NOT trigger FAST003 because FastAPI doesn't recognize them as path parameters
+
+# Non-ASCII characters in parameter name
+@app.get("/f1/{用户身份}")
+async def f1():
+    return locals()
+
+# Space in parameter name  
+@app.get("/f2/{x: str}")
+async def f2():
+    return locals()
+
+# Non-ASCII converter
+@app.get("/f3/{complex_number:ℂ}")
+async def f3():
+    return locals()
+
+# Mixed non-ASCII characters
+@app.get("/f4/{用户_id}")
+async def f4():
+    return locals()
+
+# Space in parameter name with converter
+@app.get("/f5/{param: int}")
+async def f5():
+    return locals()
+
+# https://github.com/astral-sh/ruff/issues/20941
+@app.get("/imports/{import}")
+async def get_import():
+    ...
+
+@app.get("/debug/{__debug__}")
+async def get_debug():
+    ...

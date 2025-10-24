@@ -165,7 +165,9 @@ from does_not_exist import DoesNotExist  # error: [unresolved-import]
 reveal_type(DoesNotExist)  # revealed: Unknown
 
 if hasattr(DoesNotExist, "__mro__"):
-    reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
+    # TODO: this should be `Unknown & <Protocol with members '__mro__'>` or similar
+    # (The second part of the intersection is incorrectly simplified to `object` due to https://github.com/astral-sh/ty/issues/986)
+    reveal_type(DoesNotExist)  # revealed: Unknown
 
     class Foo(DoesNotExist): ...  # no error!
     reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
@@ -239,8 +241,6 @@ find a union type in a class's bases, we infer the class's `__mro__` as being
 `[<class>, Unknown, object]`, the same as for MROs that cause errors at runtime.
 
 ```py
-from typing_extensions import reveal_type
-
 def returns_bool() -> bool:
     return True
 
@@ -389,8 +389,6 @@ class BadSub2(Bad2()): ...  # error: [invalid-base]
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]

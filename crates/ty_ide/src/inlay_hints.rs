@@ -1,62 +1,129 @@
+use std::{fmt, vec};
+
 use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use std::fmt;
-use std::fmt::Formatter;
-use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::types::ide_support::inlay_hint_function_argument_details;
 use ty_python_semantic::{HasType, SemanticModel};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct InlayHint<'db> {
+#[derive(Debug, Clone)]
+pub struct InlayHint {
     pub position: TextSize,
-    pub content: InlayHintContent<'db>,
+    pub kind: InlayHintKind,
+    pub label: InlayHintLabel,
 }
 
-impl<'db> InlayHint<'db> {
-    pub const fn display(&self, db: &'db dyn Db) -> DisplayInlayHint<'_, 'db> {
-        self.content.display(db)
+impl InlayHint {
+    fn variable_type(position: TextSize, ty: Type, db: &dyn Db) -> Self {
+        let label_parts = vec![
+            ": ".into(),
+            InlayHintLabelPart::new(ty.display(db).to_string()),
+        ];
+
+        Self {
+            position,
+            kind: InlayHintKind::Type,
+            label: InlayHintLabel { parts: label_parts },
+        }
+    }
+
+    fn call_argument_name(position: TextSize, name: &str) -> Self {
+        let label_parts = vec![InlayHintLabelPart::new(name), "=".into()];
+
+        Self {
+            position,
+            kind: InlayHintKind::CallArgumentName,
+            label: InlayHintLabel { parts: label_parts },
+        }
+    }
+
+    pub fn display(&self) -> InlayHintDisplay<'_> {
+        InlayHintDisplay { inlay_hint: self }
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum InlayHintContent<'db> {
-    Type(Type<'db>),
-    CallArgumentName(String),
+#[derive(Debug, Clone)]
+pub enum InlayHintKind {
+    Type,
+    CallArgumentName,
 }
 
-impl<'db> InlayHintContent<'db> {
-    pub const fn display(&self, db: &'db dyn Db) -> DisplayInlayHint<'_, 'db> {
-        DisplayInlayHint { db, hint: self }
+#[derive(Debug, Clone)]
+pub struct InlayHintLabel {
+    parts: Vec<InlayHintLabelPart>,
+}
+
+impl InlayHintLabel {
+    pub fn parts(&self) -> &[InlayHintLabelPart] {
+        &self.parts
     }
 }
 
-pub struct DisplayInlayHint<'a, 'db> {
-    db: &'db dyn Db,
-    hint: &'a InlayHintContent<'db>,
+pub struct InlayHintDisplay<'a> {
+    inlay_hint: &'a InlayHint,
 }
 
-impl fmt::Display for DisplayInlayHint<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.hint {
-            InlayHintContent::Type(ty) => {
-                write!(f, ": {}", ty.display(self.db))
-            }
-            InlayHintContent::CallArgumentName(name) => {
-                write!(f, "{name}=")
-            }
+impl fmt::Display for InlayHintDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        for part in &self.inlay_hint.label.parts {
+            write!(f, "{}", part.text)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct InlayHintLabelPart {
+    text: String,
+
+    target: Option<crate::NavigationTarget>,
+}
+
+impl InlayHintLabelPart {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            target: None,
+        }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn target(&self) -> Option<&crate::NavigationTarget> {
+        self.target.as_ref()
+    }
+}
+
+impl From<String> for InlayHintLabelPart {
+    fn from(s: String) -> Self {
+        Self {
+            text: s,
+            target: None,
         }
     }
 }
 
-pub fn inlay_hints<'db>(
-    db: &'db dyn Db,
+impl From<&str> for InlayHintLabelPart {
+    fn from(s: &str) -> Self {
+        Self {
+            text: s.to_string(),
+            target: None,
+        }
+    }
+}
+
+pub fn inlay_hints(
+    db: &dyn Db,
     file: File,
     range: TextRange,
     settings: &InlayHintSettings,
-) -> Vec<InlayHint<'db>> {
+) -> Vec<InlayHint> {
     let mut visitor = InlayHintVisitor::new(db, file, range, settings);
 
     let ast = parsed_module(db, file).load(db);
@@ -106,7 +173,7 @@ impl Default for InlayHintSettings {
 struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
-    hints: Vec<InlayHint<'db>>,
+    hints: Vec<InlayHint>,
     in_assignment: bool,
     range: TextRange,
     settings: &'a InlayHintSettings,
@@ -128,13 +195,11 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if !self.settings.variable_types {
             return;
         }
-        self.hints.push(InlayHint {
-            position,
-            content: InlayHintContent::Type(ty),
-        });
+        self.hints
+            .push(InlayHint::variable_type(position, ty, self.db));
     }
 
-    fn add_call_argument_name(&mut self, position: TextSize, name: String) {
+    fn add_call_argument_name(&mut self, position: TextSize, name: &str) {
         if !self.settings.call_argument_names {
             return;
         }
@@ -143,10 +208,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        self.hints.push(InlayHint {
-            position,
-            content: InlayHintContent::CallArgumentName(name),
-        });
+        self.hints
+            .push(InlayHint::call_argument_name(position, name));
     }
 }
 
@@ -202,6 +265,15 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 }
                 source_order::walk_expr(self, expr);
             }
+            Expr::Attribute(attribute) => {
+                if self.in_assignment {
+                    if attribute.ctx.is_store() {
+                        let ty = expr.inferred_type(&self.model);
+                        self.add_type_hint(expr.range().end(), ty);
+                    }
+                }
+                source_order::walk_expr(self, expr);
+            }
             Expr::Call(call) => {
                 let argument_names =
                     inlay_hint_function_argument_details(self.db, &self.model, call)
@@ -212,10 +284,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
                     if let Some(name) = argument_names.get(&index) {
-                        self.add_call_argument_name(
-                            arg_or_keyword.range().start(),
-                            name.to_string(),
-                        );
+                        self.add_call_argument_name(arg_or_keyword.range().start(), name);
                     }
                     self.visit_expr(arg_or_keyword.value());
                 }
@@ -322,7 +391,7 @@ mod tests {
 
             for hint in hints {
                 let end_position = (hint.position.to_u32() as usize) + offset;
-                let hint_str = format!("[{}]", hint.display(&self.db));
+                let hint_str = format!("[{}]", hint.display());
                 buf.insert_str(end_position, &hint_str);
                 offset += hint_str.len();
             }
@@ -374,6 +443,31 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
         y = 2
+        ");
+    }
+
+    #[test]
+    fn test_assign_attribute_of_instance() {
+        let test = inlay_hint_test(
+            "
+            class A:
+                def __init__(self, y):
+                    self.x = 1
+                    self.y = y
+
+            a = A(2)
+            a.y = 3
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class A:
+            def __init__(self, y):
+                self.x[: Literal[1]] = 1
+                self.y[: Unknown] = y
+
+        a[: A] = A([y=]2)
+        a.y[: Literal[3]] = 3
         ");
     }
 

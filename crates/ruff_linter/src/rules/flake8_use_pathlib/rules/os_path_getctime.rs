@@ -1,9 +1,10 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_getctime_enabled;
 use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.path.getctime`.
@@ -42,10 +43,11 @@ use ruff_python_ast::ExprCall;
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
 /// - [Python documentation: `os.path.getctime`](https://docs.python.org/3/library/os.path.html#os.path.getctime)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct OsPathGetctime;
 
 impl Violation for OsPathGetctime {
@@ -66,6 +68,7 @@ pub(crate) fn os_path_getctime(checker: &Checker, call: &ExprCall, segments: &[&
     if segments != ["os", "path", "getctime"] {
         return;
     }
+
     check_os_pathlib_single_arg_calls(
         checker,
         call,
@@ -73,5 +76,6 @@ pub(crate) fn os_path_getctime(checker: &Checker, call: &ExprCall, segments: &[&
         "filename",
         is_fix_os_path_getctime_enabled(checker.settings()),
         OsPathGetctime,
+        None,
     );
 }

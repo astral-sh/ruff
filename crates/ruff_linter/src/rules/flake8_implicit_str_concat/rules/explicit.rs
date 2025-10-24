@@ -33,6 +33,7 @@ use crate::{Edit, Fix};
 /// )
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.201")]
 pub(crate) struct ExplicitStringConcatenation;
 
 impl AlwaysFixableViolation for ExplicitStringConcatenation {
@@ -74,6 +75,7 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     Expr::StringLiteral(_) | Expr::FString(_),
                     Expr::StringLiteral(_) | Expr::FString(_)
                 ) | (Expr::BytesLiteral(_), Expr::BytesLiteral(_))
+                    | (Expr::TString(_), Expr::TString(_))
             );
             if concatable
                 && checker

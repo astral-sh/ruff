@@ -41,6 +41,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 ///         raise ValueError("`obj` cannot be `None`")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct MisplacedBareRaise;
 
 impl Violation for MisplacedBareRaise {

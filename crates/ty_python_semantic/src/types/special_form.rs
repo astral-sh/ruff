@@ -27,6 +27,7 @@ use std::str::FromStr;
     get_size2::GetSize,
 )]
 pub enum SpecialFormType {
+    Any,
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
@@ -77,6 +78,10 @@ pub enum SpecialFormType {
     TypeOf,
     /// The symbol `ty_extensions.CallableTypeOf`
     CallableTypeOf,
+    /// The symbol `ty_extensions.Top`
+    Top,
+    /// The symbol `ty_extensions.Bottom`
+    Bottom,
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
@@ -151,11 +156,18 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypeOf
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
-            | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            | Self::Generic  // actually `type` at runtime but this is what typeshed says
             | Self::ReadOnly => KnownClass::SpecialForm,
+
+            // Typeshed says it's an instance of `_SpecialForm`,
+            // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
+            // as being valid.
+            Self::Protocol => KnownClass::ProtocolMeta,
+
+            Self::Generic | Self::Any => KnownClass::Type,
 
             Self::List
             | Self::Dict
@@ -238,6 +250,7 @@ impl SpecialFormType {
             | Self::TypingSelf
             | Self::Protocol
             | Self::NamedTuple
+            | Self::Any
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -246,6 +259,8 @@ impl SpecialFormType {
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf => module.is_ty_extensions(),
@@ -290,6 +305,8 @@ impl SpecialFormType {
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf
@@ -306,6 +323,7 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::ReadOnly
             | Self::Protocol
+            | Self::Any
             | Self::Generic => false,
         }
     }
@@ -313,6 +331,7 @@ impl SpecialFormType {
     /// Return the repr of the symbol at runtime
     pub(super) const fn repr(self) -> &'static str {
         match self {
+            SpecialFormType::Any => "typing.Any",
             SpecialFormType::Annotated => "typing.Annotated",
             SpecialFormType::Literal => "typing.Literal",
             SpecialFormType::LiteralString => "typing.LiteralString",
@@ -351,6 +370,8 @@ impl SpecialFormType {
             SpecialFormType::Intersection => "ty_extensions.Intersection",
             SpecialFormType::TypeOf => "ty_extensions.TypeOf",
             SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
+            SpecialFormType::Top => "ty_extensions.Top",
+            SpecialFormType::Bottom => "ty_extensions.Bottom",
             SpecialFormType::Protocol => "typing.Protocol",
             SpecialFormType::Generic => "typing.Generic",
             SpecialFormType::NamedTuple => "typing.NamedTuple",

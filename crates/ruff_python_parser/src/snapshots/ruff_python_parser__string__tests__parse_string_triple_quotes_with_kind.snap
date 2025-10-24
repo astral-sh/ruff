@@ -5,22 +5,23 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..20,
             value: StringLiteral(
                 ExprStringLiteral {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..20,
                     value: StringLiteralValue {
                         inner: Single(
                             StringLiteral {
                                 range: 0..20,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 value: "Hello, world!",
                                 flags: StringLiteralFlags {
                                     quote_style: Single,
                                     prefix: Unicode,
                                     triple_quoted: true,
+                                    unclosed: false,
                                 },
                             },
                         ),

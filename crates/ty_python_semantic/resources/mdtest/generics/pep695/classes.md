@@ -40,13 +40,6 @@ You cannot use the same typevar more than once.
 class RepeatedTypevar[T, T]: ...
 ```
 
-You can only use typevars (TODO: or param specs or typevar tuples) in the class's generic context.
-
-```py
-# TODO: error
-class GenericOfType[int]: ...
-```
-
 You can also define a generic class by inheriting from some _other_ generic class, and specializing
 it with typevars. With PEP 695 syntax, you must explicitly list all of the typevars that you use in
 your base classes.
@@ -511,17 +504,17 @@ class C[T]:
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 reveal_type(generic_context(C))  # revealed: tuple[T@C]
-reveal_type(generic_context(C.method))  # revealed: None
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 reveal_type(generic_context(C[int]))  # revealed: None
-reveal_type(generic_context(C[int].method))  # revealed: None
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C[int].method))  # revealed: tuple[Self@method]
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 reveal_type(generic_context(c))  # revealed: None
-reveal_type(generic_context(c.method))  # revealed: None
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(c.method))  # revealed: tuple[Self@method]
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 ```
 
 ## Specializations propagate
@@ -560,13 +553,9 @@ from typing import overload
 
 class WithOverloadedMethod[T]:
     @overload
-    def method(self, x: T) -> T:
-        return x
-
+    def method(self, x: T) -> T: ...
     @overload
-    def method[S](self, x: S) -> S | T:
-        return x
-
+    def method[S](self, x: S) -> S | T: ...
     def method[S](self, x: S | T) -> S | T:
         return x
 
@@ -647,6 +636,25 @@ class C[T](C): ...
 
 # error: [cyclic-class-definition]
 class D[T](D[int]): ...
+```
+
+### Cyclic inheritance in a stub file combined with constrained type variables
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1390>; we used to panic on
+this:
+
+`stub.pyi`:
+
+```pyi
+class A(B): ...
+class G: ...
+class C[T: (G, A)]: ...
+class B(C[A]): ...
+class D(C[G]): ...
+
+def func(x: D): ...
+
+func(G())  # error: [invalid-argument-type]
 ```
 
 ## Tuple as a PEP-695 generic class

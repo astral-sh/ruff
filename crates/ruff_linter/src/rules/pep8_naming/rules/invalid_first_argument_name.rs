@@ -59,6 +59,7 @@ use crate::{Fix, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidFirstArgumentNameForMethod {
     argument_name: String,
 }
@@ -129,6 +130,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
     // Whether the method is `__new__`
@@ -141,7 +143,6 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
     #[derive_message_formats]
     // The first string below is what shows up in the documentation
     // in the rule table, and it is the more common case.
-    #[expect(clippy::if_not_else)]
     fn message(&self) -> String {
         if !self.is_new {
             "First argument of a class method should be named `cls`".to_string()

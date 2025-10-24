@@ -1,11 +1,12 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{ExprCall, PythonVersion};
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_readlink_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_single_arg_calls, is_keyword_only_argument_non_default,
 };
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprCall, PythonVersion};
 
 /// ## What it does
 /// Checks for uses of `os.readlink`.
@@ -42,10 +43,11 @@ use ruff_python_ast::{ExprCall, PythonVersion};
 /// - [Python documentation: `Path.readlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.readline)
 /// - [Python documentation: `os.readlink`](https://docs.python.org/3/library/os.html#os.readlink)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct OsReadlink;
 
 impl Violation for OsReadlink {
@@ -87,5 +89,6 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
         "path",
         is_fix_os_readlink_enabled(checker.settings()),
         OsReadlink,
+        None,
     );
 }

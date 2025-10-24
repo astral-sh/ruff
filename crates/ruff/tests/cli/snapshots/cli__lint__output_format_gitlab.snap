@@ -1,0 +1,78 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - gitlab
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "check_name": "F401",
+    "description": "F401: `os` imported but unused",
+    "severity": "major",
+    "fingerprint": "4dbad37161e65c72",
+    "location": {
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      }
+    }
+  },
+  {
+    "check_name": "F821",
+    "description": "F821: Undefined name `y`",
+    "severity": "major",
+    "fingerprint": "7af59862a085230",
+    "location": {
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 2,
+          "column": 5
+        },
+        "end": {
+          "line": 2,
+          "column": 6
+        }
+      }
+    }
+  },
+  {
+    "check_name": "invalid-syntax",
+    "description": "invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "severity": "major",
+    "fingerprint": "e558cec859bb66e8",
+    "location": {
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 6
+        }
+      }
+    }
+  }
+]
+----- stderr -----

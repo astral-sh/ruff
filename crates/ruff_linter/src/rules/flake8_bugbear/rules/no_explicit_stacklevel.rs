@@ -41,6 +41,7 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// ## References
 /// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct NoExplicitStacklevel;
 
 impl AlwaysFixableViolation for NoExplicitStacklevel {

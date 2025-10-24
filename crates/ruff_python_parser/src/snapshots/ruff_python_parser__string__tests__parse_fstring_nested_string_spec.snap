@@ -5,26 +5,26 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..13,
             value: FString(
                 ExprFString {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..13,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..13,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..12,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 3..6,
                                                         id: Name("foo"),
                                                         ctx: Load,
@@ -35,26 +35,27 @@ expression: suite
                                                 format_spec: Some(
                                                     InterpolatedStringFormatSpec {
                                                         range: 7..11,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         elements: [
                                                             Interpolation(
                                                                 InterpolatedElement {
                                                                     range: 7..11,
-                                                                    node_index: AtomicNodeIndex(..),
+                                                                    node_index: NodeIndex(None),
                                                                     expression: StringLiteral(
                                                                         ExprStringLiteral {
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             range: 8..10,
                                                                             value: StringLiteralValue {
                                                                                 inner: Single(
                                                                                     StringLiteral {
                                                                                         range: 8..10,
-                                                                                        node_index: AtomicNodeIndex(..),
+                                                                                        node_index: NodeIndex(None),
                                                                                         value: "",
                                                                                         flags: StringLiteralFlags {
                                                                                             quote_style: Single,
                                                                                             prefix: Empty,
                                                                                             triple_quoted: false,
+                                                                                            unclosed: false,
                                                                                         },
                                                                                     },
                                                                                 ),
@@ -76,6 +77,7 @@ expression: suite
                                         quote_style: Double,
                                         prefix: Regular,
                                         triple_quoted: false,
+                                        unclosed: false,
                                     },
                                 },
                             ),

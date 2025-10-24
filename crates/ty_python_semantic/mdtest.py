@@ -46,6 +46,7 @@ class MDTestRunner:
                 CRATE_NAME,
                 "--no-run",
                 "--color=always",
+                "--test=mdtest",
                 "--message-format",
                 message_format,
             ],
@@ -105,7 +106,12 @@ class MDTestRunner:
         return subprocess.run(
             [self.mdtest_executable, *arguments],
             cwd=CRATE_ROOT,
-            env=dict(os.environ, CLICOLOR_FORCE="1"),
+            env=dict(
+                os.environ,
+                CLICOLOR_FORCE="1",
+                INSTA_FORCE_PASS="1",
+                INSTA_OUTPUT="none",
+            ),
             capture_output=capture_output,
             text=True,
             check=False,

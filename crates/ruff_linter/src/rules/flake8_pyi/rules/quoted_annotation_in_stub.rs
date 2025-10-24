@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.265")]
 pub(crate) struct QuotedAnnotationInStub;
 
 impl AlwaysFixableViolation for QuotedAnnotationInStub {

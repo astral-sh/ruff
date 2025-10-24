@@ -4,6 +4,7 @@
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Color(Enum):
     RED = 1
@@ -11,8 +12,8 @@ class Color(Enum):
     BLUE = 3
 
 reveal_type(Color.RED)  # revealed: Literal[Color.RED]
-# TODO: This could be `Literal[1]`
-reveal_type(Color.RED.value)  # revealed: Any
+reveal_type(Color.RED.name)  # revealed: Literal["RED"]
+reveal_type(Color.RED.value)  # revealed: Literal[1]
 
 # TODO: Should be `Color` or `Literal[Color.RED]`
 reveal_type(Color["RED"])  # revealed: Unknown
@@ -155,6 +156,7 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, property as enum_property
+from typing import Any
 from ty_extensions import enum_members
 
 class Answer(Enum):
@@ -167,6 +169,22 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+Enum attributes defined using `enum.property` take precedence over generated attributes.
+
+```py
+from enum import Enum, property as enum_property
+
+class Choices(Enum):
+    A = 1
+    B = 2
+
+    @enum_property
+    def value(self) -> Any: ...
+
+# TODO: This should be `Any` - overridden by `@enum_property`
+reveal_type(Choices.A.value)  # revealed: Literal[1]
 ```
 
 ### `types.DynamicClassAttribute`
@@ -247,7 +265,47 @@ reveal_type(enum_members(Color))
 reveal_type(Color.red)
 ```
 
+Multiple aliases to the same member are also supported. This is a regression test for
+<https://github.com/astral-sh/ty/issues/1293>:
+
+```py
+from ty_extensions import enum_members
+
+class ManyAliases(Enum):
+    real_member = "real_member"
+    alias1 = "real_member"
+    alias2 = "real_member"
+    alias3 = "real_member"
+
+    other_member = "other_real_member"
+
+# revealed: tuple[Literal["real_member"], Literal["other_member"]]
+reveal_type(enum_members(ManyAliases))
+
+reveal_type(ManyAliases.real_member)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias1)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias2)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias3)  # revealed: Literal[ManyAliases.real_member]
+
+reveal_type(ManyAliases.real_member.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.real_member.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias1.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias1.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias2.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias2.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
+```
+
 ### Using `auto()`
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
 from enum import Enum, auto
@@ -259,6 +317,50 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
+Usages of `auto()` can be combined with manual value assignments:
+
+```py
+class Mixed(Enum):
+    MANUAL_1 = -1
+    AUTO_1 = auto()
+    MANUAL_2 = -2
+    AUTO_2 = auto()
+
+reveal_type(Mixed.MANUAL_1.value)  # revealed: Literal[-1]
+reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[1]
+reveal_type(Mixed.MANUAL_2.value)  # revealed: Literal[-2]
+reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[2]
+```
+
+When using `auto()` with `StrEnum`, the value is the lowercase name of the member:
+
+```py
+from enum import StrEnum, auto
+
+class Answer(StrEnum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+```
+
+Using `auto()` with `IntEnum` also works as expected:
+
+```py
+from enum import IntEnum, auto
+
+class Answer(IntEnum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
 Combining aliases with `auto()`:
@@ -481,6 +583,62 @@ callable = Printer.STDERR
 callable("Another error!")
 ```
 
+## Special attributes on enum members
+
+### `name` and `_name_`
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
+
+def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
+    reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
+
+def _(any_color: Color):
+    # TODO: Literal["RED", "GREEN", "BLUE"]
+    reveal_type(any_color.name)  # revealed: Any
+```
+
+### `value` and `_value_`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, StrEnum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.RED._value_)  # revealed: Literal[1]
+
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
+
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
+```
+
 ## Properties of enum types
 
 ### Implicitly final
@@ -609,6 +767,12 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWit
 # Attributes like `.value` can *not* be accessed on members of these enums:
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO._value_
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.name
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO._name_
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass

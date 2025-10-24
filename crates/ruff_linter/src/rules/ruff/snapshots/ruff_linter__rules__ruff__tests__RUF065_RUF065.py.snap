@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+ --> RUF065.py:4:26
+  |
+3 | # %s + str()
+4 | logging.info("Hello %s", str("World!"))
+  |                          ^^^^^^^^^^^^^
+5 | logging.log(logging.INFO, "Hello %s", str("World!"))
+  |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+ --> RUF065.py:5:39
+  |
+3 | # %s + str()
+4 | logging.info("Hello %s", str("World!"))
+5 | logging.log(logging.INFO, "Hello %s", str("World!"))
+  |                                       ^^^^^^^^^^^^^
+6 |
+7 | # %s + repr()
+  |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+  --> RUF065.py:22:18
+   |
+21 | # %s + str()
+22 | info("Hello %s", str("World!"))
+   |                  ^^^^^^^^^^^^^
+23 | log(logging.INFO, "Hello %s", str("World!"))
+   |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+  --> RUF065.py:23:31
+   |
+21 | # %s + str()
+22 | info("Hello %s", str("World!"))
+23 | log(logging.INFO, "Hello %s", str("World!"))
+   |                               ^^^^^^^^^^^^^
+24 |
+25 | # %s + repr()
+   |

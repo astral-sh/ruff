@@ -469,6 +469,22 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^
           |
+
+        info[goto-definition]: Definition
+         --> mymodule.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         ^^^^^^^^
+        4 |         self.val = val
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+          |     ^^^^^^^
+          |
         ");
     }
 
@@ -626,6 +642,759 @@ class MyClass: ...
           |
         2 | from mymodule import MyClass
           |                      ^^^^^^^
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they ultimately have different signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y, z = None): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(a<CURSOR>b=5, y=2), 0)
+my_func(my_other_func(ab=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:2:13
+          |
+        2 | def my_func(ab, y, z = None): ...
+          |             ^^
+        3 | def my_other_func(ab, y): ...
+          |
+        info: Source
+         --> main.py:5:23
+          |
+        3 | def my_other_func(ab, y): ...
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they ultimately have different signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y, z = None): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(ab=5, y=2), 0)
+my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:19
+          |
+        2 | def my_func(ab, y, z = None): ...
+        3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |
+        info: Source
+         --> main.py:6:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |                       ^^
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they have identical signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg3() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(a<CURSOR>b=5, y=2), 0)
+my_func(my_other_func(ab=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:2:13
+          |
+        2 | def my_func(ab, y): ...
+          |             ^^
+        3 | def my_other_func(ab, y): ...
+          |
+        info: Source
+         --> main.py:5:23
+          |
+        3 | def my_other_func(ab, y): ...
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they have identical signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg4() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(ab=5, y=2), 0)
+my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:19
+          |
+        2 | def my_func(ab, y): ...
+        3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |
+        info: Source
+         --> main.py:6:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |                       ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overload_type_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_type_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mymodule import ab
+
+a<CURSOR>b("hello")
+"#,
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_arity_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, 2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, b = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_arity_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, b = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_keyword_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, b=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, *, b = None, c = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_keyword_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, c=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, *, b = None, c = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_binary_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+a = Test()
+b = Test()
+
+a <CURSOR>+ b
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __add__(self, other):
+          |         ^^^^^^^
+        4 |         return Test()
+          |
+        info: Source
+          --> main.py:10:3
+           |
+         8 | b = Test()
+         9 |
+        10 | a + b
+           |   ^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_reflected_dunder() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class A:
+    def __radd__(self, other) -> A:
+        return self
+
+class B: ...
+
+B() <CURSOR>+ A()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class A:
+        3 |     def __radd__(self, other) -> A:
+          |         ^^^^^^^^
+        4 |         return self
+          |
+        info: Source
+         --> main.py:8:5
+          |
+        6 | class B: ...
+        7 |
+        8 | B() + A()
+          |     ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_no_spaces_before_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+a = Test()
+b = Test()
+
+a<CURSOR>+b
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __add__(self, other):
+          |         ^^^^^^^
+        4 |         return Test()
+          |
+        info: Source
+          --> main.py:10:2
+           |
+         8 | b = Test()
+         9 |
+        10 | a+b
+           |  ^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_no_spaces_after_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+a = Test()
+b = Test()
+
+a+<CURSOR>b
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+          --> main.py:8:1
+           |
+         7 | a = Test()
+         8 | b = Test()
+           | ^
+         9 |
+        10 | a+b
+           |
+        info: Source
+          --> main.py:10:3
+           |
+         8 | b = Test()
+         9 |
+        10 | a+b
+           |   ^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_binary_operator_comment() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __add__(self, other):
+        return Test()
+
+
+(
+    Test()  <CURSOR># comment
+    + Test()
+)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_definition_unary_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self) -> bool: ...
+
+a = Test()
+
+<CURSOR>not a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __bool__(self) -> bool: ...
+          |         ^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | not a
+          | ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_after_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self) -> bool: ...
+
+a = Test()
+
+not<CURSOR> a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __bool__(self) -> bool: ...
+          |         ^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | not a
+          | ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_between_operator_and_operand() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self) -> bool: ...
+
+a = Test()
+
+-<CURSOR>a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:5:1
+          |
+        3 |     def __bool__(self) -> bool: ...
+        4 |
+        5 | a = Test()
+          | ^
+        6 |
+        7 | -a
+          |
+        info: Source
+         --> main.py:7:2
+          |
+        5 | a = Test()
+        6 |
+        7 | -a
+          |  ^
           |
         ");
     }

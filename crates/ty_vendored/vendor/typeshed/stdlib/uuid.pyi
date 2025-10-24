@@ -133,6 +133,7 @@ class UUID:
                     uuid_generate_time_safe(3).
     """
 
+    __slots__ = ("int", "is_safe", "__weakref__")
     def __init__(
         self,
         hex: str | None = None,

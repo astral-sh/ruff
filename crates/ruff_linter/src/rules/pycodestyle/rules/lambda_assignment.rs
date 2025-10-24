@@ -36,6 +36,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct LambdaAssignment {
     name: String,
 }
@@ -154,11 +155,16 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     }
 
     // The first argument to `Callable` must be a list of types, parameter
-    // specification, or ellipsis.
+    // specification (e.g., a `ParamSpec`), or ellipsis.
+    // For parameter specifications, we cannot assign per-parameter annotations,
+    // but we can still preserve the return type annotation.
     let params = match param_types {
         Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
         Expr::EllipsisLiteral(_) => vec![],
-        _ => return None,
+        // Treat any other form (e.g., `ParamSpec`, `Concatenate`, etc.) as a
+        // parameter specification: do not annotate individual parameters, but
+        // keep the return type.
+        _ => vec![],
     };
 
     // The second argument to `Callable` must be a type.
@@ -182,7 +188,7 @@ fn function(
             ExprEllipsisLiteral::default(),
         ))),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
     let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
@@ -230,7 +236,7 @@ fn function(
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let generated = checker.generator().stmt(&func);
 
@@ -246,7 +252,7 @@ fn function(
         returns: None,
         type_params: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
     let generated = checker.generator().stmt(&function);
 

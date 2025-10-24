@@ -1,3 +1,7 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
@@ -24,9 +28,9 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
-use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
+use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
+use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
-use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
 mod db;
 mod files;
@@ -34,15 +38,6 @@ mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
-
-pub static DEFAULT_LINT_REGISTRY: std::sync::LazyLock<LintRegistry> =
-    std::sync::LazyLock::new(default_lints_registry);
-
-pub fn default_lints_registry() -> LintRegistry {
-    let mut builder = LintRegistryBuilder::default();
-    register_lints(&mut builder);
-    builder.build()
-}
 
 /// The project as a Salsa ingredient.
 ///
@@ -118,6 +113,9 @@ pub struct Project {
     /// the project including the virtual files that might exists in the editor.
     #[default]
     check_mode: CheckMode,
+
+    #[default]
+    verbose_flag: bool,
 }
 
 /// A progress reporter.
@@ -371,6 +369,16 @@ impl Project {
 
         self.set_included_paths_list(db).to(paths);
         self.reload_files(db);
+    }
+
+    pub fn set_verbose(self, db: &mut dyn Db, verbose: bool) {
+        if self.verbose_flag(db) != verbose {
+            self.set_verbose_flag(db).to(verbose);
+        }
+    }
+
+    pub fn verbose(self, db: &dyn Db) -> bool {
+        self.verbose_flag(db)
     }
 
     /// Returns the paths that should be checked.
@@ -671,24 +679,7 @@ where
     }) {
         Ok(result) => Ok(result),
         Err(error) => {
-            use std::fmt::Write;
-            let mut message = String::new();
-            message.push_str("Panicked");
-
-            if let Some(location) = error.location {
-                let _ = write!(&mut message, " at {location}");
-            }
-
-            let _ = write!(
-                &mut message,
-                " when checking `{file}`",
-                file = file.path(db)
-            );
-
-            if let Some(payload) = error.payload.as_str() {
-                let _ = write!(&mut message, ": `{payload}`");
-            }
-
+            let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,

@@ -46,6 +46,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct IfStmtMinMax {
     min_max: MinMax,
     replacement: SourceCodeSnippet,

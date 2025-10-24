@@ -77,11 +77,9 @@ impl<'a> ConciseRenderer<'a> {
                     )?;
                 }
                 if self.config.show_fix_status {
-                    if let Some(fix) = diag.fix() {
-                        // Do not display an indicator for inapplicable fixes
-                        if fix.applies(self.config.fix_applicability) {
-                            write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                        }
+                    // Do not display an indicator for inapplicable fixes
+                    if diag.has_applicable_fix(self.config) {
+                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
                     }
                 }
             } else {

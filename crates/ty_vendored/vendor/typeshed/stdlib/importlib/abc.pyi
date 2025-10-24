@@ -81,7 +81,7 @@ if sys.version_info < (3, 12):
         Deprecated since Python 3.3
         """
 
-@deprecated("Deprecated as of Python 3.7: Use importlib.resources.abc.TraversableResources instead.")
+@deprecated("Deprecated since Python 3.7. Use `importlib.resources.abc.TraversableResources` instead.")
 class ResourceLoader(Loader):
     """Abstract base class for loaders which can return data from their
     back-end storage to facilitate reading data to perform an import.
@@ -136,7 +136,7 @@ class InspectLoader(Loader):
 
     @staticmethod
     def source_to_code(
-        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath = "<string>"
+        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath = "<string>"
     ) -> types.CodeType:
         """Compile 'data' into a code object.
 
@@ -176,7 +176,7 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
 
     """
 
-    @deprecated("Deprecated as of Python 3.3: Use importlib.resources.abc.SourceLoader.path_stats instead.")
+    @deprecated("Deprecated since Python 3.3. Use `importlib.resources.abc.SourceLoader.path_stats` instead.")
     def path_mtime(self, path: str) -> float:
         """Return the (int) modification time for the path (str)."""
 
@@ -342,10 +342,10 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
     def get_data(self, path: str) -> bytes:
         """Return the data from path as raw bytes."""
 
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
-    def load_module(self, name: str | None = None) -> types.ModuleType:
+    def load_module(self, fullname: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.

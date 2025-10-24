@@ -17,6 +17,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
+use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -48,6 +49,7 @@ pub(crate) enum MockReference {
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.206")]
 pub(crate) struct DeprecatedMockImport {
     reference_type: MockReference,
 }
@@ -264,6 +266,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
             },
             attribute.value.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "mock".to_string(),
             attribute.value.range(),
@@ -299,13 +302,20 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
 
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
-                    if &name.name == "mock" || &name.name == "mock.mock" {
+                    if (&name.name == "mock" || &name.name == "mock.mock")
+                        && !is_import_required_by_isort(
+                            &checker.settings().isort.required_imports,
+                            stmt.into(),
+                            name,
+                        )
+                    {
                         let mut diagnostic = checker.report_diagnostic(
                             DeprecatedMockImport {
                                 reference_type: MockReference::Import,
                             },
                             name.range(),
                         );
+                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
                         if let Some(content) = content.as_ref() {
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 content.clone(),
@@ -319,6 +329,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
         Stmt::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             level,
+            names,
             ..
         }) => {
             if *level > 0 {
@@ -326,12 +337,24 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
+                if names.iter().any(|alias| {
+                    alias.name.as_str() == "mock"
+                        && is_import_required_by_isort(
+                            &checker.settings().isort.required_imports,
+                            stmt.into(),
+                            alias,
+                        )
+                }) {
+                    return;
+                }
+
                 let mut diagnostic = checker.report_diagnostic(
                     DeprecatedMockImport {
                         reference_type: MockReference::Import,
                     },
                     stmt.range(),
                 );
+                diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
                 if let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())

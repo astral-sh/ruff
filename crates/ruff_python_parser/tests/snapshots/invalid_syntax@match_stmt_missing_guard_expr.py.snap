@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_missing_gu
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..28,
         body: [
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..27,
                     subject: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 6..7,
                             id: Name("x"),
                             ctx: Load,
@@ -25,17 +25,17 @@ Module(
                     cases: [
                         MatchCase {
                             range: 13..27,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 18..19,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: Some(
                                         Identifier {
                                             id: Name("y"),
                                             range: 18..19,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                         },
                                     ),
                                 },
@@ -44,11 +44,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 24..27,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 24..27,
                                             },
                                         ),

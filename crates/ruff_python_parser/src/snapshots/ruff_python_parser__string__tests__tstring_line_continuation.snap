@@ -5,32 +5,32 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..9,
             value: TString(
                 ExprTString {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..9,
                     value: TStringValue {
                         inner: Single(
                             TString {
                                 range: 0..9,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 elements: [
                                     Literal(
                                         InterpolatedStringLiteralElement {
                                             range: 3..5,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             value: "\\\n",
                                         },
                                     ),
                                     Interpolation(
                                         InterpolatedElement {
                                             range: 5..8,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             expression: Name(
                                                 ExprName {
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     range: 6..7,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -48,6 +48,7 @@ expression: suite
                                         uppercase_r: false,
                                     },
                                     triple_quoted: false,
+                                    unclosed: false,
                                 },
                             },
                         ),

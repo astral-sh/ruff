@@ -40,6 +40,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct DuplicateLiteralMember {
     duplicate_name: String,
 }
@@ -92,14 +93,14 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
                 Expr::Tuple(ast::ExprTuple {
                     elts: unique_nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

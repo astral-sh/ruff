@@ -66,6 +66,7 @@ use crate::rules::flake8_pytest_style::types;
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestParametrizeNamesWrongType {
     single_argument: bool,
     expected: types::ParametrizeNameType,
@@ -200,6 +201,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
@@ -264,6 +266,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct PytestDuplicateParametrizeTestCases {
     index: usize,
 }
@@ -301,7 +304,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -
             })
             .into_boxed_str(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         flags,
     });
     Some(generator.expr(&node))
@@ -367,14 +370,14 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                     Expr::from(ast::StringLiteral {
                                         value: Box::from(*name),
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                         flags: checker.default_string_flags(),
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -404,14 +407,14 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                     Expr::from(ast::StringLiteral {
                                         value: Box::from(*name),
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                         flags: checker.default_string_flags(),
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             checker.generator().expr(&node),
@@ -440,7 +443,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             checker.generator().expr(&node),
@@ -485,7 +488,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

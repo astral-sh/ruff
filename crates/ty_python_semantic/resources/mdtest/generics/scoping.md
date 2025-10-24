@@ -117,6 +117,7 @@ reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
 reveal_type(C[int]().f(1))  # revealed: str
 reveal_type(bound_method(1))  # revealed: str
 
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[T@C]` of type variable `Self`"
 C[int].f(1)  # error: [missing-argument]
 reveal_type(C[int].f(C[int](), 1))  # revealed: str
 
@@ -154,7 +155,7 @@ from ty_extensions import generic_context
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
 reveal_type(generic_context(Legacy))  # revealed: tuple[T@Legacy]
-reveal_type(generic_context(legacy.m))  # revealed: tuple[S@m]
+reveal_type(generic_context(legacy.m))  # revealed: tuple[Self@m, S@m]
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -259,27 +260,31 @@ class C[T]:
 
 ### Generic class within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 
 ### Generic class within generic class
+
+<!-- snapshot-diagnostics -->
 
 ```py
 from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 

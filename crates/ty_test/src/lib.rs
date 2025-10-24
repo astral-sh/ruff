@@ -6,7 +6,7 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -16,7 +16,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::check_types;
+use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
@@ -78,7 +78,7 @@ pub fn run(
             println!("\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
+        if let Err(failures) = failures {
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -105,7 +105,7 @@ pub fn run(
                 }
             }
         }
-        if let Err(inconsistencies) = run_module_resolution_consistency_test(&db) {
+        if let Err(inconsistencies) = inconsistencies {
             any_failures = true;
             for inconsistency in inconsistencies {
                 match output_format {
@@ -241,7 +241,9 @@ fn run_test(
 
             db.write_file(&full_path, &embedded.code).unwrap();
 
-            if !(full_path.starts_with(&src_path) && matches!(embedded.lang, "py" | "pyi")) {
+            if !(full_path.starts_with(&src_path)
+                && matches!(embedded.lang, "py" | "python" | "pyi"))
+            {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;
             }
@@ -321,26 +323,6 @@ fn run_test(
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let pull_types_result = attempt_test(
-                db,
-                pull_types,
-                test_file,
-                "\"pull types\"",
-                Some(
-                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
-                    directive to this test",
-                ),
-            );
-            match pull_types_result {
-                Ok(()) => {}
-                Err(failures) => {
-                    any_pull_types_failures = true;
-                    if !test.should_skip_pulling_types() {
-                        return Some(failures);
-                    }
-                }
-            }
-
             let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
@@ -375,8 +357,34 @@ fn run_test(
                     by_line: line_failures,
                 }),
             };
+
+            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+            // since they make snapshots very noisy!
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics);
+                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
+                    diagnostic.id() != DiagnosticId::RevealedType
+                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+                }));
+            }
+
+            let pull_types_result = attempt_test(
+                db,
+                pull_types,
+                test_file,
+                "\"pull types\"",
+                Some(
+                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
+                    directive to this test",
+                ),
+            );
+            match pull_types_result {
+                Ok(()) => {}
+                Err(failures) => {
+                    any_pull_types_failures = true;
+                    if !test.should_skip_pulling_types() {
+                        return Some(failures);
+                    }
+                }
             }
 
             failure

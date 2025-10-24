@@ -1,21 +1,27 @@
+use rustc_hash::FxHashMap;
+
 use crate::{
     Db, FxIndexSet,
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
-        IntersectionType, KnownInstanceType, MethodWrapperKind, NominalInstanceType,
+        IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
         TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        bound_super::walk_bound_super_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         subclass_of::walk_subclass_of_type,
-        walk_bound_method_type, walk_bound_super_type, walk_bound_type_var_type,
-        walk_callable_type, walk_intersection_type, walk_known_instance_type,
-        walk_method_wrapper_type, walk_property_instance_type, walk_type_alias_type,
-        walk_type_var_type, walk_typed_dict_type, walk_typeis_type, walk_union,
+        walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
+        walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
+        walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
+        walk_typed_dict_type, walk_typeis_type, walk_union,
     },
 };
-use std::cell::{Cell, RefCell};
+use std::{
+    cell::{Cell, RefCell},
+    collections::hash_map::Entry,
+};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -23,6 +29,9 @@ use std::cell::{Cell, RefCell};
 /// but it makes it easy for implementors of the trait to do so.
 /// See [`any_over_type`] for an example of how to do this.
 pub(crate) trait TypeVisitor<'db> {
+    /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
+    fn should_visit_lazy_type_attributes(&self) -> bool;
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
@@ -81,7 +90,11 @@ pub(crate) trait TypeVisitor<'db> {
         walk_protocol_instance_type(db, protocol, self);
     }
 
-    fn visit_method_wrapper_type(&self, db: &'db dyn Db, method_wrapper: MethodWrapperKind<'db>) {
+    fn visit_method_wrapper_type(
+        &self,
+        db: &'db dyn Db,
+        method_wrapper: KnownBoundMethodType<'db>,
+    ) {
         walk_method_wrapper_type(db, method_wrapper, self);
     }
 
@@ -100,13 +113,13 @@ pub(crate) trait TypeVisitor<'db> {
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-enum NonAtomicType<'db> {
+pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
-    MethodWrapper(MethodWrapperKind<'db>),
+    MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
     GenericAlias(GenericAlias<'db>),
     KnownInstance(KnownInstanceType<'db>),
@@ -114,14 +127,13 @@ enum NonAtomicType<'db> {
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
-    NonInferableTypeVar(BoundTypeVarInstance<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
 }
 
-enum TypeKind<'db> {
+pub(super) enum TypeKind<'db> {
     Atomic,
     NonAtomic(NonAtomicType<'db>),
 }
@@ -158,7 +170,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
             }
-            Type::MethodWrapper(method_wrapper) => {
+            Type::KnownBoundMethod(method_wrapper) => {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
@@ -178,9 +190,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
-            Type::NonInferableTypeVar(bound_typevar) => {
-                TypeKind::NonAtomic(NonAtomicType::NonInferableTypeVar(bound_typevar))
-            }
             Type::TypeVar(bound_typevar) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
@@ -193,7 +202,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
     }
 }
 
-fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     non_atomic_type: NonAtomicType<'db>,
     visitor: &V,
@@ -220,9 +229,6 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_property_instance_type(db, property);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
-        NonAtomicType::NonInferableTypeVar(bound_typevar) => {
-            visitor.visit_bound_type_var_type(db, bound_typevar);
-        }
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }
@@ -240,18 +246,28 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
 ///
 /// The function guards against infinite recursion
 /// by keeping track of the non-atomic types it has already seen.
+///
+/// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
+/// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
+/// are visited or not.
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     query: &dyn Fn(Type<'db>) -> bool,
+    should_visit_lazy_type_attributes: bool,
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
         seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
         found_matching_type: Cell<bool>,
+        should_visit_lazy_type_attributes: bool,
     }
 
     impl<'db> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            self.should_visit_lazy_type_attributes
+        }
+
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             let already_found = self.found_matching_type.get();
             if already_found {
@@ -279,7 +295,153 @@ pub(super) fn any_over_type<'db>(
         query,
         seen_types: RefCell::new(FxIndexSet::default()),
         found_matching_type: Cell::new(false),
+        should_visit_lazy_type_attributes,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
+}
+
+/// Returns the maximum number of layers of generic specializations for a given type.
+///
+/// For example, `int` has a depth of `0`, `list[int]` has a depth of `1`, and `list[set[int]]`
+/// has a depth of `2`. A set-theoretic type like `list[int] | list[list[int]]` has a maximum
+/// depth of `2`.
+fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
+    #[derive(Debug, Default)]
+    struct SpecializationDepthVisitor<'db> {
+        seen_types: RefCell<FxHashMap<NonAtomicType<'db>, Option<usize>>>,
+        max_depth: Cell<usize>,
+    }
+
+    impl<'db> TypeVisitor<'db> for SpecializationDepthVisitor<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            match TypeKind::from(ty) {
+                TypeKind::Atomic => {
+                    if ty.is_divergent() {
+                        self.max_depth.set(usize::MAX);
+                    }
+                }
+                TypeKind::NonAtomic(non_atomic_type) => {
+                    match self.seen_types.borrow_mut().entry(non_atomic_type) {
+                        Entry::Occupied(cached_depth) => {
+                            self.max_depth
+                                .update(|current| current.max(cached_depth.get().unwrap_or(0)));
+                            return;
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(None);
+                        }
+                    }
+
+                    let self_depth: usize =
+                        matches!(non_atomic_type, NonAtomicType::GenericAlias(_)).into();
+
+                    let previous_max_depth = self.max_depth.replace(0);
+                    walk_non_atomic_type(db, non_atomic_type, self);
+
+                    self.max_depth.update(|max_child_depth| {
+                        previous_max_depth.max(max_child_depth.saturating_add(self_depth))
+                    });
+
+                    self.seen_types
+                        .borrow_mut()
+                        .insert(non_atomic_type, Some(self.max_depth.get()));
+                }
+            }
+        }
+    }
+
+    let visitor = SpecializationDepthVisitor::default();
+    visitor.visit_type(db, ty);
+    visitor.max_depth.get()
+}
+
+pub(super) fn exceeds_max_specialization_depth(db: &dyn Db, ty: Type<'_>) -> bool {
+    // To prevent infinite recursion during type inference for infinite types, we fall back to
+    // `C[Divergent]` once a certain amount of levels of specialization have occurred. For
+    // example:
+    //
+    // ```py
+    // x = 1
+    // while random_bool():
+    //     x = [x]
+    //
+    // reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
+    // ```
+    const MAX_SPECIALIZATION_DEPTH: usize = 10;
+
+    specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{db::tests::setup_db, types::KnownClass};
+
+    #[test]
+    fn test_generics_layering_depth() {
+        let db = setup_db();
+
+        let int = || KnownClass::Int.to_instance(&db);
+        let list = |element| KnownClass::List.to_specialized_instance(&db, [element]);
+        let dict = |key, value| KnownClass::Dict.to_specialized_instance(&db, [key, value]);
+        let set = |element| KnownClass::Set.to_specialized_instance(&db, [element]);
+        let str = || KnownClass::Str.to_instance(&db);
+        let bytes = || KnownClass::Bytes.to_instance(&db);
+
+        let list_of_int = list(int());
+        assert_eq!(specialization_depth(&db, list_of_int), 1);
+
+        let list_of_list_of_int = list(list_of_int);
+        assert_eq!(specialization_depth(&db, list_of_list_of_int), 2);
+
+        let list_of_list_of_list_of_int = list(list_of_list_of_int);
+        assert_eq!(specialization_depth(&db, list_of_list_of_list_of_int), 3);
+
+        assert_eq!(specialization_depth(&db, set(dict(str(), list_of_int))), 3);
+
+        assert_eq!(
+            specialization_depth(
+                &db,
+                UnionType::from_elements(&db, [list_of_list_of_list_of_int, list_of_list_of_int])
+            ),
+            3
+        );
+
+        assert_eq!(
+            specialization_depth(
+                &db,
+                UnionType::from_elements(&db, [list_of_list_of_int, list_of_list_of_list_of_int])
+            ),
+            3
+        );
+
+        assert_eq!(
+            specialization_depth(
+                &db,
+                Type::heterogeneous_tuple(&db, [Type::heterogeneous_tuple(&db, [int()])])
+            ),
+            2
+        );
+
+        assert_eq!(
+            specialization_depth(&db, Type::heterogeneous_tuple(&db, [list_of_int, str()])),
+            2
+        );
+
+        assert_eq!(
+            specialization_depth(
+                &db,
+                list(UnionType::from_elements(
+                    &db,
+                    [list(int()), list(str()), list(bytes())]
+                ))
+            ),
+            2
+        );
+    }
 }

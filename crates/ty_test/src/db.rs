@@ -88,6 +88,10 @@ impl SemanticDb for Db {
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
     }
+
+    fn verbose(&self) -> bool {
+        false
+    }
 }
 
 #[salsa::db]
@@ -267,6 +271,10 @@ impl System for MdtestSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 

@@ -22,11 +22,11 @@ reveal_type(y)
 ```
 
 ```py
-# error: [possibly-unbound-import] "Member `y` of module `maybe_unbound` is possibly unbound"
+# error: [possibly-missing-import] "Member `y` of module `maybe_unbound` may be missing"
 from maybe_unbound import x, y
 
-reveal_type(x)  # revealed: Unknown | Literal[3]
-reveal_type(y)  # revealed: Unknown | Literal[3]
+reveal_type(x)  # revealed: Literal[3]
+reveal_type(y)  # revealed: Literal[3]
 ```
 
 ## Maybe unbound annotated
@@ -53,10 +53,10 @@ reveal_type(y)
 Importing an annotated name prefers the declared type over the inferred type:
 
 ```py
-# error: [possibly-unbound-import] "Member `y` of module `maybe_unbound_annotated` is possibly unbound"
+# error: [possibly-missing-import] "Member `y` of module `maybe_unbound_annotated` may be missing"
 from maybe_unbound_annotated import x, y
 
-reveal_type(x)  # revealed: Unknown | Literal[3]
+reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: int
 ```
 

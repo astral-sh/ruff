@@ -5,33 +5,33 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..22,
             value: FString(
                 ExprFString {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..22,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..22,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     elements: [
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 2..5,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "aaa",
                                             },
                                         ),
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 5..10,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 6..9,
                                                         id: Name("bbb"),
                                                         ctx: Load,
@@ -45,17 +45,17 @@ expression: suite
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 10..13,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "ccc",
                                             },
                                         ),
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 13..18,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 14..17,
                                                         id: Name("ddd"),
                                                         ctx: Load,
@@ -69,7 +69,7 @@ expression: suite
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 18..21,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "eee",
                                             },
                                         ),
@@ -78,6 +78,7 @@ expression: suite
                                         quote_style: Double,
                                         prefix: Regular,
                                         triple_quoted: false,
+                                        unclosed: false,
                                     },
                                 },
                             ),

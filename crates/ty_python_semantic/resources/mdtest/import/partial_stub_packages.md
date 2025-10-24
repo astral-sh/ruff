@@ -426,7 +426,8 @@ reveal_type(Fake().fake)  # revealed: Unknown
 
 ## Namespace stub with missing module
 
-Namespace stubs are always partial.
+Namespace stubs are always partial, as specified in:
+<https://peps.python.org/pep-0561/#partial-stub-packages>
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/520>.
 

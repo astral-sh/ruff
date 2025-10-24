@@ -12,7 +12,7 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr,
+    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
     InterpolatedStringElement, MatchCase, Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
@@ -1219,6 +1219,8 @@ impl Truthiness {
         F: Fn(&str) -> bool,
     {
         match expr {
+            Expr::Lambda(_) => Self::Truthy,
+            Expr::Generator(_) => Self::Truthy,
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if value.is_empty() {
                     Self::Falsey
@@ -1294,15 +1296,14 @@ impl Truthiness {
                     return Self::Falsey;
                 }
 
-                if dict.items.iter().all(|item| {
-                    matches!(
-                        item,
-                        DictItem {
-                            key: None,
-                            value: Expr::Name(..)
-                        }
-                    )
-                }) {
+                // If the dict consists only of double-starred items (e.g., {**x, **y}),
+                // consider its truthiness unknown. This matches lists/sets/tuples containing
+                // only starred elements, which are also Unknown.
+                if dict
+                    .items
+                    .iter()
+                    .all(|item| matches!(item, DictItem { key: None, .. }))
+                {
                     // {**foo} / {**foo, **bar}
                     Self::Unknown
                 } else {
@@ -1389,7 +1390,9 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::FString(f_string) => is_non_empty_f_string(f_string),
             // These literals may or may not be empty.
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+            // Confusingly, f"{b""}" renders as the string 'b""', which is non-empty.
+            // Therefore, any bytes interpolation is guaranteed non-empty when stringified.
+            Expr::BytesLiteral(_) => true,
         }
     }
 
@@ -1398,7 +1401,9 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
+                InterpolatedStringElement::Interpolation(f_string) => {
+                    f_string.debug_text.is_some() || inner(&f_string.expression)
+                }
             })
         }
     })
@@ -1406,35 +1411,42 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
 
 /// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
 /// expression.
-fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
+pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     fn inner(expr: &Expr) -> bool {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            // Confusingly, `bool(f"{b""}") == True` even though
+            // `bool(b"") == False`. This is because `f"{b""}"`
+            // evaluates as the string `'b""'` of length 3.
+            Expr::BytesLiteral(_) => false,
             Expr::FString(ast::ExprFString { value, .. }) => {
-                value
-                    .elements()
-                    .all(|f_string_element| match f_string_element {
-                        InterpolatedStringElement::Literal(
-                            ast::InterpolatedStringLiteralElement { value, .. },
-                        ) => value.is_empty(),
-                        InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
-                            expression,
-                            ..
-                        }) => inner(expression),
-                    })
+                is_empty_interpolated_elements(value.elements())
             }
             _ => false,
         }
     }
 
+    fn is_empty_interpolated_elements<'a>(
+        mut elements: impl Iterator<Item = &'a InterpolatedStringElement>,
+    ) -> bool {
+        elements.all(|element| match element {
+            InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+                value,
+                ..
+            }) => value.is_empty(),
+            InterpolatedStringElement::Interpolation(f_string) => {
+                f_string.debug_text.is_none()
+                    && f_string.conversion.is_none()
+                    && f_string.format_spec.is_none()
+                    && inner(&f_string.expression)
+            }
+        })
+    }
+
     expr.value.iter().all(|part| match part {
         ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
-            f_string.elements.iter().all(|element| match element {
-                InterpolatedStringElement::Literal(string_literal) => string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
-            })
+            is_empty_interpolated_elements(f_string.elements.iter())
         }
     })
 }
@@ -1487,9 +1499,9 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
     ast::ExprBinOp {
         left: Box::new(expr.clone()),
         op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        right: Box::new(Expr::NoneLiteral(ExprNoneLiteral::default())),
         range: TextRange::default(),
-        node_index: AtomicNodeIndex::dummy(),
+        node_index: AtomicNodeIndex::NONE,
     }
     .into()
 }
@@ -1501,7 +1513,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             elts: vec![],
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             parenthesized: true,
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
@@ -1511,7 +1523,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             op: Operator::BitOr,
             right: Box::new(pep_604_union(std::slice::from_ref(elt))),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }),
     }
 }
@@ -1522,13 +1534,13 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         })),
         slice: Box::new(elt),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: AtomicNodeIndex::dummy(),
+        node_index: AtomicNodeIndex::NONE,
     })
 }
 
@@ -1541,19 +1553,19 @@ pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         })),
         slice: Box::new(Expr::Tuple(ast::ExprTuple {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             elts: elts.to_vec(),
             ctx: ExprContext::Load,
             parenthesized: false,
         })),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: AtomicNodeIndex::dummy(),
+        node_index: AtomicNodeIndex::NONE,
     })
 }
 
@@ -1686,34 +1698,34 @@ mod tests {
         let name = Expr::Name(ExprName {
             id: "x".into(),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(1u8)),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
         let constant_two = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(2u8)),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
         let constant_three = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(3u8)),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             bound: Some(Box::new(constant_one.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             bound: None,
             default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
@@ -1723,11 +1735,11 @@ mod tests {
             type_params: Some(Box::new(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
                 range: TextRange::default(),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             })),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
         assert!(!any_over_stmt(&type_alias, &|expr| {
             seen.borrow_mut().push(expr.clone());
@@ -1743,7 +1755,7 @@ mod tests {
     fn any_over_type_param_type_var() {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             bound: None,
             default: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1753,12 +1765,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             bound: Some(Box::new(constant.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1776,7 +1788,7 @@ mod tests {
 
         let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             default: Some(Box::new(constant.clone())),
             bound: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1797,7 +1809,7 @@ mod tests {
     fn any_over_type_param_type_var_tuple() {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             name: Identifier::new("x", TextRange::default()),
             default: None,
         });
@@ -1809,12 +1821,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
 
         let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
@@ -1834,7 +1846,7 @@ mod tests {
     fn any_over_type_param_param_spec() {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             name: Identifier::new("x", TextRange::default()),
             default: None,
         });
@@ -1846,12 +1858,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         });
 
         let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });

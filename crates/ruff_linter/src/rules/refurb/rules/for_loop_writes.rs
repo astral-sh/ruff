@@ -47,6 +47,7 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 /// ## References
 /// - [Python documentation: `io.IOBase.writelines`](https://docs.python.org/3/library/io.html#io.IOBase.writelines)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ForLoopWrites {
     name: String,
 }

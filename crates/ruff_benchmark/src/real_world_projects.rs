@@ -30,9 +30,9 @@ pub struct RealWorldProject<'a> {
     /// Specific commit hash to checkout
     pub commit: &'a str,
     /// List of paths within the project to check (`ty check <paths>`)
-    pub paths: Vec<&'a SystemPath>,
+    pub paths: &'a [&'a str],
     /// Dependencies to install via uv
-    pub dependencies: Vec<&'a str>,
+    pub dependencies: &'a [&'a str],
     /// Limit candidate packages to those that were uploaded prior to a given point in time (ISO 8601 format).
     /// Maps to uv's `exclude-newer`.
     pub max_dep_date: &'a str,
@@ -125,9 +125,9 @@ impl<'a> InstalledProject<'a> {
         &self.config
     }
 
-    /// Get the benchmark paths as `SystemPathBuf`
-    pub fn check_paths(&self) -> &[&SystemPath] {
-        &self.config.paths
+    /// Get the benchmark paths
+    pub fn check_paths(&self) -> &[&str] {
+        self.config.paths
     }
 
     /// Get the virtual environment path
@@ -297,7 +297,7 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         "--exclude-newer",
         checkout.project().max_dep_date,
     ])
-    .args(&checkout.project().dependencies);
+    .args(checkout.project().dependencies);
 
     let output = cmd
         .output()

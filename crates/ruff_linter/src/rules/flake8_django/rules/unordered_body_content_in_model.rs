@@ -63,6 +63,7 @@ use crate::rules::flake8_django::helpers;
 ///
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct DjangoUnorderedBodyContentInModel {
     element_type: ContentType,
     prev_element_type: ContentType,

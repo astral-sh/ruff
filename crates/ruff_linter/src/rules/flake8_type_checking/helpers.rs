@@ -66,7 +66,7 @@ impl TypingReference {
             }
 
             // prefer `from __future__ import annotations` to quoting
-            if settings.future_annotations()
+            if settings.future_annotations
                 && !reference.in_typing_only_annotation()
                 && reference.in_runtime_evaluated_annotation()
             {
@@ -436,7 +436,7 @@ impl<'a> QuoteAnnotator<'a> {
         let annotation = subgenerator.expr(&expr_without_forward_references);
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             value: annotation.into_boxed_str(),
             flags: self.flags,
         }))

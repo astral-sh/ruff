@@ -43,6 +43,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct SuppressibleException {
     exception: String,
 }
@@ -58,7 +59,9 @@ impl Violation for SuppressibleException {
 
     fn fix_title(&self) -> Option<String> {
         let SuppressibleException { exception } = self;
-        Some(format!("Replace with `contextlib.suppress({exception})`"))
+        Some(format!(
+            "Replace `try`-`except`-`pass` with `with contextlib.suppress({exception}): ...`"
+        ))
     }
 }
 
