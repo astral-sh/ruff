@@ -97,7 +97,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.get_mut().extend(other);
+        if !self.is_in_multi_inference() {
+            self.diagnostics.get_mut().extend(other);
+        }
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
