@@ -254,25 +254,7 @@ where
             .expect("request should have been tested for cancellation before scheduling");
 
         let url = R::document_url(&params).into_owned();
-
-        let Ok(path) = AnySystemPath::try_from_url(&url) else {
-            let reason = format!("URL `{url}` isn't a valid system path");
-            tracing::warn!(
-                "Ignoring request id={id} method={} because {reason}",
-                R::METHOD
-            );
-            return Box::new(|client| {
-                respond_silent_error(
-                    id,
-                    client,
-                    lsp_server::ResponseError {
-                        code: lsp_server::ErrorCode::InvalidParams as i32,
-                        message: reason,
-                        data: None,
-                    },
-                );
-            });
-        };
+        let path = AnySystemPath::from_url(&url);
 
         let db = session.project_db(&path).clone();
         let snapshot = session.take_document_snapshot(url);

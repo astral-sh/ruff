@@ -442,7 +442,7 @@ impl Session {
     /// Returns the [`DocumentKey`] for the given URL.
     ///
     /// Refer to [`Index::key_from_url`] for more details.
-    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
+    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
         self.index().key_from_url(url)
     }
 
@@ -820,19 +820,17 @@ impl Session {
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
-        let key = self
-            .key_from_url(url)
-            .map_err(DocumentQueryError::InvalidUrl);
+        let key = self.key_from_url(url);
         DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
             workspace_settings: key
-                .as_ref()
-                .ok()
-                .and_then(|key| self.workspaces.settings_for_path(key.path().as_system()?))
+                .path()
+                .as_system()
+                .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document_query_result: key.and_then(|key| self.index().make_document_ref(key)),
+            document_query_result: self.index().make_document_ref(key),
         }
     }
 

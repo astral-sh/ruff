@@ -25,16 +25,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
-            let path = match AnySystemPath::try_from_url(&change.uri) {
-                Ok(path) => path,
-                Err(err) => {
-                    tracing::warn!(
-                        "Failed to convert URI '{}` to system path: {err:?}",
-                        change.uri
-                    );
-                    continue;
-                }
-            };
+            let path = AnySystemPath::from_url(&change.uri);
 
             let system_path = match path {
                 AnySystemPath::System(system) => system,

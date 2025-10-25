@@ -69,25 +69,22 @@ impl Index {
     /// Returns the [`DocumentKey`] corresponding to the given URL.
     ///
     /// It returns [`Err`] with the original URL if it cannot be converted to a [`AnySystemPath`].
-    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
+    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
         if let Some(notebook_path) = self.notebook_cells.get(&url) {
-            Ok(DocumentKey::NotebookCell {
+            DocumentKey::NotebookCell {
                 cell_url: url,
                 notebook_path: notebook_path.clone(),
-            })
+            }
         } else {
-            let path = match AnySystemPath::try_from_url(&url) {
-                Ok(path) => path,
-                Err(_) => return Err(url),
-            };
+            let path = AnySystemPath::from_url(&url);
 
             if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
             {
-                Ok(DocumentKey::Notebook { path, url })
+                DocumentKey::Notebook { path, url }
             } else {
-                Ok(DocumentKey::Text { path, url })
+                DocumentKey::Text { path, url }
             }
         }
     }
@@ -334,8 +331,6 @@ impl DocumentQuery {
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub(crate) enum DocumentQueryError {
-    #[error("invalid URL: {0}")]
-    InvalidUrl(Url),
     #[error("document not found for key: {0}")]
     NotFound(DocumentKey),
 }

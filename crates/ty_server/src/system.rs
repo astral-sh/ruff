@@ -42,21 +42,24 @@ pub(crate) enum AnySystemPath {
 impl AnySystemPath {
     /// Converts the given [`Url`] to an [`AnySystemPath`].
     ///
-    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`]. Otherwise, the
-    /// URL is converted to a [`SystemVirtualPathBuf`].
+    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
+    /// the url isn't a valid file path.
     ///
-    /// This fails in the following cases:
-    /// * The URL cannot be converted to a file path (refer to [`Url::to_file_path`]).
-    /// * If the URL is not a valid UTF-8 string.
-    pub(crate) fn try_from_url(url: &Url) -> std::result::Result<Self, ()> {
+    /// In all other cases, the URL is converted to a [`SystemVirtualPathBuf`].
+    pub(crate) fn from_url(url: &Url) -> Self {
         if url.scheme() == "file" {
-            Ok(AnySystemPath::System(
-                SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?,
-            ))
+            if let Ok(path) = url.to_file_path() {
+                AnySystemPath::System(
+                    SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8"),
+                )
+            } else {
+                tracing::warn!(
+                    "Treating `file:` url `{url}` as virtual path as it isn't a valid file path"
+                );
+                AnySystemPath::SystemVirtual(SystemVirtualPath::new(url.as_str()).to_path_buf())
+            }
         } else {
-            Ok(AnySystemPath::SystemVirtual(
-                SystemVirtualPath::new(url.as_str()).to_path_buf(),
-            ))
+            AnySystemPath::SystemVirtual(SystemVirtualPath::new(url.as_str()).to_path_buf())
         }
     }
 
@@ -145,7 +148,7 @@ impl LSPSystem {
 
     fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentQuery> {
         let index = self.index();
-        let key = index.key_from_url(path.to_url()?).ok()?;
+        let key = index.key_from_url(path.to_url()?);
         index.make_document_ref(key).ok()
     }
 

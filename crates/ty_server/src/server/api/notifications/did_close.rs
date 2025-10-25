@@ -27,13 +27,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             text_document: TextDocumentIdentifier { uri },
         } = params;
 
-        let key = match session.key_from_url(uri) {
-            Ok(key) => key,
-            Err(uri) => {
-                tracing::debug!("Failed to create document key from URI: {}", uri);
-                return Ok(());
-            }
-        };
+        let key = session.key_from_url(uri);
 
         session
             .close_document(&key)

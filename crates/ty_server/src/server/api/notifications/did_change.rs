@@ -28,13 +28,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let key = match session.key_from_url(uri) {
-            Ok(key) => key,
-            Err(uri) => {
-                tracing::debug!("Failed to create document key from URI: {}", uri);
-                return Ok(());
-            }
-        };
+        let key = session.key_from_url(uri);
 
         session
             .update_text_document(&key, content_changes, version)
