@@ -935,10 +935,6 @@ impl<'src> Parser<'src> {
             );
         }
 
-        // test_ok nonlocal_stmt
-        // def _():
-        //     nonlocal x
-        //     nonlocal x, y, z
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,

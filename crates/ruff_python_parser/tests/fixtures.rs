@@ -527,6 +527,10 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         None
     }
 
+    fn nonlocal(&self, name: &str) -> Option<TextRange> {
+        None
+    }
+
     fn in_async_context(&self) -> bool {
         if let Some(scope) = self.scopes.iter().next_back() {
             match scope {
