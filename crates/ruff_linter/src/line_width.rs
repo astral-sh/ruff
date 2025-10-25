@@ -52,7 +52,7 @@ impl<'de> serde::Deserialize<'de> for LineLength {
         D: serde::Deserializer<'de>,
     {
         let value = u16::deserialize(deserializer)?;
-        let value = Self::try_from(value).map_err(|_| {
+        Self::try_from(value).map_err(|_| {
             serde::de::Error::custom(format!(
                 "line-length must be between 1 and {} (got {value})",
                 Self::MAX,
