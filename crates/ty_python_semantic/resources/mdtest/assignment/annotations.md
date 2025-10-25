@@ -427,14 +427,13 @@ a = f("a")
 reveal_type(a)  # revealed: list[Literal["a"]]
 
 b: list[int | Literal["a"]] = f("a")
-reveal_type(b)  # revealed: list[Literal["a"] | int]
+reveal_type(b)  # revealed: list[int | Literal["a"]]
 
 c: list[int | str] = f("a")
-reveal_type(c)  # revealed: list[str | int]
+reveal_type(c)  # revealed: list[int | str]
 
 d: list[int | tuple[int, int]] = f((1, 2))
-# TODO: We could avoid reordering the union elements here.
-reveal_type(d)  # revealed: list[tuple[int, int] | int]
+reveal_type(d)  # revealed: list[int | tuple[int, int]]
 
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
@@ -455,7 +454,54 @@ j: int | str = f2(True)
 reveal_type(j)  # revealed: Literal[True]
 ```
 
-Types are not widened unnecessarily:
+## Prefer the declared type of generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+def f[T](x: T) -> list[T]:
+    return [x]
+
+def f2[T](x: T) -> list[T] | None:
+    return [x]
+
+def f3[T](x: T) -> list[T] | dict[T, T]:
+    return [x]
+
+a = f(1)
+reveal_type(a)  # revealed: list[Literal[1]]
+
+b: list[Any] = f(1)
+reveal_type(b)  # revealed: list[Any]
+
+c: list[Any] = [1]
+reveal_type(c)  # revealed: list[Any]
+
+d: list[Any] | None = f(1)
+reveal_type(d)  # revealed: list[Any]
+
+e: list[Any] | None = [1]
+reveal_type(e)  # revealed: list[Any]
+
+f: list[Any] | None = f2(1)
+reveal_type(f)  # revealed: list[Any] | None
+
+g: list[Any] | dict[Any, Any] = f3(1)
+# TODO: Better constraint solver.
+reveal_type(g)  # revealed: list[Literal[1]] | dict[Literal[1], Literal[1]]
+```
+
+## Prefer the inferred type of non-generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 def id[T](x: T) -> T:
