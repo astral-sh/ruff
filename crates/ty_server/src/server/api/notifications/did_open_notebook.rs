@@ -29,10 +29,17 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             return Ok(());
         };
 
+        let lsp_types::NotebookDocument {
+            version,
+            cells,
+            metadata,
+            ..
+        } = params.notebook_document;
+
         let notebook = NotebookDocument::new(
-            params.notebook_document.version,
-            params.notebook_document.cells,
-            params.notebook_document.metadata.unwrap_or_default(),
+            version,
+            cells,
+            metadata.unwrap_or_default(),
             params.cell_text_documents,
         )
         .with_failure_code(ErrorCode::InternalError)?;

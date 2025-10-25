@@ -29,10 +29,11 @@ impl Index {
         }
     }
 
-    pub(super) fn text_document_paths(&self) -> impl Iterator<Item = &AnySystemPath> + '_ {
-        self.documents
-            .iter()
-            .filter_map(|(path, doc)| doc.as_text().and(Some(path)))
+    pub(super) fn text_document_iter(&self) -> impl Iterator<Item = (&Url, &AnySystemPath)> + '_ {
+        self.documents.iter().filter_map(|(path, doc)| {
+            let text_document = doc.as_text()?;
+            Some((text_document.url(), path))
+        })
     }
 
     #[expect(dead_code)]
@@ -75,14 +76,18 @@ impl Index {
                 notebook_path: notebook_path.clone(),
             })
         } else {
-            let path = AnySystemPath::try_from_url(&url).map_err(|()| url)?;
+            let path = match AnySystemPath::try_from_url(&url) {
+                Ok(path) => path,
+                Err(_) => return Err(url),
+            };
+
             if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
             {
-                Ok(DocumentKey::Notebook(path))
+                Ok(DocumentKey::Notebook { path, url })
             } else {
-                Ok(DocumentKey::Text(path))
+                Ok(DocumentKey::Text { path, url })
             }
         }
     }
@@ -131,14 +136,12 @@ impl Index {
         let Some(controller) = self.documents.get(path) else {
             return Err(DocumentQueryError::NotFound(key));
         };
-        // TODO: The `to_url` conversion shouldn't be an error because the paths themselves are
-        // constructed from the URLs but the `Index` APIs don't maintain this invariant.
         let (cell_url, file_path) = match key {
             DocumentKey::NotebookCell {
                 cell_url,
                 notebook_path,
             } => (Some(cell_url), notebook_path),
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => (None, path),
+            DocumentKey::Notebook { path, .. } | DocumentKey::Text { path, .. } => (None, path),
         };
         Ok(controller.make_ref(cell_url, file_path))
     }

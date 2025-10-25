@@ -43,7 +43,8 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
             }
         };
 
-        let document = TextDocument::new(text, version).with_language_id(&language_id);
+        let document =
+            TextDocument::new(key.url().clone(), text, version).with_language_id(&language_id);
         session.open_text_document(key.path(), document);
 
         let path = key.path();

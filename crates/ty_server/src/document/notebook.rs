@@ -23,6 +23,14 @@ pub struct NotebookDocument {
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
 #[derive(Clone, Debug)]
 struct NotebookCell {
+    /// The URL uniquely identifying the cell.
+    ///
+    /// > Cell text documents have a URI, but servers should not rely on any
+    /// > format for this URI, since it is up to the client on how it will
+    /// > create these URIs. The URIs must be unique across ALL notebook
+    /// > cells and can therefore be used to uniquely identify a notebook cell
+    /// >  or the cell’s text document.
+    /// > https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#notebookDocument_synchronization
     url: lsp_types::Url,
     kind: NotebookCellKind,
     document: TextDocument,
@@ -30,29 +38,36 @@ struct NotebookCell {
 
 impl NotebookDocument {
     pub fn new(
-        version: DocumentVersion,
+        notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
         metadata: serde_json::Map<String, serde_json::Value>,
         cell_documents: Vec<lsp_types::TextDocumentItem>,
     ) -> crate::Result<Self> {
-        let mut cell_contents: FxHashMap<_, _> = cell_documents
+        let mut cells: Vec<_> = cells
             .into_iter()
-            .map(|document| (document.uri, document.text))
+            .map(|cell| NotebookCell::empty(cell))
             .collect();
 
-        let cells: Vec<_> = cells
-            .into_iter()
-            .map(|cell| {
-                let contents = cell_contents.remove(&cell.document).unwrap_or_default();
-                NotebookCell::new(cell, contents, version)
-            })
-            .collect();
+        let cell_index = Self::make_cell_index(&cells);
+
+        for cell_document in cell_documents {
+            let index = cell_index.get(&cell_document.uri).copied().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Received content for cell `{}` that isn't present in the metadata",
+                    cell_document.uri
+                )
+            })?;
+
+            cells[index].document =
+                TextDocument::new(cell_document.uri, cell_document.text, cell_document.version)
+                    .with_language_id(&cell_document.language_id);
+        }
 
         Ok(Self {
-            version,
-            cell_index: Self::make_cell_index(cells.as_slice()),
-            metadata: serde_json::from_value(serde_json::Value::Object(metadata))?,
+            version: notebook_version,
+            cell_index,
             cells,
+            metadata: serde_json::from_value(serde_json::Value::Object(metadata))?,
         })
     }
 
@@ -160,6 +175,7 @@ impl NotebookDocument {
                     for cell_text_document in did_open {
                         if let Some(cell) = self.cell_by_uri_mut(&cell_text_document.uri) {
                             cell.document = TextDocument::new(
+                                cell_text_document.uri,
                                 cell_text_document.text,
                                 cell_text_document.version,
                             );
@@ -229,15 +245,27 @@ impl NotebookDocument {
 }
 
 impl NotebookCell {
+    pub(crate) fn empty(cell: lsp_types::NotebookCell) -> Self {
+        Self {
+            kind: cell.kind,
+            document: TextDocument::new(
+                cell.document.clone(),
+                String::new(),
+                DocumentVersion::default(),
+            ),
+            url: cell.document,
+        }
+    }
+
     pub(crate) fn new(
         cell: lsp_types::NotebookCell,
         contents: String,
         version: DocumentVersion,
     ) -> Self {
         Self {
+            document: TextDocument::new(cell.document.clone(), contents, version),
             url: cell.document,
             kind: cell.kind,
-            document: TextDocument::new(contents, version),
         }
     }
 }

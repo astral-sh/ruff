@@ -17,7 +17,6 @@ use ty_ide::cached_vendored_path;
 use ty_python_semantic::Db;
 
 use crate::DocumentQuery;
-use crate::document::DocumentKey;
 use crate::session::index::Index;
 
 /// Returns a [`Url`] for the given [`File`].
@@ -146,7 +145,7 @@ impl LSPSystem {
 
     fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentQuery> {
         let index = self.index();
-        let key = DocumentKey::from_path(path);
+        let key = index.key_from_url(path.to_url()?).ok()?;
         index.make_document_ref(key).ok()
     }
 
