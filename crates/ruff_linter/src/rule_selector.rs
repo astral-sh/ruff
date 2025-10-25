@@ -7,9 +7,14 @@ use strum_macros::EnumIter;
 
 use crate::codes::RuleIter;
 use crate::codes::{RuleCodePrefix, RuleGroup};
+use crate::external::ast::rule::ExternalRuleCode;
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
+
+fn looks_like_external_rule_code(s: &str) -> bool {
+    ExternalRuleCode::matches_format(s)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
@@ -33,6 +38,8 @@ pub enum RuleSelector {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
+    /// Select an external rule code.
+    External { code: Box<str> },
 }
 
 impl From<Linter> for RuleSelector {
@@ -70,8 +77,16 @@ impl FromStr for RuleSelector {
                     None => (s, None),
                 };
 
-                let (linter, code) =
-                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+                let Some((linter, code)) = Linter::parse_code(s) else {
+                    if looks_like_external_rule_code(s) {
+                        if ExternalRuleCode::new(s).is_ok() {
+                            return Ok(Self::External { code: s.into() });
+                        }
+
+                        return Err(ParseError::External(s.to_string()));
+                    }
+                    return Err(ParseError::Unknown(s.to_string()));
+                };
 
                 if code.is_empty() {
                     return Ok(Self::Linter(linter));
@@ -119,10 +134,12 @@ pub enum ParseError {
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
     // implemented (but that should of course be done only in ruff and not here)
     Unknown(String),
+    #[error("External rule selector `{0}` is not supported yet.")]
+    External(String),
 }
 
 impl RuleSelector {
-    pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
+    pub fn prefix_and_code(&self) -> (&str, &str) {
         match self {
             RuleSelector::All => ("", "ALL"),
             RuleSelector::C => ("", "C"),
@@ -131,6 +148,7 @@ impl RuleSelector {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
+            RuleSelector::External { code } => ("", code.as_ref()),
         }
     }
 }
@@ -174,7 +192,14 @@ impl Visitor<'_> for SelectorVisitor {
     where
         E: de::Error,
     {
-        FromStr::from_str(v).map_err(de::Error::custom)
+        match FromStr::from_str(v) {
+            Ok(value) => Ok(value),
+            Err(err @ ParseError::External(_)) => Err(de::Error::custom(err.to_string())),
+            Err(err) if looks_like_external_rule_code(v) => Err(de::Error::custom(format!(
+                "{err}. External rule selectors are not supported yet."
+            ))),
+            Err(err) => Err(de::Error::custom(err)),
+        }
     }
 }
 
@@ -197,6 +222,9 @@ impl RuleSelector {
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
             RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
                 RuleSelectorIter::Vec(prefix.clone().rules())
+            }
+            RuleSelector::External { .. } => {
+                RuleSelectorIter::Vec(vec![Rule::ExternalLinter].into_iter())
             }
         }
     }
@@ -224,7 +252,7 @@ impl RuleSelector {
 
     /// Returns true if this selector is exact i.e. selects a single rule by code
     pub fn is_exact(&self) -> bool {
-        matches!(self, Self::Rule { .. })
+        matches!(self, Self::Rule { .. } | Self::External { .. })
     }
 }
 
@@ -337,6 +365,7 @@ impl RuleSelector {
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
             RuleSelector::Rule { .. } => Specificity::Rule,
+            RuleSelector::External { .. } => Specificity::Rule,
             RuleSelector::Prefix { prefix, .. } => {
                 let prefix: &'static str = prefix.short_code();
                 match prefix.len() {
@@ -360,8 +389,16 @@ impl RuleSelector {
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
-                let (linter, code) =
-                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+                let Some((linter, code)) = Linter::parse_code(s) else {
+                    if looks_like_external_rule_code(s) {
+                        if ExternalRuleCode::new(s).is_ok() {
+                            return Ok(Self::External { code: s.into() });
+                        }
+
+                        return Err(ParseError::External(s.to_string()));
+                    }
+                    return Err(ParseError::Unknown(s.to_string()));
+                };
 
                 if code.is_empty() {
                     return Ok(Self::Linter(linter));
@@ -415,7 +452,7 @@ pub mod clap_completion {
         RuleSelector,
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
-        rule_selector::is_single_rule_selector,
+        rule_selector::{ParseError, is_single_rule_selector},
     };
 
     #[derive(Clone)]
@@ -442,20 +479,26 @@ pub mod clap_completion {
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            value.parse().map_err(|_| {
-                let mut error =
-                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-                if let Some(arg) = arg {
+            value.parse().map_err(|err| match err {
+                ParseError::External(code) => clap::Error::raw(
+                    clap::error::ErrorKind::ValueValidation,
+                    format!("External rule selector `{code}` is not supported yet."),
+                ),
+                ParseError::Unknown(_) => {
+                    let mut error =
+                        clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                    if let Some(arg) = arg {
+                        error.insert(
+                            clap::error::ContextKind::InvalidArg,
+                            clap::error::ContextValue::String(arg.to_string()),
+                        );
+                    }
                     error.insert(
-                        clap::error::ContextKind::InvalidArg,
-                        clap::error::ContextValue::String(arg.to_string()),
+                        clap::error::ContextKind::InvalidValue,
+                        clap::error::ContextValue::String(value.to_string()),
                     );
+                    error
                 }
-                error.insert(
-                    clap::error::ContextKind::InvalidValue,
-                    clap::error::ContextValue::String(value.to_string()),
-                );
-                error
             })
         }
 
