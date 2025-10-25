@@ -266,7 +266,6 @@ mod tests {
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
-
     fn deserialize() -> Result<()> {
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
@@ -451,6 +450,16 @@ select = ["E123"]
 [tool.ruff]
 line-length = 79
 other-attribute = 1
+",
+            )
+            .is_err()
+        );
+
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
+[tool.ruff]
+line-length = 500
 ",
             )
             .is_err()
