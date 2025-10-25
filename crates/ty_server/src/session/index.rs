@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use lsp_types::Url;
-use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
-use rustc_hash::FxHashMap;
-
 use crate::{
     PositionEncoding, TextDocument,
     document::{DocumentKey, DocumentVersion, NotebookDocument},
     system::AnySystemPath,
 };
+use lsp_types::Url;
+use ruff_db::Db;
+use ruff_db::files::{File, system_path_to_file};
+use rustc_hash::FxHashMap;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Debug)]
@@ -29,10 +28,10 @@ impl Index {
         }
     }
 
-    pub(super) fn text_document_iter(&self) -> impl Iterator<Item = (&Url, &AnySystemPath)> + '_ {
-        self.documents.iter().filter_map(|(path, doc)| {
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
+        self.documents.values().filter_map(|doc| {
             let text_document = doc.as_text()?;
-            Some((text_document.url(), path))
+            Some(text_document.url())
         })
     }
 
@@ -67,8 +66,6 @@ impl Index {
     }
 
     /// Returns the [`DocumentKey`] corresponding to the given URL.
-    ///
-    /// It returns [`Err`] with the original URL if it cannot be converted to a [`AnySystemPath`].
     pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
         if let Some(notebook_path) = self.notebook_cells.get(&url) {
             DocumentKey::NotebookCell {
@@ -82,9 +79,9 @@ impl Index {
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
             {
-                DocumentKey::Notebook { path, url }
+                DocumentKey::Notebook { url }
             } else {
-                DocumentKey::Text { path, url }
+                DocumentKey::Text { url }
             }
         }
     }
@@ -104,7 +101,7 @@ impl Index {
             ..
         }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
-            let notebook_path = key.path().clone();
+            let notebook_path = key.to_path().into_owned();
 
             for opened_cell in did_open {
                 self.notebook_cells
@@ -129,18 +126,18 @@ impl Index {
         &self,
         key: DocumentKey,
     ) -> Result<DocumentQuery, DocumentQueryError> {
-        let path = key.path();
-        let Some(controller) = self.documents.get(path) else {
+        let path = key.to_path().into_owned();
+        let Some(controller) = self.documents.get(&path) else {
             return Err(DocumentQueryError::NotFound(key));
         };
-        let (cell_url, file_path) = match key {
+        let cell_url = match key {
             DocumentKey::NotebookCell {
                 cell_url,
-                notebook_path,
-            } => (Some(cell_url), notebook_path),
-            DocumentKey::Notebook { path, .. } | DocumentKey::Text { path, .. } => (None, path),
+                notebook_path: _,
+            } => Some(cell_url),
+            DocumentKey::Notebook { .. } | DocumentKey::Text { .. } => None,
         };
-        Ok(controller.make_ref(cell_url, file_path))
+        Ok(controller.make_ref(cell_url, path))
     }
 
     pub(super) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
@@ -175,9 +172,9 @@ impl Index {
             }
             return Ok(());
         }
-        let path = key.path();
+        let path = key.to_path();
 
-        let Some(_) = self.documents.remove(path) else {
+        let Some(_) = self.documents.remove(&path) else {
             anyhow::bail!("tried to close document that didn't exist at {key}")
         };
         Ok(())
@@ -187,8 +184,8 @@ impl Index {
         &mut self,
         key: &DocumentKey,
     ) -> crate::Result<&mut DocumentController> {
-        let path = key.path();
-        let Some(controller) = self.documents.get_mut(path) else {
+        let path = key.to_path();
+        let Some(controller) = self.documents.get_mut(&path) else {
             anyhow::bail!("Document controller not available at `{key}`");
         };
         Ok(controller)

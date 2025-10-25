@@ -825,7 +825,7 @@ impl Session {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
             workspace_settings: key
-                .path()
+                .to_path()
                 .as_system()
                 .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
@@ -855,11 +855,8 @@ impl Session {
     /// Iterates over the document keys for all open text documents.
     pub(super) fn text_document_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
         self.index()
-            .text_document_iter()
-            .map(|(url, path)| DocumentKey::Text {
-                path: path.clone(),
-                url: url.clone(),
-            })
+            .text_document_urls()
+            .map(|url| DocumentKey::Text { url: url.clone() })
     }
 
     /// Registers a notebook document at the provided `path`.

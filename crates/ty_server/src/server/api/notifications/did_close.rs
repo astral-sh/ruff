@@ -33,10 +33,10 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .close_document(&key)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let path = key.path();
-        let db = session.project_db_mut(path);
+        let path = key.to_path();
+        let db = session.project_db_mut(&path);
 
-        match path {
+        match &*path {
             AnySystemPath::System(system_path) => {
                 if let Some(file) = db.files().try_system(db, system_path) {
                     db.project().close_file(db, file);

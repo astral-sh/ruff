@@ -7,6 +7,7 @@ mod text_document;
 
 pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
+use std::borrow::Cow;
 
 use crate::system::AnySystemPath;
 pub use notebook::NotebookDocument;
@@ -44,7 +45,6 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 #[derive(Clone, Debug)]
 pub(crate) enum DocumentKey {
     Notebook {
-        path: AnySystemPath,
         url: Url,
     },
     NotebookCell {
@@ -52,22 +52,24 @@ pub(crate) enum DocumentKey {
         notebook_path: AnySystemPath,
     },
     Text {
-        path: AnySystemPath,
         url: Url,
     },
 }
 
 impl DocumentKey {
     /// Returns the file path associated with the key.
-    pub(crate) fn path(&self) -> &AnySystemPath {
+    ///
+    /// Returns the notebook path for notebook cells.
+    pub(crate) fn to_path(&self) -> Cow<'_, AnySystemPath> {
         match self {
-            DocumentKey::Notebook { path, .. } | DocumentKey::Text { path, .. } => path,
-            DocumentKey::NotebookCell { notebook_path, .. } => notebook_path,
+            DocumentKey::Notebook { url, .. } | DocumentKey::Text { url, .. } => {
+                Cow::Owned(AnySystemPath::from_url(url))
+            }
+            DocumentKey::NotebookCell { notebook_path, .. } => Cow::Borrowed(notebook_path),
         }
     }
 
     /// Returns the URL for this document key. For notebook cells, returns the cell URL.
-    /// For other document types, converts the path to a URL.
     pub(crate) fn url(&self) -> &Url {
         match self {
             Self::NotebookCell { cell_url: url, .. }
@@ -81,7 +83,7 @@ impl std::fmt::Display for DocumentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotebookCell { cell_url, .. } => cell_url.fmt(f),
-            Self::Notebook { path, .. } | Self::Text { path, .. } => match path {
+            Self::Notebook { .. } | Self::Text { .. } => match &*self.to_path() {
                 AnySystemPath::System(system_path) => system_path.fmt(f),
                 AnySystemPath::SystemVirtual(virtual_path) => virtual_path.fmt(f),
             },
