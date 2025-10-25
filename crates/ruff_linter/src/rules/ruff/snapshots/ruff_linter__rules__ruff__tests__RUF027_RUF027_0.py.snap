@@ -326,13 +326,13 @@ RUF027 [*] Possible f-string without an `f` prefix
    |
 90 | def backslash_test():
 91 |     x = "test"
-92 |     print("Hello {x}\\n")  # Should not trigger RUF027 for Python < 3.12
-   |           ^^^^^^^^^^^^^^
+92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+   |           ^^^^^^^^^^^^^^^^^^
    |
 help: Add `f` prefix
-89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes
+89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
 90 | def backslash_test():
 91 |     x = "test"
-   -     print("Hello {x}\\n")  # Should not trigger RUF027 for Python < 3.12
-92 +     print(f"Hello {x}\\n")  # Should not trigger RUF027 for Python < 3.12
+   -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 note: This is an unsafe fix and may change runtime behavior

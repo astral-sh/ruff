@@ -186,12 +186,6 @@ fn should_be_fstring(
         return false;
     }
 
-    // Check if the string contains backslashes and target Python version is < 3.12
-    // F-strings with backslashes are only valid in Python 3.12+
-    if literal.value.contains('\\') && checker.target_version() < PythonVersion::PY312 {
-        return false;
-    }
-
     let fstring_expr = format!("f{}", locator.slice(literal));
     let Ok(parsed) = parse_expression(&fstring_expr) else {
         return false;
@@ -223,6 +217,14 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.interpolations() {
+            // Check if the interpolation expression contains backslashes
+            // F-strings with backslashes in interpolations are only valid in Python 3.12+
+            let interpolation_text = &fstring_expr[element.range()];
+            if interpolation_text.contains('\\') && checker.target_version() < PythonVersion::PY312
+            {
+                return false;
+            }
+
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id) {
                     return false;
