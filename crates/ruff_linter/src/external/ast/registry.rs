@@ -129,6 +129,42 @@ impl ExternalLintRegistry {
         let rule = linter.rules.get(locator.rule_index)?;
         Some((rule, linter))
     }
+
+    pub fn iter_enabled_rules(&self) -> impl Iterator<Item = &ExternalAstRule> {
+        self.linters
+            .iter()
+            .filter(|linter| linter.enabled)
+            .flat_map(|linter| linter.rules.iter())
+    }
+
+    pub fn iter_enabled_linter_rules(
+        &self,
+    ) -> impl Iterator<Item = (&ExternalAstLinter, &ExternalAstRule)> {
+        self.linters
+            .iter()
+            .filter(|linter| linter.enabled)
+            .flat_map(|linter| linter.rules.iter().map(move |rule| (linter, rule)))
+    }
+
+    pub fn iter_enabled_rule_locators(&self) -> impl Iterator<Item = RuleLocator> + '_ {
+        self.linters
+            .iter_enumerated()
+            .filter(|(_, linter)| linter.enabled)
+            .flat_map(|(linter_index, linter)| {
+                linter
+                    .rules
+                    .iter()
+                    .enumerate()
+                    .map(move |(rule_index, _)| RuleLocator::new(linter_index, rule_index))
+            })
+    }
+
+    pub fn expect_entry(&self, locator: RuleLocator) -> (&ExternalAstLinter, &ExternalAstRule) {
+        let (rule, linter) = self
+            .rule_entry(locator)
+            .expect("rule locator does not reference a valid entry");
+        (linter, rule)
+    }
 }
 
 impl ruff_cache::CacheKey for ExternalLintRegistry {

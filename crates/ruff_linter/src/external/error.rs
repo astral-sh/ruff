@@ -75,4 +75,25 @@ pub enum ExternalLinterError {
         "external rule `{rule}` in linter `{linter}` declares `call-callee-regex` but does not target `expr:Call` nodes"
     )]
     CallCalleeRegexWithoutCallTarget { linter: String, rule: String },
+
+    #[error("{message}")]
+    ScriptCompile { message: String },
+}
+
+impl ExternalLinterError {
+    #[allow(dead_code)]
+    pub(crate) fn format_script_compile_message(
+        linter: &str,
+        rule: &str,
+        path: Option<PathBuf>,
+        message: impl Into<String>,
+    ) -> String {
+        let message = message.into();
+        let location = path
+            .map(|p| format!(" at {}", p.display()))
+            .unwrap_or_default();
+        format!(
+            "failed to compile script for external rule `{rule}` in linter `{linter}`{location}: {message}"
+        )
+    }
 }

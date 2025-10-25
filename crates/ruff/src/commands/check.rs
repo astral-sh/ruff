@@ -21,6 +21,7 @@ use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
+use ruff_workspace::Settings;
 use ruff_workspace::resolver::{
     PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
 };
@@ -28,6 +29,7 @@ use ruff_workspace::resolver::{
 use crate::args::ConfigArguments;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
+use crate::{apply_external_linter_selection_to_settings, compute_external_selection_state};
 
 /// Run the linter over a collection of files.
 pub(crate) fn check(
@@ -41,12 +43,39 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
+    let apply_external_selection = |settings: &mut Settings| -> Result<()> {
+        let state = compute_external_selection_state(
+            &settings.linter.selected_external,
+            &settings.linter.ignored_external,
+            &[],
+            &[],
+            &[],
+            &[],
+        );
+        settings.linter.selected_external = state.effective.iter().cloned().collect();
+        settings.linter.ignored_external = state.ignored.iter().cloned().collect();
+        apply_external_linter_selection_to_settings(settings, &state.effective, &state.ignored)?;
+        Ok(())
+    };
     let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(Diagnostics::default());
+    }
+
+    let resolver = resolver.transform_settings(apply_external_selection)?;
+    let selection_from_cli = config_arguments.has_cli_external_selection();
+    let any_external_selection = selection_from_cli
+        || resolver
+            .settings()
+            .any(|settings| !settings.linter.selected_external.is_empty());
+    let any_external_registry = resolver
+        .settings()
+        .any(|settings| settings.linter.external_ast.is_some());
+    if any_external_selection && !any_external_registry {
+        anyhow::bail!("No external AST linters are configured in this workspace.");
     }
 
     // Discover the package root for each Python file.
