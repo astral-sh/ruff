@@ -136,6 +136,9 @@ pub(super) fn request(req: server::Request) -> Task {
 
 pub(super) fn notification(notif: server::Notification) -> Task {
     match notif.method.as_str() {
+        notifications::DidChangeConfiguration::METHOD => {
+            sync_notification_task::<notifications::DidChangeConfiguration>(notif)
+        }
         notifications::DidCloseTextDocumentHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
