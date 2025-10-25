@@ -43,37 +43,36 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 #[derive(Clone, Debug)]
 pub(crate) enum DocumentKey {
-    Notebook(AnySystemPath),
+    Notebook {
+        path: AnySystemPath,
+        url: Url,
+    },
     NotebookCell {
         cell_url: Url,
         notebook_path: AnySystemPath,
     },
-    Text(AnySystemPath),
+    Text {
+        path: AnySystemPath,
+        url: Url,
+    },
 }
 
 impl DocumentKey {
     /// Returns the file path associated with the key.
     pub(crate) fn path(&self) -> &AnySystemPath {
         match self {
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path,
+            DocumentKey::Notebook { path, .. } | DocumentKey::Text { path, .. } => path,
             DocumentKey::NotebookCell { notebook_path, .. } => notebook_path,
-        }
-    }
-
-    pub(crate) fn from_path(path: AnySystemPath) -> Self {
-        // For text documents, we assume it's a text document unless it's a notebook file.
-        match path.extension() {
-            Some("ipynb") => Self::Notebook(path),
-            _ => Self::Text(path),
         }
     }
 
     /// Returns the URL for this document key. For notebook cells, returns the cell URL.
     /// For other document types, converts the path to a URL.
-    pub(crate) fn to_url(&self) -> Option<Url> {
+    pub(crate) fn url(&self) -> &Url {
         match self {
-            DocumentKey::NotebookCell { cell_url, .. } => Some(cell_url.clone()),
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path.to_url(),
+            Self::NotebookCell { cell_url: url, .. }
+            | Self::Notebook { url, .. }
+            | Self::Text { url, .. } => url,
         }
     }
 }
@@ -82,7 +81,7 @@ impl std::fmt::Display for DocumentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotebookCell { cell_url, .. } => cell_url.fmt(f),
-            Self::Notebook(path) | Self::Text(path) => match path {
+            Self::Notebook { path, .. } | Self::Text { path, .. } => match path {
                 AnySystemPath::System(system_path) => system_path.fmt(f),
                 AnySystemPath::SystemVirtual(virtual_path) => virtual_path.fmt(f),
             },

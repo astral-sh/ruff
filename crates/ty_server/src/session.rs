@@ -857,8 +857,11 @@ impl Session {
     /// Iterates over the document keys for all open text documents.
     pub(super) fn text_document_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
         self.index()
-            .text_document_paths()
-            .map(|path| DocumentKey::Text(path.clone()))
+            .text_document_iter()
+            .map(|(url, path)| DocumentKey::Text {
+                path: path.clone(),
+                url: url.clone(),
+            })
     }
 
     /// Registers a notebook document at the provided `path`.

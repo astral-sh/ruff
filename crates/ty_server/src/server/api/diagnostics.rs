@@ -125,13 +125,8 @@ pub(super) fn clear_diagnostics(session: &Session, key: &DocumentKey, client: &C
         return;
     }
 
-    let Some(uri) = key.to_url() else {
-        // If we can't convert to URL, we can't clear diagnostics
-        return;
-    };
-
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-        uri,
+        uri: key.url().clone(),
         diagnostics: vec![],
         version: None,
     });
@@ -148,10 +143,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         return;
     }
 
-    let Some(url) = key.to_url() else {
-        return;
-    };
-
+    let url = key.url();
     let snapshot = session.take_document_snapshot(url.clone());
 
     let document = match snapshot.document() {
@@ -179,7 +171,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
 
     match diagnostics.to_lsp_diagnostics(db) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url, diagnostics);
+            publish_diagnostics_notification(url.clone(), diagnostics);
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
