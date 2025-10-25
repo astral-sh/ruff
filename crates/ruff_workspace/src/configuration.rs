@@ -21,6 +21,9 @@ use strum::IntoEnumIterator;
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
+use ruff_linter::external::{
+    ExternalLintRegistry, PyprojectExternalLinterEntry, load_linter_into_registry,
+};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
@@ -69,6 +72,14 @@ pub struct RuleSelection {
     pub extend_fixable: Vec<RuleSelector>,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ExternalRuleSelection {
+    pub select: Option<Vec<String>>,
+    pub extend_select: Vec<String>,
+    pub ignore: Vec<String>,
+    pub extend_ignore: Vec<String>,
+}
+
 #[derive(Debug, Eq, PartialEq, is_macro::Is)]
 pub enum RuleSelectorKind {
     /// Enables the selected rules
@@ -112,6 +123,65 @@ impl RuleSelection {
                     .map(|selector| (RuleSelectorKind::Modify, selector)),
             )
     }
+
+    pub fn selectors(&self) -> impl Iterator<Item = &RuleSelector> {
+        self.selectors_by_kind().map(|(_, selector)| selector)
+    }
+}
+
+fn build_external_registry(
+    entries: &BTreeMap<String, ExternalLinterEntry>,
+) -> Result<Option<ExternalLintRegistry>> {
+    let mut registry = ExternalLintRegistry::new();
+    for (id, entry) in entries {
+        if !entry.enabled {
+            continue;
+        }
+        let py_entry = PyprojectExternalLinterEntry {
+            toml_path: entry.path.clone(),
+            enabled: entry.enabled,
+        };
+        load_linter_into_registry(&mut registry, id, &py_entry)?;
+    }
+    if registry.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(registry))
+    }
+}
+
+fn resolve_external_rule_selections(
+    selections: &[ExternalRuleSelection],
+) -> (Vec<String>, Vec<String>) {
+    let mut selected: FxHashSet<String> = FxHashSet::default();
+    let mut ignored: FxHashSet<String> = FxHashSet::default();
+
+    for selection in selections {
+        if let Some(select) = &selection.select {
+            selected = select.iter().cloned().collect();
+        }
+        for code in &selection.extend_select {
+            selected.insert(code.clone());
+        }
+        for code in &selection.ignore {
+            ignored.insert(code.clone());
+        }
+        for code in &selection.extend_ignore {
+            ignored.insert(code.clone());
+        }
+    }
+
+    let mut selected_vec: Vec<String> = selected.into_iter().collect();
+    let mut ignored_vec: Vec<String> = ignored.into_iter().collect();
+    selected_vec.sort_unstable();
+    ignored_vec.sort_unstable();
+    (selected_vec, ignored_vec)
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalLinterEntry {
+    pub path: PathBuf,
+    pub enabled: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -242,7 +312,8 @@ impl Configuration {
 
         let line_length = self.line_length.unwrap_or_default();
 
-        let rules = lint.as_rule_table(lint_preview)?;
+        #[allow(unused_mut)]
+        let mut rules = lint.as_rule_table(lint_preview)?;
 
         // LinterSettings validation
         let isort = lint
@@ -259,6 +330,75 @@ impl Configuration {
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
+
+        let (configured_selected_external_vec, configured_ignored_external_vec) =
+            resolve_external_rule_selections(&lint.external_rule_selections);
+
+        let mut external_codes = lint.external.unwrap_or_default();
+        let mut seen_external_codes = external_codes.iter().cloned().collect::<FxHashSet<_>>();
+
+        let external_ast_registry = match lint.external_ast.as_ref() {
+            Some(entries) => build_external_registry(entries)?,
+            None => None,
+        };
+
+        if let Some(registry) = external_ast_registry.as_ref() {
+            for rule in registry.iter_enabled_rules() {
+                let code = rule.code.as_str().to_owned();
+                if seen_external_codes.insert(code.clone()) {
+                    external_codes.push(code);
+                }
+            }
+        }
+        for code in &configured_selected_external_vec {
+            if seen_external_codes.insert(code.clone()) {
+                external_codes.push(code.clone());
+            }
+        }
+
+        let available_external_codes = external_ast_registry.as_ref().map(|registry| {
+            registry
+                .iter_enabled_rules()
+                .map(|rule| rule.code.as_str().to_string())
+                .collect::<FxHashSet<_>>()
+        });
+
+        let selectors = lint
+            .rule_selections
+            .iter()
+            .flat_map(RuleSelection::selectors)
+            .chain(lint.extend_safe_fixes.iter())
+            .chain(lint.extend_unsafe_fixes.iter());
+
+        let mut missing_external = FxHashSet::default();
+        for selector in selectors {
+            if let RuleSelector::External { code } = selector {
+                let is_known = available_external_codes
+                    .as_ref()
+                    .is_some_and(|available| available.contains(code.as_ref()));
+                if !is_known {
+                    missing_external.insert(code.as_ref().to_string());
+                }
+            }
+        }
+
+        if !missing_external.is_empty() {
+            let mut missing: Vec<_> = missing_external.into_iter().collect();
+            missing.sort_unstable();
+            let formatted = missing
+                .into_iter()
+                .map(|code| format!("`{code}`"))
+                .collect::<Vec<_>>();
+            let message = if formatted.len() == 1 {
+                format!("Unknown rule selector: {}", formatted[0])
+            } else {
+                format!("Unknown rule selectors: {}", formatted.join(", "))
+            };
+            return Err(anyhow!(message));
+        }
+        if external_ast_registry.is_none() {
+            rules.disable(Rule::ExternalLinter);
+        }
 
         Ok(Settings {
             cache_dir: self
@@ -306,7 +446,10 @@ impl Configuration {
                 dummy_variable_rgx: lint
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
-                external: lint.external.unwrap_or_default(),
+                external: external_codes,
+                external_ast: external_ast_registry,
+                selected_external: configured_selected_external_vec,
+                ignored_external: configured_ignored_external_vec,
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or(true),
                 line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
@@ -638,6 +781,7 @@ pub struct LintConfiguration {
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub rule_selections: Vec<RuleSelection>,
     pub explicit_preview_rules: Option<bool>,
+    pub external_rule_selections: Vec<ExternalRuleSelection>,
 
     // Fix configuration
     pub extend_unsafe_fixes: Vec<RuleSelector>,
@@ -647,6 +791,7 @@ pub struct LintConfiguration {
     pub allowed_confusables: Option<Vec<char>>,
     pub dummy_variable_rgx: Option<Regex>,
     pub external: Option<Vec<String>>,
+    pub external_ast: Option<BTreeMap<String, ExternalLinterEntry>>,
     pub ignore_init_module_imports: Option<bool>,
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
@@ -713,6 +858,118 @@ impl LintConfiguration {
             options.common.ignore_init_module_imports
         };
 
+        for (label, selectors) in [
+            ("lint.select", options.common.select.as_ref()),
+            ("lint.extend-select", options.common.extend_select.as_ref()),
+        ] {
+            if let Some(selectors) = selectors {
+                if let Some(code) = selectors.iter().find_map(|selector| {
+                    if let RuleSelector::External { code } = selector {
+                        Some(code.as_ref().to_string())
+                    } else {
+                        None
+                    }
+                }) {
+                    return Err(anyhow::anyhow!(
+                        "External rule `{code}` cannot be enabled via `{label}`; use `lint.select-external` instead."
+                    ));
+                }
+            }
+        }
+
+        if let Some(internal) = options.common.select_external.as_ref().and_then(|values| {
+            values.iter().find(|value| {
+                matches!(
+                    RuleSelector::from_str(value),
+                    Ok(RuleSelector::Linter(_)
+                        | RuleSelector::Prefix { .. }
+                        | RuleSelector::Rule { .. })
+                )
+            })
+        }) {
+            return Err(anyhow::anyhow!(
+                "Internal rule `{internal}` cannot be enabled via `lint.select-external`; use `lint.select` instead."
+            ));
+        }
+        if let Some(internal) = options
+            .common
+            .extend_select_external
+            .as_ref()
+            .and_then(|values| {
+                values.iter().find(|value| {
+                    matches!(
+                        RuleSelector::from_str(value),
+                        Ok(RuleSelector::Linter(_)
+                            | RuleSelector::Prefix { .. }
+                            | RuleSelector::Rule { .. })
+                    )
+                })
+            })
+        {
+            return Err(anyhow::anyhow!(
+                "Internal rule `{internal}` cannot be enabled via `lint.extend-select-external`; use `lint.extend-select` instead."
+            ));
+        }
+        if let Some(internal) = options.common.ignore_external.as_ref().and_then(|values| {
+            values.iter().find(|value| {
+                matches!(
+                    RuleSelector::from_str(value),
+                    Ok(RuleSelector::Linter(_)
+                        | RuleSelector::Prefix { .. }
+                        | RuleSelector::Rule { .. })
+                )
+            })
+        }) {
+            return Err(anyhow::anyhow!(
+                "Internal rule `{internal}` cannot be disabled via `lint.ignore-external`; use `lint.ignore` instead."
+            ));
+        }
+        if let Some(internal) = options
+            .common
+            .extend_ignore_external
+            .as_ref()
+            .and_then(|values| {
+                values.iter().find(|value| {
+                    matches!(
+                        RuleSelector::from_str(value),
+                        Ok(RuleSelector::Linter(_)
+                            | RuleSelector::Prefix { .. }
+                            | RuleSelector::Rule { .. })
+                    )
+                })
+            })
+        {
+            return Err(anyhow::anyhow!(
+                "Internal rule `{internal}` cannot be disabled via `lint.extend-ignore-external`; use `lint.extend-ignore` instead."
+            ));
+        }
+
+        let external_ast_entries = options
+            .external_ast
+            .map(|entries| {
+                entries
+                    .into_iter()
+                    .map(|(id, entry)| {
+                        let raw_path = entry
+                            .path
+                            .ok_or_else(|| anyhow!("external linter `{id}` must define `path`"))?;
+                        let path = if raw_path.is_absolute() {
+                            raw_path
+                        } else {
+                            project_root.join(raw_path)
+                        };
+                        Ok((
+                            id,
+                            ExternalLinterEntry {
+                                path,
+                                enabled: entry.enabled.unwrap_or(true),
+                            },
+                        ))
+                    })
+                    .collect::<Result<BTreeMap<_, _>>>()
+            })
+            .transpose()?;
+
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -732,6 +989,12 @@ impl LintConfiguration {
                 fixable: options.common.fixable,
                 unfixable,
                 extend_fixable: options.common.extend_fixable.unwrap_or_default(),
+            }],
+            external_rule_selections: vec![ExternalRuleSelection {
+                select: options.common.select_external,
+                extend_select: options.common.extend_select_external.unwrap_or_default(),
+                ignore: options.common.ignore_external.unwrap_or_default(),
+                extend_ignore: options.common.extend_ignore_external.unwrap_or_default(),
             }],
             extend_safe_fixes: options.common.extend_safe_fixes.unwrap_or_default(),
             extend_unsafe_fixes: options.common.extend_unsafe_fixes.unwrap_or_default(),
@@ -755,6 +1018,7 @@ impl LintConfiguration {
                 })
                 .unwrap_or_default(),
             external: options.common.external,
+            external_ast: external_ast_entries,
             ignore_init_module_imports,
             explicit_preview_rules: options.common.explicit_preview_rules,
             per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
@@ -1136,6 +1400,8 @@ impl LintConfiguration {
 
         let mut extend_per_file_ignores = config.extend_per_file_ignores;
         extend_per_file_ignores.extend(self.extend_per_file_ignores);
+        let mut external_rule_selections = config.external_rule_selections;
+        external_rule_selections.extend(self.external_rule_selections);
 
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1143,10 +1409,12 @@ impl LintConfiguration {
             rule_selections,
             extend_safe_fixes,
             extend_unsafe_fixes,
+            external_rule_selections,
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             extend_per_file_ignores,
             external: self.external.or(config.external),
+            external_ast: self.external_ast.or(config.external_ast),
             ignore_init_module_imports: self
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
@@ -1414,6 +1682,8 @@ fn warn_about_deprecated_top_level_lint_options(
         pyupgrade,
         per_file_ignores,
         extend_per_file_ignores,
+        select_external,
+        ..
     } = top_level_options;
     let mut used_options = Vec::new();
 
@@ -1471,6 +1741,9 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if select.is_some() {
         used_options.push("select");
+    }
+    if select_external.is_some() {
+        used_options.push("select-external");
     }
 
     if explicit_preview_rules.is_some() {

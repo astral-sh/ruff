@@ -14,25 +14,34 @@ use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};
 use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_linter::external::ExternalLintRegistry;
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
+use ruff_workspace::resolver::PyprojectConfig;
+use rustc_hash::FxHashSet;
 
-use crate::args::{
-    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand,
+use crate::{
+    args::{AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand},
+    printer::{Flags as PrinterFlags, Printer},
 };
-use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
+mod external;
 mod printer;
 pub mod resolve;
 mod stdin;
 mod version;
+
+pub(crate) use external::{
+    apply_external_linter_selection_to_settings, compute_external_selection_state,
+    print_external_linters, select_external_linters,
+};
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -123,6 +132,14 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     } else {
         files
     }
+}
+
+fn apply_external_linter_selection(
+    pyproject_config: &mut PyprojectConfig,
+    selected: &FxHashSet<String>,
+    ignored: &FxHashSet<String>,
+) -> Result<bool> {
+    apply_external_linter_selection_to_settings(&mut pyproject_config.settings, selected, ignored)
 }
 
 pub fn run(
@@ -238,7 +255,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let mut pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -256,6 +273,48 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
     let files = resolve_default_files(cli.files, is_stdin);
 
+    let mut external_state = compute_external_selection_state(
+        &pyproject_config.settings.linter.selected_external,
+        &pyproject_config.settings.linter.ignored_external,
+        &cli.select_external,
+        &cli.extend_select_external,
+        &cli.ignore_external,
+        &cli.extend_ignore_external,
+    );
+    pyproject_config.settings.linter.selected_external =
+        external_state.effective.iter().cloned().collect();
+    pyproject_config.settings.linter.ignored_external =
+        external_state.ignored.iter().cloned().collect();
+    if cli.list_external_linters {
+        let mut stdout = BufWriter::new(io::stdout().lock());
+        if let Some(registry) = pyproject_config.settings.linter.external_ast.as_ref() {
+            let selection = select_external_linters(
+                registry,
+                &external_state.effective,
+                &external_state.ignored,
+            );
+            if !selection.missing.is_empty() {
+                anyhow::bail!(
+                    "Unknown external linter or rule selector(s): {}",
+                    selection.missing.join(", ")
+                );
+            }
+            print_external_linters(registry, &selection.matches, &mut stdout)?;
+        } else {
+            if !external_state.effective.is_empty() {
+                anyhow::bail!("No external AST linters are configured in this workspace.");
+            }
+            print_external_linters(&ExternalLintRegistry::new(), &[], &mut stdout)?;
+        }
+        return Ok(ExitStatus::Success);
+    }
+
+    let _ = apply_external_linter_selection(
+        &mut pyproject_config,
+        &external_state.effective,
+        &external_state.ignored,
+    )?;
+
     if cli.show_settings {
         commands::show_settings::show_settings(
             &files,
@@ -272,6 +331,38 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             &config_arguments,
             &mut writer,
         )?;
+        return Ok(ExitStatus::Success);
+    }
+
+    if cli.verify_external_linters {
+        let mut stdout = BufWriter::new(io::stdout().lock());
+        if let Some(registry) = pyproject_config.settings.linter.external_ast.as_ref() {
+            let selection = select_external_linters(
+                registry,
+                &external_state.effective,
+                &external_state.ignored,
+            );
+            if !selection.missing.is_empty() {
+                anyhow::bail!(
+                    "Unknown external linter or rule selector(s): {}",
+                    selection.missing.join(", ")
+                );
+            }
+            if selection.matches.is_empty() {
+                writeln!(stdout, "No external AST linters to validate.")?;
+            } else {
+                writeln!(
+                    stdout,
+                    "Validated {} external AST linter(s).",
+                    selection.matches.len()
+                )?;
+            }
+        } else {
+            if !external_state.effective.is_empty() {
+                anyhow::bail!("No external AST linters are configured in this workspace.");
+            }
+            writeln!(stdout, "No external AST linters are configured.")?;
+        }
         return Ok(ExitStatus::Success);
     }
 
@@ -404,6 +495,23 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                     if matches!(change_kind, ChangeKind::Configuration) {
                         pyproject_config =
                             resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+                        external_state = compute_external_selection_state(
+                            &pyproject_config.settings.linter.selected_external,
+                            &pyproject_config.settings.linter.ignored_external,
+                            &cli.select_external,
+                            &cli.extend_select_external,
+                            &cli.ignore_external,
+                            &cli.extend_ignore_external,
+                        );
+                        pyproject_config.settings.linter.selected_external =
+                            external_state.effective.iter().cloned().collect();
+                        pyproject_config.settings.linter.ignored_external =
+                            external_state.ignored.iter().cloned().collect();
+                        let _ = apply_external_linter_selection(
+                            &mut pyproject_config,
+                            &external_state.effective,
+                            &external_state.ignored,
+                        )?;
                     }
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
@@ -512,6 +620,85 @@ https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
         }
     }
     Ok(ExitStatus::Success)
+}
+
+#[cfg(test)]
+mod external_selection_tests {
+    use std::path::PathBuf;
+
+    use ruff_linter::external::ast::registry::ExternalLintRegistry;
+    use ruff_linter::external::ast::rule::{
+        ExternalAstLinter, ExternalAstRule, ExternalRuleCode, ExternalRuleScript,
+    };
+    use ruff_linter::external::ast::target::{AstTarget, StmtKind};
+    use rustc_hash::FxHashSet;
+
+    use super::{Settings, apply_external_linter_selection_to_settings};
+
+    fn make_registry() -> ExternalLintRegistry {
+        let mut registry = ExternalLintRegistry::new();
+
+        let rules = vec![
+            ExternalAstRule::new(
+                ExternalRuleCode::new("EXT001").unwrap(),
+                "FirstRule",
+                None::<&str>,
+                vec![AstTarget::Stmt(StmtKind::FunctionDef)],
+                ExternalRuleScript::file(
+                    PathBuf::from("ext001.py"),
+                    "def check_stmt(node, ctx):\n    pass\n",
+                ),
+                None,
+            ),
+            ExternalAstRule::new(
+                ExternalRuleCode::new("EXT002").unwrap(),
+                "SecondRule",
+                None::<&str>,
+                vec![AstTarget::Stmt(StmtKind::FunctionDef)],
+                ExternalRuleScript::file(
+                    PathBuf::from("ext002.py"),
+                    "def check_stmt(node, ctx):\n    pass\n",
+                ),
+                None,
+            ),
+        ];
+
+        let linter = ExternalAstLinter::new("demo", "Demo", None::<&str>, true, rules);
+        registry.insert_linter(linter).unwrap();
+        registry
+    }
+
+    #[test]
+    fn selecting_linter_respects_ignored_rule_codes() {
+        let registry = make_registry();
+
+        let mut settings = Settings::default();
+        settings.linter.external_ast = Some(registry);
+        settings.linter.selected_external = vec!["demo".to_string()];
+        settings.linter.ignored_external = vec!["EXT002".to_string()];
+        settings
+            .linter
+            .rules
+            .enable(ruff_linter::registry::Rule::ExternalLinter, false);
+
+        let selected: FxHashSet<String> =
+            settings.linter.selected_external.iter().cloned().collect();
+        let ignored: FxHashSet<String> = settings.linter.ignored_external.iter().cloned().collect();
+        apply_external_linter_selection_to_settings(&mut settings, &selected, &ignored).unwrap();
+
+        let filtered = settings
+            .linter
+            .external_ast
+            .expect("external registry should remain configured");
+        assert!(
+            filtered.find_rule_by_code("EXT002").is_none(),
+            "ignored rule code should be excluded when selecting the entire linter"
+        );
+        assert!(
+            filtered.find_rule_by_code("EXT001").is_some(),
+            "other rules should remain enabled"
+        );
+    }
 }
 
 #[cfg(test)]

@@ -67,6 +67,11 @@ impl FromStr for RuleSelector {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // **Changes should be reflected in `parse_no_redirect` as well**
+        // External AST rules reserve the `EXT` prefix; short-circuit before we
+        // attempt to interpret the selector as a built-in linter code.
+        if s.starts_with("EXT") && ExternalRuleCode::new(s).is_ok() {
+            return Ok(Self::External { code: s.into() });
+        }
         match s {
             "ALL" => Ok(Self::All),
             "C" => Ok(Self::C),
@@ -134,7 +139,9 @@ pub enum ParseError {
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
     // implemented (but that should of course be done only in ruff and not here)
     Unknown(String),
-    #[error("External rule selector `{0}` is not supported yet.")]
+    #[error(
+        "External rule selector `{0}` must be provided via `--select-external` or `lint.select-external`."
+    )]
     External(String),
 }
 
@@ -158,6 +165,9 @@ impl Serialize for RuleSelector {
     where
         S: serde::Serializer,
     {
+        if let RuleSelector::External { code } = self {
+            return serializer.serialize_str(code);
+        }
         let (prefix, code) = self.prefix_and_code();
         serializer.serialize_str(&format!("{prefix}{code}"))
     }
@@ -196,7 +206,7 @@ impl Visitor<'_> for SelectorVisitor {
             Ok(value) => Ok(value),
             Err(err @ ParseError::External(_)) => Err(de::Error::custom(err.to_string())),
             Err(err) if looks_like_external_rule_code(v) => Err(de::Error::custom(format!(
-                "{err}. External rule selectors are not supported yet."
+                "{err}. External rule selectors must be provided via `lint.select-external`."
             ))),
             Err(err) => Err(de::Error::custom(err)),
         }
@@ -384,6 +394,11 @@ impl RuleSelector {
     /// Parse [`RuleSelector`] from a string; but do not follow redirects.
     pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
         // **Changes should be reflected in `from_str` as well**
+        // External AST rules reserve the `EXT` prefix; short-circuit before we
+        // attempt to interpret the selector as a built-in linter code.
+        if s.starts_with("EXT") && ExternalRuleCode::new(s).is_ok() {
+            return Ok(Self::External { code: s.into() });
+        }
         match s {
             "ALL" => Ok(Self::All),
             "C" => Ok(Self::C),
@@ -482,7 +497,9 @@ pub mod clap_completion {
             value.parse().map_err(|err| match err {
                 ParseError::External(code) => clap::Error::raw(
                     clap::error::ErrorKind::ValueValidation,
-                    format!("External rule selector `{code}` is not supported yet."),
+                    format!(
+                        "External rule selector `{code}` must be provided via `--select-external`."
+                    ),
                 ),
                 ParseError::Unknown(_) => {
                     let mut error =
