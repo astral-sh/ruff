@@ -476,10 +476,8 @@ def _(i: int):
     b: list[int | None] | None = id([i])
     c: list[int | None] | int | None = id([i])
     reveal_type(a)  # revealed: list[int | None]
-    # TODO: these should reveal `list[int | None]`
-    # we currently do not use the call expression annotation as type context for argument inference
-    reveal_type(b)  # revealed: list[Unknown | int]
-    reveal_type(c)  # revealed: list[Unknown | int]
+    reveal_type(b)  # revealed: list[int | None]
+    reveal_type(c)  # revealed: list[int | None]
 
     a: list[int | None] | None = [i]
     b: list[int | None] | None = lst(i)
@@ -494,4 +492,27 @@ def _(i: int):
     reveal_type(a)  # revealed: list[Unknown]
     reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: list[Unknown]
+```
+
+The function arguments are inferred using the type context:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+def f[T](x: list[T]) -> T:
+    return x[0]
+
+a: TD = f([{"x": 0}, {"x": 1}])
+reveal_type(a)  # revealed: TD
+
+b: TD | None = f([{"x": 0}, {"x": 1}])
+# TODO: Narrow away the `None` here.
+reveal_type(b)  # revealed: TD | None
+
+# error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+# error: [invalid-key] "Invalid key access on TypedDict `TD`: Unknown key "y""
+c: TD | None = f([{"y": 0}, {"x": 1}])
 ```
