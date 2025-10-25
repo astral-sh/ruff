@@ -71,7 +71,7 @@ pub use crate::error::{
     UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
 pub use crate::parser::ParseOptions;
-pub use crate::token::{Token, TokenKind};
+pub use crate::token::{Token, TokenFlags, TokenKind};
 
 use crate::parser::Parser;
 

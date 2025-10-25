@@ -82,7 +82,7 @@ impl<'src> Lexer<'src> {
     /// If the start offset is greater than 0, the cursor is moved ahead that many bytes.
     /// This means that the input source should be the complete source code and not the
     /// sliced version.
-    pub fn new(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+    pub(crate) fn new(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
         assert!(
             u32::try_from(source.len()).is_ok(),
             "Lexer only supports files with a size up to 4GB"
@@ -131,7 +131,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the flags for the current token.
-    pub(crate) fn current_flags(&self) -> TokenFlags {
+    pub fn current_flags(&self) -> TokenFlags {
         self.current_flags
     }
 

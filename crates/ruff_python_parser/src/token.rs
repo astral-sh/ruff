@@ -729,7 +729,7 @@ impl fmt::Display for TokenKind {
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct TokenFlags: u16 {
+    pub struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
         const DOUBLE_QUOTES = 1 << 0;
         /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
