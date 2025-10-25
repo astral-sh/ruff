@@ -26,6 +26,7 @@ mod cst;
 pub mod directives;
 mod doc_lines;
 mod docstrings;
+pub mod external;
 mod fix;
 pub mod fs;
 mod importer;
