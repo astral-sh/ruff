@@ -6260,7 +6260,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let inferred_elt_ty = self.get_or_infer_expression(elt, elt_tcx);
 
-                // Simplify the inference based on the declared type of the element.
+                // Avoid widening the inferred type if it is already assignable to the preferred
+                // declared type.
                 if let Some(elt_tcx) = elt_tcx.annotation {
                     if inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
                         continue;

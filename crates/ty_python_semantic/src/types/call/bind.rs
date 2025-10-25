@@ -35,11 +35,11 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
-    todo_type,
+    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
+    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support,
+    infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2718,8 +2718,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
+        let return_with_tcx = self
+            .signature
+            .return_ty
+            .zip(self.call_expression_tcx.annotation);
+
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+
+        // Prefer the declared type of generic classes.
+        let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
+            let preferred_return_ty =
+                tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
+            let return_ty =
+                return_ty.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
+
+            builder.infer(return_ty, preferred_return_ty).ok()?;
+            Some(builder.type_mappings().clone())
+        });
 
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
@@ -2733,9 +2749,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                if let Err(error) = builder.infer(
+                let filter = |declared_ty: BoundTypeVarIdentity<'_>, inferred_ty: Type<'_>| {
+                    // Avoid widening the inferred type if it is already assignable to the
+                    // preferred declared type.
+                    preferred_type_mappings
+                        .as_ref()
+                        .and_then(|types| types.get(&declared_ty))
+                        .is_none_or(|preferred_ty| {
+                            !inferred_ty.is_assignable_to(self.db, *preferred_ty)
+                        })
+                };
+
+                if let Err(error) = builder.infer_filter(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
+                    filter,
                 ) {
                     self.errors.push(BindingError::SpecializationError {
                         error,
@@ -2745,15 +2773,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        // Build the specialization first without inferring the type context.
+        // Build the specialization first without inferring the complete type context.
         let isolated_specialization = builder.build(generic_context, *self.call_expression_tcx);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
 
         let mut try_infer_tcx = || {
-            let return_ty = self.signature.return_ty?;
-            let call_expression_tcx = self.call_expression_tcx.annotation?;
+            let (return_ty, call_expression_tcx) = return_with_tcx?;
 
             // A type variable is not a useful type-context for expression inference, and applying it
             // to the return type can lead to confusing unions in nested generic calls.
@@ -2762,7 +2789,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             // If the return type is already assignable to the annotated type, we can ignore the
-            // type context and prefer the narrower inferred type.
+            // rest of the type context and prefer the narrower inferred type.
             if isolated_return_ty.is_assignable_to(self.db, call_expression_tcx) {
                 return None;
             }
@@ -2771,7 +2798,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // annotated assignment, to closer match the order of any unions written in the type annotation.
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
-            // Otherwise, build the specialization again after inferring the type context.
+            // Otherwise, build the specialization again after inferring the complete type context.
             let specialization = builder.build(generic_context, *self.call_expression_tcx);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 

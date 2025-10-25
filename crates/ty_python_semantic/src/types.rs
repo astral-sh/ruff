@@ -891,13 +891,24 @@ impl<'db> Type<'db> {
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         let class_literal = known_class.try_to_class_literal(db)?;
-        self.specialization_of(db, Some(class_literal))
+        self.specialization_of(db, class_literal)
+    }
+
+    // If this type is a class instance, returns its specialization.
+    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.specialization_of_optional(db, None)
     }
 
     // If the type is a specialized instance of the given class, returns the specialization.
-    //
-    // If no class is provided, returns the specialization of any class instance.
     pub(crate) fn specialization_of(
+        self,
+        db: &'db dyn Db,
+        expected_class: ClassLiteral<'_>,
+    ) -> Option<Specialization<'db>> {
+        self.specialization_of_optional(db, Some(expected_class))
+    }
+
+    fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,
@@ -1214,22 +1225,28 @@ impl<'db> Type<'db> {
 
     /// If the type is a union, filters union elements based on the provided predicate.
     ///
-    /// Otherwise, returns the type unchanged.
+    /// Otherwise, considers the type to be the sole inhabitant of a single-valued union,
+    /// and filters it, returning `Never` if the predicate returns `false`, or the type
+    /// unchanged if `true`.
     pub(crate) fn filter_union(
         self,
         db: &'db dyn Db,
-        f: impl FnMut(&Type<'db>) -> bool,
+        mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
         if let Type::Union(union) = self {
             union.filter(db, f)
-        } else {
+        } else if f(&self) {
             self
+        } else {
+            Type::Never
         }
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.
     ///
-    /// Otherwise, returns the type unchanged.
+    /// Otherwise, considers the type to be the sole inhabitant of a single-valued union,
+    /// and filters it, returning `Never` if it is disjoint from `target`, or the type
+    /// unchanged if `true`.
     pub(crate) fn filter_disjoint_elements(
         self,
         db: &'db dyn Db,
