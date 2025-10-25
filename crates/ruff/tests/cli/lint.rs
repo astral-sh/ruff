@@ -21,6 +21,44 @@ impl CliTest {
     }
 }
 
+fn toml_path(path: &std::path::Path) -> String {
+    // Escape backslashes so Windows paths stay valid inside TOML strings.
+    path.to_string_lossy().replace('\\', "\\\\")
+}
+
+fn write_demo_external_linter(test: &CliTest) -> Result<std::path::PathBuf> {
+    test.write_file(
+        "lint/external/demo.toml",
+        r#"
+name = "Demo External Linter"
+description = "Shows how to configure external AST linters"
+
+[[rule]]
+code = "EXT001"
+name = "ExampleRule"
+summary = "Provides illustrative coverage"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+
+[[rule]]
+code = "EXT002"
+name = "AnotherRule"
+summary = "Provides illustrative coverage"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+"#,
+    )?;
+    test.write_file(
+        "lint/external/rules/example.py",
+        r#"
+def check_stmt(node, ctx):
+    if node["_kind"] == "FunctionDef":
+        ctx.report("external lint fired")
+"#,
+    )?;
+    Ok(test.root().join("lint/external/demo.toml"))
+}
+
 #[test]
 fn top_level_options() -> Result<()> {
     let test = CliTest::new()?;
@@ -164,6 +202,767 @@ inline-quotes = "single"
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'flake8-quotes' -> 'lint.flake8-quotes'
     ");
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_linter_listing() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "lint/external/demo.toml",
+        r#"
+name = "Demo External Linter"
+description = "Shows how to configure external AST linters"
+
+[[rule]]
+code = "EXT001"
+name = "ExampleRule"
+summary = "Provides illustrative coverage"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+
+[[rule]]
+code = "EXT002"
+name = "AnotherRule"
+summary = "Demonstrates code-based selection"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+"#,
+    )?;
+    test.write_file(
+        "lint/external/rules/example.py",
+        r#"
+def check():
+    # placeholder script body
+    pass
+"#,
+    )?;
+    let linter_path = test.root().join("lint/external/demo.toml");
+    let config = format!(
+        r#"
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml", "--list-external-linters"])
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = std::str::from_utf8(&output.stdout)?;
+    assert!(stdout.contains("demo"));
+    assert!(stdout.contains("Demo External Linter"));
+    assert!(stdout.contains("EXT001"));
+    assert!(stdout.contains("ExampleRule"));
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_linter_listing_filtered_by_code() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "lint/external/demo.toml",
+        r#"
+name = "Demo External Linter"
+description = "Shows how to configure external AST linters"
+
+[[rule]]
+code = "EXT001"
+name = "ExampleRule"
+summary = "Provides illustrative coverage"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+
+[[rule]]
+code = "EXT002"
+name = "AnotherRule"
+summary = "Demonstrates code-based selection"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+"#,
+    )?;
+    test.write_file(
+        "lint/external/rules/example.py",
+        r#"
+def check():
+    # placeholder script body
+    pass
+"#,
+    )?;
+    let linter_path = test.root().join("lint/external/demo.toml");
+    let config = format!(
+        r#"
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--list-external-linters",
+            "--select-external",
+            "EXT002",
+        ])
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = std::str::from_utf8(&output.stdout)?;
+    assert!(stdout.contains("EXT002"));
+    assert!(!stdout.contains("EXT001"));
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_requires_explicit_selection() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "lint/external/demo.toml",
+        r#"
+name = "Demo External Linter"
+description = "Shows how to configure external AST linters"
+
+[[rule]]
+code = "EXT001"
+name = "ExampleRule"
+summary = "Provides illustrative coverage"
+targets = ["stmt:FunctionDef"]
+script = "rules/example.py"
+"#,
+    )?;
+    test.write_file(
+        "lint/external/rules/example.py",
+        r#"
+def check():
+    # placeholder script body
+    pass
+"#,
+    )?;
+    let linter_path = test.root().join("lint/external/demo.toml");
+    let config = format!(
+        r#"
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml", "--show-settings"])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = std::str::from_utf8(&output.stdout)?;
+    assert!(
+        !stdout.contains("external-linter (RUF300)"),
+        "Expected external-linter to be disabled without an explicit selection"
+    );
+
+    let config_with_select = format!(
+        r#"
+[lint]
+extend-select = ["RUF300"]
+select-external = ["EXT001"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config_with_select)?;
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml", "--show-settings"])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = std::str::from_utf8(&output.stdout)?;
+    assert!(
+        stdout.contains("external-linter (RUF300)"),
+        "Expected external-linter to be enabled when configured via lint.select-external"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_select_external_disabled_rule_errors() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = {
+        test.write_file(
+            "lint/external/disabled.toml",
+            r#"
+enabled = false
+name = "Disabled External Linter"
+
+[[rule]]
+code = "EXTDIS001"
+name = "DisabledRule"
+summary = "Rule intentionally disabled"
+targets = ["stmt:FunctionDef"]
+script = "rules/disabled.py"
+"#,
+        )?;
+        test.write_file(
+            "lint/external/rules/disabled.py",
+            r#"
+def check_stmt(node, ctx):
+    ctx.report("should not fire")
+"#,
+        )?;
+        test.root().join("lint/external/disabled.toml")
+    };
+    let config = format!(
+        r#"
+[lint.external-ast.disabled]
+path = "{}"
+
+[lint]
+select = ["RUF300"]
+select-external = ["EXTDIS001"]
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file("example.py", "def foo():\n    pass\n")?;
+
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml", "example.py"])
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "command unexpectedly succeeded: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = std::str::from_utf8(&output.stderr)?;
+    assert!(
+        stderr.contains("Unknown external linter or rule selector(s): EXTDIS001"),
+        "stderr missing warning about disabled external selection: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_ignore_external_cli() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+    let config = format!(
+        r#"
+[lint]
+select-external = ["EXT001"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file(
+        "example.py",
+        r#"
+def demo():
+    return 1
+"#,
+    )?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--select",
+            "RUF300",
+            "--extend-select-external",
+            "EXT002",
+            "--ignore-external",
+            "EXT002",
+            "--list-external-linters",
+            "example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("EXT001"), "stdout missing EXT001: {stdout}");
+    assert!(
+        !stdout.contains("EXT002"),
+        "stdout unexpectedly included EXT002: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn external_ast_select_external_overrides_config() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+    let config = format!(
+        r#"
+[lint]
+select-external = ["EXT001"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file("example.py", "def demo():\n    return 1\n")?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--select",
+            "RUF300",
+            "--select-external",
+            "EXT002",
+            "--list-external-linters",
+            "example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("EXT002"), "stdout missing EXT002: {stdout}");
+    assert!(
+        !stdout.contains("EXT001"),
+        "stdout unexpectedly included EXT001: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn cli_select_disables_configured_external_linters() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+    let config = format!(
+        r#"
+[lint]
+select = ["RUF300"]
+select-external = ["EXT001"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file("example.py", "def demo():\n    return 1\n")?;
+
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml", "--show-settings"])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("external-linter (RUF300)"),
+        "Expected external linters to be enabled via configuration"
+    );
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--select",
+            "G004",
+            "--show-settings",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("external-linter (RUF300)"),
+        "Expected `--select` to clear configured external linters"
+    );
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--select",
+            "G004",
+            "example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("EXT001"),
+        "Expected external linter diagnostics to be suppressed: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_select_external_overrides_nested_config() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+    let config = format!(
+        r#"
+[lint]
+select-external = ["EXT001", "EXT002"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file("nested/ruff.toml", r#"extend = "../ruff.toml""#)?;
+    test.write_file(
+        "nested/example.py",
+        r#"
+def demo():
+    return 1
+"#,
+    )?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--select",
+            "RUF300",
+            "--select-external",
+            "EXT002",
+            "--list-external-linters",
+            "nested/example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("EXT002"), "stdout missing EXT002: {stdout}");
+    assert!(
+        !stdout.contains("EXT001"),
+        "stdout unexpectedly included EXT001: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn select_external_cli_allows_nested_registry() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+
+    let nested_config = format!(
+        r#"
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("nested/ruff.toml", &nested_config)?;
+    test.write_file("example.py", "def root():\n    return 1\n")?;
+    test.write_file("nested/example.py", "def nested():\n    return 1\n")?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--select",
+            "RUF300",
+            "--select-external",
+            "EXT001",
+            "example.py",
+            "nested/example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed unexpectedly: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn select_external_cli_errors_when_no_registries() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file("example.py", "def root():\n    return 1\n")?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--select",
+            "RUF300",
+            "--select-external",
+            "EXT001",
+            "example.py",
+        ])
+        .output()?;
+    assert!(
+        !output.status.success(),
+        "command unexpectedly succeeded: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("No external AST linters are configured in this workspace."),
+        "stderr missing missing-registry error: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn external_ast_ignore_external_config() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+    let config = format!(
+        r#"
+[lint]
+select-external = ["EXT001"]
+extend-select-external = ["EXT002"]
+ignore-external = ["EXT002"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file(
+        "example.py",
+        r#"
+def demo():
+    return 1
+"#,
+    )?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--select",
+            "RUF300",
+            "--list-external-linters",
+            "example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("EXT001"), "stdout missing EXT001: {stdout}");
+    assert!(
+        !stdout.contains("EXT002"),
+        "stdout unexpectedly included EXT002: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn external_ast_ignore_external_nested_config() -> Result<()> {
+    let test = CliTest::new()?;
+    let linter_path = write_demo_external_linter(&test)?;
+    let config = format!(
+        r#"
+[lint]
+select-external = ["EXT001", "EXT002"]
+ignore-external = ["EXT002"]
+
+[lint.external-ast.demo]
+path = "{}"
+"#,
+        toml_path(&linter_path)
+    );
+    test.write_file("ruff.toml", &config)?;
+    test.write_file(
+        "pkg/pyproject.toml",
+        r#"
+[tool.ruff]
+line-length = 88
+"#,
+    )?;
+    test.write_file(
+        "pkg/example.py",
+        r#"
+def demo():
+    return 1
+"#,
+    )?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--config",
+            "ruff.toml",
+            "--select",
+            "RUF300",
+            "--list-external-linters",
+            "pkg/example.py",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("EXT001"),
+        "stdout missing surviving EXT001 listing: {stdout}"
+    );
+    assert!(
+        !stdout.contains("EXT002"),
+        "stdout unexpectedly included ignored EXT002 listing: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn select_rejects_external_rules() -> Result<()> {
+    let test = CliTest::new()?;
+
+    let output = test
+        .command()
+        .args(["check", "--isolated", "--select", "EXT001"])
+        .output()?;
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    let stderr = std::str::from_utf8(&output.stderr)?;
+    assert!(
+        stderr.contains("cannot be enabled with `--select`"),
+        "expected failure when selecting external rule via --select"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn select_external_rejects_internal_rules() -> Result<()> {
+    let test = CliTest::new()?;
+
+    let output = test
+        .command()
+        .args(["check", "--isolated", "--select-external", "F401"])
+        .output()?;
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    let stderr = std::str::from_utf8(&output.stderr)?;
+    assert!(
+        stderr.contains("cannot be enabled with `--select-external`"),
+        "expected failure when selecting internal rules via --select-external"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn config_select_rejects_external_rules() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["EXT001"]
+"#,
+    )?;
+
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml"])
+        .output()?;
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    let stderr = std::str::from_utf8(&output.stderr)?;
+    assert!(
+        stderr.contains("lint.select-external"),
+        "expected parse failure when selecting external rule via configuration"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn config_select_external_rejects_internal_rules() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select-external = ["F401"]
+"#,
+    )?;
+
+    let output = test
+        .command()
+        .args(["check", "--config", "ruff.toml"])
+        .output()?;
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    let stderr = std::str::from_utf8(&output.stderr)?;
+    assert!(
+        stderr.contains("cannot be enabled via `lint.select-external`"),
+        "expected lint.select-external failure when selecting internal rule"
+    );
 
     Ok(())
 }
@@ -775,7 +1574,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
 
     Could not parse the supplied argument as a `ruff.toml` configuration option:
 
-    Unknown rule selector: `F481`. External rule selectors are not supported yet.
+    Unknown rule selector: `F481`. External rule selectors must be provided via `lint.select-external`.
 
     For more information, try '--help'.
     ");
@@ -907,6 +1706,10 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.dummy-variable-rgx`
     - `lint.extend-ignore`
     - `lint.extend-select`
+    - `lint.select-external`
+    - `lint.extend-select-external`
+    - `lint.ignore-external`
+    - `lint.extend-ignore-external`
     - `lint.extend-fixable`
     - `lint.external`
     - `lint.fixable`
