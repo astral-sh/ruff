@@ -346,12 +346,7 @@ impl<'a> ResponseWriter<'a> {
 
         let previous_result_ids = previous_result_ids
             .into_iter()
-            .filter_map(|prev| {
-                Some((
-                    AnySystemPath::try_from_url(&prev.uri).ok()?,
-                    (prev.uri, prev.value),
-                ))
-            })
+            .map(|prev| (AnySystemPath::from_url(&prev.uri), (prev.uri, prev.value)))
             .collect();
 
         Self {
@@ -368,18 +363,19 @@ impl<'a> ResponseWriter<'a> {
             return;
         };
 
+        let key = self.index.key_from_url(url.clone());
+
         let version = self
             .index
-            .key_from_url(url.clone())
+            .make_document_ref(key)
             .ok()
-            .and_then(|key| self.index.make_document_ref(key).ok())
             .map(|doc| i64::from(doc.version()));
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
-        let previous_result_id = AnySystemPath::try_from_url(&url)
-            .ok()
-            .and_then(|path| self.previous_result_ids.remove(&path))
+        let previous_result_id = self
+            .previous_result_ids
+            .remove(&AnySystemPath::from_url(&url))
             .map(|(_url, id)| id);
 
         let report = match result_id {
@@ -446,11 +442,11 @@ impl<'a> ResponseWriter<'a> {
         // Any remaining entries in previous_results are files that were fixed
         for (previous_url, previous_result_id) in self.previous_result_ids.into_values() {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
+            let key = self.index.key_from_url(previous_url.clone());
             let version = self
                 .index
-                .key_from_url(previous_url.clone())
+                .make_document_ref(key)
                 .ok()
-                .and_then(|key| self.index.make_document_ref(key).ok())
                 .map(|doc| i64::from(doc.version()));
 
             let new_result_id = Diagnostics::result_id_from_hash(&[]);

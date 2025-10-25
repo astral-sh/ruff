@@ -25,9 +25,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         _client: &Client,
         params: DidOpenNotebookDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = AnySystemPath::try_from_url(&params.notebook_document.uri) else {
-            return Ok(());
-        };
+        let path = AnySystemPath::from_url(&params.notebook_document.uri);
 
         let lsp_types::NotebookDocument {
             version,

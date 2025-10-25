@@ -162,11 +162,12 @@ impl TextDocument {
 #[cfg(test)]
 mod tests {
     use crate::{PositionEncoding, TextDocument};
-    use lsp_types::{Position, TextDocumentContentChangeEvent};
+    use lsp_types::{Position, TextDocumentContentChangeEvent, Url};
 
     #[test]
     fn redo_edit() {
         let mut document = TextDocument::new(
+            Url::parse("file:///test").unwrap(),
             r#""""
 测试comment
 一些测试内容
