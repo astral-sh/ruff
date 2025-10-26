@@ -226,6 +226,7 @@ impl NotebookDocument {
     }
 
     /// Get the text document representing the contents of a cell by the cell URI.
+    #[expect(unused)]
     pub(crate) fn cell_document_by_uri(&self, uri: &str) -> Option<&TextDocument> {
         self.cells
             .get(*self.cell_index.get(uri)?)

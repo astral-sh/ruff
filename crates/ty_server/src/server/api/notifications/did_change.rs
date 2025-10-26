@@ -36,7 +36,8 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .update_text_document(session, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let changes = match document.file_path() {
+        let path = document.to_file_path();
+        let changes = match &*path {
             AnySystemPath::System(system_path) => {
                 vec![ChangeEvent::file_content_changed(system_path.clone())]
             }
@@ -45,7 +46,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         };
 
-        session.apply_changes(document.file_path(), changes);
+        session.apply_changes(&path, changes);
 
         publish_diagnostics(session, document.url(), client);
 

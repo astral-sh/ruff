@@ -363,11 +363,10 @@ impl<'a> ResponseWriter<'a> {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
-
         let key = DocumentKey::from_url(&url);
         let version = self
             .index
-            .make_document_ref(&key)
+            .document_handle(&url)
             .map(|doc| i64::from(doc.version()))
             .ok();
 
@@ -441,7 +440,7 @@ impl<'a> ResponseWriter<'a> {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index
-                .make_document_ref(&key)
+                .document(&key)
                 .ok()
                 .map(|doc| i64::from(doc.version()));
 

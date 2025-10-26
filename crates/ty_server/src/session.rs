@@ -15,8 +15,9 @@ use lsp_types::{
 };
 use options::GlobalOptions;
 use ruff_db::Db;
-use ruff_db::files::File;
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
@@ -26,7 +27,6 @@ use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
-pub(crate) use self::index::DocumentRef;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
@@ -813,20 +813,28 @@ impl Session {
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn snapshot_document(&self, url: &Url) -> Result<DocumentSnapshot, DocumentError> {
-        let document_ref = self
-            .index()
-            .make_document_ref(&DocumentKey::from_url(url))?;
+        let index = self.index();
+        let document_handle = index.document_handle(url)?;
+
+        let notebook = if let Some(notebook_path) = &document_handle.notebook_path {
+            index
+                .notebook_arc(&DocumentKey::from(notebook_path.clone()))
+                .ok()
+        } else {
+            None
+        };
 
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
-            workspace_settings: document_ref
-                .file_path()
+            workspace_settings: document_handle
+                .to_file_path()
                 .as_system()
                 .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document: document_ref,
+            document: document_handle,
+            notebook,
         })
     }
 
@@ -852,11 +860,12 @@ impl Session {
     pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
         self.index()
             .text_documents()
-            .map(|(key, url)| DocumentHandle {
+            .map(|(key, document)| DocumentHandle {
                 key: key.clone(),
-                url: url.clone(),
-                // FIXME: When notebooks are represented as text documetns
-                file_path: key.to_file_path(),
+                url: document.url().clone(),
+                version: document.version(),
+                // TODO: Set notebook path if text document is part of a notebook
+                notebook_path: None,
             })
     }
 
@@ -866,7 +875,7 @@ impl Session {
     ///
     /// If the document is not found.
     pub(crate) fn document(&self, url: &lsp_types::Url) -> Result<DocumentHandle, DocumentError> {
-        self.index().document(url)
+        self.index().document_handle(url)
     }
 
     /// Registers a notebook document at the provided `path`.
@@ -986,7 +995,8 @@ pub(crate) struct DocumentSnapshot {
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document: DocumentRef,
+    document: DocumentHandle,
+    notebook: Option<Arc<NotebookDocument>>,
 }
 
 impl DocumentSnapshot {
@@ -1011,23 +1021,27 @@ impl DocumentSnapshot {
     }
 
     /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> &DocumentRef {
+    pub(crate) fn document(&self) -> &DocumentHandle {
         &self.document
     }
 
-    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        let file = self.document.file(db);
+    pub(crate) fn notebook(&self) -> Option<&NotebookDocument> {
+        self.notebook.as_deref()
+    }
+
+    pub(crate) fn to_file(&self, db: &dyn Db) -> Option<File> {
+        let file = self.document.to_file(db);
         if file.is_none() {
             tracing::debug!(
-                "Failed to resolve file: file not found for path `{}`",
-                self.document.file_path()
+                "Failed to resolve file: file not found for `{}`",
+                self.document.url()
             );
         }
         file
     }
 
-    pub(crate) fn file_path(&self) -> &AnySystemPath {
-        self.document.file_path()
+    pub(crate) fn to_file_path(&self) -> Cow<'_, AnySystemPath> {
+        self.document.to_file_path()
     }
 }
 
@@ -1304,15 +1318,17 @@ impl SuspendedWorkspaceDiagnosticRequest {
 /// A handle to a document stored within [`Session`].
 #[derive(Clone, Debug)]
 pub(crate) struct DocumentHandle {
+    /// The key that uniquely identifies this document in the index.
     key: DocumentKey,
     url: lsp_types::Url,
-    file_path: AnySystemPath,
+    /// The path to the enclosing notebook file if this document is a notebook or a notebook cell.
+    notebook_path: Option<AnySystemPath>,
+    version: DocumentVersion,
 }
 
 impl DocumentHandle {
-    /// The key that uniquely identifies this document in the index.
-    pub(crate) fn key(&self) -> &DocumentKey {
-        &self.key
+    pub(crate) const fn version(&self) -> DocumentVersion {
+        self.version
     }
 
     /// The URL as used by the client to reference this document.
@@ -1324,8 +1340,27 @@ impl DocumentHandle {
     ///
     /// This is the path corresponding to the URL, except for notebook cells where the
     /// path corresponds to the notebook file.
-    pub(crate) fn file_path(&self) -> &AnySystemPath {
-        &self.file_path
+    pub(crate) fn to_file_path(&self) -> Cow<'_, AnySystemPath> {
+        if let Some(path) = self.notebook_path.as_ref() {
+            Cow::Borrowed(path)
+        } else {
+            Cow::Owned(self.key.to_file_path())
+        }
+    }
+
+    /// Returns the salsa interned [`File`] for the document selected by this query.
+    ///
+    /// It returns [`None`] for the following cases:
+    /// - For virtual file, if it's not yet opened
+    /// - For regular file, if it does not exists or is a directory
+    pub(crate) fn to_file(&self, db: &dyn Db) -> Option<File> {
+        match &*self.to_file_path() {
+            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
+            AnySystemPath::SystemVirtual(virtual_path) => db
+                .files()
+                .try_virtual_file(virtual_path)
+                .map(|virtual_file| virtual_file.file()),
+        }
     }
 
     pub(crate) fn update_text_document(
@@ -1337,7 +1372,7 @@ impl DocumentHandle {
         let position_encoding = session.position_encoding();
         let mut index = session.index_mut();
 
-        let document_mut = index.document_mut(self.key())?;
+        let document_mut = index.document_mut(&self.key)?;
 
         let Some(document) = document_mut.as_text_mut() else {
             anyhow::bail!("Text document path does not point to a text document");

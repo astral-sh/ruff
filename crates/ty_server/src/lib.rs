@@ -8,7 +8,7 @@ pub use crate::logging::{LogLevel, init_logging};
 pub use crate::server::{PartialWorkspaceProgress, PartialWorkspaceProgressParams, Server};
 pub use crate::session::{ClientOptions, DiagnosticMode};
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
-pub(crate) use session::{DocumentRef, Session};
+pub(crate) use session::Session;
 
 mod capabilities;
 mod document;
