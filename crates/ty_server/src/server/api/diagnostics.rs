@@ -151,8 +151,7 @@ pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, clien
         }
     };
 
-    let path = snapshot.file_path();
-    let db = session.project_db(&path);
+    let db = session.project_db(snapshot.file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return;

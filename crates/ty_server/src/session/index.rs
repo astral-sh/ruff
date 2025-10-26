@@ -127,7 +127,7 @@ impl Index {
         // TODO: Fix file path for notebook cells
         let handle = DocumentHandle {
             key: key.clone(),
-            file_path: key.to_file_path().clone(),
+            file_path: key.to_file_path(),
             url: document.url().clone(),
         };
 
@@ -155,18 +155,18 @@ impl Index {
         }
     }
 
-    pub(super) fn close_document(&mut self, path: &DocumentKey) -> crate::Result<()> {
+    pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
         // Notebook cells URIs are removed from the index here, instead of during
         // `update_notebook_document`. This is because a notebook cell, as a text document,
         // is requested to be `closed` by VS Code after the notebook gets updated.
         // This is not documented in the LSP specification explicitly, and this assumption
         // may need revisiting in the future as we support more editors with notebook support.
-        if let DocumentKey::Opaque(uri) = path {
+        if let DocumentKey::Opaque(uri) = key {
             self.notebook_cells.remove(uri);
         }
 
-        let Some(_) = self.documents.remove(&path) else {
-            anyhow::bail!("tried to close document that didn't exist at {path}")
+        let Some(_) = self.documents.remove(key) else {
+            anyhow::bail!("tried to close document that didn't exist at {key}")
         };
 
         Ok(())
