@@ -8,6 +8,7 @@ use crate::{
 use lsp_types::Url;
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
+use ruff_db::system::{SystemVirtualPath, SystemVirtualPathBuf};
 use rustc_hash::FxHashMap;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
@@ -17,7 +18,7 @@ pub(crate) struct Index {
     documents: FxHashMap<AnySystemPath, DocumentController>,
 
     /// Maps opaque cell URLs to a notebook path (document)
-    notebook_cells: FxHashMap<Url, AnySystemPath>,
+    notebook_cells: FxHashMap<SystemVirtualPathBuf, AnySystemPath>,
 }
 
 impl Index {
@@ -45,12 +46,12 @@ impl Index {
 
     pub(super) fn update_text_document(
         &mut self,
-        key: &DocumentKey,
+        path: &AnySystemPath,
         content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
-        let controller = self.document_controller_for_key(key)?;
+        let controller = self.document_controller_for_key(path)?;
         let Some(document) = controller.as_text_mut() else {
             anyhow::bail!("Text document path does not point to a text document");
         };
@@ -67,14 +68,17 @@ impl Index {
 
     /// Returns the [`DocumentKey`] corresponding to the given URL.
     pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
-        if let Some(notebook_path) = self.notebook_cells.get(&url) {
+        let path = AnySystemPath::from_url(&url);
+
+        if let Some(notebook_path) = path
+            .as_virtual()
+            .and_then(|path| self.notebook_cells.get(&path.to_path_buf()))
+        {
             DocumentKey::NotebookCell {
                 cell_url: url,
                 notebook_path: notebook_path.clone(),
             }
         } else {
-            let path = AnySystemPath::from_url(&url);
-
             if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
@@ -89,7 +93,7 @@ impl Index {
     #[expect(dead_code)]
     pub(super) fn update_notebook_document(
         &mut self,
-        key: &DocumentKey,
+        path: &AnySystemPath,
         cells: Option<lsp_types::NotebookDocumentCellChange>,
         metadata: Option<serde_json::Map<String, serde_json::Value>>,
         new_version: DocumentVersion,
@@ -101,16 +105,15 @@ impl Index {
             ..
         }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
-            let notebook_path = key.to_path().into_owned();
-
             for opened_cell in did_open {
+                let cell_path = SystemVirtualPath::new(opened_cell.uri.as_str());
                 self.notebook_cells
-                    .insert(opened_cell.uri.clone(), notebook_path.clone());
+                    .insert(cell_path.to_path_buf(), path.clone());
             }
             // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
         }
 
-        let controller = self.document_controller_for_key(key)?;
+        let controller = self.document_controller_for_key(path)?;
         let Some(notebook) = controller.as_notebook_mut() else {
             anyhow::bail!("Notebook document path does not point to a notebook document");
         };
@@ -124,20 +127,20 @@ impl Index {
     /// Returns an error if the document is not found or if the path cannot be converted to a URL.
     pub(crate) fn make_document_ref(
         &self,
-        key: DocumentKey,
+        path: &AnySystemPath,
     ) -> Result<DocumentQuery, DocumentQueryError> {
-        let path = key.to_path().into_owned();
         let Some(controller) = self.documents.get(&path) else {
-            return Err(DocumentQueryError::NotFound(key));
+            return Err(DocumentQueryError::NotFound(path.clone()));
         };
-        let cell_url = match key {
-            DocumentKey::NotebookCell {
-                cell_url,
-                notebook_path: _,
-            } => Some(cell_url),
-            DocumentKey::Notebook { .. } | DocumentKey::Text { .. } => None,
-        };
-        Ok(controller.make_ref(cell_url, path))
+
+        if let Some(r#virtual) = path.as_virtual() {
+            let cell_path = r#virtual.to_path_buf();
+            if let Some(notebook_path) = self.notebook_cells.get(&cell_path) {
+                return Ok(controller.make_ref(Some(cell_path), notebook_path.clone()));
+            }
+        }
+
+        Ok(controller.make_ref(None, path.clone()))
     }
 
     pub(super) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
@@ -151,8 +154,9 @@ impl Index {
         document: NotebookDocument,
     ) {
         for cell_url in document.cell_urls() {
+            let cell_path = SystemVirtualPath::new(cell_url.as_str());
             self.notebook_cells
-                .insert(cell_url.clone(), notebook_path.clone());
+                .insert(cell_path.to_path_buf(), notebook_path.clone());
         }
         self.documents.insert(
             notebook_path.clone(),
@@ -160,33 +164,28 @@ impl Index {
         );
     }
 
-    pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
+    pub(super) fn close_document(&mut self, path: &AnySystemPath) -> crate::Result<()> {
         // Notebook cells URIs are removed from the index here, instead of during
         // `update_notebook_document`. This is because a notebook cell, as a text document,
         // is requested to be `closed` by VS Code after the notebook gets updated.
         // This is not documented in the LSP specification explicitly, and this assumption
         // may need revisiting in the future as we support more editors with notebook support.
-        if let DocumentKey::NotebookCell { cell_url, .. } = key {
-            if self.notebook_cells.remove(cell_url).is_none() {
-                tracing::warn!("Tried to remove a notebook cell that does not exist: {cell_url}");
-            }
-            return Ok(());
+        if let AnySystemPath::SystemVirtual(r#virtual) = path {
+            self.notebook_cells.remove(r#virtual);
         }
-        let path = key.to_path();
 
         let Some(_) = self.documents.remove(&path) else {
-            anyhow::bail!("tried to close document that didn't exist at {key}")
+            anyhow::bail!("tried to close document that didn't exist at {path}")
         };
         Ok(())
     }
 
     fn document_controller_for_key(
         &mut self,
-        key: &DocumentKey,
+        path: &AnySystemPath,
     ) -> crate::Result<&mut DocumentController> {
-        let path = key.to_path();
         let Some(controller) = self.documents.get_mut(&path) else {
-            anyhow::bail!("Document controller not available at `{key}`");
+            anyhow::bail!("Document controller not available at `{path}`");
         };
         Ok(controller)
     }
@@ -208,10 +207,14 @@ impl DocumentController {
         Self::Notebook(Arc::new(document))
     }
 
-    fn make_ref(&self, cell_url: Option<Url>, file_path: AnySystemPath) -> DocumentQuery {
+    fn make_ref(
+        &self,
+        cell_path: Option<SystemVirtualPathBuf>,
+        file_path: AnySystemPath,
+    ) -> DocumentQuery {
         match &self {
             Self::Notebook(notebook) => DocumentQuery::Notebook {
-                cell_url,
+                cell_path,
                 file_path,
                 notebook: notebook.clone(),
             },
@@ -263,7 +266,7 @@ pub(crate) enum DocumentQuery {
     },
     Notebook {
         /// The selected notebook cell, if it exists.
-        cell_url: Option<Url>,
+        cell_path: Option<SystemVirtualPathBuf>,
         /// The path to the notebook.
         file_path: AnySystemPath,
         notebook: Arc<NotebookDocument>,
@@ -302,7 +305,7 @@ impl DocumentQuery {
             Self::Text { document, .. } => Some(document),
             Self::Notebook {
                 notebook,
-                cell_url: cell_uri,
+                cell_path: cell_uri,
                 ..
             } => cell_uri
                 .as_ref()
@@ -328,6 +331,6 @@ impl DocumentQuery {
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub(crate) enum DocumentQueryError {
-    #[error("document not found for key: {0}")]
-    NotFound(DocumentKey),
+    #[error("document not found for path: {0}")]
+    NotFound(AnySystemPath),
 }

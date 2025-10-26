@@ -27,12 +27,12 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
         } = params;
 
         let key = session.key_from_url(uri);
+        let path = key.to_path();
 
         session
-            .close_document(&key)
+            .close_document(&path)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        let path = key.to_path();
         if let AnySystemPath::SystemVirtual(virtual_path) = &*path {
             session.apply_changes(
                 &path,

@@ -70,21 +70,18 @@ impl AnySystemPath {
         }
     }
 
+    pub(crate) const fn as_virtual(&self) -> Option<&SystemVirtualPath> {
+        match self {
+            AnySystemPath::SystemVirtual(path) => Some(path.as_path()),
+            AnySystemPath::System(_) => None,
+        }
+    }
+
     /// Returns the extension of the path, if any.
     pub(crate) fn extension(&self) -> Option<&str> {
         match self {
             AnySystemPath::System(system_path) => system_path.extension(),
             AnySystemPath::SystemVirtual(virtual_path) => virtual_path.extension(),
-        }
-    }
-
-    /// Converts the path to a URL.
-    pub(crate) fn to_url(&self) -> Option<Url> {
-        match self {
-            AnySystemPath::System(system_path) => {
-                Url::from_file_path(system_path.as_std_path()).ok()
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => Url::parse(virtual_path.as_str()).ok(),
         }
     }
 }
@@ -146,15 +143,14 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentQuery> {
+    fn make_document_ref(&self, path: &AnySystemPath) -> Option<DocumentQuery> {
         let index = self.index();
-        let key = index.key_from_url(path.to_url()?);
-        index.make_document_ref(key).ok()
+        index.make_document_ref(&path).ok()
     }
 
     fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentQuery> {
         let any_path = AnySystemPath::System(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.make_document_ref(&any_path)
     }
 
     fn system_virtual_path_to_document_ref(
@@ -162,7 +158,7 @@ impl LSPSystem {
         path: &SystemVirtualPath,
     ) -> Option<DocumentQuery> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.make_document_ref(&any_path)
     }
 }
 

@@ -28,12 +28,12 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         } = params;
 
         let key = session.key_from_url(uri);
+        let path = key.to_path();
 
         session
-            .close_document(&key)
+            .close_document(&path)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let path = key.to_path();
         let db = session.project_db_mut(&path);
 
         match &*path {

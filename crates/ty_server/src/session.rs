@@ -821,16 +821,16 @@ impl Session {
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
         let key = self.key_from_url(url);
+        let path = key.to_path();
         DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
-            workspace_settings: key
-                .to_path()
+            workspace_settings: path
                 .as_system()
                 .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document_query_result: self.index().make_document_ref(key),
+            document_query_result: self.index().make_document_ref(&path),
         }
     }
 
@@ -882,13 +882,13 @@ impl Session {
     /// The document key must point to a text document, or this will throw an error.
     pub(crate) fn update_text_document(
         &mut self,
-        key: &DocumentKey,
+        path: &AnySystemPath,
         content_changes: Vec<TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
         let position_encoding = self.position_encoding;
         self.index_mut().update_text_document(
-            key,
+            path,
             content_changes,
             new_version,
             position_encoding,
@@ -899,7 +899,7 @@ impl Session {
 
     /// De-registers a document, specified by its key.
     /// Calling this multiple times for the same document is a logic error.
-    pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
+    pub(crate) fn close_document(&mut self, key: &AnySystemPath) -> crate::Result<()> {
         self.index_mut().close_document(key)?;
         self.bump_revision();
         Ok(())
