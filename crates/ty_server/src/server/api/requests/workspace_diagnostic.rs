@@ -9,7 +9,7 @@ use crate::server::{Action, Result};
 use crate::session::client::Client;
 use crate::session::index::Index;
 use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
-use crate::system::{AnySystemPath, file_to_url};
+use crate::system::file_to_url;
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -318,7 +318,7 @@ struct ResponseWriter<'a> {
     // It's important that we use `AnySystemPath` over `Url` here because
     // `file_to_url` isn't guaranteed to return the exact same URL as the one provided
     // by the client.
-    previous_result_ids: FxHashMap<AnySystemPath, (Url, String)>,
+    previous_result_ids: FxHashMap<DocumentKey, (Url, String)>,
 }
 
 impl<'a> ResponseWriter<'a> {
@@ -347,7 +347,7 @@ impl<'a> ResponseWriter<'a> {
 
         let previous_result_ids = previous_result_ids
             .into_iter()
-            .map(|prev| (AnySystemPath::from_url(&prev.uri), (prev.uri, prev.value)))
+            .map(|prev| (DocumentKey::from_url(&prev.uri), (prev.uri, prev.value)))
             .collect();
 
         Self {
@@ -364,18 +364,16 @@ impl<'a> ResponseWriter<'a> {
             return;
         };
 
+        let key = DocumentKey::from_url(&url);
         let version = self
             .index
-            .make_document_ref(&DocumentKey::from_url(&url))
+            .make_document_ref(&key)
             .map(|doc| i64::from(doc.version()))
             .ok();
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
-        let previous_result_id = self
-            .previous_result_ids
-            .remove(&AnySystemPath::from_url(&url))
-            .map(|(_url, id)| id);
+        let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
@@ -439,11 +437,11 @@ impl<'a> ResponseWriter<'a> {
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
-        for (previous_url, previous_result_id) in self.previous_result_ids.into_values() {
+        for (key, (previous_url, previous_result_id)) in self.previous_result_ids {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index
-                .make_document_ref(&DocumentKey::from_url(&previous_url))
+                .make_document_ref(&key)
                 .ok()
                 .map(|doc| i64::from(doc.version()));
 

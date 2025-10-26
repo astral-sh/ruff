@@ -17,7 +17,7 @@ use rustc_hash::FxHashMap;
 #[derive(Debug)]
 pub(crate) struct Index {
     /// Maps all document file paths to the associated document controller
-    pub(super) documents: FxHashMap<DocumentKey, Document>,
+    documents: FxHashMap<DocumentKey, Document>,
 
     /// Maps opaque cell URLs to a notebook path (document)
     notebook_cells: FxHashMap<String, DocumentKey>,
