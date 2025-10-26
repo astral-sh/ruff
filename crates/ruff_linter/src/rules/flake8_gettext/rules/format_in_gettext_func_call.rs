@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_gettext::helpers;
 
 /// ## What it does
 /// Checks for `str.format` calls in `gettext` function calls.
@@ -52,12 +53,26 @@ impl Violation for FormatInGetTextFuncCall {
 }
 
 /// INT002
-pub(crate) fn format_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
+pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+    // Check first argument (singular)
     if let Some(first) = args.first() {
         if let Expr::Call(ast::ExprCall { func, .. }) = &first {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                 if attr == "format" {
                     checker.report_diagnostic(FormatInGetTextFuncCall {}, first.range());
+                }
+            }
+        }
+    }
+
+    // Check second argument (plural) for ngettext calls
+    if helpers::is_ngettext_call(checker, func) {
+        if let Some(second) = args.get(1) {
+            if let Expr::Call(ast::ExprCall { func, .. }) = &second {
+                if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
+                    if attr == "format" {
+                        checker.report_diagnostic(FormatInGetTextFuncCall {}, second.range());
+                    }
                 }
             }
         }
