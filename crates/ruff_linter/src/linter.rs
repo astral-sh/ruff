@@ -962,89 +962,46 @@ mod tests {
 
     #[test_case(
         Path::new("async_comprehension_outside_async_function.py"),
-        &[PythonVersion::PY310, PythonVersion::PY312],
-        "AsyncComprehensionOutsideAsyncFunction"
+        PythonVersion::PY312
     )]
     #[test_case(
-        Path::new("rebound_comprehension.py"),
-        &[PythonVersion::PY310],
-        "ReboundComprehensionVariable"
+        Path::new("async_comprehension_outside_async_function.py"),
+        PythonVersion::PY310
     )]
-    #[test_case(
-        Path::new("duplicate_type_parameter.py"),
-        &[PythonVersion::PY312],
-        "DuplicateTypeParameter"
-    )]
-    #[test_case(
-        Path::new("multiple_case_assignment.py"),
-        &[PythonVersion::PY310],
-        "MultipleCaseAssignment"
-    )]
-    #[test_case(
-        Path::new("duplicate_match_key.py"),
-        &[PythonVersion::PY310],
-        "DuplicateMatchKey"
-    )]
-    #[test_case(
-        Path::new("duplicate_match_class_attribute.py"),
-        &[PythonVersion::PY310],
-        "DuplicateMatchClassAttribute"
-    )]
-    #[test_case(
-        Path::new("invalid_star_expression.py"),
-        &[PythonVersion::PY310],
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        Path::new("irrefutable_case_pattern.py"),
-        &[PythonVersion::PY310],
-        "IrrefutableCasePattern"
-    )]
-    #[test_case(
-        Path::new("single_starred_expression.py"),
-        &[PythonVersion::PY310],
-        "SingleStarredExpression"
-    )]
-    #[test_case(
-        Path::new("write_to_debug.py"),
-        &[PythonVersion::PY310, PythonVersion::PY312],
-        "WriteToDebug"
-    )]
-    #[test_case(
-        Path::new("invalid_expression.py"),
-        &[PythonVersion::PY312],
-        "InvalidExpression"
-    )]
-    #[test_case(
-        Path::new("global_parameter.py"),
-        &[PythonVersion::PY312],
-        "GlobalParameter"
-
-    )]
-    fn test_semantic_errors(
-        path: &Path,
-        python_versions: &[PythonVersion],
-        error_type: &str,
-    ) -> Result<()> {
+    #[test_case(Path::new("rebound_comprehension.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_type_parameter.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("multiple_case_assignment.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_match_key.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_match_class_attribute.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("invalid_star_expression.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("irrefutable_case_pattern.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("single_starred_expression.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("global_parameter.py"), PythonVersion::PY312)]
+    fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
         let contents = std::fs::read_to_string(&path)?;
         let source_kind = SourceKind::Python(contents);
-        for &python_version in python_versions {
-            let snapshot = format!("semantic_syntax_error_{error_type}_{python_version}");
-            let diagnostics = test_contents_syntax_errors(
-                &source_kind,
-                &path,
-                &LinterSettings {
-                    rules: settings::rule_table::RuleTable::empty(),
-                    unresolved_target_version: python_version.into(),
-                    preview: settings::types::PreviewMode::Enabled,
-                    ..Default::default()
-                },
-            );
-            insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-                assert_diagnostics!(format!("{snapshot}_{python_version}"), diagnostics);
-            });
-        }
+
+        let snapshot = format!(
+            "semantic_syntax_error_{}_{}",
+            path.display(),
+            python_version
+        );
+
+        let diagnostics = test_contents_syntax_errors(
+            &source_kind,
+            &path,
+            &LinterSettings {
+                rules: settings::rule_table::RuleTable::empty(),
+                unresolved_target_version: python_version.into(),
+                preview: settings::types::PreviewMode::Enabled,
+                ..Default::default()
+            },
+        );
+        assert_diagnostics!(format!("{snapshot}"), diagnostics);
 
         Ok(())
     }
