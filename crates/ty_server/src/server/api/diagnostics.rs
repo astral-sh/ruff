@@ -14,8 +14,8 @@ use ruff_db::system::SystemPathBuf;
 use ty_project::{Db, ProjectDatabase};
 
 use crate::document::{FileRangeExt, ToRangeExt};
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use crate::session::{DocumentHandle, DocumentSnapshot};
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{DocumentRef, PositionEncoding, Session};
 
@@ -115,18 +115,18 @@ impl LspDiagnostics {
     }
 }
 
-/// Clears the diagnostics for the document identified by `key`.
+/// Clears the diagnostics for the document identified by `uri`.
 ///
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(session: &Session, document: &DocumentHandle, client: &Client) {
+pub(super) fn clear_diagnostics(session: &Session, uri: &lsp_types::Url, client: &Client) {
     if session.client_capabilities().supports_pull_diagnostics() {
         return;
     }
 
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-        uri: document.url().clone(),
+        uri: uri.clone(),
         diagnostics: vec![],
         version: None,
     });

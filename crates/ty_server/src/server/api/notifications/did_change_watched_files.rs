@@ -1,3 +1,4 @@
+use crate::document::DocumentKey;
 use crate::server::Result;
 use crate::server::api::diagnostics::{publish_diagnostics, publish_settings_diagnostics};
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -25,7 +26,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
-            let path = AnySystemPath::from_url(&change.uri);
+            let key = DocumentKey::from_url(&change.uri);
+            let path = key.to_file_path();
 
             let system_path = match path {
                 AnySystemPath::System(system) => system,
