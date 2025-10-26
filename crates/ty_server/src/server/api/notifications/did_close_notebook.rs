@@ -27,7 +27,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
         } = params;
 
         let document = session
-            .document(&uri)
+            .document_handle(&uri)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         let path = document.to_file_path();
@@ -42,6 +42,8 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
         document
             .close(session)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+
+        // TODO: Clear diagnostics.
 
         Ok(())
     }

@@ -84,13 +84,6 @@ impl DocumentKey {
         }
     }
 
-    pub(crate) fn as_opaque(&self) -> Option<&str> {
-        match self {
-            Self::Opaque(uri) => Some(uri),
-            Self::File(_) => None,
-        }
-    }
-
     /// Returns the corresponding [`AnySystemPath`] for this document key.
     ///
     /// Note, calling this method on a `DocumentKey::Opaque` representing a cell document

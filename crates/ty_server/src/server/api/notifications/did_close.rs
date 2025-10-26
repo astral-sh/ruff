@@ -28,7 +28,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         } = params;
 
         let document = session
-            .document(&uri)
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
         let path = document.to_file_path();

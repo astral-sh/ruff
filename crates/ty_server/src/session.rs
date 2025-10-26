@@ -874,7 +874,10 @@ impl Session {
     /// # Errors
     ///
     /// If the document is not found.
-    pub(crate) fn document(&self, url: &lsp_types::Url) -> Result<DocumentHandle, DocumentError> {
+    pub(crate) fn document_handle(
+        &self,
+        url: &lsp_types::Url,
+    ) -> Result<DocumentHandle, DocumentError> {
         self.index().document_handle(url)
     }
 
@@ -1386,6 +1389,19 @@ impl DocumentHandle {
         document.apply_changes(content_changes, new_version, position_encoding);
 
         Ok(())
+    }
+
+    pub(crate) fn update_notebook_document(
+        &self,
+        session: &mut Session,
+        cells: Option<lsp_types::NotebookDocumentCellChange>,
+        metadata: Option<lsp_types::LSPObject>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        let mut index = session.index_mut();
+
+        index.update_notebook_document(&self.key, cells, metadata, new_version, position_encoding)
     }
 
     /// De-registers a document, specified by its key.
