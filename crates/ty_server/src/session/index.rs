@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 #[derive(Debug)]
 pub(crate) struct Index {
     /// Maps all document file paths to the associated document controller
-    documents: FxHashMap<AnySystemPath, DocumentController>,
+    documents: FxHashMap<AnySystemPath, Document>,
 
     /// Maps opaque cell URLs to a notebook path (document)
     notebook_cells: FxHashMap<SystemVirtualPathBuf, AnySystemPath>,
@@ -51,7 +51,7 @@ impl Index {
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
-        let controller = self.document_controller_for_key(path)?;
+        let controller = self.document_mut(path)?;
         let Some(document) = controller.as_text_mut() else {
             anyhow::bail!("Text document path does not point to a text document");
         };
@@ -113,7 +113,7 @@ impl Index {
             // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
         }
 
-        let controller = self.document_controller_for_key(path)?;
+        let controller = self.document_mut(path)?;
         let Some(notebook) = controller.as_notebook_mut() else {
             anyhow::bail!("Notebook document path does not point to a notebook document");
         };
@@ -128,9 +128,9 @@ impl Index {
     pub(crate) fn make_document_ref(
         &self,
         path: &AnySystemPath,
-    ) -> Result<DocumentQuery, DocumentQueryError> {
+    ) -> Result<DocumentRef, DocumentError> {
         let Some(controller) = self.documents.get(&path) else {
-            return Err(DocumentQueryError::NotFound(path.clone()));
+            return Err(DocumentError::NotFound(path.clone()));
         };
 
         if let Some(r#virtual) = path.as_virtual() {
@@ -145,7 +145,7 @@ impl Index {
 
     pub(super) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
         self.documents
-            .insert(path.clone(), DocumentController::new_text(document));
+            .insert(path.clone(), Document::new_text(document));
     }
 
     pub(super) fn open_notebook_document(
@@ -158,10 +158,8 @@ impl Index {
             self.notebook_cells
                 .insert(cell_path.to_path_buf(), notebook_path.clone());
         }
-        self.documents.insert(
-            notebook_path.clone(),
-            DocumentController::new_notebook(document),
-        );
+        self.documents
+            .insert(notebook_path.clone(), Document::new_notebook(document));
     }
 
     pub(super) fn close_document(&mut self, path: &AnySystemPath) -> crate::Result<()> {
@@ -180,12 +178,9 @@ impl Index {
         Ok(())
     }
 
-    fn document_controller_for_key(
-        &mut self,
-        path: &AnySystemPath,
-    ) -> crate::Result<&mut DocumentController> {
+    fn document_mut(&mut self, path: &AnySystemPath) -> Result<&mut Document, DocumentError> {
         let Some(controller) = self.documents.get_mut(&path) else {
-            anyhow::bail!("Document controller not available at `{path}`");
+            return Err(DocumentError::NotFound(path.clone()));
         };
         Ok(controller)
     }
@@ -193,12 +188,12 @@ impl Index {
 
 /// A mutable handler to an underlying document.
 #[derive(Debug)]
-enum DocumentController {
+enum Document {
     Text(Arc<TextDocument>),
     Notebook(Arc<NotebookDocument>),
 }
 
-impl DocumentController {
+impl Document {
     fn new_text(document: TextDocument) -> Self {
         Self::Text(Arc::new(document))
     }
@@ -211,14 +206,14 @@ impl DocumentController {
         &self,
         cell_path: Option<SystemVirtualPathBuf>,
         file_path: AnySystemPath,
-    ) -> DocumentQuery {
+    ) -> DocumentRef {
         match &self {
-            Self::Notebook(notebook) => DocumentQuery::Notebook {
+            Self::Notebook(notebook) => DocumentRef::Notebook {
                 cell_path,
                 file_path,
                 notebook: notebook.clone(),
             },
-            Self::Text(document) => DocumentQuery::Text {
+            Self::Text(document) => DocumentRef::Text {
                 file_path,
                 document: document.clone(),
             },
@@ -259,7 +254,7 @@ impl DocumentController {
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
 #[derive(Debug, Clone)]
-pub(crate) enum DocumentQuery {
+pub(crate) enum DocumentRef {
     Text {
         file_path: AnySystemPath,
         document: Arc<TextDocument>,
@@ -273,7 +268,7 @@ pub(crate) enum DocumentQuery {
     },
 }
 
-impl DocumentQuery {
+impl DocumentRef {
     /// Attempts to access the underlying notebook document that this query is selecting.
     pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {
@@ -330,7 +325,7 @@ impl DocumentQuery {
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
-pub(crate) enum DocumentQueryError {
+pub(crate) enum DocumentError {
     #[error("document not found for path: {0}")]
     NotFound(AnySystemPath),
 }

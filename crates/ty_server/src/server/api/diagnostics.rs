@@ -17,12 +17,12 @@ use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{DocumentQuery, PositionEncoding, Session};
+use crate::{DocumentRef, PositionEncoding, Session};
 
 pub(super) struct Diagnostics<'a> {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
     encoding: PositionEncoding,
-    document: &'a DocumentQuery,
+    document: &'a DocumentRef,
 }
 
 impl Diagnostics<'_> {
