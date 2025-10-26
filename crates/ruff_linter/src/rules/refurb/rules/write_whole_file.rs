@@ -47,6 +47,7 @@ use crate::{FixAvailability, Violation};
 pub(crate) struct WriteWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
+    is_path_open: bool,
 }
 
 impl Violation for WriteWholeFile {
@@ -56,7 +57,13 @@ impl Violation for WriteWholeFile {
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
-        format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+        if self.is_path_open {
+            format!(
+                "`Path.open()` followed by `write()` can be replaced by `Path({filename}).{suggestion}`"
+            )
+        } else {
+            format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+        }
     }
     fn fix_title(&self) -> Option<String> {
         Some(format!(
@@ -137,6 +144,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                                 &self.checker.generator().expr(open.filename),
                             ),
                             suggestion: SourceCodeSnippet::from_str(&suggestion),
+                            is_path_open: open.path_obj.is_some(),
                         },
                         open.item.range(),
                     );
@@ -217,7 +225,13 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = format!("{binding}({filename_code}).{suggestion}");
+    let target = if let Some(path_obj) = open.path_obj {
+        locator.slice(path_obj.range()).to_string()
+    } else {
+        format!("{binding}({filename_code})")
+    };
+
+    let replacement = format!("{target}.{suggestion}");
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
         Applicability::Unsafe
