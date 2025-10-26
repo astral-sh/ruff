@@ -36,7 +36,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         } = params;
 
         let document = session.open_text_document(
-            TextDocument::new(uri.clone(), text, version).with_language_id(&language_id),
+            TextDocument::new(uri, text, version).with_language_id(&language_id),
         );
 
         let path = document.file_path();
@@ -61,16 +61,16 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 } else {
                     ChangeEvent::Opened(system_path.clone())
                 };
-                session.apply_changes(&path, vec![event]);
+                session.apply_changes(path, vec![event]);
 
-                let db = session.project_db_mut(&path);
+                let db = session.project_db_mut(path);
                 match system_path_to_file(db, system_path) {
                     Ok(file) => db.project().open_file(db, file),
                     Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.project_db_mut(&path);
+                let db = session.project_db_mut(path);
                 let virtual_file = db.files().virtual_file(db, virtual_path);
                 db.project().open_file(db, virtual_file.file());
             }

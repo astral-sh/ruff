@@ -30,7 +30,7 @@ struct NotebookCell {
     /// > create these URIs. The URIs must be unique across ALL notebook
     /// > cells and can therefore be used to uniquely identify a notebook cell
     /// >  or the cell’s text document.
-    /// > https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#notebookDocument_synchronization
+    /// > <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#notebookDocument_synchronization>
     url: lsp_types::Url,
     kind: NotebookCellKind,
     document: TextDocument,
@@ -44,10 +44,7 @@ impl NotebookDocument {
         metadata: serde_json::Map<String, serde_json::Value>,
         cell_documents: Vec<lsp_types::TextDocumentItem>,
     ) -> crate::Result<Self> {
-        let mut cells: Vec<_> = cells
-            .into_iter()
-            .map(|cell| NotebookCell::empty(cell))
-            .collect();
+        let mut cells: Vec<_> = cells.into_iter().map(NotebookCell::empty).collect();
 
         let cell_index = Self::make_cell_index(&cells);
 
@@ -182,7 +179,7 @@ impl NotebookDocument {
                 // `cell_index` are updated before we start applying the changes to the cells.
                 if let Some(did_open) = structure.did_open {
                     for cell_text_document in did_open {
-                        if let Some(cell) = self.cell_by_uri_mut(&cell_text_document.uri.as_str()) {
+                        if let Some(cell) = self.cell_by_uri_mut(cell_text_document.uri.as_str()) {
                             cell.document = TextDocument::new(
                                 cell_text_document.uri,
                                 cell_text_document.text,
@@ -195,7 +192,7 @@ impl NotebookDocument {
 
             if let Some(cell_data) = data {
                 for cell in cell_data {
-                    if let Some(existing_cell) = self.cell_by_uri_mut(&cell.document.as_str()) {
+                    if let Some(existing_cell) = self.cell_by_uri_mut(cell.document.as_str()) {
                         existing_cell.kind = cell.kind;
                     }
                 }
@@ -203,8 +200,7 @@ impl NotebookDocument {
 
             if let Some(content_changes) = text_content {
                 for content_change in content_changes {
-                    if let Some(cell) = self.cell_by_uri_mut(&content_change.document.uri.as_str())
-                    {
+                    if let Some(cell) = self.cell_by_uri_mut(content_change.document.uri.as_str()) {
                         cell.document
                             .apply_changes(content_change.changes, version, encoding);
                     }

@@ -32,7 +32,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
 
         if let AnySystemPath::SystemVirtual(virtual_path) = document.file_path() {
             session.apply_changes(
-                &document.file_path(),
+                document.file_path(),
                 vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
             );
         }
