@@ -16,7 +16,7 @@ use ruff_notebook::{Notebook, NotebookError};
 use ty_ide::cached_vendored_path;
 use ty_python_semantic::Db;
 
-use crate::DocumentQuery;
+use crate::DocumentRef;
 use crate::session::index::Index;
 
 /// Returns a [`Url`] for the given [`File`].
@@ -143,20 +143,17 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: &AnySystemPath) -> Option<DocumentQuery> {
+    fn make_document_ref(&self, path: &AnySystemPath) -> Option<DocumentRef> {
         let index = self.index();
         index.make_document_ref(&path).ok()
     }
 
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentQuery> {
+    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentRef> {
         let any_path = AnySystemPath::System(path.to_path_buf());
         self.make_document_ref(&any_path)
     }
 
-    fn system_virtual_path_to_document_ref(
-        &self,
-        path: &SystemVirtualPath,
-    ) -> Option<DocumentQuery> {
+    fn system_virtual_path_to_document_ref(&self, path: &SystemVirtualPath) -> Option<DocumentRef> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
         self.make_document_ref(&any_path)
     }
@@ -189,7 +186,7 @@ impl System for LSPSystem {
         let document = self.system_path_to_document_ref(path);
 
         match document {
-            Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
+            Some(DocumentRef::Text { document, .. }) => Ok(document.contents().to_string()),
             _ => self.native_system.read_to_string(path),
         }
     }
@@ -198,10 +195,10 @@ impl System for LSPSystem {
         let document = self.system_path_to_document_ref(path);
 
         match document {
-            Some(DocumentQuery::Text { document, .. }) => {
+            Some(DocumentRef::Text { document, .. }) => {
                 Notebook::from_source_code(document.contents())
             }
-            Some(DocumentQuery::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
+            Some(DocumentRef::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
             None => self.native_system.read_to_notebook(path),
         }
     }
@@ -211,7 +208,7 @@ impl System for LSPSystem {
             .system_virtual_path_to_document_ref(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
-        if let DocumentQuery::Text { document, .. } = &document {
+        if let DocumentRef::Text { document, .. } = &document {
             Ok(document.contents().to_string())
         } else {
             Err(not_a_text_document(path))
@@ -227,8 +224,8 @@ impl System for LSPSystem {
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         match document {
-            DocumentQuery::Text { document, .. } => Notebook::from_source_code(document.contents()),
-            DocumentQuery::Notebook { notebook, .. } => Ok(notebook.make_ruff_notebook()),
+            DocumentRef::Text { document, .. } => Notebook::from_source_code(document.contents()),
+            DocumentRef::Notebook { notebook, .. } => Ok(notebook.make_ruff_notebook()),
         }
     }
 
@@ -305,7 +302,7 @@ fn virtual_path_not_found(path: impl Display) -> std::io::Error {
 }
 
 /// Helper function to get the [`FileRevision`] of the given document.
-fn document_revision(document: &DocumentQuery) -> FileRevision {
+fn document_revision(document: &DocumentRef) -> FileRevision {
     // The file revision is just an opaque number which doesn't have any significant meaning other
     // than that the file has changed if the revisions are different.
     #[expect(clippy::cast_sign_loss)]

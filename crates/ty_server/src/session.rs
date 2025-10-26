@@ -1,7 +1,7 @@
 //! Data model, state management, and configuration resolution.
 
 use anyhow::{Context, anyhow};
-use index::DocumentQueryError;
+use index::DocumentError;
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
@@ -26,7 +26,7 @@ use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
-pub(crate) use self::index::DocumentQuery;
+pub(crate) use self::index::DocumentRef;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
@@ -1001,7 +1001,7 @@ pub(crate) struct DocumentSnapshot {
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document_query_result: Result<DocumentQuery, DocumentQueryError>,
+    document_query_result: Result<DocumentRef, DocumentError>,
 }
 
 impl DocumentSnapshot {
@@ -1026,7 +1026,7 @@ impl DocumentSnapshot {
     }
 
     /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> Result<&DocumentQuery, &DocumentQueryError> {
+    pub(crate) fn document(&self) -> Result<&DocumentRef, &DocumentError> {
         self.document_query_result.as_ref()
     }
 
