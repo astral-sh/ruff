@@ -35,24 +35,23 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 },
         } = params;
 
-        let key = session.key_from_url(uri);
-        let path = key.to_path();
+        let document = session.open_text_document(
+            TextDocument::new(uri.clone(), text, version).with_language_id(&language_id),
+        );
 
-        let document =
-            TextDocument::new(key.url().clone(), text, version).with_language_id(&language_id);
-        session.open_text_document(&path, document);
+        let path = document.file_path();
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
         // `try_system` call will return `None` which doesn't mean that the file is new, it's just
         // that the server didn't need the file yet.
         let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
-            let db = session.project_db(&path);
+            let db = session.project_db(path);
             db.files()
                 .try_system(db, system_path)
                 .is_none_or(|file| !file.exists(db))
         });
 
-        match &*path {
+        match path {
             AnySystemPath::System(system_path) => {
                 let event = if is_maybe_new_system_file {
                     ChangeEvent::Created {
@@ -77,7 +76,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
             }
         }
 
-        publish_diagnostics(session, &key, client);
+        publish_diagnostics(session, document.url(), client);
 
         Ok(())
     }

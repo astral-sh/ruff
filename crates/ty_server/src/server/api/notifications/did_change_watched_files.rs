@@ -90,8 +90,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 |_, ()| {},
             );
         } else {
-            for key in session.text_document_keys() {
-                publish_diagnostics(session, &key, client);
+            for key in session.text_document_handles() {
+                publish_diagnostics(session, key.url(), client);
             }
         }
         // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)

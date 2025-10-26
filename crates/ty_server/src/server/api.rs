@@ -1,6 +1,5 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
-use crate::system::AnySystemPath;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::RequestId;
@@ -208,7 +207,7 @@ where
 
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.
-        let snapshot = AssertUnwindSafe(session.take_session_snapshot());
+        let snapshot = AssertUnwindSafe(session.snapshot_session());
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -253,11 +252,28 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params).into_owned();
-        let path = AnySystemPath::from_url(&url);
+        let url = R::document_url(&params);
 
-        let db = session.project_db(&path).clone();
-        let snapshot = session.take_document_snapshot(url);
+        let Ok(document) = session.snapshot_document(&url) else {
+            let reason = format!("Document {url} is not open in the session");
+            tracing::warn!(
+                "Ignoring request id={id} method={} because {reason}",
+                R::METHOD
+            );
+            return Box::new(|client| {
+                respond_silent_error(
+                    id,
+                    client,
+                    lsp_server::ResponseError {
+                        code: lsp_server::ErrorCode::InvalidParams as i32,
+                        message: reason,
+                        data: None,
+                    },
+                );
+            });
+        };
+
+        let db = session.project_db(document.file_path()).clone();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -276,7 +292,7 @@ where
             }
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
-                R::handle_request(&id, &db, snapshot, client, params);
+                R::handle_request(&id, &db, document, client, params);
             }) {
                 panic_response::<R>(&id, client, &error, retry);
             }
@@ -353,7 +369,15 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
-        let snapshot = session.take_document_snapshot((*url).clone());
+        let Ok(snapshot) = session.snapshot_document(&url) else {
+            let reason = format!("Document {url} is not open in the session");
+            tracing::warn!(
+                "Ignoring notification id={id} method={} because {reason}",
+                N::METHOD
+            );
+            return Box::new(|_| {});
+        };
+
         Box::new(move |client| {
             let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
 

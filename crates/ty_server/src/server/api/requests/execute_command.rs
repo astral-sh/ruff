@@ -52,7 +52,7 @@ fn debug_information(session: &Session) -> crate::Result<String> {
     writeln!(
         buffer,
         "Open text documents: {}",
-        session.text_document_keys().count()
+        session.text_document_handles().count()
     )?;
     writeln!(buffer)?;
 

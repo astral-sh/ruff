@@ -4,6 +4,9 @@ use std::fmt::Display;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
+use crate::DocumentRef;
+use crate::document::DocumentKey;
+use crate::session::index::Index;
 use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
@@ -15,9 +18,6 @@ use ruff_db::system::{
 use ruff_notebook::{Notebook, NotebookError};
 use ty_ide::cached_vendored_path;
 use ty_python_semantic::Db;
-
-use crate::DocumentRef;
-use crate::session::index::Index;
 
 /// Returns a [`Url`] for the given [`File`].
 pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
@@ -70,18 +70,11 @@ impl AnySystemPath {
         }
     }
 
+    #[expect(unused)]
     pub(crate) const fn as_virtual(&self) -> Option<&SystemVirtualPath> {
         match self {
             AnySystemPath::SystemVirtual(path) => Some(path.as_path()),
             AnySystemPath::System(_) => None,
-        }
-    }
-
-    /// Returns the extension of the path, if any.
-    pub(crate) fn extension(&self) -> Option<&str> {
-        match self {
-            AnySystemPath::System(system_path) => system_path.extension(),
-            AnySystemPath::SystemVirtual(virtual_path) => virtual_path.extension(),
         }
     }
 }
@@ -143,19 +136,19 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: &AnySystemPath) -> Option<DocumentRef> {
+    fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentRef> {
         let index = self.index();
-        index.make_document_ref(&path).ok()
+        index.make_document_ref(&DocumentKey::from(path)).ok()
     }
 
     fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentRef> {
         let any_path = AnySystemPath::System(path.to_path_buf());
-        self.make_document_ref(&any_path)
+        self.make_document_ref(any_path)
     }
 
     fn system_virtual_path_to_document_ref(&self, path: &SystemVirtualPath) -> Option<DocumentRef> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
-        self.make_document_ref(&any_path)
+        self.make_document_ref(any_path)
     }
 }
 
