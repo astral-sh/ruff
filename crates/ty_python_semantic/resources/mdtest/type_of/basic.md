@@ -145,10 +145,12 @@ _: type[A, B]
 ## As a base class
 
 ```py
+from ty_extensions import reveal_mro
+
 class Foo(type[int]): ...
 
 # TODO: should be `tuple[<class 'Foo'>, <class 'type'>, <class 'object'>]
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>)
 ```
 
 ## Display of generic `type[]` types

@@ -1319,6 +1319,8 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
+    /// `ty_extensions.reveal_mro`
+    RevealMro,
     /// `ty_extensions.range_constraint`
     RangeConstraint,
     /// `ty_extensions.negated_range_constraint`
@@ -1397,6 +1399,7 @@ impl KnownFunction {
             | Self::RevealProtocolInterface
             | Self::RangeConstraint
             | Self::NegatedRangeConstraint
+            | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
 
@@ -1619,6 +1622,80 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::RevealMro => {
+                let [Some(param_type)] = parameter_types else {
+                    return;
+                };
+                let mut good_argument = true;
+                let classes = match param_type {
+                    Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
+                    Type::GenericAlias(generic_alias) => vec![ClassType::Generic(*generic_alias)],
+                    Type::Union(union) => {
+                        let elements = union.elements(db);
+                        let mut classes = Vec::with_capacity(elements.len());
+                        for element in elements {
+                            match element {
+                                Type::ClassLiteral(class) => {
+                                    classes.push(ClassType::NonGeneric(*class));
+                                }
+                                Type::GenericAlias(generic_alias) => {
+                                    classes.push(ClassType::Generic(*generic_alias));
+                                }
+                                _ => {
+                                    good_argument = false;
+                                    break;
+                                }
+                            }
+                        }
+                        classes
+                    }
+                    _ => {
+                        good_argument = false;
+                        vec![]
+                    }
+                };
+                if !good_argument {
+                    let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    else {
+                        return;
+                    };
+                    let mut diagnostic =
+                        builder.into_diagnostic("Invalid argument to `reveal_mro`");
+                    diagnostic.set_primary_message(format_args!(
+                        "Can only pass a class object, generic alias or a union thereof"
+                    ));
+                    return;
+                }
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed MRO");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    let mut message = String::new();
+                    for (i, class) in classes.iter().enumerate() {
+                        message.push('(');
+                        for class in class.iter_mro(db) {
+                            message.push_str(&class.display(db).to_string());
+                            if class
+                                .into_class()
+                                .is_none_or(|base| !base.is_object(context.db()))
+                            {
+                                message.push_str(", ");
+                            }
+                        }
+                        if class.is_known(db, KnownClass::Object) {
+                            message.push(',');
+                        }
+                        message.push(')');
+                        if i < classes.len() - 1 {
+                            message.push_str(" | ");
+                        }
+                    }
+                    diag.annotate(Annotation::primary(span).message(message));
+                }
+            }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
                 let [Some(first_arg), Some(second_argument)] = parameter_types else {
                     return;
@@ -1822,6 +1899,7 @@ pub(crate) mod tests {
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RangeConstraint
                 | KnownFunction::NegatedRangeConstraint
+                | KnownFunction::RevealMro
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

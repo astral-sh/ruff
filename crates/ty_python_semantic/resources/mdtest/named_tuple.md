@@ -9,7 +9,7 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to, reveal_mro
 
 class Person(NamedTuple):
     id: int
@@ -25,8 +25,8 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(Person.__mro__)
+# revealed: (<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Person)
 
 static_assert(is_subtype_of(Person, tuple[int, str, int | None]))
 static_assert(is_subtype_of(Person, tuple[object, ...]))

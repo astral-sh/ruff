@@ -7644,22 +7644,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
-        /// Return the precise type ty should infer for the `__mro__` attribute
-        /// if `ty` is a class type or a union of class types.
-        fn class_mro_attribute<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-            ty.to_class_type(db)
-                .map(|class| {
-                    Type::tuple(TupleType::heterogeneous(
-                        db,
-                        class.iter_mro(db).map(Type::from),
-                    ))
-                })
-                .or_else(|| {
-                    ty.as_union()?
-                        .try_map(db, |element| class_mro_attribute(db, *element))
-                })
-        }
-
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
@@ -7677,15 +7661,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let attr_name = &attr.id;
-        let fallback_place = value_type.member(db, attr_name);
-
-        if attr_name == "__mro__"
-            && let Some(precise_mro_type) = class_mro_attribute(db, value_type)
-        {
-            return precise_mro_type;
-        }
-
+        let fallback_place = value_type.member(db, &attr.id);
         // Exclude non-definitely-bound places for purposes of reachability
         // analysis. We currently do not perform boundness analysis for implicit
         // instance attributes, so we exclude them here as well.
@@ -7701,81 +7677,87 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             fallback_place.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
-            LookupError::Undefined(_) => {
-                let report_unresolved_attribute = self.is_reachable(attribute);
+                LookupError::Undefined(_) => {
+                    let report_unresolved_attribute = self.is_reachable(attribute);
 
-                if report_unresolved_attribute {
-                    let bound_on_instance = match value_type {
-                        Type::ClassLiteral(class) => {
-                            !class.instance_member(db, None, attr_name).is_undefined()
-                        }
-                        Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                            match subclass_of.subclass_of() {
-                                SubclassOfInner::Class(class) => {
-                                    !class.instance_member(db, attr_name).is_undefined()
+                    if report_unresolved_attribute {
+                        let bound_on_instance = match value_type {
+                            Type::ClassLiteral(class) => {
+                                !class.instance_member(db, None, attr).is_undefined()
+                            }
+                            Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                                match subclass_of.subclass_of() {
+                                    SubclassOfInner::Class(class) => {
+                                        !class.instance_member(db, attr).is_undefined()
+                                    }
+                                    SubclassOfInner::Dynamic(_) => unreachable!(
+                                        "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
+                                    ),
                                 }
-                                SubclassOfInner::Dynamic(_) => unreachable!(
-                                    "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
-                                ),
+                            }
+                            _ => false,
+                        };
+
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                        {
+                            if bound_on_instance {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Attribute `{}` can only be accessed on instances, \
+                                        not on the class object `{}` itself.",
+                                        attr.id,
+                                        value_type.display(db)
+                                    ),
+                                );
+                            } else {
+                                let diagnostic = match value_type {
+                                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+                                        "Module `{}` has no member `{}`",
+                                        module.module(db).name(db),
+                                        &attr.id
+                                    )),
+                                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+                                        "Class `{}` has no attribute `{}`",
+                                        class.name(db),
+                                        &attr.id
+                                    )),
+                                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                                        "Class `{}` has no attribute `{}`",
+                                        alias.display(db),
+                                        &attr.id
+                                    )),
+                                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
+                                        "Function `{}` has no attribute `{}`",
+                                        function.name(db),
+                                        &attr.id
+                                    )),
+                                    _ => builder.into_diagnostic(format_args!(
+                                        "Object of type `{}` has no attribute `{}`",
+                                        value_type.display(db),
+                                        &attr.id
+                                    )),
+                                };
+                                hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
                             }
                         }
-                        _ => false,
-                    };
-
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
-                    {
-                        if bound_on_instance {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Attribute `{attr_name}` can only be accessed on instances, \
-                                    not on the class object `{}` itself.",
-                                    value_type.display(db)
-                                ),
-                            );
-                        } else {
-                            let diagnostic = match value_type {
-                                Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                                    "Module `{}` has no member `{attr_name}`",
-                                    module.module(db).name(db),
-                                )),
-                                Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
-                                    "Class `{}` has no attribute `{attr_name}`",
-                                    class.name(db),
-                                )),
-                                Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                                    "Class `{}` has no attribute `{attr_name}`",
-                                    alias.display(db),
-                                )),
-                                Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
-                                    "Function `{}` has no attribute `{attr_name}`",
-                                    function.name(db),
-                                )),
-                                _ => builder.into_diagnostic(format_args!(
-                                    "Object of type `{}` has no attribute `{attr_name}`",
-                                    value_type.display(db),
-                                )),
-                            };
-                            hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr_name);
-                        }
                     }
+
+                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, TypeQualifiers::empty())
                 }
+                LookupError::PossiblyUndefined(type_when_bound) => {
+                    report_possibly_missing_attribute(
+                        &self.context,
+                        attribute,
+                        &attr.id,
+                        value_type,
+                    );
 
-                TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, TypeQualifiers::empty())
-            }
-            LookupError::PossiblyUndefined(type_when_bound) => {
-                report_possibly_missing_attribute(
-                    &self.context,
-                    attribute,
-                    attr_name,
-                    value_type,
-                );
-
-                type_when_bound
-            }
-        })
-        .inner_type();
+                    type_when_bound
+                }
+            })
+            .inner_type();
 
         self.check_deprecated(attr, resolved_type);
 

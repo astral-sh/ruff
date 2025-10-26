@@ -31,7 +31,7 @@ use crate::{
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -3169,7 +3169,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
     mut diagnostic: LintDiagnosticGuard,
     value_type: &Type,
-    attr: &str,
+    attr: &Identifier,
 ) {
     // Currently we limit this analysis to attributes of stdlib modules,
     // as this covers the most important cases while not being too noisy
@@ -3203,6 +3203,6 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     add_inferred_python_version_hint_to_diagnostic(
         db,
         &mut diagnostic,
-        &format!("accessing `{attr}`"),
+        &format!("accessing `{}`", attr.id),
     );
 }
