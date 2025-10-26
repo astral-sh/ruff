@@ -199,6 +199,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::AccessAnnotationsFromClassDict) {
                 ruff::rules::access_annotations_from_class_dict_by_key(checker, subscript);
             }
+            if checker.is_rule_enabled(Rule::NestedAnnotatedType) {
+                ruff::rules::nested_annotated_type(checker, subscript);
+            }
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
