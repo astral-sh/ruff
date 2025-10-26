@@ -31,13 +31,6 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let path = document.to_file_path().into_owned();
-        let url = document.url().clone();
-
-        document
-            .close(session)
-            .with_failure_code(ErrorCode::InternalError)?;
-
         let db = session.project_db_mut(&path);
 
         match &path {

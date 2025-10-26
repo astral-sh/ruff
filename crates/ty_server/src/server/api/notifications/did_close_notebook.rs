@@ -36,12 +36,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .close(session)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        if let AnySystemPath::SystemVirtual(virtual_path) = &path {
-            session.apply_changes(
-                &path,
-                vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
-            );
-        }
+        // TODO: Clear diagnostics.
 
         Ok(())
     }

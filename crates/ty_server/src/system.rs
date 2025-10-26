@@ -165,7 +165,7 @@ impl System for LSPSystem {
 
         match document {
             Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
-            Some(Document::Notebook(notebook)) => Ok(notebook.make_ruff_notebook()),
+            Some(Document::Notebook(notebook)) => Ok(notebook.to_ruff_notebook(self.index())),
             None => self.native_system.read_to_notebook(path),
         }
     }
@@ -192,7 +192,7 @@ impl System for LSPSystem {
 
         match document {
             Document::Text(document) => Notebook::from_source_code(document.contents()),
-            Document::Notebook(notebook) => Ok(notebook.make_ruff_notebook()),
+            Document::Notebook(notebook) => Ok(notebook.to_ruff_notebook(self.index())),
         }
     }
 

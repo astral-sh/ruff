@@ -5,9 +5,11 @@ use lsp_types::notification::DidOpenNotebookDocument;
 use ruff_db::Db;
 use ty_project::watch::ChangeEvent;
 
+use crate::TextDocument;
 use crate::document::NotebookDocument;
 use crate::server::Result;
 use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -22,7 +24,7 @@ impl NotificationHandler for DidOpenNotebookHandler {
 impl SyncNotificationHandler for DidOpenNotebookHandler {
     fn run(
         session: &mut Session,
-        _client: &Client,
+        client: &Client,
         params: DidOpenNotebookDocumentParams,
     ) -> Result<()> {
         let lsp_types::NotebookDocument {
@@ -38,12 +40,18 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             version,
             cells,
             metadata.unwrap_or_default(),
-            params.cell_text_documents,
         )
         .with_failure_code(ErrorCode::InternalError)?;
 
         let document = session.open_notebook_document(notebook);
         let path = document.to_file_path();
+
+        for cell in params.cell_text_documents {
+            let cell_document = TextDocument::new(cell.uri, cell.text, cell.version)
+                .with_language_id(&cell.language_id)
+                .with_notebook(path.clone().into_owned());
+            session.open_text_document(cell_document);
+        }
 
         match &*path {
             AnySystemPath::System(system_path) => {
@@ -55,7 +63,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             }
         }
 
-        // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics
+        publish_diagnostics(session, document.url(), client);
 
         Ok(())
     }
