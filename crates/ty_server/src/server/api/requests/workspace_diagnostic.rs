@@ -364,10 +364,11 @@ impl<'a> ResponseWriter<'a> {
         };
 
         let key = self.index.key_from_url(url.clone());
+        let path = key.to_path();
 
         let version = self
             .index
-            .make_document_ref(key)
+            .make_document_ref(&path)
             .ok()
             .map(|doc| i64::from(doc.version()));
 
@@ -443,9 +444,10 @@ impl<'a> ResponseWriter<'a> {
         for (previous_url, previous_result_id) in self.previous_result_ids.into_values() {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let key = self.index.key_from_url(previous_url.clone());
+            let path = key.to_path();
             let version = self
                 .index
-                .make_document_ref(key)
+                .make_document_ref(&path)
                 .ok()
                 .map(|doc| i64::from(doc.version()));
 

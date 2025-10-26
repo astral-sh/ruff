@@ -29,9 +29,10 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
         } = params;
 
         let key = session.key_from_url(uri);
+        let path = key.to_path();
 
         session
-            .update_text_document(&key, content_changes, version)
+            .update_text_document(&path, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
         let path = key.to_path();

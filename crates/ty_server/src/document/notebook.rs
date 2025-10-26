@@ -1,9 +1,9 @@
+use crate::{PositionEncoding, TextDocument};
 use anyhow::Ok;
 use lsp_types::NotebookCellKind;
+use ruff_db::system::{SystemVirtualPath, SystemVirtualPathBuf};
 use ruff_notebook::CellMetadata;
 use rustc_hash::{FxBuildHasher, FxHashMap};
-
-use crate::{PositionEncoding, TextDocument};
 
 use super::DocumentVersion;
 
@@ -17,7 +17,7 @@ pub struct NotebookDocument {
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
     // Used to quickly find the index of a cell for a given URL.
-    cell_index: FxHashMap<lsp_types::Url, CellId>,
+    cell_index: FxHashMap<SystemVirtualPathBuf, CellId>,
 }
 
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
@@ -51,12 +51,15 @@ impl NotebookDocument {
         let cell_index = Self::make_cell_index(&cells);
 
         for cell_document in cell_documents {
-            let index = cell_index.get(&cell_document.uri).copied().ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Received content for cell `{}` that isn't present in the metadata",
-                    cell_document.uri
-                )
-            })?;
+            let index = cell_index
+                .get(SystemVirtualPath::new(cell_document.uri.as_str()))
+                .copied()
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Received content for cell `{}` that isn't present in the metadata",
+                        cell_document.uri
+                    )
+                })?;
 
             cells[index].document =
                 TextDocument::new(cell_document.uri, cell_document.text, cell_document.version)
@@ -142,7 +145,8 @@ impl NotebookDocument {
                 // First, delete the cells and remove them from the index.
                 if delete > 0 {
                     for cell in self.cells.drain(start..start + delete) {
-                        self.cell_index.remove(&cell.url);
+                        self.cell_index
+                            .remove(SystemVirtualPath::new(cell.url.as_str()));
                         deleted_cells.insert(cell.url, cell.document);
                     }
                 }
@@ -165,7 +169,10 @@ impl NotebookDocument {
                 // Third, register the new cells in the index and update existing ones that came
                 // after the insertion.
                 for (index, cell) in self.cells.iter().enumerate().skip(start) {
-                    self.cell_index.insert(cell.url.clone(), index);
+                    self.cell_index.insert(
+                        SystemVirtualPath::new(cell.url.as_str()).to_path_buf(),
+                        index,
+                    );
                 }
 
                 // Finally, update the text document that represents the cell with the actual
@@ -173,7 +180,9 @@ impl NotebookDocument {
                 // `cell_index` are updated before we start applying the changes to the cells.
                 if let Some(did_open) = structure.did_open {
                     for cell_text_document in did_open {
-                        if let Some(cell) = self.cell_by_uri_mut(&cell_text_document.uri) {
+                        if let Some(cell) = self.cell_by_uri_mut(&SystemVirtualPath::new(
+                            cell_text_document.uri.as_str(),
+                        )) {
                             cell.document = TextDocument::new(
                                 cell_text_document.uri,
                                 cell_text_document.text,
@@ -186,7 +195,9 @@ impl NotebookDocument {
 
             if let Some(cell_data) = data {
                 for cell in cell_data {
-                    if let Some(existing_cell) = self.cell_by_uri_mut(&cell.document) {
+                    if let Some(existing_cell) =
+                        self.cell_by_uri_mut(&SystemVirtualPath::new(cell.document.as_str()))
+                    {
                         existing_cell.kind = cell.kind;
                     }
                 }
@@ -194,7 +205,9 @@ impl NotebookDocument {
 
             if let Some(content_changes) = text_content {
                 for content_change in content_changes {
-                    if let Some(cell) = self.cell_by_uri_mut(&content_change.document.uri) {
+                    if let Some(cell) = self.cell_by_uri_mut(&SystemVirtualPath::new(
+                        content_change.document.uri.as_str(),
+                    )) {
                         cell.document
                             .apply_changes(content_change.changes, version, encoding);
                     }
@@ -220,7 +233,7 @@ impl NotebookDocument {
     }
 
     /// Get the text document representing the contents of a cell by the cell URI.
-    pub(crate) fn cell_document_by_uri(&self, uri: &lsp_types::Url) -> Option<&TextDocument> {
+    pub(crate) fn cell_document_by_uri(&self, uri: &SystemVirtualPathBuf) -> Option<&TextDocument> {
         self.cells
             .get(*self.cell_index.get(uri)?)
             .map(|cell| &cell.document)
@@ -231,14 +244,14 @@ impl NotebookDocument {
         self.cells.iter().map(|cell| &cell.url)
     }
 
-    fn cell_by_uri_mut(&mut self, uri: &lsp_types::Url) -> Option<&mut NotebookCell> {
+    fn cell_by_uri_mut(&mut self, uri: &SystemVirtualPath) -> Option<&mut NotebookCell> {
         self.cells.get_mut(*self.cell_index.get(uri)?)
     }
 
-    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, CellId> {
+    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<SystemVirtualPathBuf, CellId> {
         let mut index = FxHashMap::with_capacity_and_hasher(cells.len(), FxBuildHasher);
         for (i, cell) in cells.iter().enumerate() {
-            index.insert(cell.url.clone(), i);
+            index.insert(SystemVirtualPath::new(cell.url.as_str()).to_path_buf(), i);
         }
         index
     }
