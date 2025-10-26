@@ -273,7 +273,8 @@ where
             });
         };
 
-        let db = session.project_db(document.file_path()).clone();
+        let path = document.to_file_path();
+        let db = session.project_db(&path).clone();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();

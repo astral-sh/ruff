@@ -4,9 +4,8 @@ use std::fmt::Display;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use crate::DocumentRef;
 use crate::document::DocumentKey;
-use crate::session::index::Index;
+use crate::session::index::{Document, Index};
 use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
@@ -113,17 +112,17 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentRef> {
+    fn make_document_ref(&self, path: AnySystemPath) -> Option<&Document> {
         let index = self.index();
-        index.make_document_ref(&DocumentKey::from(path)).ok()
+        index.document(&DocumentKey::from(path)).ok()
     }
 
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentRef> {
+    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
         self.make_document_ref(any_path)
     }
 
-    fn system_virtual_path_to_document_ref(&self, path: &SystemVirtualPath) -> Option<DocumentRef> {
+    fn system_virtual_path_to_document_ref(&self, path: &SystemVirtualPath) -> Option<&Document> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
         self.make_document_ref(any_path)
     }
@@ -135,7 +134,7 @@ impl System for LSPSystem {
 
         if let Some(document) = document {
             Ok(Metadata::new(
-                document_revision(&document),
+                document_revision(document),
                 None,
                 FileType::File,
             ))
@@ -156,7 +155,7 @@ impl System for LSPSystem {
         let document = self.system_path_to_document_ref(path);
 
         match document {
-            Some(DocumentRef::Text { document, .. }) => Ok(document.contents().to_string()),
+            Some(Document::Text(document)) => Ok(document.contents().to_string()),
             _ => self.native_system.read_to_string(path),
         }
     }
@@ -165,10 +164,8 @@ impl System for LSPSystem {
         let document = self.system_path_to_document_ref(path);
 
         match document {
-            Some(DocumentRef::Text { document, .. }) => {
-                Notebook::from_source_code(document.contents())
-            }
-            Some(DocumentRef::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
+            Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
+            Some(Document::Notebook(notebook)) => Ok(notebook.make_ruff_notebook()),
             None => self.native_system.read_to_notebook(path),
         }
     }
@@ -178,7 +175,7 @@ impl System for LSPSystem {
             .system_virtual_path_to_document_ref(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
-        if let DocumentRef::Text { document, .. } = &document {
+        if let Document::Text(document) = &document {
             Ok(document.contents().to_string())
         } else {
             Err(not_a_text_document(path))
@@ -194,8 +191,8 @@ impl System for LSPSystem {
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         match document {
-            DocumentRef::Text { document, .. } => Notebook::from_source_code(document.contents()),
-            DocumentRef::Notebook { notebook, .. } => Ok(notebook.make_ruff_notebook()),
+            Document::Text(document) => Notebook::from_source_code(document.contents()),
+            Document::Notebook(notebook) => Ok(notebook.make_ruff_notebook()),
         }
     }
 
@@ -272,7 +269,7 @@ fn virtual_path_not_found(path: impl Display) -> std::io::Error {
 }
 
 /// Helper function to get the [`FileRevision`] of the given document.
-fn document_revision(document: &DocumentRef) -> FileRevision {
+fn document_revision(document: &Document) -> FileRevision {
     // The file revision is just an opaque number which doesn't have any significant meaning other
     // than that the file has changed if the revisions are different.
     #[expect(clippy::cast_sign_loss)]

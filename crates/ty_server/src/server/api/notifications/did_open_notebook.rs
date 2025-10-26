@@ -42,14 +42,14 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         .with_failure_code(ErrorCode::InternalError)?;
 
         let document = session.open_notebook_document(notebook);
-        let path = document.file_path();
+        let path = document.to_file_path();
 
-        match path {
+        match &*path {
             AnySystemPath::System(system_path) => {
-                session.apply_changes(path, vec![ChangeEvent::Opened(system_path.clone())]);
+                session.apply_changes(&path, vec![ChangeEvent::Opened(system_path.clone())]);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.project_db_mut(path);
+                let db = session.project_db_mut(&path);
                 db.files().virtual_file(db, virtual_path);
             }
         }

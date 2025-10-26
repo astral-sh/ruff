@@ -17,12 +17,12 @@ use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{DocumentRef, PositionEncoding, Session};
+use crate::{NotebookDocument, PositionEncoding, Session};
 
 pub(super) struct Diagnostics<'a> {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
     encoding: PositionEncoding,
-    document: &'a DocumentRef,
+    notebook: Option<&'a NotebookDocument>,
 }
 
 impl Diagnostics<'_> {
@@ -53,7 +53,7 @@ impl Diagnostics<'_> {
     }
 
     pub(super) fn to_lsp_diagnostics(&self, db: &ProjectDatabase) -> LspDiagnostics {
-        if let Some(notebook) = self.document.as_notebook() {
+        if let Some(notebook) = self.notebook {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
             // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
@@ -151,7 +151,7 @@ pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, clien
         }
     };
 
-    let db = session.project_db(snapshot.file_path());
+    let db = session.project_db(&snapshot.to_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return;
@@ -253,8 +253,11 @@ pub(super) fn compute_diagnostics<'a>(
     db: &ProjectDatabase,
     snapshot: &'a DocumentSnapshot,
 ) -> Option<Diagnostics<'a>> {
-    let Some(file) = snapshot.file(db) else {
-        tracing::info!("No file found for snapshot for `{}`", snapshot.file_path());
+    let Some(file) = snapshot.to_file(db) else {
+        tracing::info!(
+            "No file found for snapshot for `{}`",
+            snapshot.to_file_path()
+        );
         return None;
     };
 
@@ -263,7 +266,7 @@ pub(super) fn compute_diagnostics<'a>(
     Some(Diagnostics {
         items: diagnostics,
         encoding: snapshot.encoding(),
-        document: snapshot.document(),
+        notebook: snapshot.notebook(),
     })
 }
 

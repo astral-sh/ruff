@@ -7,9 +7,7 @@ use crate::{
     document::{DocumentVersion, NotebookDocument},
     system::AnySystemPath,
 };
-use lsp_types::Url;
-use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
+
 use ruff_db::system::SystemVirtualPath;
 use rustc_hash::FxHashMap;
 
@@ -20,7 +18,7 @@ pub(crate) struct Index {
     documents: FxHashMap<DocumentKey, Document>,
 
     /// Maps opaque cell URLs to a notebook path (document)
-    notebook_cells: FxHashMap<String, DocumentKey>,
+    notebook_cells: FxHashMap<String, AnySystemPath>,
 }
 
 impl Index {
@@ -31,33 +29,40 @@ impl Index {
         }
     }
 
-    pub(super) fn text_documents(&self) -> impl Iterator<Item = (&DocumentKey, &Url)> + '_ {
+    pub(super) fn text_documents(
+        &self,
+    ) -> impl Iterator<Item = (&DocumentKey, &TextDocument)> + '_ {
         self.documents.iter().filter_map(|(key, doc)| {
             let text_document = doc.as_text()?;
-            Some((key, text_document.url()))
+            Some((key, text_document))
         })
     }
 
-    pub(super) fn document(&self, url: &lsp_types::Url) -> Result<DocumentHandle, DocumentError> {
+    pub(crate) fn document_handle(
+        &self,
+        url: &lsp_types::Url,
+    ) -> Result<DocumentHandle, DocumentError> {
         let key = DocumentKey::from_url(url);
-        if !self.documents.contains_key(&key) {
+        let Some(document) = self.documents.get(&key) else {
             return Err(DocumentError::NotFound(key));
-        }
+        };
 
         if let Some(path) = key.as_opaque() {
             if let Some(notebook_path) = self.notebook_cells.get(path) {
                 return Ok(DocumentHandle {
                     key: key.clone(),
-                    file_path: notebook_path.to_file_path(),
+                    notebook_path: Some(notebook_path.clone()),
                     url: url.clone(),
+                    version: document.version(),
                 });
             }
         }
 
         Ok(DocumentHandle {
             key: key.clone(),
-            file_path: key.to_file_path(),
+            notebook_path: None,
             url: url.clone(),
+            version: document.version(),
         })
     }
 
@@ -87,7 +92,7 @@ impl Index {
             for opened_cell in did_open {
                 let cell_path = SystemVirtualPath::new(opened_cell.uri.as_str());
                 self.notebook_cells
-                    .insert(cell_path.to_string(), notebook_key.clone());
+                    .insert(cell_path.to_string(), notebook_key.to_file_path());
             }
             // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
         }
@@ -104,21 +109,27 @@ impl Index {
     /// Create a document reference corresponding to the given document key.
     ///
     /// Returns an error if the document is not found or if the path cannot be converted to a URL.
-    pub(crate) fn make_document_ref(
-        &self,
-        key: &DocumentKey,
-    ) -> Result<DocumentRef, DocumentError> {
-        let Some(controller) = self.documents.get(key) else {
+    pub(crate) fn document(&self, key: &DocumentKey) -> Result<&Document, DocumentError> {
+        let Some(document) = self.documents.get(key) else {
             return Err(DocumentError::NotFound(key.clone()));
         };
 
-        if let Some(uri) = key.as_opaque() {
-            if let Some(notebook_path) = self.notebook_cells.get(uri) {
-                return Ok(controller.make_ref(Some(uri.to_string()), notebook_path.to_file_path()));
-            }
-        }
+        Ok(document)
+    }
 
-        Ok(controller.make_ref(None, key.to_file_path()))
+    pub(crate) fn notebook_arc(
+        &self,
+        key: &DocumentKey,
+    ) -> Result<Arc<NotebookDocument>, DocumentError> {
+        let Some(document) = self.documents.get(key) else {
+            return Err(DocumentError::NotFound(key.clone()));
+        };
+
+        if let Document::Notebook(notebook) = document {
+            Ok(notebook.clone())
+        } else {
+            Err(DocumentError::NotFound(key.clone()))
+        }
     }
 
     pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
@@ -127,8 +138,9 @@ impl Index {
         // TODO: Fix file path for notebook cells
         let handle = DocumentHandle {
             key: key.clone(),
-            file_path: key.to_file_path(),
+            notebook_path: None,
             url: document.url().clone(),
+            version: document.version(),
         };
 
         self.documents.insert(key, Document::new_text(document));
@@ -139,19 +151,21 @@ impl Index {
     pub(super) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
         let notebook_key = DocumentKey::from_url(document.url());
         let url = document.url().clone();
+        let version = document.version();
 
         for cell_url in document.cell_urls() {
             self.notebook_cells
-                .insert(cell_url.to_string(), notebook_key.clone());
+                .insert(cell_url.to_string(), notebook_key.to_file_path());
         }
 
         self.documents
             .insert(notebook_key.clone(), Document::new_notebook(document));
 
         DocumentHandle {
-            file_path: notebook_key.to_file_path(),
+            notebook_path: Some(notebook_key.to_file_path()),
             key: notebook_key,
             url,
+            version,
         }
     }
 
@@ -199,17 +213,10 @@ impl Document {
         Self::Notebook(Arc::new(document))
     }
 
-    fn make_ref(&self, cell_path: Option<String>, file_path: AnySystemPath) -> DocumentRef {
-        match &self {
-            Self::Notebook(notebook) => DocumentRef::Notebook {
-                cell_path,
-                file_path,
-                notebook: notebook.clone(),
-            },
-            Self::Text(document) => DocumentRef::Text {
-                file_path,
-                document: document.clone(),
-            },
+    pub(crate) fn version(&self) -> DocumentVersion {
+        match self {
+            Self::Text(document) => document.version(),
+            Self::Notebook(notebook) => notebook.version(),
         }
     }
 
@@ -239,82 +246,6 @@ impl Document {
             Self::Text(document) => Arc::make_mut(document),
             Self::Notebook(_) => return None,
         })
-    }
-}
-
-/// A read-only query to an open document.
-///
-/// This query can 'select' a text document, full notebook, or a specific notebook cell.
-/// It also includes document settings.
-#[derive(Debug, Clone)]
-pub(crate) enum DocumentRef {
-    Text {
-        file_path: AnySystemPath,
-        document: Arc<TextDocument>,
-    },
-    // TODO: Should notebook and notebook cell be separate variants?
-    Notebook {
-        /// The selected notebook cell, if it exists.
-        cell_path: Option<String>,
-        /// The path to the notebook.
-        file_path: AnySystemPath,
-        notebook: Arc<NotebookDocument>,
-    },
-}
-
-impl DocumentRef {
-    /// Attempts to access the underlying notebook document that this query is selecting.
-    pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
-        match self {
-            Self::Notebook { notebook, .. } => Some(notebook),
-            Self::Text { .. } => None,
-        }
-    }
-
-    /// Get the version of document selected by this query.
-    pub(crate) fn version(&self) -> DocumentVersion {
-        match self {
-            Self::Text { document, .. } => document.version(),
-            Self::Notebook { notebook, .. } => notebook.version(),
-        }
-    }
-
-    /// Get the system path for the document selected by this query.
-    pub(crate) fn file_path(&self) -> &AnySystemPath {
-        match self {
-            Self::Text { file_path, .. } | Self::Notebook { file_path, .. } => file_path,
-        }
-    }
-
-    /// Attempt to access the single inner text document selected by the query.
-    /// If this query is selecting an entire notebook document, this will return `None`.
-    #[expect(dead_code)]
-    pub(crate) fn as_single_document(&self) -> Option<&TextDocument> {
-        match self {
-            Self::Text { document, .. } => Some(document),
-            Self::Notebook {
-                notebook,
-                cell_path: cell_uri,
-                ..
-            } => cell_uri
-                .as_ref()
-                .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),
-        }
-    }
-
-    /// Returns the salsa interned [`File`] for the document selected by this query.
-    ///
-    /// It returns [`None`] for the following cases:
-    /// - For virtual file, if it's not yet opened
-    /// - For regular file, if it does not exists or is a directory
-    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        match self.file_path() {
-            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
-            AnySystemPath::SystemVirtual(virtual_path) => db
-                .files()
-                .try_virtual_file(virtual_path)
-                .map(|virtual_file| virtual_file.file()),
-        }
     }
 }
 
