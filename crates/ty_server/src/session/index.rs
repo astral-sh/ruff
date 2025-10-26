@@ -1,24 +1,26 @@
 use std::sync::Arc;
 
+use crate::document::DocumentKey;
+use crate::session::DocumentHandle;
 use crate::{
     PositionEncoding, TextDocument,
-    document::{DocumentKey, DocumentVersion, NotebookDocument},
+    document::{DocumentVersion, NotebookDocument},
     system::AnySystemPath,
 };
 use lsp_types::Url;
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
-use ruff_db::system::{SystemVirtualPath, SystemVirtualPathBuf};
+use ruff_db::system::SystemVirtualPath;
 use rustc_hash::FxHashMap;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Debug)]
 pub(crate) struct Index {
     /// Maps all document file paths to the associated document controller
-    documents: FxHashMap<AnySystemPath, Document>,
+    pub(super) documents: FxHashMap<DocumentKey, Document>,
 
     /// Maps opaque cell URLs to a notebook path (document)
-    notebook_cells: FxHashMap<SystemVirtualPathBuf, AnySystemPath>,
+    notebook_cells: FxHashMap<String, DocumentKey>,
 }
 
 impl Index {
@@ -29,71 +31,48 @@ impl Index {
         }
     }
 
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
-        self.documents.values().filter_map(|doc| {
+    pub(super) fn text_documents(&self) -> impl Iterator<Item = (&DocumentKey, &Url)> + '_ {
+        self.documents.iter().filter_map(|(key, doc)| {
             let text_document = doc.as_text()?;
-            Some(text_document.url())
+            Some((key, text_document.url()))
+        })
+    }
+
+    pub(super) fn document(&self, url: &lsp_types::Url) -> Result<DocumentHandle, DocumentError> {
+        let key = DocumentKey::from_url(url);
+        if !self.documents.contains_key(&key) {
+            return Err(DocumentError::NotFound(key));
+        }
+
+        if let Some(path) = key.as_opaque() {
+            if let Some(notebook_path) = self.notebook_cells.get(path) {
+                return Ok(DocumentHandle {
+                    key: key.clone(),
+                    file_path: notebook_path.to_file_path(),
+                    url: url.clone(),
+                });
+            }
+        }
+
+        Ok(DocumentHandle {
+            key: key.clone(),
+            file_path: key.to_file_path(),
+            url: url.clone(),
         })
     }
 
     #[expect(dead_code)]
-    pub(super) fn notebook_document_paths(&self) -> impl Iterator<Item = &AnySystemPath> + '_ {
+    pub(super) fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
-            .map(|(path, _)| path)
-    }
-
-    pub(super) fn update_text_document(
-        &mut self,
-        path: &AnySystemPath,
-        content_changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
-        new_version: DocumentVersion,
-        encoding: PositionEncoding,
-    ) -> crate::Result<()> {
-        let controller = self.document_mut(path)?;
-        let Some(document) = controller.as_text_mut() else {
-            anyhow::bail!("Text document path does not point to a text document");
-        };
-
-        if content_changes.is_empty() {
-            document.update_version(new_version);
-            return Ok(());
-        }
-
-        document.apply_changes(content_changes, new_version, encoding);
-
-        Ok(())
-    }
-
-    /// Returns the [`DocumentKey`] corresponding to the given URL.
-    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
-        let path = AnySystemPath::from_url(&url);
-
-        if let Some(notebook_path) = path
-            .as_virtual()
-            .and_then(|path| self.notebook_cells.get(&path.to_path_buf()))
-        {
-            DocumentKey::NotebookCell {
-                cell_url: url,
-                notebook_path: notebook_path.clone(),
-            }
-        } else {
-            if path
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
-            {
-                DocumentKey::Notebook { url }
-            } else {
-                DocumentKey::Text { url }
-            }
-        }
+            .map(|(key, _)| key)
     }
 
     #[expect(dead_code)]
     pub(super) fn update_notebook_document(
         &mut self,
-        path: &AnySystemPath,
+        notebook_key: &DocumentKey,
         cells: Option<lsp_types::NotebookDocumentCellChange>,
         metadata: Option<serde_json::Map<String, serde_json::Value>>,
         new_version: DocumentVersion,
@@ -108,13 +87,13 @@ impl Index {
             for opened_cell in did_open {
                 let cell_path = SystemVirtualPath::new(opened_cell.uri.as_str());
                 self.notebook_cells
-                    .insert(cell_path.to_path_buf(), path.clone());
+                    .insert(cell_path.to_string(), notebook_key.clone());
             }
             // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
         }
 
-        let controller = self.document_mut(path)?;
-        let Some(notebook) = controller.as_notebook_mut() else {
+        let document = self.document_mut(notebook_key)?;
+        let Some(notebook) = document.as_notebook_mut() else {
             anyhow::bail!("Notebook document path does not point to a notebook document");
         };
 
@@ -127,60 +106,78 @@ impl Index {
     /// Returns an error if the document is not found or if the path cannot be converted to a URL.
     pub(crate) fn make_document_ref(
         &self,
-        path: &AnySystemPath,
+        key: &DocumentKey,
     ) -> Result<DocumentRef, DocumentError> {
-        let Some(controller) = self.documents.get(&path) else {
-            return Err(DocumentError::NotFound(path.clone()));
+        let Some(controller) = self.documents.get(key) else {
+            return Err(DocumentError::NotFound(key.clone()));
         };
 
-        if let Some(r#virtual) = path.as_virtual() {
-            let cell_path = r#virtual.to_path_buf();
-            if let Some(notebook_path) = self.notebook_cells.get(&cell_path) {
-                return Ok(controller.make_ref(Some(cell_path), notebook_path.clone()));
+        if let Some(uri) = key.as_opaque() {
+            if let Some(notebook_path) = self.notebook_cells.get(uri) {
+                return Ok(controller.make_ref(Some(uri.to_string()), notebook_path.to_file_path()));
             }
         }
 
-        Ok(controller.make_ref(None, path.clone()))
+        Ok(controller.make_ref(None, key.to_file_path()))
     }
 
-    pub(super) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
-        self.documents
-            .insert(path.clone(), Document::new_text(document));
+    pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+        let key = DocumentKey::from_url(document.url());
+
+        // TODO: Fix file path for notebook cells
+        let handle = DocumentHandle {
+            key: key.clone(),
+            file_path: key.to_file_path().clone(),
+            url: document.url().clone(),
+        };
+
+        self.documents.insert(key, Document::new_text(document));
+
+        handle
     }
 
-    pub(super) fn open_notebook_document(
-        &mut self,
-        notebook_path: &AnySystemPath,
-        document: NotebookDocument,
-    ) {
+    pub(super) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+        let notebook_key = DocumentKey::from_url(document.url());
+        let url = document.url().clone();
+
         for cell_url in document.cell_urls() {
-            let cell_path = SystemVirtualPath::new(cell_url.as_str());
             self.notebook_cells
-                .insert(cell_path.to_path_buf(), notebook_path.clone());
+                .insert(cell_url.to_string(), notebook_key.clone());
         }
+
         self.documents
-            .insert(notebook_path.clone(), Document::new_notebook(document));
+            .insert(notebook_key.clone(), Document::new_notebook(document));
+
+        DocumentHandle {
+            file_path: notebook_key.to_file_path(),
+            key: notebook_key,
+            url,
+        }
     }
 
-    pub(super) fn close_document(&mut self, path: &AnySystemPath) -> crate::Result<()> {
+    pub(super) fn close_document(&mut self, path: &DocumentKey) -> crate::Result<()> {
         // Notebook cells URIs are removed from the index here, instead of during
         // `update_notebook_document`. This is because a notebook cell, as a text document,
         // is requested to be `closed` by VS Code after the notebook gets updated.
         // This is not documented in the LSP specification explicitly, and this assumption
         // may need revisiting in the future as we support more editors with notebook support.
-        if let AnySystemPath::SystemVirtual(r#virtual) = path {
-            self.notebook_cells.remove(r#virtual);
+        if let DocumentKey::Opaque(uri) = path {
+            self.notebook_cells.remove(uri);
         }
 
         let Some(_) = self.documents.remove(&path) else {
             anyhow::bail!("tried to close document that didn't exist at {path}")
         };
+
         Ok(())
     }
 
-    fn document_mut(&mut self, path: &AnySystemPath) -> Result<&mut Document, DocumentError> {
-        let Some(controller) = self.documents.get_mut(&path) else {
-            return Err(DocumentError::NotFound(path.clone()));
+    pub(super) fn document_mut(
+        &mut self,
+        key: &DocumentKey,
+    ) -> Result<&mut Document, DocumentError> {
+        let Some(controller) = self.documents.get_mut(key) else {
+            return Err(DocumentError::NotFound(key.clone()));
         };
         Ok(controller)
     }
@@ -188,25 +185,21 @@ impl Index {
 
 /// A mutable handler to an underlying document.
 #[derive(Debug)]
-enum Document {
+pub(crate) enum Document {
     Text(Arc<TextDocument>),
     Notebook(Arc<NotebookDocument>),
 }
 
 impl Document {
-    fn new_text(document: TextDocument) -> Self {
+    pub(super) fn new_text(document: TextDocument) -> Self {
         Self::Text(Arc::new(document))
     }
 
-    fn new_notebook(document: NotebookDocument) -> Self {
+    pub(super) fn new_notebook(document: NotebookDocument) -> Self {
         Self::Notebook(Arc::new(document))
     }
 
-    fn make_ref(
-        &self,
-        cell_path: Option<SystemVirtualPathBuf>,
-        file_path: AnySystemPath,
-    ) -> DocumentRef {
+    fn make_ref(&self, cell_path: Option<String>, file_path: AnySystemPath) -> DocumentRef {
         match &self {
             Self::Notebook(notebook) => DocumentRef::Notebook {
                 cell_path,
@@ -259,9 +252,10 @@ pub(crate) enum DocumentRef {
         file_path: AnySystemPath,
         document: Arc<TextDocument>,
     },
+    // TODO: Should notebook and notebook cell be separate variants?
     Notebook {
         /// The selected notebook cell, if it exists.
-        cell_path: Option<SystemVirtualPathBuf>,
+        cell_path: Option<String>,
         /// The path to the notebook.
         file_path: AnySystemPath,
         notebook: Arc<NotebookDocument>,
@@ -326,6 +320,6 @@ impl DocumentRef {
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub(crate) enum DocumentError {
-    #[error("document not found for path: {0}")]
-    NotFound(AnySystemPath),
+    #[error("document not found for key: {0}")]
+    NotFound(DocumentKey),
 }

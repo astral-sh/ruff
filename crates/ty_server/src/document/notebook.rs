@@ -1,7 +1,6 @@
 use crate::{PositionEncoding, TextDocument};
 use anyhow::Ok;
 use lsp_types::NotebookCellKind;
-use ruff_db::system::{SystemVirtualPath, SystemVirtualPathBuf};
 use ruff_notebook::CellMetadata;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
@@ -13,11 +12,12 @@ pub(super) type CellId = usize;
 /// contents are internally represented by [`TextDocument`]s.
 #[derive(Clone, Debug)]
 pub struct NotebookDocument {
+    url: lsp_types::Url,
     cells: Vec<NotebookCell>,
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
     // Used to quickly find the index of a cell for a given URL.
-    cell_index: FxHashMap<SystemVirtualPathBuf, CellId>,
+    cell_index: FxHashMap<String, CellId>,
 }
 
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
@@ -38,6 +38,7 @@ struct NotebookCell {
 
 impl NotebookDocument {
     pub fn new(
+        url: lsp_types::Url,
         notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
         metadata: serde_json::Map<String, serde_json::Value>,
@@ -52,7 +53,7 @@ impl NotebookDocument {
 
         for cell_document in cell_documents {
             let index = cell_index
-                .get(SystemVirtualPath::new(cell_document.uri.as_str()))
+                .get(cell_document.uri.as_str())
                 .copied()
                 .ok_or_else(|| {
                     anyhow::anyhow!(
@@ -67,11 +68,16 @@ impl NotebookDocument {
         }
 
         Ok(Self {
+            url,
             version: notebook_version,
             cell_index,
             cells,
             metadata: serde_json::from_value(serde_json::Value::Object(metadata))?,
         })
+    }
+
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        &self.url
     }
 
     /// Generates a pseudo-representation of a notebook that lacks per-cell metadata and contextual information
@@ -145,8 +151,7 @@ impl NotebookDocument {
                 // First, delete the cells and remove them from the index.
                 if delete > 0 {
                     for cell in self.cells.drain(start..start + delete) {
-                        self.cell_index
-                            .remove(SystemVirtualPath::new(cell.url.as_str()));
+                        self.cell_index.remove(cell.url.as_str());
                         deleted_cells.insert(cell.url, cell.document);
                     }
                 }
@@ -169,10 +174,7 @@ impl NotebookDocument {
                 // Third, register the new cells in the index and update existing ones that came
                 // after the insertion.
                 for (index, cell) in self.cells.iter().enumerate().skip(start) {
-                    self.cell_index.insert(
-                        SystemVirtualPath::new(cell.url.as_str()).to_path_buf(),
-                        index,
-                    );
+                    self.cell_index.insert(cell.url.to_string(), index);
                 }
 
                 // Finally, update the text document that represents the cell with the actual
@@ -180,9 +182,7 @@ impl NotebookDocument {
                 // `cell_index` are updated before we start applying the changes to the cells.
                 if let Some(did_open) = structure.did_open {
                     for cell_text_document in did_open {
-                        if let Some(cell) = self.cell_by_uri_mut(&SystemVirtualPath::new(
-                            cell_text_document.uri.as_str(),
-                        )) {
+                        if let Some(cell) = self.cell_by_uri_mut(&cell_text_document.uri.as_str()) {
                             cell.document = TextDocument::new(
                                 cell_text_document.uri,
                                 cell_text_document.text,
@@ -195,9 +195,7 @@ impl NotebookDocument {
 
             if let Some(cell_data) = data {
                 for cell in cell_data {
-                    if let Some(existing_cell) =
-                        self.cell_by_uri_mut(&SystemVirtualPath::new(cell.document.as_str()))
-                    {
+                    if let Some(existing_cell) = self.cell_by_uri_mut(&cell.document.as_str()) {
                         existing_cell.kind = cell.kind;
                     }
                 }
@@ -205,9 +203,8 @@ impl NotebookDocument {
 
             if let Some(content_changes) = text_content {
                 for content_change in content_changes {
-                    if let Some(cell) = self.cell_by_uri_mut(&SystemVirtualPath::new(
-                        content_change.document.uri.as_str(),
-                    )) {
+                    if let Some(cell) = self.cell_by_uri_mut(&content_change.document.uri.as_str())
+                    {
                         cell.document
                             .apply_changes(content_change.changes, version, encoding);
                     }
@@ -233,7 +230,7 @@ impl NotebookDocument {
     }
 
     /// Get the text document representing the contents of a cell by the cell URI.
-    pub(crate) fn cell_document_by_uri(&self, uri: &SystemVirtualPathBuf) -> Option<&TextDocument> {
+    pub(crate) fn cell_document_by_uri(&self, uri: &str) -> Option<&TextDocument> {
         self.cells
             .get(*self.cell_index.get(uri)?)
             .map(|cell| &cell.document)
@@ -244,14 +241,14 @@ impl NotebookDocument {
         self.cells.iter().map(|cell| &cell.url)
     }
 
-    fn cell_by_uri_mut(&mut self, uri: &SystemVirtualPath) -> Option<&mut NotebookCell> {
+    fn cell_by_uri_mut(&mut self, uri: &str) -> Option<&mut NotebookCell> {
         self.cells.get_mut(*self.cell_index.get(uri)?)
     }
 
-    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<SystemVirtualPathBuf, CellId> {
+    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<String, CellId> {
         let mut index = FxHashMap::with_capacity_and_hasher(cells.len(), FxBuildHasher);
         for (i, cell) in cells.iter().enumerate() {
-            index.insert(SystemVirtualPath::new(cell.url.as_str()).to_path_buf(), i);
+            index.insert(cell.url.to_string(), i);
         }
         index
     }
@@ -335,7 +332,14 @@ mod tests {
             }
         }
 
-        NotebookDocument::new(0, cells, serde_json::Map::default(), cell_documents).unwrap()
+        NotebookDocument::new(
+            lsp_types::Url::parse("file://test.ipynb").unwrap(),
+            0,
+            cells,
+            serde_json::Map::default(),
+            cell_documents,
+        )
+        .unwrap()
     }
 
     /// This test case checks that for a notebook with three code cells, when the client sends a

@@ -439,13 +439,6 @@ impl Session {
         self.projects.values_mut().chain(default_project)
     }
 
-    /// Returns the [`DocumentKey`] for the given URL.
-    ///
-    /// Refer to [`Index::key_from_url`] for more details.
-    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
-        self.index().key_from_url(url)
-    }
-
     pub(crate) fn initialize_workspaces(
         &mut self,
         workspace_settings: Vec<(Url, ClientOptions)>,
@@ -819,23 +812,26 @@ impl Session {
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
-        let key = self.key_from_url(url);
-        let path = key.to_path();
-        DocumentSnapshot {
+    pub(crate) fn snapshot_document(&self, url: &Url) -> Result<DocumentSnapshot, DocumentError> {
+        let document_ref = self
+            .index()
+            .make_document_ref(&DocumentKey::from_url(url))?;
+
+        Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
-            workspace_settings: path
+            workspace_settings: document_ref
+                .file_path()
                 .as_system()
                 .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document_query_result: self.index().make_document_ref(&path),
-        }
+            document: document_ref,
+        })
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
-    pub(crate) fn take_session_snapshot(&self) -> SessionSnapshot {
+    pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
         SessionSnapshot {
             projects: self
                 .projects
@@ -853,56 +849,45 @@ impl Session {
     }
 
     /// Iterates over the document keys for all open text documents.
-    pub(super) fn text_document_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
+    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
         self.index()
-            .text_document_urls()
-            .map(|url| DocumentKey::Text { url: url.clone() })
+            .text_documents()
+            .map(|(key, url)| DocumentHandle {
+                key: key.clone(),
+                url: url.clone(),
+                // FIXME: When notebooks are represented as text documetns
+                file_path: key.to_file_path(),
+            })
+    }
+
+    /// Returns a handle to the document specified by its URL.
+    ///
+    /// # Errors
+    ///
+    /// If the document is not found.
+    pub(crate) fn document(&self, url: &lsp_types::Url) -> Result<DocumentHandle, DocumentError> {
+        self.index().document(url)
     }
 
     /// Registers a notebook document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_notebook_document(
-        &mut self,
-        path: &AnySystemPath,
-        document: NotebookDocument,
-    ) {
-        self.index_mut().open_notebook_document(path, document);
+    ///
+    /// Returns a handle to the opened document.
+    pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+        let handle = self.index_mut().open_notebook_document(document);
         self.bump_revision();
+        handle
     }
 
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
-        self.index_mut().open_text_document(path, document);
-        self.bump_revision();
-    }
-
-    /// Updates a text document at the associated `key`.
     ///
-    /// The document key must point to a text document, or this will throw an error.
-    pub(crate) fn update_text_document(
-        &mut self,
-        path: &AnySystemPath,
-        content_changes: Vec<TextDocumentContentChangeEvent>,
-        new_version: DocumentVersion,
-    ) -> crate::Result<()> {
-        let position_encoding = self.position_encoding;
-        self.index_mut().update_text_document(
-            path,
-            content_changes,
-            new_version,
-            position_encoding,
-        )?;
-        self.bump_revision();
-        Ok(())
-    }
+    /// Returns a handle to the opened document.
+    pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+        let handle = self.index_mut().open_text_document(document);
 
-    /// De-registers a document, specified by its key.
-    /// Calling this multiple times for the same document is a logic error.
-    pub(crate) fn close_document(&mut self, key: &AnySystemPath) -> crate::Result<()> {
-        self.index_mut().close_document(key)?;
         self.bump_revision();
-        Ok(())
+        handle
     }
 
     /// Returns a reference to the index.
@@ -1001,7 +986,7 @@ pub(crate) struct DocumentSnapshot {
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document_query_result: Result<DocumentRef, DocumentError>,
+    document: DocumentRef,
 }
 
 impl DocumentSnapshot {
@@ -1026,26 +1011,23 @@ impl DocumentSnapshot {
     }
 
     /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> Result<&DocumentRef, &DocumentError> {
-        self.document_query_result.as_ref()
+    pub(crate) fn document(&self) -> &DocumentRef {
+        &self.document
     }
 
     pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        let document = match self.document() {
-            Ok(document) => document,
-            Err(err) => {
-                tracing::debug!("Failed to resolve file: {}", err);
-                return None;
-            }
-        };
-        let file = document.file(db);
+        let file = self.document.file(db);
         if file.is_none() {
             tracing::debug!(
                 "Failed to resolve file: file not found for path `{}`",
-                document.file_path()
+                self.document.file_path()
             );
         }
         file
+    }
+
+    pub(crate) fn file_path(&self) -> &AnySystemPath {
+        self.document.file_path()
     }
 }
 
@@ -1316,5 +1298,66 @@ impl SuspendedWorkspaceDiagnosticRequest {
         }));
 
         None
+    }
+}
+
+/// A handle to a document stored within [`Session`].
+#[derive(Clone, Debug)]
+pub(crate) struct DocumentHandle {
+    key: DocumentKey,
+    url: lsp_types::Url,
+    file_path: AnySystemPath,
+}
+
+impl DocumentHandle {
+    /// The key that uniquely identifies this document in the index.
+    pub(crate) fn key(&self) -> &DocumentKey {
+        &self.key
+    }
+
+    /// The URL as used by the client to reference this document.
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        &self.url
+    }
+
+    /// The path to the enclosing file for this document.
+    ///
+    /// This is the path corresponding to the URL, except for notebook cells where the
+    /// path corresponds to the notebook file.
+    pub(crate) fn file_path(&self) -> &AnySystemPath {
+        &self.file_path
+    }
+
+    pub(crate) fn update_text_document(
+        &self,
+        session: &mut Session,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        let mut index = session.index_mut();
+
+        let document_mut = index.document_mut(self.key())?;
+
+        let Some(document) = document_mut.as_text_mut() else {
+            anyhow::bail!("Text document path does not point to a text document");
+        };
+
+        if content_changes.is_empty() {
+            document.update_version(new_version);
+            return Ok(());
+        }
+
+        document.apply_changes(content_changes, new_version, position_encoding);
+
+        Ok(())
+    }
+
+    /// De-registers a document, specified by its key.
+    /// Calling this multiple times for the same document is a logic error.
+    pub(crate) fn close(self, session: &mut Session) -> crate::Result<()> {
+        session.index_mut().close_document(&self.key)?;
+        session.bump_revision();
+        Ok(())
     }
 }

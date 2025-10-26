@@ -25,8 +25,6 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         _client: &Client,
         params: DidOpenNotebookDocumentParams,
     ) -> Result<()> {
-        let path = AnySystemPath::from_url(&params.notebook_document.uri);
-
         let lsp_types::NotebookDocument {
             version,
             cells,
@@ -35,15 +33,18 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         } = params.notebook_document;
 
         let notebook = NotebookDocument::new(
+            params.notebook_document.uri,
             version,
             cells,
             metadata.unwrap_or_default(),
             params.cell_text_documents,
         )
         .with_failure_code(ErrorCode::InternalError)?;
-        session.open_notebook_document(&path, notebook);
 
-        match &path {
+        let document = session.open_notebook_document(notebook);
+        let path = document.file_path();
+
+        match path {
             AnySystemPath::System(system_path) => {
                 session.apply_changes(&path, vec![ChangeEvent::Opened(system_path.clone())]);
             }

@@ -13,9 +13,9 @@ use ruff_db::source::{line_index, source_text};
 use ruff_db::system::SystemPathBuf;
 use ty_project::{Db, ProjectDatabase};
 
-use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
-use crate::session::DocumentSnapshot;
+use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::client::Client;
+use crate::session::{DocumentHandle, DocumentSnapshot};
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{DocumentRef, PositionEncoding, Session};
 
@@ -120,13 +120,13 @@ impl LspDiagnostics {
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
+pub(super) fn clear_diagnostics(session: &Session, document: &DocumentHandle, client: &Client) {
     if session.client_capabilities().supports_pull_diagnostics() {
         return;
     }
 
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-        uri: key.url().clone(),
+        uri: document.url().clone(),
         diagnostics: vec![],
         version: None,
     });
@@ -138,15 +138,12 @@ pub(super) fn clear_diagnostics(session: &Session, key: &DocumentKey, client: &C
 /// This function is a no-op if the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
+pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, client: &Client) {
     if session.client_capabilities().supports_pull_diagnostics() {
         return;
     }
 
-    let url = key.url();
-    let snapshot = session.take_document_snapshot(url.clone());
-
-    let document = match snapshot.document() {
+    let snapshot = match session.snapshot_document(url) {
         Ok(document) => document,
         Err(err) => {
             tracing::debug!("Failed to resolve document for URL `{}`: {}", url, err);
@@ -154,7 +151,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         }
     };
 
-    let path = key.to_path();
+    let path = snapshot.file_path();
     let db = session.project_db(&path);
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
@@ -166,7 +163,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
             uri,
             diagnostics,
-            version: Some(document.version()),
+            version: Some(snapshot.document().version()),
         });
     };
 
@@ -257,16 +254,8 @@ pub(super) fn compute_diagnostics<'a>(
     db: &ProjectDatabase,
     snapshot: &'a DocumentSnapshot,
 ) -> Option<Diagnostics<'a>> {
-    let document = match snapshot.document() {
-        Ok(document) => document,
-        Err(err) => {
-            tracing::info!("Failed to resolve document for snapshot: {}", err);
-            return None;
-        }
-    };
-
-    let Some(file) = document.file(db) else {
-        tracing::info!("No file found for snapshot for `{}`", document.file_path());
+    let Some(file) = snapshot.file(db) else {
+        tracing::info!("No file found for snapshot for `{}`", snapshot.file_path());
         return None;
     };
 
@@ -275,7 +264,7 @@ pub(super) fn compute_diagnostics<'a>(
     Some(Diagnostics {
         items: diagnostics,
         encoding: snapshot.encoding(),
-        document,
+        document: snapshot.document(),
     })
 }
 

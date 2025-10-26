@@ -28,15 +28,15 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let key = session.key_from_url(uri);
-        let path = key.to_path();
-
-        session
-            .update_text_document(&path, content_changes, version)
+        let document = session
+            .document(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let path = key.to_path();
-        let changes = match &*path {
+        document
+            .update_text_document(session, content_changes, version)
+            .with_failure_code(ErrorCode::InternalError)?;
+
+        let changes = match document.file_path() {
             AnySystemPath::System(system_path) => {
                 vec![ChangeEvent::file_content_changed(system_path.clone())]
             }
@@ -45,9 +45,9 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         };
 
-        session.apply_changes(&path, changes);
+        session.apply_changes(document.file_path(), changes);
 
-        publish_diagnostics(session, &key, client);
+        publish_diagnostics(session, document.url(), client);
 
         Ok(())
     }

@@ -1,4 +1,5 @@
 use crate::PositionEncoding;
+use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -363,14 +364,11 @@ impl<'a> ResponseWriter<'a> {
             return;
         };
 
-        let key = self.index.key_from_url(url.clone());
-        let path = key.to_path();
-
         let version = self
             .index
-            .make_document_ref(&path)
-            .ok()
-            .map(|doc| i64::from(doc.version()));
+            .make_document_ref(&DocumentKey::from_url(&url))
+            .map(|doc| i64::from(doc.version()))
+            .ok();
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
@@ -443,11 +441,9 @@ impl<'a> ResponseWriter<'a> {
         // Any remaining entries in previous_results are files that were fixed
         for (previous_url, previous_result_id) in self.previous_result_ids.into_values() {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
-            let key = self.index.key_from_url(previous_url.clone());
-            let path = key.to_path();
             let version = self
                 .index
-                .make_document_ref(&path)
+                .make_document_ref(&DocumentKey::from_url(&previous_url))
                 .ok()
                 .map(|doc| i64::from(doc.version()));
 
