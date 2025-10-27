@@ -734,34 +734,20 @@ impl<'db> Node<'db> {
             // subtype of `int` becomes the constraint `T ≤ int`), and then check when the BDD
             // implies that constraint.
             (Type::TypeVar(bound_typevar), _) => {
-                let constrained_typevar = match rhs {
-                    Type::TypeVar(rhs) if bound_typevar.can_be_bound_for(db, rhs) => rhs,
-                    _ => bound_typevar,
-                };
-                let projected = self.project_typevar(db, constrained_typevar);
                 let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
-                projected.and(db, constraint).iff(db, projected)
+                let (simplified, domain) = self.implies(db, constraint).simplify_and_domain(db);
+                simplified.and(db, domain)
             }
 
             (_, Type::TypeVar(bound_typevar)) => {
-                let projected = self.project_typevar(db, bound_typevar);
                 let constraint =
                     ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
-                projected.and(db, constraint).iff(db, projected)
+                let (simplified, domain) = self.implies(db, constraint).simplify_and_domain(db);
+                simplified.and(db, domain)
             }
 
             // If neither type is a typevar, then we fall back on a normal subtyping check.
             _ => lhs.when_subtype_of(db, rhs, inferable).node,
-        }
-    }
-
-    /// Returns a new BDD that only includes constraints on the given typevar, and any other
-    /// typevars that can be the lower or upper bound of that typevar.
-    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
-        match self {
-            Node::AlwaysTrue => Node::AlwaysTrue,
-            Node::AlwaysFalse => Node::AlwaysFalse,
-            Node::Interior(interior) => interior.project_typevar(db, typevar),
         }
     }
 
@@ -924,26 +910,24 @@ impl<'db> Node<'db> {
         interior.if_false(db).for_each_constraint(db, f);
     }
 
+    /// Returns a simplified version of a BDD, along with the BDD's domain.
+    fn simplify_and_domain(self, db: &'db dyn Db) -> (Self, Self) {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => (self, Node::AlwaysTrue),
+            Node::Interior(interior) => interior.simplify(db),
+        }
+    }
+
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
     fn simplify(self, db: &'db dyn Db) -> Self {
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
-            Node::Interior(interior) => {
-                let (simplified, _) = interior.simplify(db);
-                simplified
-            }
-        }
+        let (simplified, _) = self.simplify_and_domain(db);
+        simplified
     }
 
     /// Returns the domain (the set of allowed inputs) for a BDD.
     fn domain(self, db: &'db dyn Db) -> Self {
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => Node::AlwaysTrue,
-            Node::Interior(interior) => {
-                let (_, domain) = interior.simplify(db);
-                domain
-            }
-        }
+        let (_, domain) = self.simplify_and_domain(db);
+        domain
     }
 
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
@@ -1177,18 +1161,6 @@ impl<'db> InteriorNode<'db> {
                 Node::Interior(self).iff(db, other.if_true(db)),
                 Node::Interior(self).iff(db, other.if_false(db)),
             ),
-        }
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        let if_true = self.if_true(db).project_typevar(db, typevar);
-        let if_false = self.if_false(db).project_typevar(db, typevar);
-        if typevar.can_be_bound_for(db, self_constraint.typevar(db)) {
-            if_true.or(db, if_false)
-        } else {
-            Node::new(db, self_constraint, if_true, if_false)
         }
     }
 

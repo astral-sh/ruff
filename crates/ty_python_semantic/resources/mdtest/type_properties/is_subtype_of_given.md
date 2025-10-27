@@ -144,6 +144,15 @@ from typing import Never
 from ty_extensions import is_subtype_of_given, range_constraint, static_assert
 
 def given_constraints[T]():
+    static_assert(not is_subtype_of_given(True, T, int))
+    static_assert(not is_subtype_of_given(True, T, bool))
+    static_assert(not is_subtype_of_given(True, T, str))
+
+    # These are vacuously true; false implies anything
+    static_assert(is_subtype_of_given(False, T, int))
+    static_assert(is_subtype_of_given(False, T, bool))
+    static_assert(is_subtype_of_given(False, T, str))
+
     given_int = range_constraint(Never, T, int)
     static_assert(is_subtype_of_given(given_int, T, int))
     static_assert(not is_subtype_of_given(given_int, T, bool))
