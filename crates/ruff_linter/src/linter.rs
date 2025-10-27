@@ -983,7 +983,7 @@ mod tests {
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",
-            path.to_string_lossy(),
+            path.to_string_lossy().replace('\\', "/"),
             python_version
         );
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
