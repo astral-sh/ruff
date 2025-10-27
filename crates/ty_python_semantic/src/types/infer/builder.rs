@@ -6798,9 +6798,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_class_type(self.db())
                     .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
-                let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
-
                 if matches!(
                     class.known(self.db()),
                     Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
@@ -6819,8 +6816,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
+                let db = self.db();
+                let infer_call_arguments = |bindings: Option<Bindings<'db>>| {
+                    if let Some(bindings) = bindings {
+                        let bindings = bindings.match_parameters(self.db(), &call_arguments);
+                        self.infer_all_argument_types(arguments, &mut call_arguments, &bindings);
+                    } else {
+                        let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+                        self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
+                    }
+
+                    call_arguments
+                };
+
                 return callable_type
-                    .try_call_constructor(self.db(), call_arguments, tcx)
+                    .try_call_constructor(db, infer_call_arguments, tcx)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, callable_type, call_expression.into());
                         err.return_type()

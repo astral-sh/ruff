@@ -265,6 +265,7 @@ python-version = "3.12"
 
 ```py
 from typing import Final, ClassVar, Annotated
+from ty_extensions import reveal_mro
 
 LEGAL_A: Final[int] = 1
 LEGAL_B: Final = 1
@@ -304,8 +305,8 @@ def f[T](x: T) -> Final[T]:
 class Foo(Final[tuple[int]]): ...
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
-# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
-reveal_type(Foo.__mro__)
+# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(Foo)
 ```
 
 ### Attribute assignment outside `__init__`

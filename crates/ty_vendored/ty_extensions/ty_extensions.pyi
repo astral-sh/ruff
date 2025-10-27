@@ -1,5 +1,6 @@
 # ruff: noqa: PYI021
 import sys
+import types
 from collections.abc import Iterable
 from enum import Enum
 from typing import (
@@ -124,11 +125,16 @@ def all_members(obj: Any) -> tuple[str, ...]: ...
 
 # Returns `True` if the given object has a member with the given name.
 def has_member(obj: Any, name: str) -> bool: ...
+def reveal_protocol_interface(protocol: type) -> None:
+    """
+    Passing a protocol type to this function will cause ty to emit an info-level
+    diagnostic describing the protocol's interface.
 
-# Passing a protocol type to this function will cause ty to emit an info-level
-# diagnostic describing the protocol's interface. Passing a non-protocol type
-# will cause ty to emit an error diagnostic.
-def reveal_protocol_interface(protocol: type) -> None: ...
+    Passing a non-protocol type will cause ty to emit an error diagnostic.
+    """
+
+def reveal_mro(cls: type | types.GenericAlias) -> None:
+    """Reveal the MRO that ty infers for the given class or generic alias."""
 
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.

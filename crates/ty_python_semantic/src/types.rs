@@ -4364,14 +4364,6 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
-                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
-                );
-
-                if name == "__mro__" {
-                    return class_attr_plain;
-                }
-
                 if let Some(enum_class) = match self {
                     Type::ClassLiteral(literal) => Some(literal),
                     Type::SubclassOf(subclass_of) => subclass_of
@@ -4391,6 +4383,10 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
+
+                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
+                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
+                );
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
                     db,
@@ -6031,6 +6027,9 @@ impl<'db> Type<'db> {
     /// Given a class literal or non-dynamic `SubclassOf` type, try calling it (creating an instance)
     /// and return the resulting instance type.
     ///
+    /// The `infer_argument_types` closure should be invoked with the signatures of `__new__` and
+    /// `__init__`, such that the argument types can be inferred with the correct type context.
+    ///
     /// Models `type.__call__` behavior.
     /// TODO: model metaclass `__call__`.
     ///
@@ -6041,10 +6040,10 @@ impl<'db> Type<'db> {
     ///
     /// Foo()
     /// ```
-    fn try_call_constructor(
+    fn try_call_constructor<'ast>(
         self,
         db: &'db dyn Db,
-        argument_types: CallArguments<'_, 'db>,
+        infer_argument_types: impl FnOnce(Option<Bindings<'db>>) -> CallArguments<'ast, 'db>,
         tcx: TypeContext<'db>,
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(
@@ -6100,11 +6099,63 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
         let new_method = self_type.lookup_dunder_new(db, ());
+
+        // Construct an instance type that we can use to look up the `__init__` instance method.
+        // This performs the same logic as `Type::to_instance`, except for generic class literals.
+        // TODO: we should use the actual return type of `__new__` to determine the instance type
+        let init_ty = self_type
+            .to_instance(db)
+            .expect("type should be convertible to instance type");
+
+        // Lookup the `__init__` instance method in the MRO.
+        let init_method = init_ty.member_lookup_with_policy(
+            db,
+            "__init__".into(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+
+        // Infer the call argument types, using both `__new__` and `__init__` for type-context.
+        let bindings = match (
+            new_method.as_ref().map(|method| &method.place),
+            &init_method.place,
+        ) {
+            (Some(Place::Defined(new_method, ..)), Place::Undefined) => Some(
+                new_method
+                    .bindings(db)
+                    .map(|binding| binding.with_bound_type(self_type)),
+            ),
+
+            (Some(Place::Undefined) | None, Place::Defined(init_method, ..)) => {
+                Some(init_method.bindings(db))
+            }
+
+            (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
+                let callable = UnionBuilder::new(db)
+                    .add(*new_method)
+                    .add(*init_method)
+                    .build();
+
+                let new_method_bindings = new_method
+                    .bindings(db)
+                    .map(|binding| binding.with_bound_type(self_type));
+
+                Some(Bindings::from_union(
+                    callable,
+                    [new_method_bindings, init_method.bindings(db)],
+                ))
+            }
+
+            _ => None,
+        };
+
+        let argument_types = infer_argument_types(bindings);
+
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Defined(new_method, _, boundness) => {
                     let result =
                         new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
+
                     if boundness == Definedness::PossiblyUndefined {
                         Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
                     } else {
@@ -6115,24 +6166,7 @@ impl<'db> Type<'db> {
             }
         });
 
-        // Construct an instance type that we can use to look up the `__init__` instance method.
-        // This performs the same logic as `Type::to_instance`, except for generic class literals.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let init_ty = self_type
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-
-        let init_call_outcome = if new_call_outcome.is_none()
-            || !init_ty
-                .member_lookup_with_policy(
-                    db,
-                    "__init__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                        | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                )
-                .place
-                .is_undefined()
-        {
+        let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
             Some(init_ty.try_call_dunder(db, "__init__", argument_types, tcx))
         } else {
             None

@@ -370,3 +370,22 @@ class Foo:
             The flag converter instance with all flags parsed.
         """
         return
+
+# OK
+def baz(x: int) -> int:
+    """
+    Show a `Warnings` DOC102 false positive.
+
+    Parameters
+    ----------
+    x : int
+
+    Warnings
+    --------
+    This function demonstrates a DOC102 false positive
+
+    Returns
+    -------
+    int
+    """
+    return x

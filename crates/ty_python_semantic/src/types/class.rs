@@ -1981,11 +1981,6 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if name == "__mro__" {
-            let tuple_elements = self.iter_mro(db, specialization);
-            return Place::bound(Type::heterogeneous_tuple(db, tuple_elements)).into();
-        }
-
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
     }
 
