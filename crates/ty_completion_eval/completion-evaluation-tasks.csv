@@ -1,4 +1,5 @@
 name,file,index,rank
+auto-import-skips-current-module,main.py,0,4
 fstring-completions,main.py,0,1
 higher-level-symbols-preferred,main.py,0,
 higher-level-symbols-preferred,main.py,1,1
