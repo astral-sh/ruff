@@ -455,14 +455,17 @@ other-attribute = 1
             .is_err()
         );
 
-        assert!(
-            toml::from_str::<Pyproject>(
-                r"
+        let invalid_line_length = toml::from_str::<Pyproject>(
+            r"
 [tool.ruff]
 line-length = 500
 ",
-            )
-            .is_err()
+        )
+        .expect_err("Deserialization should have failed for a too large line-length");
+
+        assert_eq!(
+            invalid_line_length.message(),
+            "line-length must be between 1 and 320 (got 500)"
         );
 
         Ok(())
