@@ -4841,7 +4841,7 @@ impl<'db> Type<'db> {
                     self,
                     Signature::new(
                         Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("a")))
+                            Parameter::positional_only(Some(Name::new_static("constraints")))
                                 .with_annotated_type(UnionType::from_elements(
                                     db,
                                     [
@@ -4849,10 +4849,10 @@ impl<'db> Type<'db> {
                                         KnownClass::ConstraintSet.to_instance(db),
                                     ],
                                 )),
-                            Parameter::positional_only(Some(Name::new_static("a")))
+                            Parameter::positional_only(Some(Name::new_static("ty")))
                                 .type_form()
                                 .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("b")))
+                            Parameter::positional_only(Some(Name::new_static("of")))
                                 .type_form()
                                 .with_annotated_type(Type::any()),
                         ]),
