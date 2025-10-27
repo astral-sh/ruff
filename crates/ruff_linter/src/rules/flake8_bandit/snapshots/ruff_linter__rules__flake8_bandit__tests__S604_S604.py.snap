@@ -90,4 +90,5 @@ S604 Function call with truthy `shell` parameter identified, security issue
 23 | x = 1
 24 | foo(shell=f"{x=}")
    | ^^^
+25 | print(bool(dict(shell=f"{f""!s}")["shell"]))
    |

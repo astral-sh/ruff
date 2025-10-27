@@ -22,3 +22,15 @@ foo(shell=lambda: 0)
 foo(shell=f"{b''}")
 x = 1
 foo(shell=f"{x=}")
+print(bool(dict(shell=f"{f""!s}")["shell"]))
+
+# Unknown truthiness
+print(bool(dict(shell=f"{"x":.0}")["shell"]))
+
+
+class C:
+    def __gt__(self, other):
+        return ""
+
+
+print(bool(dict(shell=f"{C() > C()}")["shell"]))
