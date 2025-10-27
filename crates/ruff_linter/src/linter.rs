@@ -981,15 +981,14 @@ mod tests {
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY312)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
+        let snapshot = format!(
+            "semantic_syntax_error_{}_{}",
+            path.to_string_lossy(),
+            python_version
+        );
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
         let contents = std::fs::read_to_string(&path)?;
         let source_kind = SourceKind::Python(contents);
-
-        let snapshot = format!(
-            "semantic_syntax_error_{}_{}",
-            path.display(),
-            python_version
-        );
 
         let diagnostics = test_contents_syntax_errors(
             &source_kind,
