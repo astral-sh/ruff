@@ -216,7 +216,11 @@ impl ClauseHeader<'_> {
                     .decorator_list
                     .last()
                     .map_or_else(|| header.start(), Ranged::end);
-                find_keyword(start_position, SimpleTokenKind::Class, source)
+                find_keyword(
+                    StartPosition::ClauseStart(start_position),
+                    SimpleTokenKind::Class,
+                    source,
+                )
             }
             ClauseHeader::Function(header) => {
                 let start_position = header
@@ -228,21 +232,39 @@ impl ClauseHeader<'_> {
                 } else {
                     SimpleTokenKind::Def
                 };
-                find_keyword(start_position, keyword, source)
+                find_keyword(StartPosition::ClauseStart(start_position), keyword, source)
             }
-            ClauseHeader::If(header) => find_keyword(header.start(), SimpleTokenKind::If, source),
+            ClauseHeader::If(header) => find_keyword(
+                StartPosition::clause_start(header),
+                SimpleTokenKind::If,
+                source,
+            ),
             ClauseHeader::ElifElse(ElifElseClause {
                 test: None, range, ..
-            }) => find_keyword(range.start(), SimpleTokenKind::Else, source),
+            }) => find_keyword(
+                StartPosition::clause_start(range),
+                SimpleTokenKind::Else,
+                source,
+            ),
             ClauseHeader::ElifElse(ElifElseClause {
                 test: Some(_),
                 range,
                 ..
-            }) => find_keyword(range.start(), SimpleTokenKind::Elif, source),
-            ClauseHeader::Try(header) => find_keyword(header.start(), SimpleTokenKind::Try, source),
-            ClauseHeader::ExceptHandler(header) => {
-                find_keyword(header.start(), SimpleTokenKind::Except, source)
-            }
+            }) => find_keyword(
+                StartPosition::clause_start(range),
+                SimpleTokenKind::Elif,
+                source,
+            ),
+            ClauseHeader::Try(header) => find_keyword(
+                StartPosition::clause_start(header),
+                SimpleTokenKind::Try,
+                source,
+            ),
+            ClauseHeader::ExceptHandler(header) => find_keyword(
+                StartPosition::clause_start(header),
+                SimpleTokenKind::Except,
+                source,
+            ),
             ClauseHeader::TryFinally(header) => {
                 let last_statement = header
                     .orelse
@@ -253,28 +275,34 @@ impl ClauseHeader<'_> {
                     .unwrap();
 
                 find_keyword(
-                    after_optional_semicolon(last_statement.end(), source),
+                    StartPosition::LastStatement(last_statement.end()),
                     SimpleTokenKind::Finally,
                     source,
                 )
             }
-            ClauseHeader::Match(header) => {
-                find_keyword(header.start(), SimpleTokenKind::Match, source)
-            }
-            ClauseHeader::MatchCase(header) => {
-                find_keyword(header.start(), SimpleTokenKind::Case, source)
-            }
+            ClauseHeader::Match(header) => find_keyword(
+                StartPosition::clause_start(header),
+                SimpleTokenKind::Match,
+                source,
+            ),
+            ClauseHeader::MatchCase(header) => find_keyword(
+                StartPosition::clause_start(header),
+                SimpleTokenKind::Case,
+                source,
+            ),
             ClauseHeader::For(header) => {
                 let keyword = if header.is_async {
                     SimpleTokenKind::Async
                 } else {
                     SimpleTokenKind::For
                 };
-                find_keyword(header.start(), keyword, source)
+                find_keyword(StartPosition::clause_start(header), keyword, source)
             }
-            ClauseHeader::While(header) => {
-                find_keyword(header.start(), SimpleTokenKind::While, source)
-            }
+            ClauseHeader::While(header) => find_keyword(
+                StartPosition::clause_start(header),
+                SimpleTokenKind::While,
+                source,
+            ),
             ClauseHeader::With(header) => {
                 let keyword = if header.is_async {
                     SimpleTokenKind::Async
@@ -282,7 +310,7 @@ impl ClauseHeader<'_> {
                     SimpleTokenKind::With
                 };
 
-                find_keyword(header.start(), keyword, source)
+                find_keyword(StartPosition::clause_start(header), keyword, source)
             }
             ClauseHeader::OrElse(header) => match header {
                 ElseClause::Try(try_stmt) => {
@@ -294,14 +322,14 @@ impl ClauseHeader<'_> {
                         .unwrap();
 
                     find_keyword(
-                        after_optional_semicolon(last_statement.end(), source),
+                        StartPosition::LastStatement(last_statement.end()),
                         SimpleTokenKind::Else,
                         source,
                     )
                 }
                 ElseClause::For(StmtFor { body, .. })
                 | ElseClause::While(StmtWhile { body, .. }) => find_keyword(
-                    after_optional_semicolon(body.last().unwrap().end(), source),
+                    StartPosition::LastStatement(body.last().unwrap().end()),
                     SimpleTokenKind::Else,
                     source,
                 ),
@@ -444,16 +472,41 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
     }
 }
 
-/// Finds the range of `keyword` starting the search at `start_position`. Expects only trivia between
-/// the `start_position` and the `keyword` token.
+/// Finds the range of `keyword` starting the search at `start_position`.
+///
+/// If the start position is at the end of the previous statement, the
+/// search will skip the optional semi-colon at the end of that statement.
+/// Other than this, we expect only trivia between the `start_position`
+/// and the keyword.
 fn find_keyword(
-    start_position: TextSize,
+    start_position: StartPosition,
     keyword: SimpleTokenKind,
     source: &str,
 ) -> FormatResult<TextRange> {
-    let mut tokenizer = SimpleTokenizer::starts_at(start_position, source).skip_trivia();
+    let next_token = match start_position {
+        StartPosition::ClauseStart(text_size) => SimpleTokenizer::starts_at(text_size, source)
+            .skip_trivia()
+            .next(),
+        StartPosition::LastStatement(text_size) => {
+            let mut tokenizer = SimpleTokenizer::starts_at(text_size, source).skip_trivia();
 
-    match tokenizer.next() {
+            let mut token = tokenizer.next();
+
+            // If the last statement ends with a semi-colon, skip it.
+            if matches!(
+                token,
+                Some(SimpleToken {
+                    kind: SimpleTokenKind::Semi,
+                    ..
+                })
+            ) {
+                token = tokenizer.next();
+            }
+            token
+        }
+    };
+
+    match next_token {
         Some(token) if token.kind() == keyword => Ok(token.range()),
         Some(other) => {
             debug_assert!(
@@ -476,15 +529,32 @@ fn find_keyword(
     }
 }
 
-fn after_optional_semicolon(end_of_statement: TextSize, source: &str) -> TextSize {
-    let mut tokenizer = SimpleTokenizer::starts_at(end_of_statement, source);
+/// Offset directly before clause header.
+///
+/// Can either be the beginning of the clause header
+/// or the end of the last statement preceding the clause.
+#[derive(Clone, Copy)]
+enum StartPosition {
+    /// The beginning of a clause header
+    ClauseStart(TextSize),
+    /// The end of the last statement in the suite preceding a clause.
+    ///
+    /// For example:
+    /// ```python
+    /// if cond:
+    ///     a
+    ///     b
+    ///     c;
+    /// # ...^here
+    /// else:
+    ///     d
+    /// ```
+    LastStatement(TextSize),
+}
 
-    if let Some(tok) = tokenizer.next()
-        && tok.kind() == SimpleTokenKind::Semi
-    {
-        tok.end()
-    } else {
-        end_of_statement
+impl StartPosition {
+    fn clause_start(ranged: impl Ranged) -> Self {
+        Self::ClauseStart(ranged.start())
     }
 }
 
