@@ -377,10 +377,7 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::NonGeneric(class) => class.has_pep_695_type_params(db),
-            Self::Generic(generic) => generic.origin(db).has_pep_695_type_params(db),
-        }
+        self.class_literal(db).0.has_pep_695_type_params(db)
     }
 
     /// Returns the class literal and specialization for this class. For a non-generic class, this
@@ -3463,11 +3460,10 @@ impl<'db> ClassLiteral<'db> {
         ) -> bool {
             let mut result = false;
             for explicit_base in class.explicit_bases(db) {
-                let explicit_base_class_literal = match explicit_base {
-                    Type::ClassLiteral(class_literal) => *class_literal,
-                    Type::GenericAlias(generic_alias) => generic_alias.origin(db),
-                    _ => continue,
+                let Some(explicit_base) = explicit_base.to_class_type(db) else {
+                    continue;
                 };
+                let explicit_base_class_literal = explicit_base.class_literal(db).0;
                 if !classes_on_stack.insert(explicit_base_class_literal) {
                     return true;
                 }
