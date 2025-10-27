@@ -492,10 +492,12 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "collected_datasets" => Replacement::AttrName("collected_assets"),
             _ => return,
         },
-        ["airflow", .., "DAG"] => match attr.as_str() {
-            "create_dagrun" => Replacement::None,
-            _ => return,
-        },
+        ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
+            match attr.as_str() {
+                "create_dagrun" => Replacement::None,
+                _ => return,
+            }
+        }
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "initialize_providers_dataset_uri_resources" => {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")

@@ -641,7 +641,7 @@ AIR301 [*] `get_connections` is removed in Airflow 3.0
 104 | lfb.get_connections()
     |     ^^^^^^^^^^^^^^^
 105 |
-106 | from airflow import DAG
+106 | from airflow.models import DAG
     |
 help: Use `get_connection` instead
 101 | 
@@ -650,7 +650,7 @@ help: Use `get_connection` instead
     - lfb.get_connections()
 104 + lfb.get_connection()
 105 | 
-106 | from airflow import DAG
+106 | from airflow.models import DAG
 107 | 
 
 AIR301 `create_dagrun` is removed in Airflow 3.0
@@ -659,5 +659,16 @@ AIR301 `create_dagrun` is removed in Airflow 3.0
 108 | # airflow.DAG
 109 | test_dag = DAG(dag_id="test_dag")
 110 | test_dag.create_dagrun()
+    |          ^^^^^^^^^^^^^
+111 |
+112 | from airflow import DAG
+    |
+
+AIR301 `create_dagrun` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:116:10
+    |
+114 | # airflow.DAG
+115 | test_dag = DAG(dag_id="test_dag")
+116 | test_dag.create_dagrun()
     |          ^^^^^^^^^^^^^
     |

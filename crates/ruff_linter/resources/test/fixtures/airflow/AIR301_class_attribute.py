@@ -103,6 +103,12 @@ base_secret_backend.get_connections()
 lfb = LocalFilesystemBackend()
 lfb.get_connections()
 
+from airflow.models import DAG
+
+# airflow.DAG
+test_dag = DAG(dag_id="test_dag")
+test_dag.create_dagrun()
+
 from airflow import DAG
 
 # airflow.DAG
