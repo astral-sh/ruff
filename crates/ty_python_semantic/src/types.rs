@@ -456,7 +456,7 @@ fn member_lookup_cycle_recover<'db>(
     _policy: MemberLookupPolicy,
 ) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     let div = Type::divergent(id);
-    let place = union_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
+    let place = join_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
     salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
@@ -474,7 +474,7 @@ fn class_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-fn union_with_previous_cycle_place<'db>(
+pub(crate) fn join_with_previous_cycle_place<'db>(
     db: &'db dyn Db,
     previous_place: &Place<'db>,
     place: &Place<'db>,
@@ -510,7 +510,7 @@ fn class_lookup_cycle_recover<'db>(
     _policy: MemberLookupPolicy,
 ) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     let div = Type::divergent(id);
-    let place = union_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
+    let place = join_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
     salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
@@ -6835,7 +6835,7 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=apply_specialization_cycle_initial)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=apply_specialization_cycle_recover, cycle_initial=apply_specialization_cycle_initial)]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -7556,6 +7556,22 @@ fn is_redundant_with_cycle_initial<'db>(
     _supertype: Type<'db>,
 ) -> bool {
     true
+}
+
+fn apply_specialization_cycle_recover<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    previous_value: &Type<'db>,
+    value: &Type<'db>,
+    _count: u32,
+    _self: Type<'db>,
+    _specialization: Specialization<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    let visitor = RecursiveTypeNormalizedVisitor::new(Type::divergent(id));
+    salsa::CycleRecoveryAction::Fallback(
+        UnionType::from_elements(db, [*previous_value, *value])
+            .recursive_type_normalized(db, &visitor),
+    )
 }
 
 fn apply_specialization_cycle_initial<'db>(
@@ -11271,12 +11287,13 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
+    db: &'db dyn Db,
+    id: salsa::Id,
     _self: PEP695TypeAliasType<'db>,
 ) -> Option<GenericContext<'db>> {
-    None
+    Some(GenericContext::cycle_initial(db, id))
 }
 
 fn value_type_cycle_initial<'db>(

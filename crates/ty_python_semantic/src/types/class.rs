@@ -38,7 +38,7 @@ use crate::types::{
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, RecursiveTypeNormalizedVisitor,
     StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
     UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
-    union_with_previous_cycle_place,
+    join_with_previous_cycle_place,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -70,12 +70,28 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 fn explicit_bases_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: ClassLiteral<'db>,
+    db: &'db dyn Db,
+    id: salsa::Id,
+    class: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
-    // TODO: divergent
-    Box::default()
+    let module = parsed_module(db, class.file(db)).load(db);
+    let class_stmt = class.node(db, &module);
+
+    if class.is_known(db, KnownClass::VersionInfo) {
+        let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
+            .expect("sys.version_info tuple spec should always be a valid tuple");
+
+        Box::new([
+            Type::divergent(id),
+            Type::from(tuple_type.to_class_type(db)),
+        ])
+    } else {
+        class_stmt
+            .bases()
+            .iter()
+            .map(|_| Type::divergent(id))
+            .collect()
+    }
 }
 
 fn inheritance_cycle_initial<'db>(
@@ -83,7 +99,7 @@ fn inheritance_cycle_initial<'db>(
     _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
-    // TODO: divergent
+    // Some(InheritanceCycle::Participant)?
     None
 }
 
@@ -113,7 +129,7 @@ fn implicit_attribute_cycle_recover<'db>(
 ) -> salsa::CycleRecoveryAction<Member<'db>> {
     let div = Type::divergent(id);
     let place =
-        union_with_previous_cycle_place(db, &previous_member.inner.place, &member.inner.place, div);
+        join_with_previous_cycle_place(db, &previous_member.inner.place, &member.inner.place, div);
     salsa::CycleRecoveryAction::Fallback(Member {
         inner: PlaceAndQualifiers {
             place,
