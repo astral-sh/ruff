@@ -116,7 +116,12 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
         return;
     }
 
-    if should_be_fstring(literal, checker.locator(), semantic, checker) {
+    if should_be_fstring(
+        literal,
+        checker.locator(),
+        semantic,
+        checker.target_version(),
+    ) {
         checker
             .report_diagnostic(MissingFStringSyntax, literal.range())
             .set_fix(fix_fstring_syntax(literal.range()));
@@ -180,7 +185,7 @@ fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
-    checker: &Checker,
+    target_version: PythonVersion,
 ) -> bool {
     if !has_brackets(&literal.value) {
         return false;
@@ -220,8 +225,7 @@ fn should_be_fstring(
             // Check if the interpolation expression contains backslashes
             // F-strings with backslashes in interpolations are only valid in Python 3.12+
             let interpolation_text = &fstring_expr[element.range()];
-            if interpolation_text.contains('\\') && checker.target_version() < PythonVersion::PY312
-            {
+            if interpolation_text.contains('\\') && target_version < PythonVersion::PY312 {
                 return false;
             }
 
