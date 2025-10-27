@@ -69,7 +69,7 @@ mod tests;
 /// scope.
 /// When using types ​​in [`ScopeInference`], you must use [`ScopeInference::cycle_recovery`].
 /// Alternatively, consider using a cycle-safe function such as [`infer_scope_expression_type`].
-#[salsa::tracked(returns(ref), cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
@@ -81,6 +81,47 @@ pub(super) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Sc
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish_scope()
+}
+
+fn scope_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_inference: &ScopeInference<'db>,
+    inference: &ScopeInference<'db>,
+    _count: u32,
+    _scope: ScopeId<'db>,
+) -> salsa::CycleRecoveryAction<ScopeInference<'db>> {
+    let ScopeInference {
+        expressions,
+        scope,
+        extra,
+    } = inference;
+    let mut expressions = expressions.clone();
+
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferScopeTypes(*scope),
+    ));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    for (expr, ty) in &mut expressions {
+        let previous_ty = previous_inference.expression_type(*expr);
+        *ty = UnionType::from_elements(db, [*ty, previous_ty])
+            .recursive_type_normalized(db, &visitor);
+    }
+
+    let extra = extra.as_ref().map(|extra| {
+        Box::new(ScopeInferenceExtra {
+            cycle_recovery: extra.cycle_recovery,
+            diagnostics: extra.diagnostics.clone(),
+            returnees: extra.returnees.clone(),
+        })
+    });
+
+    salsa::CycleRecoveryAction::Fallback(ScopeInference {
+        expressions,
+        scope: *scope,
+        extra,
+    })
 }
 
 fn scope_cycle_initial<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
@@ -99,11 +140,7 @@ pub(crate) fn infer_scope_expression_type<'db>(
     expr: impl Into<ExpressionNodeKey>,
 ) -> Type<'db> {
     let inference = infer_scope_types(db, scope);
-    if let Some(cycle_recovery) = inference.cycle_recovery() {
-        UnionType::from_elements(db, [inference.expression_type(expr), cycle_recovery])
-    } else {
-        inference.expression_type(expr)
-    }
+    inference.expression_type(expr)
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -131,14 +168,104 @@ pub(super) fn infer_definition_types<'db>(
 }
 
 fn definition_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _id: salsa::Id,
-    _last_provisional_value: &DefinitionInference<'db>,
-    _value: &DefinitionInference<'db>,
+    previous_inference: &DefinitionInference<'db>,
+    inference: &DefinitionInference<'db>,
     _count: u32,
-    _definition: Definition<'db>,
+    definition: Definition<'db>,
 ) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    definition_cycle_recover_inner(
+        db,
+        previous_inference,
+        inference,
+        DivergenceKind::InferDefinitionTypes(definition),
+    )
+}
+
+fn definition_cycle_recover_inner<'db>(
+    db: &'db dyn Db,
+    previous_inference: &DefinitionInference<'db>,
+    inference: &DefinitionInference<'db>,
+    kind: DivergenceKind<'db>,
+) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
+    let DefinitionInference {
+        expressions,
+        bindings,
+        declarations,
+        #[cfg(debug_assertions)]
+        scope,
+        extra,
+    } = inference;
+    let mut expressions = expressions.clone();
+    let mut bindings = bindings.clone();
+    let mut declarations = declarations.clone();
+
+    let div = Type::divergent(DivergentType::new(db, kind));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    for (expr, ty) in &mut expressions {
+        let previous_ty = previous_inference.expression_type(*expr);
+        *ty = UnionType::from_elements(db, [*ty, previous_ty])
+            .recursive_type_normalized(db, &visitor);
+    }
+    for (binding, binding_ty) in &mut bindings {
+        if let Some((_, previous_binding)) = previous_inference
+            .bindings
+            .iter()
+            .find(|(previous_binding, _)| previous_binding == binding)
+        {
+            *binding_ty = UnionType::from_elements(db, [*binding_ty, *previous_binding])
+                .recursive_type_normalized(db, &visitor);
+        } else {
+            *binding_ty = binding_ty.recursive_type_normalized(db, &visitor);
+        }
+    }
+    for (declaration, declaration_ty) in &mut declarations {
+        if let Some((_, previous_declaration)) = previous_inference
+            .declarations
+            .iter()
+            .find(|(previous_declaration, _)| previous_declaration == declaration)
+        {
+            *declaration_ty = TypeAndQualifiers {
+                inner: UnionType::from_elements(
+                    db,
+                    [
+                        declaration_ty.inner_type(),
+                        previous_declaration.inner_type(),
+                    ],
+                )
+                .recursive_type_normalized(db, &visitor),
+                origin: declaration_ty.origin(),
+                qualifiers: declaration_ty.qualifiers(),
+            };
+        } else {
+            *declaration_ty = TypeAndQualifiers {
+                inner: declaration_ty
+                    .inner_type()
+                    .recursive_type_normalized(db, &visitor),
+                origin: declaration_ty.origin(),
+                qualifiers: declaration_ty.qualifiers(),
+            };
+        }
+    }
+
+    let extra = extra.as_ref().map(|extra| {
+        Box::new(DefinitionInferenceExtra {
+            cycle_recovery: extra.cycle_recovery,
+            diagnostics: extra.diagnostics.clone(),
+            deferred: extra.deferred.clone(),
+            undecorated_type: extra.undecorated_type,
+        })
+    });
+
+    salsa::CycleRecoveryAction::Fallback(DefinitionInference {
+        expressions,
+        bindings,
+        declarations,
+        #[cfg(debug_assertions)]
+        scope: *scope,
+        extra,
+    })
 }
 
 fn definition_cycle_initial<'db>(
@@ -158,7 +285,7 @@ fn definition_cycle_initial<'db>(
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-#[salsa::tracked(returns(ref), cycle_initial=deferred_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recovery, cycle_initial=deferred_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -179,11 +306,33 @@ pub(crate) fn infer_deferred_types<'db>(
         .finish_definition()
 }
 
+fn deferred_cycle_recovery<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_inference: &DefinitionInference<'db>,
+    inference: &DefinitionInference<'db>,
+    _count: u32,
+    definition: Definition<'db>,
+) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
+    definition_cycle_recover_inner(
+        db,
+        previous_inference,
+        inference,
+        DivergenceKind::InferDeferredTypes(definition),
+    )
+}
+
 fn deferred_cycle_initial<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_initial(definition.scope(db), Type::Never)
+    DefinitionInference::cycle_initial(
+        definition.scope(db),
+        Type::divergent(DivergentType::new(
+            db,
+            DivergenceKind::InferDeferredTypes(definition),
+        )),
+    )
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).
@@ -226,7 +375,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression(input)
+    .finish_expression()
 }
 
 /// Infer the type of an expression in isolation.
@@ -248,14 +397,61 @@ pub(crate) fn infer_isolated_expression<'db>(
 }
 
 fn expression_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _id: salsa::Id,
-    _last_provisional_value: &ExpressionInference<'db>,
-    _value: &ExpressionInference<'db>,
+    previous_inference: &ExpressionInference<'db>,
+    inference: &ExpressionInference<'db>,
     _count: u32,
-    _input: InferExpression<'db>,
+    input: InferExpression<'db>,
 ) -> salsa::CycleRecoveryAction<ExpressionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    let ExpressionInference {
+        expressions,
+        #[cfg(debug_assertions)]
+        scope,
+        extra,
+    } = inference;
+
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferExpressionTypes(input),
+    ));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    let extra = extra.as_ref().map(|extra| {
+        let mut bindings = extra.bindings.clone();
+        for (binding, binding_ty) in &mut bindings {
+            if let Some((_, previous_binding)) =
+                previous_inference.extra.as_deref().and_then(|extra| {
+                    extra
+                        .bindings
+                        .iter()
+                        .find(|(previous_binding, _)| previous_binding == binding)
+                })
+            {
+                *binding_ty = UnionType::from_elements(db, [*binding_ty, *previous_binding])
+                    .recursive_type_normalized(db, &visitor);
+            } else {
+                *binding_ty = binding_ty.recursive_type_normalized(db, &visitor);
+            }
+        }
+        Box::new(ExpressionInferenceExtra {
+            cycle_recovery: extra.cycle_recovery,
+            diagnostics: extra.diagnostics.clone(),
+            bindings,
+            all_definitely_bound: extra.all_definitely_bound,
+        })
+    });
+    let mut expressions = expressions.clone();
+    for (expr, ty) in &mut expressions {
+        let previous_ty = previous_inference.expression_type(*expr);
+        *ty = UnionType::from_elements(db, [*ty, previous_ty])
+            .recursive_type_normalized(db, &visitor);
+    }
+    salsa::CycleRecoveryAction::Fallback(ExpressionInference {
+        expressions,
+        extra,
+        #[cfg(debug_assertions)]
+        scope: *scope,
+    })
 }
 
 fn expression_cycle_initial<'db>(
@@ -299,7 +495,7 @@ pub(crate) fn infer_expression_type<'db>(
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(cycle_initial=single_expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
     let file = input.expression(db).file(db);
     let module = parsed_module(db, file).load(db);
@@ -307,15 +503,26 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     // It's okay to call the "same file" version here because we're inside a salsa query.
     let inference = infer_expression_types_impl(db, input);
 
+    inference.expression_type(input.expression(db).node_ref(db, &module))
+}
+
+fn single_expression_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_cycle_value: &Type<'db>,
+    result: &Type<'db>,
+    _count: u32,
+    input: InferExpression<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
     let div = Type::divergent(DivergentType::new(
         db,
         DivergenceKind::InferExpression(input),
     ));
-    let previous_cycle_value = infer_expression_type_impl(db, input);
     let visitor = RecursiveTypeNormalizedVisitor::new(div);
-    let result_ty = inference.expression_type(input.expression(db).node_ref(db, &module));
-    UnionType::from_elements(db, [result_ty, previous_cycle_value])
-        .recursive_type_normalized(db, &visitor)
+    let ty = UnionType::from_elements(db, [*result, *previous_cycle_value])
+        .recursive_type_normalized(db, &visitor);
+
+    salsa::CycleRecoveryAction::Fallback(ty)
 }
 
 fn single_expression_cycle_initial<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
@@ -448,7 +655,7 @@ fn static_expression_truthiness_cycle_initial<'db>(
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-#[salsa::tracked(returns(ref), cycle_initial=unpack_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let module = parsed_module(db, file).load(db);
@@ -457,7 +664,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
 
     let mut unpacker = Unpacker::new(db, unpack.target_scope(db), &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
-    unpacker.finish(unpack)
+    unpacker.finish()
 }
 
 fn unpack_cycle_initial<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
@@ -466,6 +673,34 @@ fn unpack_cycle_initial<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResu
         DivergenceKind::InferUnpackTypes(unpack),
     ));
     UnpackResult::cycle_initial(cycle_recovery)
+}
+
+fn unpack_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_cycle_result: &UnpackResult<'db>,
+    result: &UnpackResult<'db>,
+    _count: u32,
+    unpack: Unpack<'db>,
+) -> salsa::CycleRecoveryAction<UnpackResult<'db>> {
+    let mut targets = result.targets().clone();
+
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferUnpackTypes(unpack),
+    ));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    for (expr, ty) in &mut targets {
+        let previous_ty = previous_cycle_result.expression_type(*expr);
+        *ty = UnionType::from_elements(db, [*ty, previous_ty])
+            .recursive_type_normalized(db, &visitor);
+    }
+
+    salsa::CycleRecoveryAction::Fallback(UnpackResult::new(
+        targets,
+        result.diagnostics().clone(),
+        result.cycle_recovery(),
+    ))
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -597,37 +832,10 @@ impl<'db> ScopeInference<'db> {
         }
 
         let mut union = UnionBuilder::new(db);
-        let div = Type::divergent(DivergentType::new(
-            db,
-            DivergenceKind::InferReturnType(self.scope),
-        ));
+        // Since `returnees` is empty in the initial cycle value, it is necessary to use the value of `cycle_recovery` to propagate `Divergent` properly.
         if let Some(cycle_recovery) = self.cycle_recovery() {
             union = union.add(cycle_recovery);
         }
-        let visitor = RecursiveTypeNormalizedVisitor::new(div);
-        // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
-        // For example, consider the following recursive function:
-        // ```py
-        // def div(n: int):
-        //     if n == 0:
-        //         return None
-        //     else:
-        //         return (div(n-1),)
-        // ```
-        // If we try to infer the return type of this function naively, we will get `tuple[tuple[tuple[...] | None] | None] | None`, which never converges.
-        // So, when we detect a cycle, we set the cycle initial type to `Divergent`. Then the type obtained in the first cycle is `tuple[Divergent] | None`.
-        // Let's call such a type containing `Divergent` a "recursive type".
-        // Next, if there is a type containing a recursive type (let's call this a nested recursive type), we replace the inner recursive type with the `Divergent` type.
-        // All recursive types are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
-        // 0th: Divergent
-        // 1st: tuple[Divergent] | None
-        // 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
-        if let Some(previous_cycle_value) = callee_ty.infer_return_type(db) {
-            // In fixed-point iteration of return type inference, the return type must be monotonically widened and not "oscillate".
-            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-            union = union.add(previous_cycle_value.recursive_type_normalized(db, &visitor));
-        }
-
         let Some(extra) = &self.extra else {
             unreachable!(
                 "infer_return_type should only be called on a function body scope inference"
@@ -637,7 +845,7 @@ impl<'db> ScopeInference<'db> {
             let ty = returnee.map_or(Type::none(db), |expression| {
                 self.expression_type(expression)
             });
-            union = union.add(ty.recursive_type_normalized(db, &visitor));
+            union = union.add(ty);
         }
         let use_def = use_def_map(db, self.scope);
         if use_def.can_implicitly_return_none(db) {
@@ -648,12 +856,7 @@ impl<'db> ScopeInference<'db> {
             // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
             // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
             if !method_ty.is_final(db) {
-                union = union.add(
-                    method_ty
-                        .base_return_type(db)
-                        .unwrap_or(Type::unknown())
-                        .recursive_type_normalized(db, &visitor),
-                );
+                union = union.add(method_ty.base_return_type(db).unwrap_or(Type::unknown()));
             }
         }
 
@@ -787,13 +990,6 @@ impl<'db> DefinitionInference<'db> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 
-    /// When using `DefinitionInference` during type inference,
-    /// use this method to get the cycle recovery type so that divergent types are propagated.
-    #[allow(unused)]
-    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
-        self.fallback_type()
-    }
-
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
@@ -862,12 +1058,6 @@ impl<'db> ExpressionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
-    }
-
-    /// When using `ExpressionInference` during type inference,
-    /// use this method to get the cycle recovery type so that divergent types are propagated.
-    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
-        self.fallback_type()
     }
 
     /// Returns true if all places in this expression are definitely bound.

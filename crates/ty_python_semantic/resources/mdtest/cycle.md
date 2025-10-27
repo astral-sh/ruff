@@ -51,8 +51,6 @@ from typing import Generic, TypeVar
 
 B = TypeVar("B", bound="Base")
 
-# TODO: no error
-# error: [invalid-argument-type] "`typing.TypeVar | typing.TypeVar` is not a valid argument to `Generic`"
 class Base(Generic[B]):
     pass
 ```

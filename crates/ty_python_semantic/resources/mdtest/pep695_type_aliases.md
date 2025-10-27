@@ -327,7 +327,7 @@ class C(P[T]):
     pass
 
 reveal_type(C[int]())  # revealed: C[int]
-reveal_type(C())  # revealed: C[Divergent]
+reveal_type(C())  # revealed: C[C[Divergent]]
 ```
 
 ### Union inside generic

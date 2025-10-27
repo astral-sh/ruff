@@ -85,19 +85,44 @@ use crate::types::{
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, KnownInstanceType, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
     SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
-    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
+    TypeRelation, UnionBuilder, UnionType, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
+// Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
+// For example, consider the following recursive function:
+// ```py
+// def div(n: int):
+//     if n == 0:
+//         return None
+//     else:
+//         return (div(n-1),)
+// ```
+// If we try to infer the return type of this function naively, we will get `tuple[tuple[tuple[...] | None] | None] | None`, which never converges.
+// So, when we detect a cycle, we set the cycle initial type to `Divergent`. Then the type obtained in the first cycle is `tuple[Divergent] | None`.
+// Let's call such a type containing `Divergent` a "recursive type".
+// Next, if there is a type containing a recursive type (let's call this a nested recursive type), we replace the inner recursive type with the `Divergent` type.
+// All recursive types are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
+// 0th: Divergent
+// 1st: tuple[Divergent] | None
+// 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
 fn return_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _id: salsa::Id,
-    _last_provisional_value: &Type<'db>,
-    _value: &Type<'db>,
+    previous_return_type: &Type<'db>,
+    return_type: &Type<'db>,
     _count: u32,
-    _self: FunctionType<'db>,
+    function: FunctionType<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferReturnType(function.literal(db).last_definition(db).body_scope(db)),
+    ));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    salsa::CycleRecoveryAction::Fallback(
+        UnionType::from_elements(db, [*previous_return_type, *return_type])
+            .recursive_type_normalized(db, &visitor),
+    )
 }
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {

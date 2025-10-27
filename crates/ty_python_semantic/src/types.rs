@@ -71,7 +71,7 @@ use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_type, exceeds_max_specialization_depth};
+use crate::types::visitor::any_over_type;
 use crate::unpack::{EvaluationMode, Unpack};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -115,14 +115,28 @@ mod definition;
 mod property_tests;
 
 fn return_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _id: salsa::Id,
-    _last_provisional_value: &Type<'db>,
-    _value: &Type<'db>,
+    previous_return_type: &Type<'db>,
+    return_type: &Type<'db>,
     _count: u32,
-    _self: BoundMethodType<'db>,
+    method: BoundMethodType<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferReturnType(
+            method
+                .function(db)
+                .literal(db)
+                .last_definition(db)
+                .body_scope(db),
+        ),
+    ));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    salsa::CycleRecoveryAction::Fallback(
+        UnionType::from_elements(db, [*previous_return_type, *return_type])
+            .recursive_type_normalized(db, &visitor),
+    )
 }
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Type<'db> {
@@ -178,11 +192,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    if let Some(cycle_recovery) = inference.cycle_recovery() {
-        UnionType::from_elements(db, [inference.binding_type(definition), cycle_recovery])
-    } else {
-        inference.binding_type(definition)
-    }
+    inference.binding_type(definition)
 }
 
 /// Infer the type of a declaration.
@@ -191,13 +201,7 @@ pub(crate) fn declaration_type<'db>(
     definition: Definition<'db>,
 ) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
-    if let Some(cycle_recovery) = inference.cycle_recovery() {
-        let decl_ty = inference.declaration_type(definition);
-        let union = UnionType::from_elements(db, [decl_ty.inner_type(), cycle_recovery]);
-        TypeAndQualifiers::new(union, TypeOrigin::Declared, decl_ty.qualifiers())
-    } else {
-        inference.declaration_type(definition)
-    }
+    inference.declaration_type(definition)
 }
 
 pub(crate) fn undecorated_type<'db>(
@@ -205,14 +209,7 @@ pub(crate) fn undecorated_type<'db>(
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
     let inference = infer_definition_types(db, definition);
-    if let Some(cycle_recovery) = inference.cycle_recovery() {
-        Some(UnionType::from_elements(
-            db,
-            [inference.undecorated_type()?, cycle_recovery],
-        ))
-    } else {
-        inference.undecorated_type()
-    }
+    inference.undecorated_type()
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -234,11 +231,7 @@ fn definition_expression_type<'db>(
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
         if let Some(ty) = inference.try_expression_type(expression) {
-            if let Some(cycle_recovery) = inference.cycle_recovery() {
-                UnionType::from_elements(db, [ty, cycle_recovery])
-            } else {
-                ty
-            }
+            ty
         } else {
             infer_deferred_types(db, definition).expression_type(expression)
         }
@@ -474,6 +467,32 @@ fn member_lookup_cycle_initial<'db>(
     .into()
 }
 
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+fn member_lookup_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_member: &PlaceAndQualifiers<'db>,
+    member: &PlaceAndQualifiers<'db>,
+    _count: u32,
+    self_type: Type<'db>,
+    name: Name,
+    policy: MemberLookupPolicy,
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::MemberLookupWithPolicy {
+            self_type,
+            name,
+            policy,
+        },
+    ));
+    let place = union_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
+    salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
+        place,
+        qualifiers: member.qualifiers,
+    })
+}
+
 #[allow(clippy::needless_pass_by_value)]
 fn class_lookup_cycle_initial<'db>(
     db: &'db dyn Db,
@@ -490,6 +509,56 @@ fn class_lookup_cycle_initial<'db>(
         },
     )))
     .into()
+}
+
+fn union_with_previous_cycle_place<'db>(
+    db: &'db dyn Db,
+    previous_place: &Place<'db>,
+    place: &Place<'db>,
+    div: Type<'db>,
+) -> Place<'db> {
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    match (previous_place, place) {
+        // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
+        // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+        (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => Place::Defined(
+            UnionType::from_elements(db, [prev_ty, ty]).recursive_type_normalized(db, &visitor),
+            *origin,
+            *definedness,
+        ),
+        (_, Place::Defined(ty, origin, definedness)) => Place::Defined(
+            ty.recursive_type_normalized(db, &visitor),
+            *origin,
+            *definedness,
+        ),
+        (_, Place::Undefined) => Place::Undefined,
+    }
+}
+
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+fn class_lookup_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_member: &PlaceAndQualifiers<'db>,
+    member: &PlaceAndQualifiers<'db>,
+    _count: u32,
+    self_type: Type<'db>,
+    name: Name,
+    policy: MemberLookupPolicy,
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::ClassLookupWithPolicy {
+            self_type,
+            name,
+            policy,
+        },
+    ));
+    let place = union_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
+    salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
+        place,
+        qualifiers: member.qualifiers,
+    })
 }
 
 fn variance_cycle_initial<'db, T>(
@@ -911,10 +980,6 @@ impl<'db> Type<'db> {
 
     pub(crate) fn divergent(divergent: DivergentType<'db>) -> Self {
         Self::Dynamic(DynamicType::Divergent(divergent))
-    }
-
-    pub(crate) const fn is_divergent(&self) -> bool {
-        matches!(self, Type::Dynamic(DynamicType::Divergent(_)))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -3811,7 +3876,7 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -3819,7 +3884,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
-        let result = match self {
+        match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
@@ -3837,30 +3902,7 @@ impl<'db> Type<'db> {
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
-        };
-        result.map_type(|ty| {
-            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
-            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-            let previous_cycle_value = self.class_member_with_policy(db, name.clone(), policy);
-
-            let ty =
-                if let Some(previous_ty) = previous_cycle_value.place.ignore_possibly_undefined() {
-                    UnionType::from_elements(db, [ty, previous_ty])
-                } else {
-                    ty
-                };
-
-            let div = Type::divergent(DivergentType::new(
-                db,
-                DivergenceKind::ClassLookupWithPolicy {
-                    self_type: self,
-                    name,
-                    policy,
-                },
-            ));
-            let visitor = RecursiveTypeNormalizedVisitor::new(div);
-            ty.recursive_type_normalized(db, &visitor)
-        })
+        }
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -4299,7 +4341,7 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -4313,7 +4355,7 @@ impl<'db> Type<'db> {
 
         let name_str = name.as_str();
 
-        let result = match self {
+        match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
@@ -4655,30 +4697,7 @@ impl<'db> Type<'db> {
                     .try_call_dunder_get_on_attribute(db, owner_attr.clone())
                     .unwrap_or(owner_attr)
             }
-        };
-        result.map_type(|ty| {
-            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
-            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-            let previous_cycle_value = self.member_lookup_with_policy(db, name.clone(), policy);
-
-            let ty =
-                if let Some(previous_ty) = previous_cycle_value.place.ignore_possibly_undefined() {
-                    UnionType::from_elements(db, [ty, previous_ty])
-                } else {
-                    ty
-                };
-
-            let div = Type::divergent(DivergentType::new(
-                db,
-                DivergenceKind::MemberLookupWithPolicy {
-                    self_type: self,
-                    name,
-                    policy,
-                },
-            ));
-            let visotor = RecursiveTypeNormalizedVisitor::new(div);
-            ty.recursive_type_normalized(db, &visotor)
-        })
+        }
     }
 
     /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
@@ -6899,7 +6918,7 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
-                     specialization.get(db, bound_typevar).unwrap_or(self).fallback_to_divergent(db)
+                    specialization.get(db, bound_typevar).unwrap_or(self)
                 }
                 TypeMapping::PartialSpecialization(partial) => {
                     partial.get(db, bound_typevar).unwrap_or(self)
@@ -7465,19 +7484,6 @@ impl<'db> Type<'db> {
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
         any_over_type(db, self, &|ty| ty == div, false)
     }
-
-    /// If the specialization depth of `self` exceeds the maximum limit allowed,
-    /// return `Divergent`. Otherwise, return `self`.
-    pub(super) fn fallback_to_divergent(self, db: &'db dyn Db) -> Type<'db> {
-        if exceeds_max_specialization_depth(db, self) {
-            Type::divergent(DivergentType::new(
-                db,
-                DivergenceKind::ApplySpecialization(None),
-            ))
-        } else {
-            self
-        }
-    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -7952,12 +7958,14 @@ pub enum DivergenceKind<'db> {
     InferExpressionTypes(InferExpression<'db>),
     /// Divergence from `infer_definition_types`.
     InferDefinitionTypes(Definition<'db>),
+    /// Divergence from `infer_deferred_types`.
+    InferDeferredTypes(Definition<'db>),
     /// Divergence from `infer_scope_types`.
     InferScopeTypes(ScopeId<'db>),
     /// Divergence from `infer_unpack_types`.
     InferUnpackTypes(Unpack<'db>),
-    /// Divergence from `apply_specialization`.
-    ApplySpecialization(Option<ScopeId<'db>>),
+    /// Divergence from `lazy_default`.
+    LazyDefault(TypeVarInstance<'db>),
 }
 
 pub(crate) type CycleRecoveryType<'db> = Type<'db>;
@@ -8730,7 +8738,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }
 
-    #[salsa::tracked(cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -8777,11 +8785,34 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
     None
 }
 
+#[allow(clippy::ref_option)]
+fn lazy_default_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_default: &Option<Type<'db>>,
+    default: &Option<Type<'db>>,
+    _count: u32,
+    typevar: TypeVarInstance<'db>,
+) -> salsa::CycleRecoveryAction<Option<Type<'db>>> {
+    let div = Type::divergent(DivergentType::new(db, DivergenceKind::LazyDefault(typevar)));
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
+    let ty = match (previous_default, default) {
+        (Some(prev), Some(default)) => Some(
+            UnionType::from_elements(db, [*prev, *default]).recursive_type_normalized(db, &visitor),
+        ),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, &visitor)),
+        (_, None) => None,
+    };
+    salsa::CycleRecoveryAction::Fallback(ty)
+}
+
+#[allow(clippy::unnecessary_wraps)]
 fn lazy_default_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: TypeVarInstance<'db>,
+    db: &'db dyn Db,
+    typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    let div = Type::divergent(DivergentType::new(db, DivergenceKind::LazyDefault(typevar)));
+    Some(div)
 }
 
 /// Where a type variable is bound and usable.

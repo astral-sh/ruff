@@ -584,7 +584,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(element_ty.fallback_to_divergent(self.db()));
+                        element_types.push(element_ty);
                     }
                 }
 

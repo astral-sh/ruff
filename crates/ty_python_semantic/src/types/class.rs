@@ -38,7 +38,7 @@ use crate::types::{
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
     RecursiveTypeNormalizedVisitor, StringLiteralType, TypeAliasType, TypeContext, TypeMapping,
     TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
-    determine_upper_bound, exceeds_max_specialization_depth,
+    determine_upper_bound, union_with_previous_cycle_place,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -101,6 +101,35 @@ fn implicit_attribute_initial<'db>(
         )))
         .into(),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn implicit_attribute_cycle_recover<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    previous_member: &Member<'db>,
+    member: &Member<'db>,
+    _count: u32,
+    class_body_scope: ScopeId<'db>,
+    name: String,
+    target_method_decorator: MethodDecorator,
+) -> salsa::CycleRecoveryAction<Member<'db>> {
+    let div = Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::ImplicitAttribute {
+            class_body_scope,
+            name,
+            target_method_decorator,
+        },
+    ));
+    let place =
+        union_with_previous_cycle_place(db, &previous_member.inner.place, &member.inner.place, div);
+    salsa::CycleRecoveryAction::Fallback(Member {
+        inner: PlaceAndQualifiers {
+            place,
+            qualifiers: member.inner.qualifiers,
+        },
+    })
 }
 
 fn try_mro_cycle_initial<'db>(
@@ -1551,20 +1580,7 @@ impl<'db> ClassLiteral<'db> {
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
-                let mut specialization = f(generic_context);
-
-                for (idx, ty) in specialization.types(db).iter().enumerate() {
-                    if exceeds_max_specialization_depth(db, *ty) {
-                        specialization = specialization.with_replaced_type(
-                            db,
-                            idx,
-                            Type::divergent(DivergentType::new(
-                                db,
-                                DivergenceKind::ApplySpecialization(Some(self.body_scope(db))),
-                            )),
-                        );
-                    }
-                }
+                let specialization = f(generic_context);
 
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
@@ -3061,7 +3077,9 @@ impl<'db> ClassLiteral<'db> {
         )
     }
 
-    #[salsa::tracked(cycle_initial=implicit_attribute_initial,
+    #[salsa::tracked(
+        cycle_fn=implicit_attribute_cycle_recover,
+        cycle_initial=implicit_attribute_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn implicit_attribute_inner(
@@ -3084,16 +3102,6 @@ impl<'db> ClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-        let div = DivergentType::new(
-            db,
-            DivergenceKind::ImplicitAttribute {
-                class_body_scope,
-                name: name.clone(),
-                target_method_decorator,
-            },
-        );
-        let visitor = RecursiveTypeNormalizedVisitor::new(Type::divergent(div));
-
         let is_valid_scope = |method_scope: &Scope| {
             if let Some(method_def) = method_scope.node().as_function() {
                 let method_name = method_def.node(&module).name.as_str();
@@ -3154,10 +3162,7 @@ impl<'db> ClassLiteral<'db> {
                             TypeContext::default(),
                         );
                         return Member {
-                            inner: Place::bound(
-                                inferred_ty.recursive_type_normalized(db, &visitor),
-                            )
-                            .with_qualifiers(all_qualifiers),
+                            inner: Place::bound(inferred_ty).with_qualifiers(all_qualifiers),
                         };
                     }
 
@@ -3172,20 +3177,6 @@ impl<'db> ClassLiteral<'db> {
 
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
-        }
-        if let Place::Defined(previous_cycle_type, _, _) = Self::implicit_attribute_inner(
-            db,
-            class_body_scope,
-            name.clone(),
-            target_method_decorator,
-        )
-        .inner
-        .place
-        {
-            // In fixed-point iteration of type inference, the attribute type must be monotonically widened and not "oscillate".
-            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-            union_of_inferred_types = union_of_inferred_types
-                .add(previous_cycle_type.recursive_type_normalized(db, &visitor));
         }
 
         for (attribute_assignments, method_scope_id) in
@@ -3248,8 +3239,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let inferred_ty = unpacked.expression_type(assign.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                             TargetKind::Single => {
                                 // We found an un-annotated attribute assignment of the form:
@@ -3262,8 +3252,7 @@ impl<'db> ClassLiteral<'db> {
                                     TypeContext::default(),
                                 );
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                         }
                     }
@@ -3278,8 +3267,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(for_stmt.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -3295,8 +3283,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                         }
                     }
@@ -3311,8 +3298,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(with_item.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -3330,8 +3316,7 @@ impl<'db> ClassLiteral<'db> {
                                     context_ty.enter(db)
                                 };
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                         }
                     }
@@ -3347,8 +3332,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(comprehension.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -3364,8 +3348,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.recursive_type_normalized(db, &visitor));
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
                         }
                     }
