@@ -983,7 +983,7 @@ mod tests {
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",
-            path.to_string_lossy().replace('\\', "/"),
+            path.to_string_lossy(),
             python_version
         );
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
@@ -1000,7 +1000,9 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_diagnostics!(format!("{snapshot}"), diagnostics);
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+                assert_diagnostics!(format!("{snapshot}"), diagnostics);
+        });
 
         Ok(())
     }
