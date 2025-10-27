@@ -2,10 +2,7 @@
 
 Regression test for <https://github.com/astral-sh/ty/issues/1377>.
 
-The code is an excerpt from <https://github.com/Gobot1234/steam.py> that is minimal enough to
-trigger the iteration count mismatch bug in Salsa.
-
-<!-- expect-panic: execute: too many cycle iterations -->
+The code is an excerpt from <https://github.com/Gobot1234/steam.py>.
 
 ```toml
 [environment]
