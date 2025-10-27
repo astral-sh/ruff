@@ -96,3 +96,15 @@ base_secret_backend.get_connections()
 # airflow.secrets.local_filesystem
 lfb = LocalFilesystemBackend()
 lfb.get_connections()
+
+from airflow import DAG
+
+# airflow.DAG
+test_dag = DAG(dag_id="test_dag")
+test_dag.create_dagrun()
+
+from airflow.models.dag import DAG
+
+# airflow.models.dag.DAG
+test_dag = DAG(dag_id="test_dag")
+test_dag.create_dagrun()

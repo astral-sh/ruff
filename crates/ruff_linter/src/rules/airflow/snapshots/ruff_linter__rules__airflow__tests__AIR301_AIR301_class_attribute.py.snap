@@ -623,16 +623,41 @@ help: Use `get_connection` instead
 97 | lfb = LocalFilesystemBackend()
 
 AIR301 [*] `get_connections` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:98:5
-   |
-96 | # airflow.secrets.local_filesystem
-97 | lfb = LocalFilesystemBackend()
-98 | lfb.get_connections()
-   |     ^^^^^^^^^^^^^^^
-   |
+   --> AIR301_class_attribute.py:98:5
+    |
+ 96 | # airflow.secrets.local_filesystem
+ 97 | lfb = LocalFilesystemBackend()
+ 98 | lfb.get_connections()
+    |     ^^^^^^^^^^^^^^^
+ 99 |
+100 | from airflow import DAG
+    |
 help: Use `get_connection` instead
-95 | 
-96 | # airflow.secrets.local_filesystem
-97 | lfb = LocalFilesystemBackend()
-   - lfb.get_connections()
-98 + lfb.get_connection()
+95  | 
+96  | # airflow.secrets.local_filesystem
+97  | lfb = LocalFilesystemBackend()
+    - lfb.get_connections()
+98  + lfb.get_connection()
+99  | 
+100 | from airflow import DAG
+101 | 
+
+AIR301 `create_dagrun` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:104:10
+    |
+102 | # airflow.DAG
+103 | test_dag = DAG(dag_id="test_dag")
+104 | test_dag.create_dagrun()
+    |          ^^^^^^^^^^^^^
+105 |
+106 | from airflow.models.dag import DAG
+    |
+
+AIR301 `create_dagrun` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:110:10
+    |
+108 | # airflow.models.dag.DAG
+109 | test_dag = DAG(dag_id="test_dag")
+110 | test_dag.create_dagrun()
+    |          ^^^^^^^^^^^^^
+    |
