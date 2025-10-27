@@ -163,6 +163,11 @@ def given_constraints[T]():
     static_assert(is_subtype_of_given(given_bool, T, bool))
     static_assert(not is_subtype_of_given(given_bool, T, str))
 
+    given_both = given_bool & given_int
+    static_assert(is_subtype_of_given(given_both, T, int))
+    static_assert(is_subtype_of_given(given_both, T, bool))
+    static_assert(not is_subtype_of_given(given_both, T, str))
+
     given_str = range_constraint(Never, T, str)
     static_assert(not is_subtype_of_given(given_str, T, int))
     static_assert(not is_subtype_of_given(given_str, T, bool))
