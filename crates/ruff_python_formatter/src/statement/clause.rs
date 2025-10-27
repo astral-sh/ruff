@@ -719,7 +719,17 @@ fn should_suppress_clause(
     f: &mut Formatter<PyFormatContext<'_>>,
 ) -> FormatResult<bool> {
     let source = f.context().source();
+
     let Some(last_child_in_clause) = clause.format_header.header.last_child_in_clause() else {
+        return Ok(false);
+    };
+
+    // Early return if we don't have a skip comment
+    // to avoid computing header range in the common case
+    if !has_skip_comment(
+        f.context().comments().trailing(last_child_in_clause),
+        source,
+    ) {
         return Ok(false);
     };
 
@@ -732,10 +742,9 @@ fn should_suppress_clause(
         return Ok(false);
     }
 
-    Ok(has_skip_comment(
-        f.context().comments().trailing(last_child_in_clause),
-        f.context().source(),
-    ))
+    // Recall that we already checked whether there was
+    // a skip comment
+    Ok(true)
 }
 
 #[cold]
