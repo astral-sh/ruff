@@ -10,7 +10,11 @@ use crate::semantic_index::global_scope;
 use crate::types::{Truthiness, Type, infer_scope_expression_type};
 use crate::{Db, ModuleName, resolve_module};
 
-fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet<Name>> {
+fn dunder_all_names_cycle_initial(
+    _db: &dyn Db,
+    _id: salsa::Id,
+    _file: File,
+) -> Option<FxHashSet<Name>> {
     None
 }
 

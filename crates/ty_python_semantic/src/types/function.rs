@@ -81,11 +81,11 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DeprecatedInstance, DivergenceKind, DivergentType, DynamicType,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext, TypeMapping,
-    TypeRelation, UnionBuilder, UnionType, binding_type, todo_type, walk_signature,
+    ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    NormalizedVisitor, RecursiveTypeNormalizedVisitor, SpecialFormType, TrackedConstraintSet,
+    Truthiness, Type, TypeContext, TypeMapping, TypeRelation, UnionBuilder, UnionType,
+    binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -108,16 +108,13 @@ use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 // 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
 fn return_type_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     previous_return_type: &Type<'db>,
     return_type: &Type<'db>,
     _count: u32,
-    function: FunctionType<'db>,
+    _function: FunctionType<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
-    let div = Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::InferReturnType(function.literal(db).last_definition(db).body_scope(db)),
-    ));
+    let div = Type::divergent(id);
     let visitor = RecursiveTypeNormalizedVisitor::new(div);
     salsa::CycleRecoveryAction::Fallback(
         UnionType::from_elements(db, [*previous_return_type, *return_type])
@@ -125,11 +122,12 @@ fn return_type_cycle_recover<'db>(
     )
 }
 
-fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent(DivergentType::new(
-        db,
-        DivergenceKind::InferReturnType(function.literal(db).last_definition(db).body_scope(db)),
-    )))
+fn return_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _function: FunctionType<'db>,
+) -> Type<'db> {
+    Type::divergent(id)
 }
 
 /// A collection of useful spans for annotating functions.
@@ -700,6 +698,7 @@ impl<'db> FunctionLiteral<'db> {
 
 fn overloads_and_implementation_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _function: FunctionLiteral<'db>,
 ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
     (Box::new([]), None)
@@ -1275,16 +1274,18 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
 
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
+    id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom())
+    CallableSignature::single(Signature::divergent(id))
 }
 
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
+    id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
-    Signature::bottom()
+    Signature::divergent(id)
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might

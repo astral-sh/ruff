@@ -244,7 +244,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
-fn dynamic_elements_ordering<'db>(left: DynamicType<'db>, right: DynamicType<'db>) -> Ordering {
+fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering {
     match (left, right) {
         (DynamicType::Any, _) => Ordering::Less,
         (_, DynamicType::Any) => Ordering::Greater,

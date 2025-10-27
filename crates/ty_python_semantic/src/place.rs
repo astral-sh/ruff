@@ -697,6 +697,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 
 fn place_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
@@ -1528,7 +1529,10 @@ mod implicit_globals {
             .collect()
     }
 
-    fn module_type_symbols_initial(_db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+    fn module_type_symbols_initial(
+        _db: &dyn Db,
+        _id: salsa::Id,
+    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         smallvec::SmallVec::default()
     }
 

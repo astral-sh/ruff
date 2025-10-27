@@ -675,7 +675,12 @@ impl<'db> ProtocolInstanceType<'db> {
                 .is_always_satisfied()
         }
 
-        fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
+        fn initial<'db>(
+            _db: &'db dyn Db,
+            _id: salsa::Id,
+            _value: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> bool {
             true
         }
 

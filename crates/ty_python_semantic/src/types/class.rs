@@ -33,12 +33,12 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
-    DataclassParams, DeprecatedInstance, DivergenceKind, DivergentType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    RecursiveTypeNormalizedVisitor, StringLiteralType, TypeAliasType, TypeContext, TypeMapping,
-    TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
-    determine_upper_bound, union_with_previous_cycle_place,
+    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, RecursiveTypeNormalizedVisitor,
+    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    union_with_previous_cycle_place,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -71,57 +71,47 @@ use rustc_hash::FxHashSet;
 
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
+    // TODO: divergent
     Box::default()
 }
 
 fn inheritance_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
+    // TODO: divergent
     None
 }
 
 #[allow(clippy::needless_pass_by_value)]
 fn implicit_attribute_initial<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    name: String,
-    target_method_decorator: MethodDecorator,
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
     Member {
-        inner: Place::bound(Type::divergent(DivergentType::new(
-            db,
-            DivergenceKind::ImplicitAttribute {
-                class_body_scope,
-                name,
-                target_method_decorator,
-            },
-        )))
-        .into(),
+        inner: Place::bound(Type::divergent(id)).into(),
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     previous_member: &Member<'db>,
     member: &Member<'db>,
     _count: u32,
-    class_body_scope: ScopeId<'db>,
-    name: String,
-    target_method_decorator: MethodDecorator,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
 ) -> salsa::CycleRecoveryAction<Member<'db>> {
-    let div = Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::ImplicitAttribute {
-            class_body_scope,
-            name,
-            target_method_decorator,
-        },
-    ));
+    let div = Type::divergent(id);
     let place =
         union_with_previous_cycle_place(db, &previous_member.inner.place, &member.inner.place, div);
     salsa::CycleRecoveryAction::Fallback(Member {
@@ -134,6 +124,7 @@ fn implicit_attribute_cycle_recover<'db>(
 
 fn try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     self_: ClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
 ) -> Result<Mro<'db>, MroError<'db>> {
@@ -144,13 +135,18 @@ fn try_mro_cycle_initial<'db>(
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassLiteral<'db>) -> bool {
+fn is_typed_dict_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: ClassLiteral<'db>,
+) -> bool {
     false
 }
 
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self_: ClassLiteral<'db>,
 ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
     Err(MetaclassError {
@@ -158,8 +154,12 @@ fn try_metaclass_cycle_initial<'db>(
     })
 }
 
-fn into_callable_cycle_initial<'db>(db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
-    Type::Callable(CallableType::bottom(db))
+fn into_callable_cycle_initial<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    _self: ClassType<'db>,
+) -> Type<'db> {
+    Type::Callable(CallableType::divergent(db, id))
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -213,6 +213,7 @@ impl<'db> CodeGeneratorKind<'db> {
 
         fn code_generator_of_class_initial<'db>(
             _db: &'db dyn Db,
+            _id: salsa::Id,
             _class: ClassLiteral<'db>,
             _specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
@@ -1409,11 +1410,13 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
+#[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
+    id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
-    None
+    Some(GenericContext::cycle_initial(db, id))
 }
 
 #[salsa::tracked]

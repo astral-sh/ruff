@@ -94,8 +94,13 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn bottom() -> Self {
         Self::single(Signature::bottom())
+    }
+
+    pub(crate) fn divergent(id: salsa::Id) -> Self {
+        Self::single(Signature::divergent(id))
     }
 
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
@@ -474,6 +479,11 @@ impl<'db> Signature<'db> {
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
         Self::new(Parameters::object(), Some(Type::Never))
+    }
+
+    /// Return the "bottom" signature, subtype of all other fully-static signatures.
+    pub(crate) fn divergent(id: salsa::Id) -> Self {
+        Self::new(Parameters::object(), Some(Type::divergent(id)))
     }
 
     pub(crate) fn with_inherited_generic_context(

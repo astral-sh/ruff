@@ -43,7 +43,6 @@ use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
-use crate::types::class::MethodDecorator;
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension,
@@ -62,7 +61,6 @@ use crate::types::generics::{
     InferableTypeVars, PartialSpecialization, Specialization, bind_typevar, typing_self,
     walk_generic_context,
 };
-use crate::types::infer::InferExpression;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
@@ -72,7 +70,7 @@ pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_t
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::unpack::{EvaluationMode, Unpack};
+use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
@@ -116,22 +114,13 @@ mod property_tests;
 
 fn return_type_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     previous_return_type: &Type<'db>,
     return_type: &Type<'db>,
     _count: u32,
-    method: BoundMethodType<'db>,
+    _method: BoundMethodType<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
-    let div = Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::InferReturnType(
-            method
-                .function(db)
-                .literal(db)
-                .last_definition(db)
-                .body_scope(db),
-        ),
-    ));
+    let div = Type::divergent(id);
     let visitor = RecursiveTypeNormalizedVisitor::new(div);
     salsa::CycleRecoveryAction::Fallback(
         UnionType::from_elements(db, [*previous_return_type, *return_type])
@@ -139,17 +128,12 @@ fn return_type_cycle_recover<'db>(
     )
 }
 
-fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Type<'db> {
-    Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::InferReturnType(
-            method
-                .function(db)
-                .literal(db)
-                .last_definition(db)
-                .body_scope(db),
-        ),
-    ))
+fn return_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _method: BoundMethodType<'db>,
+) -> Type<'db> {
+    Type::divergent(id)
 }
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
@@ -451,41 +435,27 @@ impl get_size2::GetSize for MemberLookupPolicy {}
 
 #[allow(clippy::needless_pass_by_value)]
 fn member_lookup_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_type: Type<'db>,
-    name: Name,
-    policy: MemberLookupPolicy,
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _self_type: Type<'db>,
+    _name: Name,
+    _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::MemberLookupWithPolicy {
-            self_type,
-            name,
-            policy,
-        },
-    )))
-    .into()
+    Place::bound(Type::divergent(id)).into()
 }
 
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     previous_member: &PlaceAndQualifiers<'db>,
     member: &PlaceAndQualifiers<'db>,
     _count: u32,
-    self_type: Type<'db>,
-    name: Name,
-    policy: MemberLookupPolicy,
+    _self_type: Type<'db>,
+    _name: Name,
+    _policy: MemberLookupPolicy,
 ) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
-    let div = Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::MemberLookupWithPolicy {
-            self_type,
-            name,
-            policy,
-        },
-    ));
+    let div = Type::divergent(id);
     let place = union_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
     salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
         place,
@@ -495,20 +465,13 @@ fn member_lookup_cycle_recover<'db>(
 
 #[allow(clippy::needless_pass_by_value)]
 fn class_lookup_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_type: Type<'db>,
-    name: Name,
-    policy: MemberLookupPolicy,
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _self_type: Type<'db>,
+    _name: Name,
+    _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::ClassLookupWithPolicy {
-            self_type,
-            name,
-            policy,
-        },
-    )))
-    .into()
+    Place::bound(Type::divergent(id)).into()
 }
 
 fn union_with_previous_cycle_place<'db>(
@@ -538,22 +501,15 @@ fn union_with_previous_cycle_place<'db>(
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     previous_member: &PlaceAndQualifiers<'db>,
     member: &PlaceAndQualifiers<'db>,
     _count: u32,
-    self_type: Type<'db>,
-    name: Name,
-    policy: MemberLookupPolicy,
+    _self_type: Type<'db>,
+    _name: Name,
+    _policy: MemberLookupPolicy,
 ) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
-    let div = Type::divergent(DivergentType::new(
-        db,
-        DivergenceKind::ClassLookupWithPolicy {
-            self_type,
-            name,
-            policy,
-        },
-    ));
+    let div = Type::divergent(id);
     let place = union_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
     salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
         place,
@@ -563,6 +519,7 @@ fn class_lookup_cycle_recover<'db>(
 
 fn variance_cycle_initial<'db, T>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: T,
     _typevar: BoundTypeVarInstance<'db>,
 ) -> TypeVarVariance {
@@ -868,7 +825,7 @@ impl<'db> DataclassParams<'db> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
-    Dynamic(DynamicType<'db>),
+    Dynamic(DynamicType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -978,8 +935,8 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(divergent: DivergentType<'db>) -> Self {
-        Self::Dynamic(DynamicType::Divergent(divergent))
+    pub(crate) fn divergent(id: salsa::Id) -> Self {
+        Self::Dynamic(DynamicType::Divergent(DivergentType { id }))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -1202,7 +1159,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
+    pub(crate) const fn as_dynamic(self) -> Option<DynamicType> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
             _ => None,
@@ -1216,7 +1173,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
+    pub(crate) const fn expect_dynamic(self) -> DynamicType {
         self.as_dynamic().expect("Expected a Type::Dynamic variant")
     }
 
@@ -7594,6 +7551,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_redundant_with_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _subtype: Type<'db>,
     _supertype: Type<'db>,
 ) -> bool {
@@ -7602,10 +7560,11 @@ fn is_redundant_with_cycle_initial<'db>(
 
 fn apply_specialization_cycle_initial<'db>(
     _db: &'db dyn Db,
+    id: salsa::Id,
     _self: Type<'db>,
     _specialization: Specialization<'db>,
 ) -> Type<'db> {
-    Type::Never
+    Type::divergent(id)
 }
 
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
@@ -7929,45 +7888,6 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
-#[allow(private_interfaces)]
-#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub enum DivergenceKind<'db> {
-    /// Divergence from `{FunctionLiteral, BoundMethodType}::infer_return_type`.
-    InferReturnType(ScopeId<'db>),
-    /// Divergence from `ClassLiteral::implicit_attribute_inner`.
-    ImplicitAttribute {
-        class_body_scope: ScopeId<'db>,
-        name: String,
-        target_method_decorator: MethodDecorator,
-    },
-    /// Divergence from `Type::member_lookup_with_policy`.
-    MemberLookupWithPolicy {
-        self_type: Type<'db>,
-        name: Name,
-        policy: MemberLookupPolicy,
-    },
-    /// Divergence from `Type::class_lookup_with_policy`.
-    ClassLookupWithPolicy {
-        self_type: Type<'db>,
-        name: Name,
-        policy: MemberLookupPolicy,
-    },
-    /// Divergence from `infer_expression_type_impl`.
-    InferExpression(InferExpression<'db>),
-    /// Divergence from `infer_expression_types_impl`.
-    InferExpressionTypes(InferExpression<'db>),
-    /// Divergence from `infer_definition_types`.
-    InferDefinitionTypes(Definition<'db>),
-    /// Divergence from `infer_deferred_types`.
-    InferDeferredTypes(Definition<'db>),
-    /// Divergence from `infer_scope_types`.
-    InferScopeTypes(ScopeId<'db>),
-    /// Divergence from `infer_unpack_types`.
-    InferUnpackTypes(Unpack<'db>),
-    /// Divergence from `lazy_default`.
-    LazyDefault(TypeVarInstance<'db>),
-}
-
 pub(crate) type CycleRecoveryType<'db> = Type<'db>;
 
 /// A type that is determined to be divergent during recursive type inference.
@@ -7975,19 +7895,17 @@ pub(crate) type CycleRecoveryType<'db> = Type<'db>;
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct DivergentType<'db> {
-    /// The kind of divergence.
-    #[returns(ref)]
-    kind: DivergenceKind<'db>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+pub struct DivergentType {
+    /// The query ID that caused the cycle.
+    id: salsa::Id,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for DivergentType<'_> {}
+impl get_size2::GetSize for DivergentType {}
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub enum DynamicType<'db> {
+pub enum DynamicType {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
@@ -8010,11 +7928,11 @@ pub enum DynamicType<'db> {
     TodoTypeAlias,
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
-    /// A type that is determined to be divergent during type inference for a recursive function.
-    Divergent(DivergentType<'db>),
+    /// A type that is determined to be divergent during recursive type inference.
+    Divergent(DivergentType),
 }
 
-impl DynamicType<'_> {
+impl DynamicType {
     fn normalized(self) -> Self {
         if matches!(self, Self::Divergent(_)) {
             self
@@ -8028,7 +7946,7 @@ impl DynamicType<'_> {
     }
 }
 
-impl std::fmt::Display for DynamicType<'_> {
+impl std::fmt::Display for DynamicType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
@@ -8780,6 +8698,7 @@ impl<'db> TypeVarInstance<'db> {
 
 fn lazy_bound_or_constraints_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: TypeVarInstance<'db>,
 ) -> Option<TypeVarBoundOrConstraints<'db>> {
     None
@@ -8788,13 +8707,13 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
 #[allow(clippy::ref_option)]
 fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     previous_default: &Option<Type<'db>>,
     default: &Option<Type<'db>>,
     _count: u32,
-    typevar: TypeVarInstance<'db>,
+    _typevar: TypeVarInstance<'db>,
 ) -> salsa::CycleRecoveryAction<Option<Type<'db>>> {
-    let div = Type::divergent(DivergentType::new(db, DivergenceKind::LazyDefault(typevar)));
+    let div = Type::divergent(id);
     let visitor = RecursiveTypeNormalizedVisitor::new(div);
     let ty = match (previous_default, default) {
         (Some(prev), Some(default)) => Some(
@@ -8808,11 +8727,11 @@ fn lazy_default_cycle_recover<'db>(
 
 #[allow(clippy::unnecessary_wraps)]
 fn lazy_default_cycle_initial<'db>(
-    db: &'db dyn Db,
-    typevar: TypeVarInstance<'db>,
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    let div = Type::divergent(DivergentType::new(db, DivergenceKind::LazyDefault(typevar)));
-    Some(div)
+    Some(Type::divergent(id))
 }
 
 /// Where a type variable is bound and usable.
@@ -10340,9 +10259,10 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 fn into_callable_type_cycle_initial<'db>(
     db: &'db dyn Db,
+    id: salsa::Id,
     _self: BoundMethodType<'db>,
 ) -> CallableType<'db> {
-    CallableType::bottom(db)
+    CallableType::divergent(db, id)
 }
 
 #[salsa::tracked]
@@ -10599,8 +10519,17 @@ impl<'db> CallableType<'db> {
     ///
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
+    #[allow(unused)]
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
         Self::new(db, CallableSignature::bottom(), false)
+    }
+
+    /// Create a callable type which represents a divergent "bottom" callable.
+    ///
+    /// Specifically, this represents a callable type with a single signature:
+    /// `(*args: object, **kwargs: object) -> Divergent`.
+    pub(crate) fn divergent(db: &'db dyn Db, id: salsa::Id) -> CallableType<'db> {
+        Self::new(db, CallableSignature::divergent(id), false)
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -11344,13 +11273,18 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: PEP695TypeAliasType<'db>,
 ) -> Option<GenericContext<'db>> {
     None
 }
 
-fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {
-    Type::Never
+fn value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _self: PEP695TypeAliasType<'db>,
+) -> Type<'db> {
+    Type::divergent(id)
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -12230,8 +12164,6 @@ pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
     use crate::place::{typing_extensions_symbol, typing_symbol};
-    use crate::semantic_index::FileScopeId;
-    use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
@@ -12318,17 +12250,8 @@ pub(crate) mod tests {
 
     #[test]
     fn divergent_type() {
-        let mut db = setup_db();
-
-        db.write_dedented("src/foo.py", "").unwrap();
-        let file = system_path_to_file(&db, "src/foo.py").unwrap();
-        let file_scope_id = FileScopeId::global();
-        let scope = file_scope_id.to_scope_id(&db, file);
-
-        let div = Type::divergent(DivergentType::new(
-            &db,
-            DivergenceKind::InferReturnType(scope),
-        ));
+        let db = setup_db();
+        let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.

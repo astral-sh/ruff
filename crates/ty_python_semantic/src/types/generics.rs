@@ -17,8 +17,8 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    CycleRecoveryType, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
     RecursiveTypeNormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionType, declaration_type, walk_bound_type_var_type,
@@ -211,6 +211,7 @@ impl<'db> GenericContextTypeVar<'db> {
 pub struct GenericContext<'db> {
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
+    cycle_recovery: Option<CycleRecoveryType<'db>>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -227,6 +228,10 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
 impl get_size2::GetSize for GenericContext<'_> {}
 
 impl<'db> GenericContext<'db> {
+    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+        Self::new_internal(db, FxOrderMap::default(), Some(Type::divergent(id)))
+    }
+
     fn from_variables(
         db: &'db dyn Db,
         variables: impl IntoIterator<Item = GenericContextTypeVar<'db>>,
@@ -237,6 +242,7 @@ impl<'db> GenericContext<'db> {
                 .into_iter()
                 .map(|variable| (variable.bound_typevar.identity(db), variable))
                 .collect::<FxOrderMap<_, _>>(),
+            None,
         )
     }
 
@@ -632,14 +638,20 @@ impl<'db> GenericContext<'db> {
     }
 
     fn heap_size(
-        (variables,): &(FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,),
+        (variables, cycle_recovery): &(
+            FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
+            Option<CycleRecoveryType<'db>>,
+        ),
     ) -> usize {
-        ruff_memory_usage::order_map_heap_size(variables)
+        use get_size2::GetSize;
+
+        ruff_memory_usage::order_map_heap_size(variables) + cycle_recovery.get_heap_size()
     }
 }
 
 fn inferable_typevars_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: GenericContext<'db>,
 ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
     FxHashSet::default()

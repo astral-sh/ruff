@@ -243,7 +243,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
-    Dynamic(DynamicType<'db>),
+    Dynamic(DynamicType),
 }
 
 impl<'db> SubclassOfInner<'db> {
@@ -262,7 +262,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
         match self {
             Self::Class(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
@@ -304,8 +304,8 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
-    fn from(value: DynamicType<'db>) -> Self {
+impl From<DynamicType> for SubclassOfInner<'_> {
+    fn from(value: DynamicType) -> Self {
         SubclassOfInner::Dynamic(value)
     }
 }
