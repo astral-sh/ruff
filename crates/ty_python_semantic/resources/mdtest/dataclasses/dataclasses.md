@@ -1173,6 +1173,7 @@ and attributes like the MRO are unchanged:
 
 ```py
 from dataclasses import dataclass
+from ty_extensions import reveal_mro
 
 @dataclass
 class Person:
@@ -1180,7 +1181,8 @@ class Person:
     age: int | None = None
 
 reveal_type(type(Person))  # revealed: <class 'type'>
-reveal_type(Person.__mro__)  # revealed: tuple[<class 'Person'>, <class 'object'>]
+reveal_type(Person.__mro__)  # revealed: tuple[type, ...]
+reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'object'>)
 ```
 
 The generated methods have the following signatures:

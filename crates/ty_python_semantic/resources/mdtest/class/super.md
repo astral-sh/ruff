@@ -26,6 +26,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
+from ty_extensions import reveal_mro
 
 class A:
     def a(self): ...
@@ -39,7 +40,7 @@ class C(B):
     def c(self): ...
     cc: int = 3
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
 super(C, C()).a
 super(C, C()).b
@@ -420,6 +421,8 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from ty_extensions import reveal_mro
+
 class A: ...
 
 class B:
@@ -429,8 +432,8 @@ class C(A, B): ...
 class D(B, A): ...
 
 def f(x: C | D):
-    reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>]
-    reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>]
+    reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
+    reveal_mro(D)  # revealed: (<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>

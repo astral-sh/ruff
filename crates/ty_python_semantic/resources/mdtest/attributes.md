@@ -1468,6 +1468,8 @@ C.X = "bar"
 ### Multiple inheritance
 
 ```py
+from ty_extensions import reveal_mro
+
 class O: ...
 
 class F(O):
@@ -1481,8 +1483,8 @@ class C(D, F): ...
 class B(E, D): ...
 class A(B, C): ...
 
-# revealed: tuple[<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>]
-reveal_type(A.__mro__)
+# revealed: (<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
+reveal_mro(A)
 
 # `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
 reveal_type(A.X)  # revealed: Unknown | Literal[42]
@@ -1682,6 +1684,7 @@ Similar principles apply if `Any` appears in the middle of an inheritance hierar
 
 ```py
 from typing import ClassVar, Literal
+from ty_extensions import reveal_mro
 
 class A:
     x: ClassVar[Literal[1]] = 1
@@ -1689,7 +1692,7 @@ class A:
 class B(Any): ...
 class C(B, A): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, Any, <class 'A'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, Any, <class 'A'>, <class 'object'>)
 reveal_type(C.x)  # revealed: Literal[1] & Any
 ```
 
