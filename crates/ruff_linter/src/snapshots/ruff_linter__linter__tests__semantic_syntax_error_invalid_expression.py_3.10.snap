@@ -1,6 +1,15 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
+invalid-syntax: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+ --> resources/test/fixtures/semantic_errors/invalid_expression.py:1:1
+  |
+1 | type X[T: (yield 1)] = int
+  | ^^^^
+2 |
+3 | type Y = (yield 1)
+  |
+
 invalid-syntax: yield expression cannot be used within a TypeVar bound
  --> resources/test/fixtures/semantic_errors/invalid_expression.py:1:12
   |
@@ -8,6 +17,17 @@ invalid-syntax: yield expression cannot be used within a TypeVar bound
   |            ^^^^^^^
 2 |
 3 | type Y = (yield 1)
+  |
+
+invalid-syntax: Cannot use `type` alias statement on Python 3.10 (syntax was added in Python 3.12)
+ --> resources/test/fixtures/semantic_errors/invalid_expression.py:3:1
+  |
+1 | type X[T: (yield 1)] = int
+2 |
+3 | type Y = (yield 1)
+  | ^^^^
+4 |
+5 | def f[T](x: int) -> (y := 3): return x
   |
 
 invalid-syntax: yield expression cannot be used within a type alias
@@ -21,6 +41,17 @@ invalid-syntax: yield expression cannot be used within a type alias
 5 | def f[T](x: int) -> (y := 3): return x
   |
 
+invalid-syntax: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+ --> resources/test/fixtures/semantic_errors/invalid_expression.py:5:6
+  |
+3 | type Y = (yield 1)
+4 |
+5 | def f[T](x: int) -> (y := 3): return x
+  |      ^^^
+6 |
+7 | class C[T]((yield from [object])):
+  |
+
 invalid-syntax: named expression cannot be used within a generic definition
  --> resources/test/fixtures/semantic_errors/invalid_expression.py:5:22
   |
@@ -30,6 +61,16 @@ invalid-syntax: named expression cannot be used within a generic definition
   |                      ^^^^^^
 6 |
 7 | class C[T]((yield from [object])):
+  |
+
+invalid-syntax: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+ --> resources/test/fixtures/semantic_errors/invalid_expression.py:7:8
+  |
+5 | def f[T](x: int) -> (y := 3): return x
+6 |
+7 | class C[T]((yield from [object])):
+  |        ^^^
+8 |     pass
   |
 
 invalid-syntax: yield expression cannot be used within a generic definition
