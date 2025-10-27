@@ -47,10 +47,10 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 /// ty doesn't know about individual notebook cells, instead, ty operates on full notebook documents.
 /// ty also doesn't support resolving settings per cell, instead, settings are resolved per file or notebook.
 ///
-/// Thus, the motivation of `DocumentKey` is to prevent accidental use of Cell URIs as key for operations
-/// that expect to work on a file path level. [`DocumentHandle::file_path`] and [`DocumentRef::file_path`]
-/// expose methods to get the file path of any document, taking into account that these methods should
-/// return the notebook for cell documents.
+/// Thus, the motivation of `DocumentKey` is to prevent accidental use of Cell keys for operations
+/// that expect to work on a file path level. That's what [`DocumentHandle::to_file_path`]
+/// is for, it returns a file path for any document, taking into account that these methods should
+/// return the notebook for cell documents and notebooks.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(super) enum DocumentKey {
     /// A URI using the `file` schema and maps to a valid path.
@@ -63,12 +63,12 @@ pub(super) enum DocumentKey {
 }
 
 impl DocumentKey {
-    /// Converts the given [`Url`] to an [`AnySystemPath`].
+    /// Converts the given [`Url`] to an [`DocumentKey`].
     ///
     /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
     /// the url isn't a valid file path.
     ///
-    /// In all other cases, the URL is converted to a [`SystemVirtualPathBuf`].
+    /// In all other cases, the URL is kept as an opaque identifier ([`Self::Opaque`]).
     pub(crate) fn from_url(url: &Url) -> Self {
         if url.scheme() == "file" {
             if let Ok(path) = url.to_file_path() {
