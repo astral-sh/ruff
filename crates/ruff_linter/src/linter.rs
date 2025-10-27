@@ -1096,6 +1096,40 @@ mod tests {
         "InvalidStarExpression"
     )]
     #[test_case(
+        "annotated_global",
+        "
+        a: int = 1
+        def f1():
+            global a
+            a: str = 'foo'
+        
+        b: int = 1
+        def outer1():
+            def inner1():
+                global b
+                b: str = 'nested'
+        
+        c: int = 1
+        def f2():
+            global c
+            c: list[str] = []
+        
+        d: int = 1
+        def f3():
+            global d
+            d: str
+        
+        e: int = 1
+        def f4():
+            e: str = 'whatever'
+
+        global f
+        f: int
+        ",
+        PythonVersion::PY310,
+        "AnnotatedGlobal"
+    )]
+    #[test_case(
         "invalid_star_expression_for",
         "
         for *x in range(10):
