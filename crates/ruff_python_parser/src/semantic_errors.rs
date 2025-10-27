@@ -1857,6 +1857,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         );
                         break;
                     }
+                    self.names = visitor.names;
                 }
             }
         }
