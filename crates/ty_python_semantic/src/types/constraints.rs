@@ -357,7 +357,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         // therefore the typevar that the constraint applies to.
         match (lower, upper) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower == upper => {
+            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower.is_same_typevar_as(db, upper) => {
                 let (bound, typevar) = if lower.can_be_bound_for(db, typevar) {
                     (lower, typevar)
                 } else {
