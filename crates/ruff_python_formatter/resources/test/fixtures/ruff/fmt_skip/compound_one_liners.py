@@ -127,3 +127,8 @@ else: success_case()  # fmt: skip
 # leading 4
 finally: cleanup()  # fmt: skip
 # trailing
+
+# multi-line before colon (should remain as is)
+if (
+	long_condition
+):  a     +     b # fmt: skip
