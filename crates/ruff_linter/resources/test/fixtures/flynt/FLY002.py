@@ -36,7 +36,7 @@ nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
 nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
 nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
 nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
-nok18 = "".join((r"", "\\r"))  # First is raw, second has carriage return escape - would change behavior
+nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
 
 # Test that all-raw strings still work (should be OK)
 ok7 = "".join((r"", r"something"))  # Both are raw - OK

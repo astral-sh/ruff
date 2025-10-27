@@ -125,6 +125,47 @@ help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`
 13 | nok2 = a.join(["1", "2", "3"])  # Not OK (not a static joiner)
 note: This is an unsafe fix and may change runtime behavior
 
+FLY002 [*] Consider `'line1\nline2'` instead of string join
+  --> FLY002.py:20:8
+   |
+18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
+19 | # https://github.com/astral-sh/ruff/issues/19887
+20 | nok8 = '\n'.join([r'line1','line2'])
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 | nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
+   |
+help: Replace with `'line1\nline2'`
+17 | nok6 = "a".join(x for x in "feefoofum")  # Not OK (generator)
+18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
+19 | # https://github.com/astral-sh/ruff/issues/19887
+   - nok8 = '\n'.join([r'line1','line2'])
+20 + nok8 = 'line1\nline2'
+21 | nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
+22 | 
+23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `"raw string\n<\"\"\">\n<'''>"` instead of string join
+  --> FLY002.py:21:8
+   |
+19 | # https://github.com/astral-sh/ruff/issues/19887
+20 | nok8 = '\n'.join([r'line1','line2'])
+21 | nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |
+23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+   |
+help: Replace with `"raw string\n<\"\"\">\n<'''>"`
+18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
+19 | # https://github.com/astral-sh/ruff/issues/19887
+20 | nok8 = '\n'.join([r'line1','line2'])
+   - nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
+21 + nok9 = "raw string\n<\"\"\">\n<'''>"  # Not OK (both triple-quote delimiters appear; should bail)
+22 | 
+23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+24 | def create_file_public_url(url, filename):
+note: This is an unsafe fix and may change runtime behavior
+
 FLY002 [*] Consider `f"{url}{filename}"` instead of string join
   --> FLY002.py:25:11
    |
@@ -187,6 +228,110 @@ help: Replace with `f"{foo}'"`
 32 | 
 note: This is an unsafe fix and may change runtime behavior
 
+FLY002 [*] Consider `'"'` instead of string join
+  --> FLY002.py:35:9
+   |
+33 | # Regression test for: https://github.com/astral-sh/ruff/issues/21082
+34 | # Mixing raw and non-raw strings can cause syntax errors or behavior changes
+35 | nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+   |         ^^^^^^^^^^^^^^^^^^^
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+   |
+help: Replace with `'"'`
+32 | 
+33 | # Regression test for: https://github.com/astral-sh/ruff/issues/21082
+34 | # Mixing raw and non-raw strings can cause syntax errors or behavior changes
+   - nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+35 + nok14 = '"'  # First is raw, second is not - would break syntax
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `"\\"` instead of string join
+  --> FLY002.py:36:9
+   |
+34 | # Mixing raw and non-raw strings can cause syntax errors or behavior changes
+35 | nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+   |         ^^^^^^^^^^^^^^^^^^^^
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+   |
+help: Replace with `"\\"`
+33 | # Regression test for: https://github.com/astral-sh/ruff/issues/21082
+34 | # Mixing raw and non-raw strings can cause syntax errors or behavior changes
+35 | nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+   - nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+36 + nok15 = "\\"  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `"\x00"` instead of string join
+  --> FLY002.py:37:9
+   |
+35 | nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+   |         ^^^^^^^^^^^^^^^^^^^^
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+   |
+help: Replace with `"\x00"`
+34 | # Mixing raw and non-raw strings can cause syntax errors or behavior changes
+35 | nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+   - nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+37 + nok16 = "\x00"  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+40 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `"\r"` instead of string join
+  --> FLY002.py:38:9
+   |
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+   |         ^^^^^^^^^^^^^^^^^^^^
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+   |
+help: Replace with `"\r"`
+35 | nok14 = "".join((r"", '"'))  # First is raw, second is not - would break syntax
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+   - nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+38 + nok17 = "\r"  # First is raw, second has carriage return - would change behavior
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+40 | 
+41 | # Test that all-raw strings still work (should be OK)
+note: This is an unsafe fix and may change runtime behavior
+
+FLY002 [*] Consider `"\\r"` instead of string join
+  --> FLY002.py:39:9
+   |
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+   |         ^^^^^^^^^^^^^^^^^^^^^
+40 |
+41 | # Test that all-raw strings still work (should be OK)
+   |
+help: Replace with `"\\r"`
+36 | nok15 = "".join((r"", "\\"))  # First is raw, second has backslash - would break syntax
+37 | nok16 = "".join((r"", "\0"))  # First is raw, second has null byte - would introduce null bytes
+38 | nok17 = "".join((r"", "\r"))  # First is raw, second has carriage return - would change behavior
+   - nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
+39 + nok18 = "\\r"  # First is raw, second has backslash escape followed by r
+40 | 
+41 | # Test that all-raw strings still work (should be OK)
+42 | ok7 = "".join((r"", r"something"))  # Both are raw - OK
+note: This is an unsafe fix and may change runtime behavior
+
 FLY002 [*] Consider `r"something"` instead of string join
   --> FLY002.py:42:7
    |
@@ -196,7 +341,7 @@ FLY002 [*] Consider `r"something"` instead of string join
 43 | ok8 = "\n".join((r"line1", r'line2'))  # Both are raw - OK
    |
 help: Replace with `r"something"`
-39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has carriage return escape - would change behavior
+39 | nok18 = "".join((r"", "\\r"))  # First is raw, second has backslash escape followed by r
 40 | 
 41 | # Test that all-raw strings still work (should be OK)
    - ok7 = "".join((r"", r"something"))  # Both are raw - OK
@@ -206,7 +351,7 @@ help: Replace with `r"something"`
 45 | # Test that all-non-raw strings still work (should be OK)
 note: This is an unsafe fix and may change runtime behavior
 
-FLY002 [*] Consider f-string instead of string join
+FLY002 [*] Consider `"line1\nline2"` instead of string join
   --> FLY002.py:43:7
    |
 41 | # Test that all-raw strings still work (should be OK)
@@ -216,16 +361,15 @@ FLY002 [*] Consider f-string instead of string join
 44 |
 45 | # Test that all-non-raw strings still work (should be OK)
    |
-help: Replace with f-string
+help: Replace with `"line1\nline2"`
 40 | 
 41 | # Test that all-raw strings still work (should be OK)
 42 | ok7 = "".join((r"", r"something"))  # Both are raw - OK
    - ok8 = "\n".join((r"line1", r'line2'))  # Both are raw - OK
-43 + ok8 = r"""line1
-44 + line2"""  # Both are raw - OK
-45 | 
-46 | # Test that all-non-raw strings still work (should be OK)
-47 | ok9 = "".join(("", '"'))  # Both are non-raw - OK
+43 + ok8 = "line1\nline2"  # Both are raw - OK
+44 | 
+45 | # Test that all-non-raw strings still work (should be OK)
+46 | ok9 = "".join(("", '"'))  # Both are non-raw - OK
 note: This is an unsafe fix and may change runtime behavior
 
 FLY002 [*] Consider `'"'` instead of string join

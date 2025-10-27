@@ -2,7 +2,9 @@ use ast::FStringFlags;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, StringFlags, str::Quote, str_prefix::StringLiteralPrefix,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -74,7 +76,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
-        let mut first_raw: Option<bool> = None;
+        let mut any_raw = false;
 
         for expr in joinees {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
@@ -83,12 +85,9 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
 
                 if flags.is_none() {
                     flags = Some(curr_flags);
-                    first_raw = Some(is_raw);
-                } else if first_raw != Some(is_raw) {
-                    // If not all strings have the same raw/non-raw status, bail.
-                    // Mixing raw and non-raw strings can cause syntax errors or
-                    // behavior changes when creating the joined string.
-                    return None;
+                    any_raw = is_raw;
+                } else if is_raw {
+                    any_raw = true;
                 }
             }
         }
@@ -105,6 +104,21 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             .join(joiner);
 
         let mut flags = flags?;
+
+        // If any input was raw but the content cannot be safely represented as a raw string,
+        // use non-raw representation. This handles cases where raw strings would create invalid
+        // syntax or behavior changes.
+        if any_raw && !content.is_empty() {
+            let needs_non_raw = content.contains(['\n', '\r', '\0']) || {
+                // Check if content contains characters that would break raw string syntax
+                let quote_char = flags.quote_str();
+                content.contains(quote_char) || content.contains('\\')
+            };
+
+            if needs_non_raw {
+                flags = flags.with_prefix(StringLiteralPrefix::Empty);
+            }
+        }
 
         // If the result is a raw string and contains a newline, use triple quotes.
         if flags.prefix().is_raw() && content.contains(['\n', '\r']) {
