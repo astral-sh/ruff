@@ -74,14 +74,29 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
+        let mut first_raw: Option<bool> = None;
+
+        for expr in joinees {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                let curr_flags = value.first_literal_flags();
+                let is_raw = curr_flags.prefix().is_raw();
+
+                if flags.is_none() {
+                    flags = Some(curr_flags);
+                    first_raw = Some(is_raw);
+                } else if first_raw != Some(is_raw) {
+                    // If not all strings have the same raw/non-raw status, bail.
+                    // Mixing raw and non-raw strings can cause syntax errors or
+                    // behavior changes when creating the joined string.
+                    return None;
+                }
+            }
+        }
+
         let content = joinees
             .iter()
             .filter_map(|expr| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                    if flags.is_none() {
-                        // Take the flags from the first Expr
-                        flags = Some(value.first_literal_flags());
-                    }
                     Some(value.to_str())
                 } else {
                     None
