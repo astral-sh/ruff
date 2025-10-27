@@ -1677,6 +1677,7 @@ impl KnownFunction {
                         message.push('(');
                         for class in class.iter_mro(db) {
                             message.push_str(&class.display(db).to_string());
+                            // Omit the comma for the last element (which is always `object`)
                             if class
                                 .into_class()
                                 .is_none_or(|base| !base.is_object(context.db()))
@@ -1684,7 +1685,11 @@ impl KnownFunction {
                                 message.push_str(", ");
                             }
                         }
-                        if class.is_known(db, KnownClass::Object) {
+                        // If the last element was also the first element
+                        // (i.e., it's a length-1 tuple -- which can only happen if we're revealing
+                        // the MRO for `object` itself), add a trailing comma so that it's still a
+                        // valid tuple display.
+                        if class.is_object(db) {
                             message.push(',');
                         }
                         message.push(')');
