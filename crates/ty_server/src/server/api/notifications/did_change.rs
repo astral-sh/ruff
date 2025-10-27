@@ -29,7 +29,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
         } = params;
 
         let document = session
-            .document(&uri)
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
         document

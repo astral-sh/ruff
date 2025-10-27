@@ -28,13 +28,19 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         } = params;
 
         let document = session
-            .document(&uri)
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let path = document.to_file_path();
+        let path = document.to_file_path().into_owned();
+        let url = document.url().clone();
+
+        document
+            .close(session)
+            .with_failure_code(ErrorCode::InternalError)?;
+
         let db = session.project_db_mut(&path);
 
-        match &*path {
+        match &path {
             AnySystemPath::System(system_path) => {
                 if let Some(file) = db.files().try_system(db, system_path) {
                     db.project().close_file(db, file);
@@ -57,7 +63,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
                         .diagnostic_mode()
                         .is_open_files_only()
                 {
-                    clear_diagnostics(session, document.url(), client);
+                    clear_diagnostics(session, &url, client);
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
@@ -70,13 +76,9 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
 
                 // Always clear diagnostics for virtual files, as they don't really exist on disk
                 // which means closing them is like deleting the file.
-                clear_diagnostics(session, document.url(), client);
+                clear_diagnostics(session, &url, client);
             }
         }
-
-        document
-            .close(session)
-            .with_failure_code(ErrorCode::InternalError)?;
 
         Ok(())
     }

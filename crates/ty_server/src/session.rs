@@ -874,7 +874,10 @@ impl Session {
     /// # Errors
     ///
     /// If the document is not found.
-    pub(crate) fn document(&self, url: &lsp_types::Url) -> Result<DocumentHandle, DocumentError> {
+    pub(crate) fn document_handle(
+        &self,
+        url: &lsp_types::Url,
+    ) -> Result<DocumentHandle, DocumentError> {
         self.index().document_handle(url)
     }
 
@@ -1315,7 +1318,12 @@ impl SuspendedWorkspaceDiagnosticRequest {
     }
 }
 
-/// A handle to a document stored within [`Session`].
+/// A handle to a document stored within [`Index`].
+///
+/// Allows identifying the document within the index but it also carries the URL used by the
+/// client to reference the document as well as the version of the document.
+///
+/// It also exposes methods to get the file-path of the corresponding ty-file.
 #[derive(Clone, Debug)]
 pub(crate) struct DocumentHandle {
     /// The key that uniquely identifies this document in the index.
