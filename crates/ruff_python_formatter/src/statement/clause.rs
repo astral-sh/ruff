@@ -731,7 +731,7 @@ fn should_suppress_clause(
         source,
     ) {
         return Ok(false);
-    };
+    }
 
     let clause_start = clause.format_header.header.range(source)?.end();
 
@@ -754,7 +754,7 @@ fn write_suppressed_clause(
 ) -> FormatResult<()> {
     if let Some((leading_comments, last_node)) = clause.format_header.leading_comments {
         leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
-    };
+    }
 
     let header = clause.format_header.header;
     let clause_start = header.first_keyword_range(f.context().source())?.start();
