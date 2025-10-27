@@ -723,11 +723,7 @@ fn should_suppress_clause(
         return Ok(false);
     };
 
-    let clause_start = clause
-        .format_header
-        .header
-        .first_keyword_range(source)?
-        .start();
+    let clause_start = clause.format_header.header.range(source)?.end();
 
     let clause_range = TextRange::new(clause_start, last_child_in_clause.end());
 
