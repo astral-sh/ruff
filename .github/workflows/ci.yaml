@@ -531,8 +531,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
-          # TODO: figure out why `ruff-ecosystem` crashes on Python 3.14
-          python-version: "3.13"
+          python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
 
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
