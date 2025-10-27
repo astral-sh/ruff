@@ -21,6 +21,11 @@ pub(crate) enum Replacement {
     Message(&'static str),
     // The attribute name of a class has been changed.
     AttrName(&'static str),
+    // The attribute name of a class has been changed with extra Message.
+    AttrNameWithMessage {
+        attr_name: &'static str,
+        message: &'static str,
+    },
     // Symbols updated in Airflow 3 with replacement
     // e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`
     Rename {

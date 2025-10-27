@@ -96,3 +96,9 @@ base_secret_backend.get_connections()
 # airflow.secrets.local_filesystem
 lfb = LocalFilesystemBackend()
 lfb.get_connections()
+
+
+hlc.create_asset("there")
+hlc.create_asset("should", "be", "no", "posarg")
+hlc.create_asset(name="but", uri="kwargs are ok")
+hlc.create_asset()

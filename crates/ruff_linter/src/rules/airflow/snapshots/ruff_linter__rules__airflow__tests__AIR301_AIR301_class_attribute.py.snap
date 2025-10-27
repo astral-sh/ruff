@@ -631,8 +631,32 @@ AIR301 [*] `get_connections` is removed in Airflow 3.0
    |     ^^^^^^^^^^^^^^^
    |
 help: Use `get_connection` instead
-95 | 
-96 | # airflow.secrets.local_filesystem
-97 | lfb = LocalFilesystemBackend()
-   - lfb.get_connections()
-98 + lfb.get_connection()
+95  | 
+96  | # airflow.secrets.local_filesystem
+97  | lfb = LocalFilesystemBackend()
+    - lfb.get_connections()
+98  + lfb.get_connection()
+99  | 
+100 | 
+101 | hlc.create_asset("there")
+
+AIR301 `create_asset` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:101:5
+    |
+101 | hlc.create_asset("there")
+    |     ^^^^^^^^^^^^
+102 | hlc.create_asset("should", "be", "no", "posarg")
+103 | hlc.create_asset(name="but", uri="kwargs are ok")
+    |
+help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
+
+AIR301 `create_asset` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:102:5
+    |
+101 | hlc.create_asset("there")
+102 | hlc.create_asset("should", "be", "no", "posarg")
+    |     ^^^^^^^^^^^^
+103 | hlc.create_asset(name="but", uri="kwargs are ok")
+104 | hlc.create_asset()
+    |
+help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
