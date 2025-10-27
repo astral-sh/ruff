@@ -1229,7 +1229,7 @@ impl<'db> Specialization<'db> {
                 ),
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -1271,7 +1271,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -1282,7 +1282,7 @@ impl<'db> Specialization<'db> {
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible =
                     self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor);
-                if result.intersect(db, compatible).is_never_satisfied() {
+                if result.intersect(db, compatible).is_never_satisfied(db) {
                     return result;
                 }
             }
@@ -1417,7 +1417,7 @@ impl<'db> SpecializationBuilder<'db> {
             && !actual.is_never()
             && actual
                 .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied()
+                .is_always_satisfied(self.db)
         {
             return Ok(());
         }
@@ -1503,7 +1503,7 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty
                             .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied()
+                            .is_always_satisfied(self.db)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -1516,7 +1516,7 @@ impl<'db> SpecializationBuilder<'db> {
                         for constraint in constraints.elements(self.db) {
                             if ty
                                 .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied()
+                                .is_always_satisfied(self.db)
                             {
                                 self.add_type_mapping(bound_typevar, *constraint);
                                 return Ok(());

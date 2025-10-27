@@ -266,7 +266,6 @@ mod tests {
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
-
     fn deserialize() -> Result<()> {
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
@@ -454,6 +453,19 @@ other-attribute = 1
 ",
             )
             .is_err()
+        );
+
+        let invalid_line_length = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 500
+",
+        )
+        .expect_err("Deserialization should have failed for a too large line-length");
+
+        assert_eq!(
+            invalid_line_length.message(),
+            "line-length must be between 1 and 320 (got 500)"
         );
 
         Ok(())

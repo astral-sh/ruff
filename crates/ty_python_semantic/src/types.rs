@@ -1375,7 +1375,7 @@ impl<'db> Type<'db> {
         self.filter_union(db, |elem| {
             !elem
                 .when_disjoint_from(db, target, inferable)
-                .is_always_satisfied()
+                .is_always_satisfied(db)
         })
     }
 
@@ -1755,7 +1755,7 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_subtype_of(db, target, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_subtype_of(
@@ -1772,7 +1772,7 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_assignable_to(
@@ -1790,7 +1790,7 @@ impl<'db> Type<'db> {
     #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn has_relation_to(
@@ -2013,7 +2013,7 @@ impl<'db> Type<'db> {
                                 )
                             })
                         })
-                        .is_never_satisfied() =>
+                        .is_never_satisfied(db) =>
             {
                 // TODO: The repetition here isn't great, but we really need the fallthrough logic,
                 // where this arm only engages if it returns true (or in the world of constraints,
@@ -2156,7 +2156,7 @@ impl<'db> Type<'db> {
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                            .is_never_satisfied()
+                            .is_never_satisfied(db)
                     }) =>
             {
                 // TODO: record the unification constraints
@@ -2636,7 +2636,7 @@ impl<'db> Type<'db> {
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_equivalent_to(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_equivalent_to(
@@ -2759,7 +2759,7 @@ impl<'db> Type<'db> {
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         self.when_disjoint_from(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     fn when_disjoint_from(
@@ -4696,18 +4696,15 @@ impl<'db> Type<'db> {
         visitor: &TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let type_to_truthiness = |ty| {
-            if let Type::BooleanLiteral(bool_val) = ty {
-                Truthiness::from(bool_val)
-            } else {
-                Truthiness::Ambiguous
+            match ty {
+                Type::BooleanLiteral(bool_val) => Truthiness::from(bool_val),
+                Type::IntLiteral(int_val) => Truthiness::from(int_val != 0),
+                // anything else is handled lower down
+                _ => Truthiness::Ambiguous,
             }
         };
 
-        let try_dunder_bool = || {
-            // We only check the `__bool__` method for truth testing, even though at
-            // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
-            // and a subclass could add a `__bool__` method.
-
+        let try_dunders = || {
             match self.try_call_dunder(
                 db,
                 "__bool__",
@@ -4742,18 +4739,67 @@ impl<'db> Type<'db> {
                     Ok(Truthiness::Ambiguous)
                 }
 
-                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
+                Err(CallDunderError::MethodNotAvailable) => {
+                    // We only consider `__len__` for tuples and `@final` types,
+                    // since `__bool__` takes precedence
+                    // and a subclass could add a `__bool__` method.
+                    //
+                    // TODO: with regards to tuple types, we intend to emit a diagnostic
+                    // if a tuple subclass defines a `__bool__` method with a return type
+                    // that is inconsistent with the tuple's length. Otherwise, the special
+                    // handling for tuples here isn't sound.
+                    if let Some(instance) = self.into_nominal_instance() {
+                        if let Some(tuple_spec) = instance.tuple_spec(db) {
+                            Ok(tuple_spec.truthiness())
+                        } else if instance.class(db).is_final(db) {
+                            match self.try_call_dunder(
+                                db,
+                                "__len__",
+                                CallArguments::none(),
+                                TypeContext::default(),
+                            ) {
+                                Ok(outcome) => {
+                                    let return_type = outcome.return_type(db);
+                                    if return_type.is_assignable_to(
+                                        db,
+                                        KnownClass::SupportsIndex.to_instance(db),
+                                    ) {
+                                        Ok(type_to_truthiness(return_type))
+                                    } else {
+                                        // TODO: should report a diagnostic similar to if return type of `__bool__`
+                                        // is not assignable to `bool`
+                                        Ok(Truthiness::Ambiguous)
+                                    }
+                                }
+                                // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
+                                Err(CallDunderError::MethodNotAvailable) => {
+                                    Ok(Truthiness::AlwaysTrue)
+                                }
+                                // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
+                                // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
+                                Err(_) => Ok(Truthiness::Ambiguous),
+                            }
+                        } else {
+                            Ok(Truthiness::Ambiguous)
+                        }
+                    } else {
+                        Ok(Truthiness::Ambiguous)
+                    }
+                }
+
                 Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
                     Err(BoolError::IncorrectArguments {
                         truthiness: type_to_truthiness(bindings.return_type(db)),
                         not_boolable_type: *self,
                     })
                 }
+
                 Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
                     Err(BoolError::NotCallable {
                         not_boolable_type: *self,
                     })
                 }
+
                 Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
                     Err(BoolError::Other {
                         not_boolable_type: *self,
@@ -4818,7 +4864,7 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = tracked_set.constraints(db);
-                Truthiness::from(constraints.is_always_satisfied())
+                Truthiness::from(constraints.is_always_satisfied(db))
             }
 
             Type::FunctionLiteral(_)
@@ -4868,9 +4914,9 @@ impl<'db> Type<'db> {
                 .known_class(db)
                 .and_then(KnownClass::bool)
                 .map(Ok)
-                .unwrap_or_else(try_dunder_bool)?,
+                .unwrap_or_else(try_dunders)?,
 
-            Type::ProtocolInstance(_) => try_dunder_bool()?,
+            Type::ProtocolInstance(_) => try_dunders()?,
 
             Type::Union(union) => try_union(*union)?,
 
@@ -4879,10 +4925,10 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::EnumLiteral(_) => {
-                // We currently make no attempt to infer the precise truthiness, but it's not impossible to do so.
-                // Note that custom `__bool__` or `__len__` methods on the class or superclasses affect the outcome.
-                Truthiness::Ambiguous
+            Type::EnumLiteral(enum_type) => {
+                enum_type
+                    .enum_class_instance(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)?
             }
 
             Type::IntLiteral(num) => Truthiness::from(*num != 0),
@@ -6207,6 +6253,9 @@ impl<'db> Type<'db> {
     /// Given a class literal or non-dynamic `SubclassOf` type, try calling it (creating an instance)
     /// and return the resulting instance type.
     ///
+    /// The `infer_argument_types` closure should be invoked with the signatures of `__new__` and
+    /// `__init__`, such that the argument types can be inferred with the correct type context.
+    ///
     /// Models `type.__call__` behavior.
     /// TODO: model metaclass `__call__`.
     ///
@@ -6217,10 +6266,10 @@ impl<'db> Type<'db> {
     ///
     /// Foo()
     /// ```
-    fn try_call_constructor(
+    fn try_call_constructor<'ast>(
         self,
         db: &'db dyn Db,
-        argument_types: CallArguments<'_, 'db>,
+        infer_argument_types: impl FnOnce(Option<Bindings<'db>>) -> CallArguments<'ast, 'db>,
         tcx: TypeContext<'db>,
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(
@@ -6276,11 +6325,63 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
         let new_method = self_type.lookup_dunder_new(db, ());
+
+        // Construct an instance type that we can use to look up the `__init__` instance method.
+        // This performs the same logic as `Type::to_instance`, except for generic class literals.
+        // TODO: we should use the actual return type of `__new__` to determine the instance type
+        let init_ty = self_type
+            .to_instance(db)
+            .expect("type should be convertible to instance type");
+
+        // Lookup the `__init__` instance method in the MRO.
+        let init_method = init_ty.member_lookup_with_policy(
+            db,
+            "__init__".into(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+
+        // Infer the call argument types, using both `__new__` and `__init__` for type-context.
+        let bindings = match (
+            new_method.as_ref().map(|method| &method.place),
+            &init_method.place,
+        ) {
+            (Some(Place::Defined(new_method, ..)), Place::Undefined) => Some(
+                new_method
+                    .bindings(db)
+                    .map(|binding| binding.with_bound_type(self_type)),
+            ),
+
+            (Some(Place::Undefined) | None, Place::Defined(init_method, ..)) => {
+                Some(init_method.bindings(db))
+            }
+
+            (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
+                let callable = UnionBuilder::new(db)
+                    .add(*new_method)
+                    .add(*init_method)
+                    .build();
+
+                let new_method_bindings = new_method
+                    .bindings(db)
+                    .map(|binding| binding.with_bound_type(self_type));
+
+                Some(Bindings::from_union(
+                    callable,
+                    [new_method_bindings, init_method.bindings(db)],
+                ))
+            }
+
+            _ => None,
+        };
+
+        let argument_types = infer_argument_types(bindings);
+
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Defined(new_method, _, boundness) => {
                     let result =
                         new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
+
                     if boundness == Definedness::PossiblyUndefined {
                         Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
                     } else {
@@ -6291,24 +6392,7 @@ impl<'db> Type<'db> {
             }
         });
 
-        // Construct an instance type that we can use to look up the `__init__` instance method.
-        // This performs the same logic as `Type::to_instance`, except for generic class literals.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let init_ty = self_type
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-
-        let init_call_outcome = if new_call_outcome.is_none()
-            || !init_ty
-                .member_lookup_with_policy(
-                    db,
-                    "__init__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                        | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                )
-                .place
-                .is_undefined()
-        {
+        let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
             Some(init_ty.try_call_dunder(db, "__init__", argument_types, tcx))
         } else {
             None
@@ -7657,7 +7741,6 @@ impl<'db> TypeMapping<'_, 'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TrackedConstraintSet<'db> {
-    #[returns(ref)]
     constraints: ConstraintSet<'db>,
 }
 
@@ -7881,17 +7964,11 @@ impl<'db> KnownInstanceType<'db> {
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
                         let constraints = tracked_set.constraints(self.db);
-                        if constraints.is_always_satisfied() {
-                            f.write_str("ty_extensions.ConstraintSet[always]")
-                        } else if constraints.is_never_satisfied() {
-                            f.write_str("ty_extensions.ConstraintSet[never]")
-                        } else {
-                            write!(
-                                f,
-                                "ty_extensions.ConstraintSet[{}]",
-                                constraints.display(self.db)
-                            )
-                        }
+                        write!(
+                            f,
+                            "ty_extensions.ConstraintSet[{}]",
+                            constraints.display(self.db)
+                        )
                     }
                 }
             }

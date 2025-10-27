@@ -501,7 +501,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -520,7 +520,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -881,7 +881,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -901,7 +901,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -954,7 +954,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return ConstraintSet::from(false);
                         }
                     };
-                    if result.intersect(db, pair_constraints).is_never_satisfied() {
+                    if result
+                        .intersect(db, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
                         return result;
                     }
                 }
@@ -990,7 +993,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return ConstraintSet::from(false);
                         }
                     };
-                    if result.intersect(db, pair_constraints).is_never_satisfied() {
+                    if result
+                        .intersect(db, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
                         return result;
                     }
                 }
