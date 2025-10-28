@@ -36,3 +36,10 @@ pub(crate) const fn is_remove_parens_around_except_types_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the
+/// [`allow_newline_after_block_open`](https://github.com/astral-sh/ruff/pull/21110) preview style
+/// is enabled.
+pub(crate) const fn is_allow_newline_after_block_open_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

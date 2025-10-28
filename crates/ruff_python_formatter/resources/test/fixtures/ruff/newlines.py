@@ -335,3 +335,40 @@ def overload4():
     # trailing comment
 
 def overload4(a: int): ...
+
+
+# In preview, we preserve these newlines at the start of functions:
+def preserved1():
+
+    return 1
+
+def preserved2():
+
+    pass
+
+
+# But we still discard these newlines:
+def removed1():
+
+    "Docstring"
+
+    return 1
+
+
+def removed2():
+
+    # Comment
+
+    return 1
+
+
+def removed3():
+
+    ...
+
+
+# And we discard empty lines after the first:
+def partially_preserved1():
+
+
+    return 1

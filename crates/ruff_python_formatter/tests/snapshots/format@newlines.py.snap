@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/newlines.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -342,6 +341,43 @@ def overload4():
     # trailing comment
 
 def overload4(a: int): ...
+
+
+# In preview, we preserve these newlines at the start of functions:
+def preserved1():
+
+    return 1
+
+def preserved2():
+
+    pass
+
+
+# But we still discard these newlines:
+def removed1():
+
+    "Docstring"
+
+    return 1
+
+
+def removed2():
+
+    # Comment
+
+    return 1
+
+
+def removed3():
+
+    ...
+
+
+# And we discard empty lines after the first:
+def partially_preserved1():
+
+
+    return 1
 ```
 
 ## Output
@@ -732,6 +768,36 @@ def overload4():
 
 
 def overload4(a: int): ...
+
+
+# In preview, we preserve these newlines at the start of functions:
+def preserved1():
+    return 1
+
+
+def preserved2():
+    pass
+
+
+# But we still discard these newlines:
+def removed1():
+    "Docstring"
+
+    return 1
+
+
+def removed2():
+    # Comment
+
+    return 1
+
+
+def removed3(): ...
+
+
+# And we discard empty lines after the first:
+def partially_preserved1():
+    return 1
 ```
 
 
@@ -739,7 +805,15 @@ def overload4(a: int): ...
 ```diff
 --- Stable
 +++ Preview
-@@ -277,6 +277,7 @@
+@@ -253,6 +253,7 @@
+ 
+ 
+ def fakehttp():
++
+     class FakeHTTPConnection:
+         if mock_close:
+ 
+@@ -277,6 +278,7 @@
  
      def a():
          return 1
@@ -747,7 +821,7 @@ def overload4(a: int): ...
  else:
      pass
  
-@@ -293,6 +294,7 @@
+@@ -293,6 +295,7 @@
  
          def a():
              return 1
@@ -755,7 +829,7 @@ def overload4(a: int): ...
      case 1:
  
          def a():
-@@ -303,6 +305,7 @@
+@@ -303,6 +306,7 @@
  
      def a():
          return 1
@@ -763,7 +837,7 @@ def overload4(a: int): ...
  except RuntimeError:
  
      def a():
-@@ -313,6 +316,7 @@
+@@ -313,6 +317,7 @@
  
      def a():
          return 1
@@ -771,7 +845,7 @@ def overload4(a: int): ...
  finally:
  
      def a():
-@@ -323,18 +327,22 @@
+@@ -323,18 +328,22 @@
  
      def a():
          return 1
@@ -794,4 +868,23 @@ def overload4(a: int): ...
  finally:
  
      def a():
+@@ -388,10 +397,12 @@
+ 
+ # In preview, we preserve these newlines at the start of functions:
+ def preserved1():
++
+     return 1
+ 
+ 
+ def preserved2():
++
+     pass
+ 
+ 
+@@ -413,4 +424,5 @@
+ 
+ # And we discard empty lines after the first:
+ def partially_preserved1():
++
+     return 1
 ```

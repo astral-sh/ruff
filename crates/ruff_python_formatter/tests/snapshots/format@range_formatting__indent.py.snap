@@ -149,6 +149,21 @@ def test6 ():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -55,6 +55,7 @@
+ 
+ 
+ def test6 ():
++
+     print("Format")
+     print(3 + 4)
+     print("Format to fix indentation" )
+```
+
+
 ### Output 2
 ```
 indent-style               = tab
@@ -228,6 +243,21 @@ def test6 ():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -55,6 +55,7 @@
+ 
+ 
+ def test6 ():
++
+ 	print("Format")
+ 	print(3 + 4)
+ 	print("Format to fix indentation")
+```
+
+
 ### Output 3
 ```
 indent-style               = space
@@ -304,4 +334,19 @@ def test6 ():
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -55,6 +55,7 @@
+ 
+ 
+ def test6 ():
++
+   print("Format")
+   print(3 + 4)
+   print("Format to fix indentation")
 ```
