@@ -763,14 +763,18 @@ impl<'db> Node<'db> {
             // implies that constraint.
             (Type::TypeVar(bound_typevar), _) => {
                 let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
-                let (simplified, domain) = self.implies(db, constraint).simplify_and_domain(db);
+                let simplified_self = self.simplify(db);
+                let implication = simplified_self.implies(db, constraint);
+                let (simplified, domain) = implication.simplify_and_domain(db);
                 simplified.and(db, domain)
             }
 
             (_, Type::TypeVar(bound_typevar)) => {
                 let constraint =
                     ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
-                let (simplified, domain) = self.implies(db, constraint).simplify_and_domain(db);
+                let simplified_self = self.simplify(db);
+                let implication = simplified_self.implies(db, constraint);
+                let (simplified, domain) = implication.simplify_and_domain(db);
                 simplified.and(db, domain)
             }
 
