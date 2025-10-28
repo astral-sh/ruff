@@ -55,6 +55,10 @@ hlc.create_dataset()
 hlc.add_input_dataset()
 hlc.add_output_dataset()
 hlc.collected_datasets()
+hlc.create_asset("there")
+hlc.create_asset("should", "be", "no", "posarg")
+hlc.create_asset(name="but", uri="kwargs are ok")
+hlc.create_asset()
 
 # airflow.providers.amazon.auth_manager.aws_auth_manager
 aam = AwsAuthManager()
@@ -96,9 +100,3 @@ base_secret_backend.get_connections()
 # airflow.secrets.local_filesystem
 lfb = LocalFilesystemBackend()
 lfb.get_connections()
-
-
-hlc.create_asset("there")
-hlc.create_asset("should", "be", "no", "posarg")
-hlc.create_asset(name="but", uri="kwargs are ok")
-hlc.create_asset()

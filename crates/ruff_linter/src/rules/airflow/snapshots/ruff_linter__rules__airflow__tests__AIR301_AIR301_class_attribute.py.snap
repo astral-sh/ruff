@@ -365,7 +365,7 @@ help: Use `add_input_asset` instead
 55 + hlc.add_input_asset()
 56 | hlc.add_output_dataset()
 57 | hlc.collected_datasets()
-58 | 
+58 | hlc.create_asset("there")
 
 AIR301 [*] `add_output_dataset` is removed in Airflow 3.0
   --> AIR301_class_attribute.py:56:5
@@ -375,6 +375,7 @@ AIR301 [*] `add_output_dataset` is removed in Airflow 3.0
 56 | hlc.add_output_dataset()
    |     ^^^^^^^^^^^^^^^^^^
 57 | hlc.collected_datasets()
+58 | hlc.create_asset("there")
    |
 help: Use `add_output_asset` instead
 53 | hlc = HookLineageCollector()
@@ -383,8 +384,8 @@ help: Use `add_output_asset` instead
    - hlc.add_output_dataset()
 56 + hlc.add_output_asset()
 57 | hlc.collected_datasets()
-58 | 
-59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+58 | hlc.create_asset("there")
+59 | hlc.create_asset("should", "be", "no", "posarg")
 
 AIR301 [*] `collected_datasets` is removed in Airflow 3.0
   --> AIR301_class_attribute.py:57:5
@@ -393,8 +394,8 @@ AIR301 [*] `collected_datasets` is removed in Airflow 3.0
 56 | hlc.add_output_dataset()
 57 | hlc.collected_datasets()
    |     ^^^^^^^^^^^^^^^^^^
-58 |
-59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+58 | hlc.create_asset("there")
+59 | hlc.create_asset("should", "be", "no", "posarg")
    |
 help: Use `collected_assets` instead
 54 | hlc.create_dataset()
@@ -402,261 +403,261 @@ help: Use `collected_assets` instead
 56 | hlc.add_output_dataset()
    - hlc.collected_datasets()
 57 + hlc.collected_assets()
-58 | 
-59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
-60 | aam = AwsAuthManager()
+58 | hlc.create_asset("there")
+59 | hlc.create_asset("should", "be", "no", "posarg")
+60 | hlc.create_asset(name="but", uri="kwargs are ok")
+
+AIR301 `create_asset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:58:5
+   |
+56 | hlc.add_output_dataset()
+57 | hlc.collected_datasets()
+58 | hlc.create_asset("there")
+   |     ^^^^^^^^^^^^
+59 | hlc.create_asset("should", "be", "no", "posarg")
+60 | hlc.create_asset(name="but", uri="kwargs are ok")
+   |
+help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
+
+AIR301 `create_asset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:59:5
+   |
+57 | hlc.collected_datasets()
+58 | hlc.create_asset("there")
+59 | hlc.create_asset("should", "be", "no", "posarg")
+   |     ^^^^^^^^^^^^
+60 | hlc.create_asset(name="but", uri="kwargs are ok")
+61 | hlc.create_asset()
+   |
+help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
 
 AIR301 [*] `is_authorized_dataset` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:61:5
+  --> AIR301_class_attribute.py:65:5
    |
-59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
-60 | aam = AwsAuthManager()
-61 | aam.is_authorized_dataset()
+63 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+64 | aam = AwsAuthManager()
+65 | aam.is_authorized_dataset()
    |     ^^^^^^^^^^^^^^^^^^^^^
-62 |
-63 | # airflow.providers.apache.beam.hooks
+66 |
+67 | # airflow.providers.apache.beam.hooks
    |
 help: Use `is_authorized_asset` instead
-58 | 
-59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
-60 | aam = AwsAuthManager()
-   - aam.is_authorized_dataset()
-61 + aam.is_authorized_asset()
 62 | 
-63 | # airflow.providers.apache.beam.hooks
-64 | # check get_conn_uri is caught if the class inherits from an airflow hook
+63 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+64 | aam = AwsAuthManager()
+   - aam.is_authorized_dataset()
+65 + aam.is_authorized_asset()
+66 | 
+67 | # airflow.providers.apache.beam.hooks
+68 | # check get_conn_uri is caught if the class inherits from an airflow hook
 
 AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:73:13
+  --> AIR301_class_attribute.py:77:13
    |
-71 | # airflow.providers.google.cloud.secrets.secret_manager
-72 | csm_backend = CloudSecretManagerBackend()
-73 | csm_backend.get_conn_uri()
+75 | # airflow.providers.google.cloud.secrets.secret_manager
+76 | csm_backend = CloudSecretManagerBackend()
+77 | csm_backend.get_conn_uri()
    |             ^^^^^^^^^^^^
-74 | csm_backend.get_connections()
+78 | csm_backend.get_connections()
    |
 help: Use `get_conn_value` instead
-70 | 
-71 | # airflow.providers.google.cloud.secrets.secret_manager
-72 | csm_backend = CloudSecretManagerBackend()
+74 | 
+75 | # airflow.providers.google.cloud.secrets.secret_manager
+76 | csm_backend = CloudSecretManagerBackend()
    - csm_backend.get_conn_uri()
-73 + csm_backend.get_conn_value()
-74 | csm_backend.get_connections()
-75 | 
-76 | # airflow.providers.hashicorp.secrets.vault
+77 + csm_backend.get_conn_value()
+78 | csm_backend.get_connections()
+79 | 
+80 | # airflow.providers.hashicorp.secrets.vault
 
 AIR301 [*] `get_connections` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:74:13
+  --> AIR301_class_attribute.py:78:13
    |
-72 | csm_backend = CloudSecretManagerBackend()
-73 | csm_backend.get_conn_uri()
-74 | csm_backend.get_connections()
+76 | csm_backend = CloudSecretManagerBackend()
+77 | csm_backend.get_conn_uri()
+78 | csm_backend.get_connections()
    |             ^^^^^^^^^^^^^^^
-75 |
-76 | # airflow.providers.hashicorp.secrets.vault
+79 |
+80 | # airflow.providers.hashicorp.secrets.vault
    |
 help: Use `get_connection` instead
-71 | # airflow.providers.google.cloud.secrets.secret_manager
-72 | csm_backend = CloudSecretManagerBackend()
-73 | csm_backend.get_conn_uri()
+75 | # airflow.providers.google.cloud.secrets.secret_manager
+76 | csm_backend = CloudSecretManagerBackend()
+77 | csm_backend.get_conn_uri()
    - csm_backend.get_connections()
-74 + csm_backend.get_connection()
-75 | 
-76 | # airflow.providers.hashicorp.secrets.vault
-77 | vault_backend = VaultBackend()
+78 + csm_backend.get_connection()
+79 | 
+80 | # airflow.providers.hashicorp.secrets.vault
+81 | vault_backend = VaultBackend()
 
 AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:78:15
+  --> AIR301_class_attribute.py:82:15
    |
-76 | # airflow.providers.hashicorp.secrets.vault
-77 | vault_backend = VaultBackend()
-78 | vault_backend.get_conn_uri()
+80 | # airflow.providers.hashicorp.secrets.vault
+81 | vault_backend = VaultBackend()
+82 | vault_backend.get_conn_uri()
    |               ^^^^^^^^^^^^
-79 | vault_backend.get_connections()
+83 | vault_backend.get_connections()
    |
 help: Use `get_conn_value` instead
-75 | 
-76 | # airflow.providers.hashicorp.secrets.vault
-77 | vault_backend = VaultBackend()
+79 | 
+80 | # airflow.providers.hashicorp.secrets.vault
+81 | vault_backend = VaultBackend()
    - vault_backend.get_conn_uri()
-78 + vault_backend.get_conn_value()
-79 | vault_backend.get_connections()
-80 | 
-81 | not_an_error = NotAir302SecretError()
+82 + vault_backend.get_conn_value()
+83 | vault_backend.get_connections()
+84 | 
+85 | not_an_error = NotAir302SecretError()
 
 AIR301 [*] `get_connections` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:79:15
+  --> AIR301_class_attribute.py:83:15
    |
-77 | vault_backend = VaultBackend()
-78 | vault_backend.get_conn_uri()
-79 | vault_backend.get_connections()
+81 | vault_backend = VaultBackend()
+82 | vault_backend.get_conn_uri()
+83 | vault_backend.get_connections()
    |               ^^^^^^^^^^^^^^^
-80 |
-81 | not_an_error = NotAir302SecretError()
+84 |
+85 | not_an_error = NotAir302SecretError()
    |
 help: Use `get_connection` instead
-76 | # airflow.providers.hashicorp.secrets.vault
-77 | vault_backend = VaultBackend()
-78 | vault_backend.get_conn_uri()
+80 | # airflow.providers.hashicorp.secrets.vault
+81 | vault_backend = VaultBackend()
+82 | vault_backend.get_conn_uri()
    - vault_backend.get_connections()
-79 + vault_backend.get_connection()
-80 | 
-81 | not_an_error = NotAir302SecretError()
-82 | not_an_error.get_conn_uri()
+83 + vault_backend.get_connection()
+84 | 
+85 | not_an_error = NotAir302SecretError()
+86 | not_an_error.get_conn_uri()
 
 AIR301 [*] `initialize_providers_dataset_uri_resources` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:86:4
+  --> AIR301_class_attribute.py:90:4
    |
-84 | # airflow.providers_manager
-85 | pm = ProvidersManager()
-86 | pm.initialize_providers_dataset_uri_resources()
+88 | # airflow.providers_manager
+89 | pm = ProvidersManager()
+90 | pm.initialize_providers_dataset_uri_resources()
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-87 | pm.dataset_factories
-88 | pm.dataset_uri_handlers
+91 | pm.dataset_factories
+92 | pm.dataset_uri_handlers
    |
 help: Use `initialize_providers_asset_uri_resources` instead
-83 | 
-84 | # airflow.providers_manager
-85 | pm = ProvidersManager()
+87 | 
+88 | # airflow.providers_manager
+89 | pm = ProvidersManager()
    - pm.initialize_providers_dataset_uri_resources()
-86 + pm.initialize_providers_asset_uri_resources()
-87 | pm.dataset_factories
-88 | pm.dataset_uri_handlers
-89 | pm.dataset_to_openlineage_converters
+90 + pm.initialize_providers_asset_uri_resources()
+91 | pm.dataset_factories
+92 | pm.dataset_uri_handlers
+93 | pm.dataset_to_openlineage_converters
 
 AIR301 [*] `dataset_factories` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:87:4
+  --> AIR301_class_attribute.py:91:4
    |
-85 | pm = ProvidersManager()
-86 | pm.initialize_providers_dataset_uri_resources()
-87 | pm.dataset_factories
+89 | pm = ProvidersManager()
+90 | pm.initialize_providers_dataset_uri_resources()
+91 | pm.dataset_factories
    |    ^^^^^^^^^^^^^^^^^
-88 | pm.dataset_uri_handlers
-89 | pm.dataset_to_openlineage_converters
+92 | pm.dataset_uri_handlers
+93 | pm.dataset_to_openlineage_converters
    |
 help: Use `asset_factories` instead
-84 | # airflow.providers_manager
-85 | pm = ProvidersManager()
-86 | pm.initialize_providers_dataset_uri_resources()
+88 | # airflow.providers_manager
+89 | pm = ProvidersManager()
+90 | pm.initialize_providers_dataset_uri_resources()
    - pm.dataset_factories
-87 + pm.asset_factories
-88 | pm.dataset_uri_handlers
-89 | pm.dataset_to_openlineage_converters
-90 | 
+91 + pm.asset_factories
+92 | pm.dataset_uri_handlers
+93 | pm.dataset_to_openlineage_converters
+94 | 
 
 AIR301 [*] `dataset_uri_handlers` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:88:4
+  --> AIR301_class_attribute.py:92:4
    |
-86 | pm.initialize_providers_dataset_uri_resources()
-87 | pm.dataset_factories
-88 | pm.dataset_uri_handlers
+90 | pm.initialize_providers_dataset_uri_resources()
+91 | pm.dataset_factories
+92 | pm.dataset_uri_handlers
    |    ^^^^^^^^^^^^^^^^^^^^
-89 | pm.dataset_to_openlineage_converters
+93 | pm.dataset_to_openlineage_converters
    |
 help: Use `asset_uri_handlers` instead
-85 | pm = ProvidersManager()
-86 | pm.initialize_providers_dataset_uri_resources()
-87 | pm.dataset_factories
+89 | pm = ProvidersManager()
+90 | pm.initialize_providers_dataset_uri_resources()
+91 | pm.dataset_factories
    - pm.dataset_uri_handlers
-88 + pm.asset_uri_handlers
-89 | pm.dataset_to_openlineage_converters
-90 | 
-91 | # airflow.secrets.base_secrets
+92 + pm.asset_uri_handlers
+93 | pm.dataset_to_openlineage_converters
+94 | 
+95 | # airflow.secrets.base_secrets
 
 AIR301 [*] `dataset_to_openlineage_converters` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:89:4
+  --> AIR301_class_attribute.py:93:4
    |
-87 | pm.dataset_factories
-88 | pm.dataset_uri_handlers
-89 | pm.dataset_to_openlineage_converters
+91 | pm.dataset_factories
+92 | pm.dataset_uri_handlers
+93 | pm.dataset_to_openlineage_converters
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-90 |
-91 | # airflow.secrets.base_secrets
+94 |
+95 | # airflow.secrets.base_secrets
    |
 help: Use `asset_to_openlineage_converters` instead
-86 | pm.initialize_providers_dataset_uri_resources()
-87 | pm.dataset_factories
-88 | pm.dataset_uri_handlers
+90 | pm.initialize_providers_dataset_uri_resources()
+91 | pm.dataset_factories
+92 | pm.dataset_uri_handlers
    - pm.dataset_to_openlineage_converters
-89 + pm.asset_to_openlineage_converters
-90 | 
-91 | # airflow.secrets.base_secrets
-92 | base_secret_backend = BaseSecretsBackend()
+93 + pm.asset_to_openlineage_converters
+94 | 
+95 | # airflow.secrets.base_secrets
+96 | base_secret_backend = BaseSecretsBackend()
 
 AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:93:21
+  --> AIR301_class_attribute.py:97:21
    |
-91 | # airflow.secrets.base_secrets
-92 | base_secret_backend = BaseSecretsBackend()
-93 | base_secret_backend.get_conn_uri()
+95 | # airflow.secrets.base_secrets
+96 | base_secret_backend = BaseSecretsBackend()
+97 | base_secret_backend.get_conn_uri()
    |                     ^^^^^^^^^^^^
-94 | base_secret_backend.get_connections()
+98 | base_secret_backend.get_connections()
    |
 help: Use `get_conn_value` instead
-90 | 
-91 | # airflow.secrets.base_secrets
-92 | base_secret_backend = BaseSecretsBackend()
-   - base_secret_backend.get_conn_uri()
-93 + base_secret_backend.get_conn_value()
-94 | base_secret_backend.get_connections()
-95 | 
-96 | # airflow.secrets.local_filesystem
-
-AIR301 [*] `get_connections` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:94:21
-   |
-92 | base_secret_backend = BaseSecretsBackend()
-93 | base_secret_backend.get_conn_uri()
-94 | base_secret_backend.get_connections()
-   |                     ^^^^^^^^^^^^^^^
-95 |
-96 | # airflow.secrets.local_filesystem
-   |
-help: Use `get_connection` instead
-91 | # airflow.secrets.base_secrets
-92 | base_secret_backend = BaseSecretsBackend()
-93 | base_secret_backend.get_conn_uri()
-   - base_secret_backend.get_connections()
-94 + base_secret_backend.get_connection()
-95 | 
-96 | # airflow.secrets.local_filesystem
-97 | lfb = LocalFilesystemBackend()
-
-AIR301 [*] `get_connections` is removed in Airflow 3.0
-  --> AIR301_class_attribute.py:98:5
-   |
-96 | # airflow.secrets.local_filesystem
-97 | lfb = LocalFilesystemBackend()
-98 | lfb.get_connections()
-   |     ^^^^^^^^^^^^^^^
-   |
-help: Use `get_connection` instead
-95  | 
-96  | # airflow.secrets.local_filesystem
-97  | lfb = LocalFilesystemBackend()
-    - lfb.get_connections()
-98  + lfb.get_connection()
+94  | 
+95  | # airflow.secrets.base_secrets
+96  | base_secret_backend = BaseSecretsBackend()
+    - base_secret_backend.get_conn_uri()
+97  + base_secret_backend.get_conn_value()
+98  | base_secret_backend.get_connections()
 99  | 
-100 | 
-101 | hlc.create_asset("there")
+100 | # airflow.secrets.local_filesystem
 
-AIR301 `create_asset` is removed in Airflow 3.0
-   --> AIR301_class_attribute.py:101:5
+AIR301 [*] `get_connections` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:98:21
     |
-101 | hlc.create_asset("there")
-    |     ^^^^^^^^^^^^
-102 | hlc.create_asset("should", "be", "no", "posarg")
-103 | hlc.create_asset(name="but", uri="kwargs are ok")
+ 96 | base_secret_backend = BaseSecretsBackend()
+ 97 | base_secret_backend.get_conn_uri()
+ 98 | base_secret_backend.get_connections()
+    |                     ^^^^^^^^^^^^^^^
+ 99 |
+100 | # airflow.secrets.local_filesystem
     |
-help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
+help: Use `get_connection` instead
+95  | # airflow.secrets.base_secrets
+96  | base_secret_backend = BaseSecretsBackend()
+97  | base_secret_backend.get_conn_uri()
+    - base_secret_backend.get_connections()
+98  + base_secret_backend.get_connection()
+99  | 
+100 | # airflow.secrets.local_filesystem
+101 | lfb = LocalFilesystemBackend()
 
-AIR301 `create_asset` is removed in Airflow 3.0
+AIR301 [*] `get_connections` is removed in Airflow 3.0
    --> AIR301_class_attribute.py:102:5
     |
-101 | hlc.create_asset("there")
-102 | hlc.create_asset("should", "be", "no", "posarg")
-    |     ^^^^^^^^^^^^
-103 | hlc.create_asset(name="but", uri="kwargs are ok")
-104 | hlc.create_asset()
+100 | # airflow.secrets.local_filesystem
+101 | lfb = LocalFilesystemBackend()
+102 | lfb.get_connections()
+    |     ^^^^^^^^^^^^^^^
     |
-help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
+help: Use `get_connection` instead
+99  | 
+100 | # airflow.secrets.local_filesystem
+101 | lfb = LocalFilesystemBackend()
+    - lfb.get_connections()
+102 + lfb.get_connection()
