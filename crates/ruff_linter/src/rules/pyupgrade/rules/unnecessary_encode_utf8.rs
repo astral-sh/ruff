@@ -316,7 +316,7 @@ fn literal_contains_string_only_escapes(fragment: &StringLiteral, locator: &Loca
             'x' => {
                 cursor.skip_bytes(2);
             }
-            '0'..'7' => {
+            '0'..='7' => {
                 let (second, third) = (cursor.first(), cursor.second());
 
                 let octal_codepoint = match (is_octal_digit(second), is_octal_digit(third)) {
@@ -339,5 +339,5 @@ fn literal_contains_string_only_escapes(fragment: &StringLiteral, locator: &Loca
 }
 
 const fn is_octal_digit(char: char) -> bool {
-    matches!(char, '0'..'7')
+    matches!(char, '0'..='7')
 }
