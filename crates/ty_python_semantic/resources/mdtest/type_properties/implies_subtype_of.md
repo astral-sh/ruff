@@ -5,7 +5,7 @@
 python-version = "3.12"
 ```
 
-This file tests the _constraint implication_ relationship between types, aka `is_subtype_of_given`,
+This file tests the _constraint implication_ relationship between types, aka `implies_subtype_of`,
 which tests whether one type is a [subtype][subtyping] of another _assuming that the constraints in
 a particular constraint set hold_.
 
@@ -16,7 +16,7 @@ fully static type that is not a typevar. It can _contain_ a typevar, though — 
 considered concrete.)
 
 ```py
-from ty_extensions import ConstraintSet, is_subtype_of, is_subtype_of_given, static_assert
+from ty_extensions import ConstraintSet, is_subtype_of, static_assert
 
 def equivalent_to_other_relationships[T]():
     static_assert(is_subtype_of(bool, int))
@@ -141,7 +141,7 @@ considering.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, is_subtype_of_given, static_assert
+from ty_extensions import ConstraintSet, static_assert
 
 def given_constraints[T]():
     static_assert(not ConstraintSet.always().implies_subtype_of(T, int))
