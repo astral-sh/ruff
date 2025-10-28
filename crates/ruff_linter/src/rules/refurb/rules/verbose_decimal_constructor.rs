@@ -9,7 +9,6 @@ use std::borrow::Cow;
 use crate::checkers::ast::Checker;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
-use ruff_diagnostics::Applicability;
 
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
@@ -146,10 +145,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::applicable_edit(
-                Edit::range_replacement(replacement, value.range()),
-                Applicability::Safe,
-            ));
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                replacement,
+                value.range(),
+            )));
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
