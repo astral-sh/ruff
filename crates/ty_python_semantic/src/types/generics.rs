@@ -1482,7 +1482,7 @@ impl<'db> SpecializationBuilder<'db> {
                         eprintln!("    bound     {}", bound.display(self.db));
                         eprintln!("    inferable {}", self.inferable.display(self.db));
                         eprintln!("    when      {}", when.display(self.db));
-                        if !when.is_always_satisfied() {
+                        if !when.is_always_satisfied(self.db) {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,

@@ -66,21 +66,15 @@ use salsa::plumbing::AsId;
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
+    UnionType,
 };
 
-fn simplify_cycle_recover<'db>(
+fn simplify_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _value: &Node<'db>,
-    _count: u32,
-    _self: InteriorNode<'db>,
-) -> salsa::CycleRecoveryAction<Node<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn simplify_cycle_initial<'db>(_db: &'db dyn Db, this: InteriorNode<'db>) -> Node<'db> {
-    Node::Interior(this)
+    this: InteriorNode<'db>,
+) -> (Node<'db>, Node<'db>) {
+    (Node::Interior(this), Node::AlwaysTrue)
 }
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -303,9 +297,7 @@ impl<'db> ConstraintSet<'db> {
         eprintln!("==> satisfied {}", self.display(db));
         for typevar in typevars {
             let valid_specializations = typevar.valid_specializations(db);
-            let restricted = (self.node)
-                .project_typevar(db, typevar.identity(db))
-                .and(db, valid_specializations.node);
+            let restricted = (self.node).and(db, valid_specializations.node);
             eprintln!(" -> typevar {}", typevar.identity(db).display(db));
             let satisfied = if typevar.is_inferable(db, inferable) {
                 eprintln!("    inferable");
@@ -1274,18 +1266,6 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn project_typevar(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
-        let self_constraint = self.constraint(db);
-        if self_constraint.typevar(db).identity(db) == typevar {
-            let if_true = self.if_true(db).project_typevar(db, typevar);
-            let if_false = self.if_false(db).project_typevar(db, typevar);
-            Node::new(db, self_constraint, if_true, if_false)
-        } else {
-            self.if_true(db).or(db, self.if_false(db))
-        }
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
         db: &'db dyn Db,
@@ -1321,11 +1301,7 @@ impl<'db> InteriorNode<'db> {
     /// are mentioned in the BDD. For instance, if one constraint implies another (`x → y`), then
     /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
     /// can rewrite any occurrences of `x ∨ y` into `y`.
-    #[salsa::tracked(
-        cycle_fn=simplify_cycle_recover,
-        cycle_initial=simplify_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
+    #[salsa::tracked(cycle_initial=simplify_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
