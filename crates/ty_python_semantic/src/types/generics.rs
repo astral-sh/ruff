@@ -1392,7 +1392,7 @@ impl<'db> SpecializationBuilder<'db> {
             && !actual.is_never()
             && actual
                 .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied(self.db)
+                .satisfied_by_all_typevars(self.db, self.inferable)
         {
             return Ok(());
         }
@@ -1478,7 +1478,7 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty
                             .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied(self.db)
+                            .satisfied_by_all_typevars(self.db, self.inferable)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -1499,7 +1499,7 @@ impl<'db> SpecializationBuilder<'db> {
                         for constraint in constraints.elements(self.db) {
                             if ty
                                 .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied(self.db)
+                                .satisfied_by_all_typevars(self.db, self.inferable)
                             {
                                 self.add_type_mapping(bound_typevar, *constraint);
                                 return Ok(());
