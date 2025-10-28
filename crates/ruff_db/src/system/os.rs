@@ -200,7 +200,12 @@ impl System for OsSystem {
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+        WalkDirectoryBuilder::new(
+            path,
+            OsDirectoryWalker {
+                cwd: self.current_directory().to_path_buf(),
+            },
+        )
     }
 
     fn glob(
@@ -454,7 +459,9 @@ struct ListedDirectory {
 }
 
 #[derive(Debug)]
-struct OsDirectoryWalker;
+struct OsDirectoryWalker {
+    cwd: SystemPathBuf,
+}
 
 impl DirectoryWalker for OsDirectoryWalker {
     fn walk(
@@ -473,6 +480,7 @@ impl DirectoryWalker for OsDirectoryWalker {
         };
 
         let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
         builder.hidden(hidden);
