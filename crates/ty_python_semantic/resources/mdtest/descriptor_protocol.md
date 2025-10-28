@@ -170,6 +170,7 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
     reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
@@ -351,7 +352,7 @@ reveal_type(C4.meta_attribute)  # revealed: Literal["value on metaclass"]
 reveal_type(C4.meta_non_data_descriptor)  # revealed: Literal["non-data"]
 ```
 
-When a metaclass data descriptor is possibly unbound, we union the result type of its `__get__`
+When a metaclass data descriptor is possibly missing, we union the result type of its `__get__`
 method with an underlying class level attribute, if present:
 
 ```py
@@ -365,7 +366,7 @@ def _(flag: bool):
         meta_data_descriptor1: Literal["value on class"] = "value on class"
 
     reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["data", "value on class"]
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
 
     # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not
@@ -375,11 +376,11 @@ def _(flag: bool):
     # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     C5.meta_data_descriptor2 = 1
 ```
 
-When a class-level attribute is possibly unbound, we union its (descriptor protocol) type with the
+When a class-level attribute is possibly missing, we union its (descriptor protocol) type with the
 metaclass attribute (unless it's a data descriptor, which always takes precedence):
 
 ```py
@@ -401,7 +402,7 @@ def _(flag: bool):
     reveal_type(C6.attribute1)  # revealed: Literal["data"]
     reveal_type(C6.attribute2)  # revealed: Literal["non-data", "value on class"]
     reveal_type(C6.attribute3)  # revealed: Literal["value on metaclass", "value on class"]
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
 ```
 
@@ -431,6 +432,8 @@ def _(flag: bool):
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 
     C7.union_of_metaclass_attributes = 2 if flag else 1
+    # TODO: https://github.com/astral-sh/ty/issues/1163
+    # error: [invalid-assignment]
     C7.union_of_metaclass_data_descriptor_and_attribute = 2 if flag else 100
     C7.union_of_class_attributes = 2 if flag else 1
     C7.union_of_class_data_descriptor_and_attribute = 2 if flag else DataDescriptor()
@@ -756,16 +759,16 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().data)  # revealed: int
 ```
 

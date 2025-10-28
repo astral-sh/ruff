@@ -339,9 +339,9 @@ Otherwise, the union cannot be simplified.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(¬(Sub ≤ T@_ ≤ Base) ∧ ¬(Base ≤ T@_ ≤ Super))]
+    # revealed: ty_extensions.ConstraintSet[(¬(Base ≤ T@_ ≤ Super) ∧ ¬(Sub ≤ T@_ ≤ Base))]
     reveal_type(negated_range_constraint(Sub, T, Base) & negated_range_constraint(Base, T, Super))
-    # revealed: ty_extensions.ConstraintSet[(¬(SubSub ≤ T@_ ≤ Sub) ∧ ¬(Base ≤ T@_ ≤ Super))]
+    # revealed: ty_extensions.ConstraintSet[(¬(Base ≤ T@_ ≤ Super) ∧ ¬(SubSub ≤ T@_ ≤ Sub))]
     reveal_type(negated_range_constraint(SubSub, T, Sub) & negated_range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(¬(SubSub ≤ T@_ ≤ Sub) ∧ ¬(Unrelated ≤ T@_))]
     reveal_type(negated_range_constraint(SubSub, T, Sub) & negated_range_constraint(Unrelated, T, object))
@@ -360,7 +360,7 @@ that type _is_ in `SubSub ≤ T ≤ Super`, it is not correct to simplify the un
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(¬(SubSub ≤ T@_ ≤ Base) ∧ ¬(Sub ≤ T@_ ≤ Super))]
+    # revealed: ty_extensions.ConstraintSet[(¬(Sub ≤ T@_ ≤ Super) ∧ ¬(SubSub ≤ T@_ ≤ Base))]
     reveal_type(negated_range_constraint(SubSub, T, Base) & negated_range_constraint(Sub, T, Super))
 ```
 
@@ -417,9 +417,9 @@ Otherwise, the union cannot be simplified.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ (Base ≤ T@_ ≤ Super)]
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (Sub ≤ T@_ ≤ Base)]
     reveal_type(range_constraint(Sub, T, Base) | range_constraint(Base, T, Super))
-    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Base ≤ T@_ ≤ Super)]
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (SubSub ≤ T@_ ≤ Sub)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Unrelated ≤ T@_)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Unrelated, T, object))
@@ -437,7 +437,7 @@ not include `Sub`. That means it should not be in the union. Since that type _is
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Super)]
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super) ∨ (SubSub ≤ T@_ ≤ Base)]
     reveal_type(range_constraint(SubSub, T, Base) | range_constraint(Sub, T, Super))
 ```
 
@@ -488,9 +488,9 @@ range.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[¬(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Base)]
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ ¬(SubSub ≤ T@_ ≤ Base)]
     reveal_type(negated_range_constraint(SubSub, T, Base) | range_constraint(Sub, T, Super))
-    # revealed: ty_extensions.ConstraintSet[¬(SubSub ≤ T@_ ≤ Super) ∨ (Sub ≤ T@_ ≤ Base)]
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ ¬(SubSub ≤ T@_ ≤ Super)]
     reveal_type(negated_range_constraint(SubSub, T, Super) | range_constraint(Sub, T, Base))
 ```
 
@@ -561,4 +561,171 @@ def _[T]() -> None:
     constraint = range_constraint(Sub, T, Base)
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(constraint | ~constraint)
+```
+
+### Negation of constraints involving two variables
+
+```py
+from typing import final, Never
+from ty_extensions import range_constraint
+
+class Base: ...
+
+@final
+class Unrelated: ...
+
+def _[T, U]() -> None:
+    # revealed: ty_extensions.ConstraintSet[¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)]
+    reveal_type(~(range_constraint(Never, T, Base) & range_constraint(Never, U, Base)))
+```
+
+The union of a constraint and its negation should always be satisfiable.
+
+```py
+def _[T, U]() -> None:
+    c1 = range_constraint(Never, T, Base) & range_constraint(Never, U, Base)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(c1 | ~c1)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(~c1 | c1)
+
+    c2 = range_constraint(Unrelated, T, object) & range_constraint(Unrelated, U, object)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(c2 | ~c2)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(~c2 | c2)
+
+    union = c1 | c2
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(union | ~union)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(~union | union)
+```
+
+## Typevar ordering
+
+Constraints can relate two typevars — i.e., `S ≤ T`. We could encode that in one of two ways:
+`Never ≤ S ≤ T` or `S ≤ T ≤ object`. In other words, we can decide whether `S` or `T` is the typevar
+being constrained. The other is then the lower or upper bound of the constraint.
+
+To handle this, we enforce an arbitrary ordering on typevars, and always place the constraint on the
+"earlier" typevar. For the example above, that does not change how the constraint is displayed,
+since we always hide `Never` lower bounds and `object` upper bounds.
+
+```py
+from typing import Never
+from ty_extensions import range_constraint
+
+def f[S, T]():
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(Never, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(S, T, object))
+
+def f[T, S]():
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(Never, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f ≤ T@f)]
+    reveal_type(range_constraint(S, T, object))
+```
+
+Equivalence constraints are similar; internally we arbitrarily choose the "earlier" typevar to be
+the constraint, and the other the bound. But we display the result the same way no matter what.
+
+```py
+def f[S, T]():
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(T, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(S, T, S))
+
+def f[T, S]():
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(T, S, T))
+    # revealed: ty_extensions.ConstraintSet[(S@f = T@f)]
+    reveal_type(range_constraint(S, T, S))
+```
+
+But in the case of `S ≤ T ≤ U`, we end up with an ambiguity. Depending on the typevar ordering, that
+might display as `S ≤ T ≤ U`, or as `(S ≤ T) ∧ (T ≤ U)`.
+
+```py
+def f[S, T, U]():
+    # Could be either of:
+    #   ty_extensions.ConstraintSet[(S@f ≤ T@f ≤ U@f)]
+    #   ty_extensions.ConstraintSet[(S@f ≤ T@f) ∧ (T@f ≤ U@f)]
+    # reveal_type(range_constraint(S, T, U))
+    ...
+```
+
+## Other simplifications
+
+### Displaying constraint sets
+
+When displaying a constraint set, we transform the internal BDD representation into a DNF formula
+(i.e., the logical OR of several clauses, each of which is the logical AND of several constraints).
+This section contains several examples that show that we simplify the DNF formula as much as we can
+before displaying it.
+
+```py
+from ty_extensions import range_constraint
+
+def f[T, U]():
+    t1 = range_constraint(str, T, str)
+    t2 = range_constraint(bool, T, bool)
+    u1 = range_constraint(str, U, str)
+    u2 = range_constraint(bool, U, bool)
+
+    # revealed: ty_extensions.ConstraintSet[(T@f = bool) ∨ (T@f = str)]
+    reveal_type(t1 | t2)
+    # revealed: ty_extensions.ConstraintSet[(U@f = bool) ∨ (U@f = str)]
+    reveal_type(u1 | u2)
+    # revealed: ty_extensions.ConstraintSet[((T@f = bool) ∧ (U@f = bool)) ∨ ((T@f = bool) ∧ (U@f = str)) ∨ ((T@f = str) ∧ (U@f = bool)) ∨ ((T@f = str) ∧ (U@f = str))]
+    reveal_type((t1 | t2) & (u1 | u2))
+```
+
+We might simplify a BDD so much that we can no longer see the constraints that we used to construct
+it!
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+
+def f[T]():
+    t_int = range_constraint(Never, T, int)
+    t_bool = range_constraint(Never, T, bool)
+
+    # `T ≤ bool` implies `T ≤ int`: if a type satisfies the former, it must always satisfy the
+    # latter. We can turn that into a constraint set, using the equivalence `p → q == ¬p ∨ q`:
+    implication = ~t_bool | t_int
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(implication)
+    static_assert(implication)
+
+    # However, because of that implication, some inputs aren't valid: it's not possible for
+    # `T ≤ bool` to be true and `T ≤ int` to be false. This is reflected in the constraint set's
+    # "domain", which maps valid inputs to `true` and invalid inputs to `false`. This means that two
+    # constraint sets that are both always satisfied will not be identical if they have different
+    # domains!
+    always = range_constraint(Never, T, object)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(always)
+    static_assert(always)
+    static_assert(implication != always)
+```
+
+### Normalized bounds
+
+The lower and upper bounds of a constraint are normalized, so that we equate unions and
+intersections whose elements appear in different orders.
+
+```py
+from typing import Never
+from ty_extensions import range_constraint
+
+def f[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
+    reveal_type(range_constraint(Never, T, str | int))
+    # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
+    reveal_type(range_constraint(Never, T, int | str))
 ```

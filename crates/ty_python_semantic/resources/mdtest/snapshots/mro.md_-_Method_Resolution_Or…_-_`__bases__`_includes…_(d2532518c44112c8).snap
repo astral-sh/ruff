@@ -12,7 +12,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing_extensions import reveal_type
+ 1 | from ty_extensions import reveal_mro
  2 | 
  3 | def returns_bool() -> bool:
  4 |     return True
@@ -30,24 +30,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 17 | class Foo(x): ...
 18 | 
-19 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+19 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
 # Diagnostics
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:14:13
-   |
-12 |     x = B
-13 |
-14 | reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
-   |             ^ `<class 'A'> | <class 'B'>`
-15 |
-16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
-   |
-
-```
 
 ```
 warning[unsupported-base]: Unsupported class base with type `<class 'A'> | <class 'B'>`
@@ -57,22 +43,10 @@ warning[unsupported-base]: Unsupported class base with type `<class 'A'> | <clas
 17 | class Foo(x): ...
    |           ^
 18 |
-19 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+19 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
    |
 info: ty cannot resolve a consistent MRO for class `Foo` due to this base
 info: Only class objects or `Any` are supported as class bases
 info: rule `unsupported-base` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:19:13
-   |
-17 | class Foo(x): ...
-18 |
-19 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-   |             ^^^^^^^^^^^ `tuple[<class 'Foo'>, Unknown, <class 'object'>]`
-   |
 
 ```

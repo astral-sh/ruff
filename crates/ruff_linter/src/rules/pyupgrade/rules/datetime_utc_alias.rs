@@ -34,6 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `datetime.UTC`](https://docs.python.org/3/library/datetime.html#datetime.UTC)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.192")]
 pub(crate) struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {

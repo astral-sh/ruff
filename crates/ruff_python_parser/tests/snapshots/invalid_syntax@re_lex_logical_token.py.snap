@@ -581,7 +581,7 @@ Module(
                     test: Call(
                         ExprCall {
                             node_index: NodeIndex(None),
-                            range: 890..905,
+                            range: 890..906,
                             func: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -591,7 +591,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 894..905,
+                                range: 894..906,
                                 node_index: NodeIndex(None),
                                 args: [
                                     FString(
@@ -634,6 +634,7 @@ Module(
                                                                 quote_style: Double,
                                                                 prefix: Regular,
                                                                 triple_quoted: false,
+                                                                unclosed: true,
                                                             },
                                                         },
                                                     ),
@@ -713,11 +714,20 @@ Module(
                                                         FString {
                                                             range: 944..951,
                                                             node_index: NodeIndex(None),
-                                                            elements: [],
+                                                            elements: [
+                                                                Literal(
+                                                                    InterpolatedStringLiteralElement {
+                                                                        range: 946..951,
+                                                                        node_index: NodeIndex(None),
+                                                                        value: "hello",
+                                                                    },
+                                                                ),
+                                                            ],
                                                             flags: FStringFlags {
                                                                 quote_style: Double,
                                                                 prefix: Regular,
                                                                 triple_quoted: false,
+                                                                unclosed: true,
                                                             },
                                                         },
                                                     ),
@@ -888,7 +898,7 @@ Module(
    |
 49 | # F-strings uses normal list parsing, so test those as well
 50 | if call(f"hello {x
-   |                   ^ Syntax Error: Expected FStringEnd, found Unknown
+   |                   ^ Syntax Error: Expected FStringEnd, found NonLogicalNewline
 51 |     def bar():
 52 |         pass
    |

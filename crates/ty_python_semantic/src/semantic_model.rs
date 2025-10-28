@@ -12,6 +12,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
+use crate::types::ide_support::{Member, all_members};
 use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
@@ -26,7 +27,7 @@ impl<'db> SemanticModel<'db> {
 
     // TODO we don't actually want to expose the Db directly to lint rules, but we need to find a
     // solution for exposing information from types
-    pub fn db(&self) -> &dyn Db {
+    pub fn db(&self) -> &'db dyn Db {
         self.db
     }
 
@@ -193,7 +194,7 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
-        for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
+        for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
                 name,
                 ty: Some(ty),
@@ -226,7 +227,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
         let ty = node.value.inferred_type(self);
-        crate::types::all_members(self.db, ty)
+        all_members(self.db, ty)
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
@@ -339,6 +340,12 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
+}
+
+impl<'db> Completion<'db> {
+    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+        self.ty.is_some_and(|ty| ty.is_type_check_only(db))
+    }
 }
 
 pub trait HasType {
@@ -478,6 +485,7 @@ impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
 impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
+impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
@@ -497,8 +505,10 @@ impl HasTrackedScope for ast::Expr {}
 impl HasTrackedScope for ast::ExprRef<'_> {}
 impl HasTrackedScope for &ast::ExprRef<'_> {}
 
-// See https://github.com/astral-sh/ty/issues/572 why this implementation exists
-// even when we never register identifiers during semantic index building.
+// We never explicitly register the scope of an `Identifier`.
+// However, `ExpressionsScopeMap` stores the text ranges of each scope.
+// That allows us to look up the identifier's scope for as long as it's
+// inside an expression (because the ranges overlap).
 impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]

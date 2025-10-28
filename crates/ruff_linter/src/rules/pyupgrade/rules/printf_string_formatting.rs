@@ -75,6 +75,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {

@@ -32,6 +32,7 @@ use crate::comments::shebang::ShebangDirective;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct ShebangMissingPython;
 
 impl Violation for ShebangMissingPython {

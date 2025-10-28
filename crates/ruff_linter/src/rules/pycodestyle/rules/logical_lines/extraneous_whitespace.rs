@@ -31,6 +31,7 @@ use super::{LogicalLine, Whitespace};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceAfterOpenBracket {
     symbol: char,
 }
@@ -70,6 +71,7 @@ impl AlwaysFixableViolation for WhitespaceAfterOpenBracket {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceBeforeCloseBracket {
     symbol: char,
 }
@@ -107,6 +109,7 @@ impl AlwaysFixableViolation for WhitespaceBeforeCloseBracket {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceBeforePunctuation {
     symbol: char,
 }

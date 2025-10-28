@@ -9,7 +9,7 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to, reveal_mro
 
 class Person(NamedTuple):
     id: int
@@ -25,8 +25,8 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(Person.__mro__)
+# revealed: (<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Person)
 
 static_assert(is_subtype_of(Person, tuple[int, str, int | None]))
 static_assert(is_subtype_of(Person, tuple[object, ...]))
@@ -208,8 +208,7 @@ class SuperUser(User):
     def now_called_robert(self):
         self.name = "Robert"  # fine because overridden with a mutable attribute
 
-        # TODO: this should cause us to emit an error as we're assigning to a read-only property
-        # inherited from the `NamedTuple` superclass (requires https://github.com/astral-sh/ty/issues/159)
+        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
         self.nickname = "Bob"
 
 james = SuperUser(0, "James", 42, "Jimmy")
@@ -278,8 +277,7 @@ reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support implicit type of `self`
-reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
@@ -296,8 +294,7 @@ class Box(NamedTuple, Generic[T]):
 class IntBox(Box[int]):
     pass
 
-# TODO: should be `IntBox` once we support the implicit type of `self`
-reveal_type(IntBox(1)._replace(content=42))  # revealed: Unknown
+reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```
 
 ## `collections.namedtuple`
@@ -332,9 +329,8 @@ reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
 
-# TODO: this should cause us to emit a diagnostic and reveal `Unknown` (function objects don't have an `__mro__` attribute),
-# but the fact that we don't isn't actually a `NamedTuple` bug (https://github.com/astral-sh/ty/issues/986)
-reveal_type(typing.NamedTuple.__mro__)  # revealed: tuple[<class 'FunctionType'>, <class 'object'>]
+# error: [unresolved-attribute]
+reveal_type(typing.NamedTuple.__mro__)  # revealed: Unknown
 ```
 
 By the normal rules, `NamedTuple` and `type[NamedTuple]` should not be valid in type expressions --

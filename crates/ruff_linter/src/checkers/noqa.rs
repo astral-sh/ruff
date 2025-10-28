@@ -130,6 +130,7 @@ pub(crate) fn check_noqa(
                         let edit = delete_comment(directive.range(), locator);
                         let mut diagnostic = context
                             .report_diagnostic(UnusedNOQA { codes: None }, directive.range());
+                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     }
                 }
@@ -226,6 +227,7 @@ pub(crate) fn check_noqa(
                             },
                             directive.range(),
                         );
+                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     }
                 }

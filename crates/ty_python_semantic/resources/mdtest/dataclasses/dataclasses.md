@@ -497,6 +497,8 @@ class A:
     a: str = field(kw_only=False)
     b: int = 0
 
+reveal_type(A.__init__)  # revealed: (self: A, a: str, *, b: int = Literal[0]) -> None
+
 A("hi")
 ```
 
@@ -542,6 +544,55 @@ from dataclasses import dataclass
 class A:
     x: int
     y: int
+```
+
+### `kw_only` - Python 3.13
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class Employee:
+    e_id: int = field(kw_only=True, default=0)
+    name: str
+
+Employee("Alice")
+Employee(name="Alice")
+Employee(name="Alice", e_id=1)
+Employee(e_id=1, name="Alice")
+Employee("Alice", e_id=1)
+
+Employee("Alice", 1)  # error: [too-many-positional-arguments]
+```
+
+### `kw_only` - Python 3.14
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class Employee:
+    # Python 3.14 introduces a new `doc` parameter for `dataclasses.field`
+    e_id: int = field(kw_only=True, default=0, doc="Global employee ID")
+    name: str
+
+Employee("Alice")
+Employee(name="Alice")
+Employee(name="Alice", e_id=1)
+Employee(e_id=1, name="Alice")
+Employee("Alice", e_id=1)
+
+Employee("Alice", 1)  # error: [too-many-positional-arguments]
 ```
 
 ### `slots`
@@ -961,7 +1012,6 @@ python-version = "3.10"
 
 ```py
 from dataclasses import dataclass, field, KW_ONLY
-from typing_extensions import reveal_type
 
 @dataclass
 class C:
@@ -1123,6 +1173,7 @@ and attributes like the MRO are unchanged:
 
 ```py
 from dataclasses import dataclass
+from ty_extensions import reveal_mro
 
 @dataclass
 class Person:
@@ -1130,7 +1181,8 @@ class Person:
     age: int | None = None
 
 reveal_type(type(Person))  # revealed: <class 'type'>
-reveal_type(Person.__mro__)  # revealed: tuple[<class 'Person'>, <class 'object'>]
+reveal_type(Person.__mro__)  # revealed: tuple[type, ...]
+reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'object'>)
 ```
 
 The generated methods have the following signatures:
@@ -1156,9 +1208,9 @@ python-version = "3.12"
 from dataclasses import dataclass
 from typing import Callable
 from types import FunctionType
-from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
 
-@dataclass
+@dataclass(order=True)
 class C:
     x: int
 
@@ -1185,8 +1237,20 @@ static_assert(not is_assignable_to(EquivalentPureCallableType, DunderInitType))
 static_assert(is_subtype_of(DunderInitType, EquivalentFunctionLikeCallableType))
 static_assert(is_assignable_to(DunderInitType, EquivalentFunctionLikeCallableType))
 
-static_assert(not is_subtype_of(EquivalentFunctionLikeCallableType, DunderInitType))
-static_assert(not is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitType))
+static_assert(is_subtype_of(EquivalentFunctionLikeCallableType, DunderInitType))
+static_assert(is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitType))
+
+static_assert(is_equivalent_to(EquivalentFunctionLikeCallableType, DunderInitType))
 
 static_assert(is_subtype_of(DunderInitType, FunctionType))
+```
+
+It should be possible to mock out synthesized methods:
+
+```py
+from unittest.mock import Mock
+
+def test_c():
+    c = C(1)
+    c.__lt__ = Mock()
 ```

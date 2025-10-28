@@ -11,7 +11,7 @@ At its simplest, to define a generic class using PEP 695 syntax, you add a list 
 `ParamSpec`s or `TypeVarTuple`s after the class name.
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions import generic_context, reveal_mro
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
@@ -77,13 +77,13 @@ T = TypeVar("T")
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
 
-reveal_type(BothGenericSyntaxes.__mro__)  # revealed: tuple[<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(BothGenericSyntaxes)  # revealed: (<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>)
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 # error: [invalid-base] "Cannot inherit from plain `Generic`"
 class DoublyInvalid[T](Generic): ...
 
-reveal_type(DoublyInvalid.__mro__)  # revealed: tuple[<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(DoublyInvalid)  # revealed: (<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>)
 ```
 
 Generic classes implicitly inherit from `Generic`:
@@ -91,26 +91,26 @@ Generic classes implicitly inherit from `Generic`:
 ```py
 class Foo[T]: ...
 
-# revealed: tuple[<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>]
-reveal_type(Foo.__mro__)
-# revealed: tuple[<class 'Foo[int]'>, typing.Generic, <class 'object'>]
-reveal_type(Foo[int].__mro__)
+# revealed: (<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Foo)
+# revealed: (<class 'Foo[int]'>, typing.Generic, <class 'object'>)
+reveal_mro(Foo[int])
 
 class A: ...
 class Bar[T](A): ...
 
-# revealed: tuple[<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>]
-reveal_type(Bar.__mro__)
-# revealed: tuple[<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>]
-reveal_type(Bar[int].__mro__)
+# revealed: (<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>)
+reveal_mro(Bar)
+# revealed: (<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>)
+reveal_mro(Bar[int])
 
 class B: ...
 class Baz[T](A, B): ...
 
-# revealed: tuple[<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
-reveal_type(Baz.__mro__)
-# revealed: tuple[<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
-reveal_type(Baz[int].__mro__)
+# revealed: (<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
+reveal_mro(Baz)
+# revealed: (<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
+reveal_mro(Baz[int])
 ```
 
 ## Specializing generic classes explicitly
@@ -504,17 +504,17 @@ class C[T]:
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 reveal_type(generic_context(C))  # revealed: tuple[T@C]
-reveal_type(generic_context(C.method))  # revealed: None
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 reveal_type(generic_context(C[int]))  # revealed: None
-reveal_type(generic_context(C[int].method))  # revealed: None
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C[int].method))  # revealed: tuple[Self@method]
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 reveal_type(generic_context(c))  # revealed: None
-reveal_type(generic_context(c.method))  # revealed: None
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(c.method))  # revealed: tuple[Self@method]
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 ```
 
 ## Specializations propagate
@@ -553,13 +553,9 @@ from typing import overload
 
 class WithOverloadedMethod[T]:
     @overload
-    def method(self, x: T) -> T:
-        return x
-
+    def method(self, x: T) -> T: ...
     @overload
-    def method[S](self, x: S) -> S | T:
-        return x
-
+    def method[S](self, x: S) -> S | T: ...
     def method[S](self, x: S | T) -> S | T:
         return x
 
@@ -640,6 +636,25 @@ class C[T](C): ...
 
 # error: [cyclic-class-definition]
 class D[T](D[int]): ...
+```
+
+### Cyclic inheritance in a stub file combined with constrained type variables
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1390>; we used to panic on
+this:
+
+`stub.pyi`:
+
+```pyi
+class A(B): ...
+class G: ...
+class C[T: (G, A)]: ...
+class B(C[A]): ...
+class D(C[G]): ...
+
+def func(x: D): ...
+
+func(G())  # error: [invalid-argument-type]
 ```
 
 ## Tuple as a PEP-695 generic class

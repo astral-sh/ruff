@@ -33,6 +33,7 @@ use crate::rules::flake8_quotes::helpers::{contains_escaped_quote, raw_contents,
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryEscapedQuote;
 
 impl AlwaysFixableViolation for UnnecessaryEscapedQuote {

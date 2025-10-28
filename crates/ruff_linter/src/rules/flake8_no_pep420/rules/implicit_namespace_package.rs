@@ -32,6 +32,7 @@ use crate::package::PackageRoot;
 /// ## Options
 /// - `namespace-packages`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.225")]
 pub(crate) struct ImplicitNamespacePackage {
     filename: String,
     parent: Option<String>,
@@ -71,6 +72,8 @@ pub(crate) fn implicit_namespace_package(
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
+        // Ignore `.pyw` files that are also PySourceType::Python but aren't importable namespaces
+        && path.extension().is_some_and(|ext| ext == "py")
         // Ignore any files that are direct children of the project root.
         && path
             .parent()

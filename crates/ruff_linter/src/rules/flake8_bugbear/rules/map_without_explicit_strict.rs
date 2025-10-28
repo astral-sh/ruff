@@ -9,7 +9,7 @@ use crate::rules::flake8_bugbear::helpers::any_infinite_iterables;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
-/// Checks for `map` calls without an explicit `strict` parameter when called with two or more iterables.
+/// Checks for `map` calls without an explicit `strict` parameter when called with two or more iterables, or any starred argument.
 ///
 /// This rule applies to Python 3.14 and later, where `map` accepts a `strict` keyword
 /// argument. For details, see: [What’s New in Python 3.14](https://docs.python.org/dev/whatsnew/3.14.html).
@@ -34,14 +34,16 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe for `map` calls that contain
-/// `**kwargs`, as adding a `strict` keyword argument to such a call may lead
-/// to a duplicate keyword argument error.
+/// This rule's fix is marked as unsafe. While adding `strict=False` preserves
+/// the runtime behavior, it can obscure situations where the iterables are of
+/// unequal length. Ruff prefers to alert users so they can choose the intended
+/// behavior themselves.
 ///
 /// ## References
 /// - [Python documentation: `map`](https://docs.python.org/3/library/functions.html#map)
 /// - [What’s New in Python 3.14](https://docs.python.org/dev/whatsnew/3.14.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.13.2")]
 pub(crate) struct MapWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for MapWithoutExplicitStrict {
@@ -61,7 +63,12 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
 
     if semantic.match_builtin_expr(&call.func, "map")
         && call.arguments.find_keyword("strict").is_none()
-        && call.arguments.args.len() >= 3 // function + at least 2 iterables
+        && (
+            // at least 2 iterables (+ 1 function)
+            call.arguments.args.len() >= 3
+            // or a starred argument
+            || call.arguments.args.iter().any(ast::Expr::is_starred_expr)
+        )
         && !any_infinite_iterables(call.arguments.args.iter().skip(1), semantic)
     {
         checker
@@ -73,17 +80,7 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
                     checker.comment_ranges(),
                     checker.locator().contents(),
                 ),
-                // If the function call contains `**kwargs`, mark the fix as unsafe.
-                if call
-                    .arguments
-                    .keywords
-                    .iter()
-                    .any(|keyword| keyword.arg.is_none())
-                {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
+                Applicability::Unsafe,
             ));
     }
 }

@@ -36,6 +36,38 @@ from .foo import X
 reveal_type(X)  # revealed: int
 ```
 
+## Simple With Stub and Implementation
+
+This is a regression test for an issue with relative imports in implementation files when a stub is
+also defined.
+
+`package/__init__.py`:
+
+```py
+```
+
+`package/foo.py`:
+
+```py
+X: int = 42
+```
+
+`package/bar.py`:
+
+```py
+from .foo import X
+
+reveal_type(X)  # revealed: int
+```
+
+`package/bar.pyi`:
+
+```pyi
+from .foo import X
+
+reveal_type(X)  # revealed: int
+```
+
 ## Dotted
 
 `package/__init__.py`:
@@ -215,7 +247,7 @@ X: int = 42
 from . import foo
 import package
 
-# error: [unresolved-attribute] "Type `<module 'package'>` has no attribute `foo`"
+# error: [unresolved-attribute] "Module `package` has no member `foo`"
 reveal_type(package.foo.X)  # revealed: Unknown
 ```
 

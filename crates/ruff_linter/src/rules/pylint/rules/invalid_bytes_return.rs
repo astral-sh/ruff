@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bytes__` method](https://docs.python.org/3/reference/datamodel.html#object.__bytes__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct InvalidBytesReturnType;
 
 impl Violation for InvalidBytesReturnType {

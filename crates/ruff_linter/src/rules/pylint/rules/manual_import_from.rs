@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -26,6 +27,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Submodules](https://docs.python.org/3/reference/import.html#submodules)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct ManualFromImport {
     module: String,
     name: String,
@@ -55,6 +57,15 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
         return;
     };
     if asname != name {
+        return;
+    }
+
+    // Skip if this import is required by isort to prevent infinite loops with I002
+    if is_import_required_by_isort(
+        &checker.settings().isort.required_imports,
+        stmt.into(),
+        alias,
+    ) {
         return;
     }
 

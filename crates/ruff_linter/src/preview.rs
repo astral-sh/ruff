@@ -7,10 +7,6 @@
 
 use crate::settings::LinterSettings;
 
-pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // Rule-specific behavior
 
 // https://github.com/astral-sh/ruff/pull/15541
@@ -200,6 +196,11 @@ pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettin
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/20659
+pub(crate) const fn is_future_required_preview_generics_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/18683
 pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
     settings: &LinterSettings,
@@ -233,5 +234,48 @@ pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bo
 pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
     settings: &LinterSettings,
 ) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20200
+pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20660
+pub(crate) const fn is_type_var_default_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// github.com/astral-sh/ruff/issues/20004
+pub(crate) const fn is_b006_check_guaranteed_mutable_expr_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
+// github.com/astral-sh/ruff/issues/20004
+pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_read_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20520
+pub(crate) const fn is_fix_write_whole_file_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+pub(crate) const fn is_typing_extensions_str_alias_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19045
+pub(crate) const fn is_extended_i18n_function_matching_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

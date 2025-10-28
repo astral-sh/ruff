@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
@@ -45,6 +46,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }
@@ -85,6 +87,13 @@ pub(crate) fn unnecessary_builtin_import(
     // Identify unaliased, builtin imports.
     let unused_imports: Vec<&Alias> = names
         .iter()
+        .filter(|alias| {
+            !is_import_required_by_isort(
+                &checker.settings().isort.required_imports,
+                stmt.into(),
+                alias,
+            )
+        })
         .filter(|alias| alias.asname.is_none())
         .filter(|alias| {
             matches!(

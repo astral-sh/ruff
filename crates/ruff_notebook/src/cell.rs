@@ -308,6 +308,13 @@ impl CellOffsets {
         })
         .is_ok()
     }
+
+    /// Returns an iterator over [`TextRange`]s covered by each cell.
+    pub fn ranges(&self) -> impl Iterator<Item = TextRange> {
+        self.iter()
+            .tuple_windows()
+            .map(|(start, end)| TextRange::new(*start, *end))
+    }
 }
 
 impl Deref for CellOffsets {

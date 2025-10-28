@@ -1,0 +1,250 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: super.md - Super - Basic Usage - Explicit Super Object
+mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+  1 | from __future__ import annotations
+  2 | from ty_extensions import reveal_mro
+  3 | 
+  4 | class A:
+  5 |     def a(self): ...
+  6 |     aa: int = 1
+  7 | 
+  8 | class B(A):
+  9 |     def b(self): ...
+ 10 |     bb: int = 2
+ 11 | 
+ 12 | class C(B):
+ 13 |     def c(self): ...
+ 14 |     cc: int = 3
+ 15 | 
+ 16 | reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
+ 17 | 
+ 18 | super(C, C()).a
+ 19 | super(C, C()).b
+ 20 | super(C, C()).c  # error: [unresolved-attribute]
+ 21 | 
+ 22 | super(B, C()).a
+ 23 | super(B, C()).b  # error: [unresolved-attribute]
+ 24 | super(B, C()).c  # error: [unresolved-attribute]
+ 25 | 
+ 26 | super(A, C()).a  # error: [unresolved-attribute]
+ 27 | super(A, C()).b  # error: [unresolved-attribute]
+ 28 | super(A, C()).c  # error: [unresolved-attribute]
+ 29 | 
+ 30 | reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
+ 31 | reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
+ 32 | reveal_type(super(C, C()).aa)  # revealed: int
+ 33 | reveal_type(super(C, C()).bb)  # revealed: int
+ 34 | import types
+ 35 | from typing_extensions import Callable, TypeIs, Literal, TypedDict
+ 36 | 
+ 37 | def f(): ...
+ 38 | 
+ 39 | class Foo[T]:
+ 40 |     def method(self): ...
+ 41 |     @property
+ 42 |     def some_property(self): ...
+ 43 | 
+ 44 | type Alias = int
+ 45 | 
+ 46 | class SomeTypedDict(TypedDict):
+ 47 |     x: int
+ 48 |     y: bytes
+ 49 | 
+ 50 | # revealed: <super: <class 'object'>, FunctionType>
+ 51 | reveal_type(super(object, f))
+ 52 | # revealed: <super: <class 'object'>, WrapperDescriptorType>
+ 53 | reveal_type(super(object, types.FunctionType.__get__))
+ 54 | # revealed: <super: <class 'object'>, GenericAlias>
+ 55 | reveal_type(super(object, Foo[int]))
+ 56 | # revealed: <super: <class 'object'>, _SpecialForm>
+ 57 | reveal_type(super(object, Literal))
+ 58 | # revealed: <super: <class 'object'>, TypeAliasType>
+ 59 | reveal_type(super(object, Alias))
+ 60 | # revealed: <super: <class 'object'>, MethodType>
+ 61 | reveal_type(super(object, Foo().method))
+ 62 | # revealed: <super: <class 'object'>, property>
+ 63 | reveal_type(super(object, Foo.some_property))
+ 64 | 
+ 65 | def g(x: object) -> TypeIs[list[object]]:
+ 66 |     return isinstance(x, list)
+ 67 | 
+ 68 | def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
+ 69 |     if hasattr(x, "bar"):
+ 70 |         # revealed: <Protocol with members 'bar'>
+ 71 |         reveal_type(x)
+ 72 |         # error: [invalid-super-argument]
+ 73 |         # revealed: Unknown
+ 74 |         reveal_type(super(object, x))
+ 75 | 
+ 76 |     # error: [invalid-super-argument]
+ 77 |     # revealed: Unknown
+ 78 |     reveal_type(super(object, z))
+ 79 | 
+ 80 |     is_list = g(x)
+ 81 |     # revealed: TypeIs[list[object] @ x]
+ 82 |     reveal_type(is_list)
+ 83 |     # revealed: <super: <class 'object'>, bool>
+ 84 |     reveal_type(super(object, is_list))
+ 85 | 
+ 86 |     # revealed: <super: <class 'object'>, dict[Literal["x", "y"], int | bytes]>
+ 87 |     reveal_type(super(object, y))
+ 88 | 
+ 89 | # The first argument to `super()` must be an actual class object;
+ 90 | # instances of `GenericAlias` are not accepted at runtime:
+ 91 | #
+ 92 | # error: [invalid-super-argument]
+ 93 | # revealed: Unknown
+ 94 | reveal_type(super(list[int], []))
+ 95 | class Super:
+ 96 |     def method(self) -> int:
+ 97 |         return 42
+ 98 | 
+ 99 | class Sub(Super):
+100 |     def method(self: Sub) -> int:
+101 |         # revealed: <super: <class 'Sub'>, Sub>
+102 |         return reveal_type(super(self.__class__, self)).method()
+```
+
+# Diagnostics
+
+```
+error[unresolved-attribute]: Object of type `<super: <class 'C'>, C>` has no attribute `c`
+  --> src/mdtest_snippet.py:20:1
+   |
+18 | super(C, C()).a
+19 | super(C, C()).b
+20 | super(C, C()).c  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^
+21 |
+22 | super(B, C()).a
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `b`
+  --> src/mdtest_snippet.py:23:1
+   |
+22 | super(B, C()).a
+23 | super(B, C()).b  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^
+24 | super(B, C()).c  # error: [unresolved-attribute]
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `c`
+  --> src/mdtest_snippet.py:24:1
+   |
+22 | super(B, C()).a
+23 | super(B, C()).b  # error: [unresolved-attribute]
+24 | super(B, C()).c  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^
+25 |
+26 | super(A, C()).a  # error: [unresolved-attribute]
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `a`
+  --> src/mdtest_snippet.py:26:1
+   |
+24 | super(B, C()).c  # error: [unresolved-attribute]
+25 |
+26 | super(A, C()).a  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^
+27 | super(A, C()).b  # error: [unresolved-attribute]
+28 | super(A, C()).c  # error: [unresolved-attribute]
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `b`
+  --> src/mdtest_snippet.py:27:1
+   |
+26 | super(A, C()).a  # error: [unresolved-attribute]
+27 | super(A, C()).b  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^
+28 | super(A, C()).c  # error: [unresolved-attribute]
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `c`
+  --> src/mdtest_snippet.py:28:1
+   |
+26 | super(A, C()).a  # error: [unresolved-attribute]
+27 | super(A, C()).b  # error: [unresolved-attribute]
+28 | super(A, C()).c  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^
+29 |
+30 | reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[invalid-super-argument]: `<Protocol with members 'bar'>` is an abstract/structural type in `super(<class 'object'>, <Protocol with members 'bar'>)` call
+  --> src/mdtest_snippet.py:74:21
+   |
+72 |         # error: [invalid-super-argument]
+73 |         # revealed: Unknown
+74 |         reveal_type(super(object, x))
+   |                     ^^^^^^^^^^^^^^^^
+75 |
+76 |     # error: [invalid-super-argument]
+   |
+info: rule `invalid-super-argument` is enabled by default
+
+```
+
+```
+error[invalid-super-argument]: `(int, str, /) -> bool` is an abstract/structural type in `super(<class 'object'>, (int, str, /) -> bool)` call
+  --> src/mdtest_snippet.py:78:17
+   |
+76 |     # error: [invalid-super-argument]
+77 |     # revealed: Unknown
+78 |     reveal_type(super(object, z))
+   |                 ^^^^^^^^^^^^^^^^
+79 |
+80 |     is_list = g(x)
+   |
+info: rule `invalid-super-argument` is enabled by default
+
+```
+
+```
+error[invalid-super-argument]: `types.GenericAlias` instance `list[int]` is not a valid class
+  --> src/mdtest_snippet.py:94:13
+   |
+92 | # error: [invalid-super-argument]
+93 | # revealed: Unknown
+94 | reveal_type(super(list[int], []))
+   |             ^^^^^^^^^^^^^^^^^^^^
+95 | class Super:
+96 |     def method(self) -> int:
+   |
+info: rule `invalid-super-argument` is enabled by default
+
+```

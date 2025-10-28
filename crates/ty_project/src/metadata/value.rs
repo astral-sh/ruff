@@ -86,7 +86,6 @@ impl Drop for ValueSourceGuard {
 /// or if the values were loaded from different sources.
 #[derive(Clone, serde::Serialize, get_size2::GetSize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RangedValue<T> {
     value: T,
     #[serde(skip)]
@@ -98,6 +97,34 @@ pub struct RangedValue<T> {
     /// For example, arguments provided on the CLI won't have a range attached.
     #[serde(skip)]
     range: Option<TextRange>,
+}
+
+#[cfg(feature = "schemars")]
+impl<T> schemars::JsonSchema for RangedValue<T>
+where
+    T: schemars::JsonSchema,
+{
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        T::schema_name()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        T::schema_id()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        T::json_schema(generator)
+    }
+
+    fn _schemars_private_non_optional_json_schema(
+        generator: &mut schemars::SchemaGenerator,
+    ) -> schemars::Schema {
+        T::_schemars_private_non_optional_json_schema(generator)
+    }
+
+    fn _schemars_private_is_option() -> bool {
+        T::_schemars_private_is_option()
+    }
 }
 
 impl<T> RangedValue<T> {

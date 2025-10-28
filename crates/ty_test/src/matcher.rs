@@ -4,8 +4,10 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Range;
+use std::sync::LazyLock;
 
 use colored::Colorize;
+use path_slash::PathExt;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::source::{SourceText, line_index, source_text};
@@ -201,14 +203,37 @@ impl UnmatchedWithColumn for &Diagnostic {
 fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
     #[cfg(not(debug_assertions))]
     {
-        static TODO_METADATA_REGEX: std::sync::LazyLock<regex::Regex> =
-            std::sync::LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
+        static TODO_METADATA_REGEX: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
 
         TODO_METADATA_REGEX.replace_all(ty, "@Todo")
     }
 
     #[cfg(debug_assertions)]
     Cow::Borrowed(ty)
+}
+
+/// Normalize paths in diagnostics to Unix paths before comparing them against
+/// the expected type. Doing otherwise means that it's hard to write cross-platform
+/// tests, since in some edge cases the display of a type can include a path to the
+/// file in which the type was defined (e.g. `foo.bar.A @ src/foo/bar.py:10` on Unix,
+/// but `foo.bar.A @ src\foo\bar.py:10` on Windows).
+fn normalize_paths(ty: &str) -> Cow<'_, str> {
+    static PATH_IN_CLASS_DISPLAY_REGEX: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"( @ )(.+)(\.pyi?:\d)").unwrap());
+
+    fn normalize_path_captures(path_captures: &regex::Captures) -> String {
+        let normalized_path = std::path::Path::new(&path_captures[2])
+            .to_slash()
+            .expect("Python module paths should be valid UTF-8");
+
+        format!(
+            "{}{}{}",
+            &path_captures[1], normalized_path, &path_captures[3]
+        )
+    }
+
+    PATH_IN_CLASS_DISPLAY_REGEX.replace_all(ty, normalize_path_captures)
 }
 
 struct Matcher {
@@ -294,7 +319,7 @@ impl Matcher {
                         .column
                         .is_none_or(|col| col == self.column(diagnostic));
                     let message_matches = error.message_contains.is_none_or(|needle| {
-                        diagnostic.concise_message().to_string().contains(needle)
+                        normalize_paths(&diagnostic.concise_message().to_string()).contains(needle)
                     });
                     lint_name_matches && column_matches && message_matches
                 });
@@ -320,29 +345,21 @@ impl Matcher {
                         return false;
                     };
 
-                    // reveal_type
-                    if primary_message == "Revealed type"
-                        && primary_annotation == expected_reveal_type_message
+                    // reveal_type, reveal_protocol_interface
+                    if matches!(
+                        primary_message,
+                        "Revealed type" | "Revealed protocol interface"
+                    ) && primary_annotation == expected_reveal_type_message
                     {
                         return true;
                     }
 
-                    // reveal_protocol_interface
-                    if primary_message == "Revealed protocol interface"
-                        && primary_annotation == expected_reveal_type_message
+                    // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
+                    if matches!(
+                        primary_message,
+                        "Assignability holds" | "Subtyping holds" | "Revealed MRO"
+                    ) && primary_annotation == expected_type
                     {
-                        return true;
-                    }
-
-                    // reveal_when_assignable_to
-                    if primary_message == "Assignability holds"
-                        && primary_annotation == expected_type
-                    {
-                        return true;
-                    }
-
-                    // reveal_when_subtype_of
-                    if primary_message == "Subtyping holds" && primary_annotation == expected_type {
                         return true;
                     }
 

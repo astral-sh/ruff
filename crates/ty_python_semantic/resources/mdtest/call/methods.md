@@ -69,7 +69,9 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-C.f(1)  # error: [missing-argument]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `C`, found `Literal[1]`"
+# error: [missing-argument]
+C.f(1)
 
 reveal_type(C.f(C(), 1))  # revealed: str
 ```
@@ -309,7 +311,7 @@ reveal_type(C.f(1))  # revealed: str
 The method `f` can not be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Type `C` has no attribute `f`"
+# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
@@ -325,7 +327,7 @@ class D(metaclass=Meta):
 reveal_type(D.f(1))  # revealed: Literal["a"]
 ```
 
-If the class method is possibly unbound, we union the return types:
+If the class method is possibly missing, we union the return types:
 
 ```py
 def flag() -> bool:
@@ -649,7 +651,7 @@ static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
 reveal_type(MyClass.my_property.__set__)
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
 
-# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(str.startswith)
 static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
 
@@ -687,7 +689,7 @@ def _(
     # revealed: (obj: type) -> None
     reveal_type(e)
 
-    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> Any) | None = None, doc: str | None = None) -> Unknown
+    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> None) | None = None, doc: str | None = None) -> property
     reveal_type(f)
 
     # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
@@ -705,7 +707,7 @@ def _(
     # revealed: (instance: object, value: object, /) -> Unknown
     reveal_type(j)
 
-    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
     reveal_type(k)
 
     # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool

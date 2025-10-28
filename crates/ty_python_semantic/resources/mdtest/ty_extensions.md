@@ -91,7 +91,7 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert, is_assignable_to
+from ty_extensions import Unknown, static_assert, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -107,8 +107,8 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
 ```py
 class C(Unknown): ...
 
-# revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
-reveal_type(C.__mro__)
+# revealed: (<class 'C'>, Unknown, <class 'object'>)
+reveal_mro(C)
 
 # error: "Special form `ty_extensions.Unknown` expected no type parameter"
 u: Unknown[str]
@@ -493,16 +493,14 @@ def _(
     c5: CallableTypeOf[Foo(42).__call__],
     c6: CallableTypeOf[Foo(42).returns_self],
     c7: CallableTypeOf[Foo.class_method],
+    c8: CallableTypeOf[Foo(42)],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int
     reveal_type(c3)  # revealed: (x: int, y: str) -> None
-
-    # TODO: should be `(x: int) -> Foo`
-    reveal_type(c4)  # revealed: (...) -> Foo
-
+    reveal_type(c4)  # revealed: (x: int) -> Foo
     reveal_type(c5)  #  revealed: (x: int) -> str
-
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
+    reveal_type(c8)  # revealed: (x: int) -> str
 ```

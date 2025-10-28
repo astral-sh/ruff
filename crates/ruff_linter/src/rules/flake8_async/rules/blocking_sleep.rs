@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 ///     await asyncio.sleep(1)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BlockingSleepInAsyncFunction;
 
 impl Violation for BlockingSleepInAsyncFunction {

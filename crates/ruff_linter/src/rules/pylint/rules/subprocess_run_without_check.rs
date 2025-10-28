@@ -46,6 +46,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct SubprocessRunWithoutCheck;
 
 impl AlwaysFixableViolation for SubprocessRunWithoutCheck {

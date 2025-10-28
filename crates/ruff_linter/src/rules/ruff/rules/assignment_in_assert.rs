@@ -48,6 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `-O`](https://docs.python.org/3/using/cmdline.html#cmdoption-O)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct AssignmentInAssert;
 
 impl Violation for AssignmentInAssert {

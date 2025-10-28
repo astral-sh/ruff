@@ -24,6 +24,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     def __repr__(self) -> str: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct StrOrReprDefinedInStub {
     name: String,
 }

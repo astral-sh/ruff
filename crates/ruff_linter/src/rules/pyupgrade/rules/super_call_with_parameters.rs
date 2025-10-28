@@ -57,6 +57,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct SuperCallWithParameters;
 
 impl Violation for SuperCallWithParameters {
@@ -139,11 +140,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    if !((first_arg_id == "__class__"
-        || (first_arg_id == parent_name.as_str()
-            // If the first argument matches the class name, check if it's a local variable
-            // that shadows the class name. If so, don't apply UP008.
-            && !checker.semantic().current_scope().has(first_arg_id)))
+    // The `super(__class__, self)` and `super(ParentClass, self)` patterns are redundant in Python 3
+    // when the first argument refers to the implicit `__class__` cell or to the enclosing class.
+    // Avoid triggering if a local variable shadows either name.
+    if !(((first_arg_id == "__class__") || (first_arg_id == parent_name.as_str()))
+        && !checker.semantic().current_scope().has(first_arg_id)
         && second_arg_id == parent_arg.name().as_str())
     {
         return;

@@ -56,10 +56,11 @@ allowed, even when the unknown superclass is `int`. The assignment to `y` should
 
 ```py
 from typing import Any
+from ty_extensions import reveal_mro
 
 class SubclassOfAny(Any): ...
 
-reveal_type(SubclassOfAny.__mro__)  # revealed: tuple[<class 'SubclassOfAny'>, Any, <class 'object'>]
+reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
 
 x: SubclassOfAny = 1  # error: [invalid-assignment]
 y: int = SubclassOfAny()

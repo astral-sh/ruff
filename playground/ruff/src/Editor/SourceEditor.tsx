@@ -125,17 +125,16 @@ class RuffCodeActionProvider implements CodeActionProvider {
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions = this.diagnostics
       // Show fixes for any diagnostic whose range intersects the requested range
-      .filter((check) =>
-        Range.areIntersecting(
-          new Range(
-            check.start_location.row,
-            check.start_location.column,
-            check.end_location.row,
-            check.end_location.column,
-          ),
-          range,
-        ),
-      )
+      .filter((check) => {
+        const diagnosticRange = new Range(
+          check.start_location.row,
+          check.start_location.column,
+          check.end_location.row,
+          check.end_location.column,
+        );
+
+        return Range.areIntersectingOrTouching(diagnosticRange, range);
+      })
       .filter(({ fix }) => fix)
       .map((check) => ({
         title: check.fix

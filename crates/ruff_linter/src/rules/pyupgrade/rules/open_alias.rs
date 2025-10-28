@@ -30,6 +30,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `io.open`](https://docs.python.org/3/library/io.html#io.open)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.196")]
 pub(crate) struct OpenAlias;
 
 impl Violation for OpenAlias {

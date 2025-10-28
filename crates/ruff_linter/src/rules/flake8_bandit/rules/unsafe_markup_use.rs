@@ -75,6 +75,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// [markupsafe-markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnsafeMarkupUse {
     name: String,
 }

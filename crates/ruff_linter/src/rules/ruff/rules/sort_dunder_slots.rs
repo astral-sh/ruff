@@ -83,6 +83,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// `__slots__` definition occurs, in which case this rule's fix could
 /// theoretically cause breakage.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct UnsortedDunderSlots {
     class_name: ast::name::Name,
 }

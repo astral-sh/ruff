@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: async_for.md - Async - Error cases - Possibly missing `__aiter__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | async def foo(flag: bool):
+ 2 |     class AsyncIterable:
+ 3 |         async def __anext__(self) -> int:
+ 4 |             return 42
+ 5 | 
+ 6 |     class PossiblyUnboundAiter:
+ 7 |         if flag:
+ 8 |             def __aiter__(self) -> AsyncIterable:
+ 9 |                 return AsyncIterable()
+10 | 
+11 |     # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
+12 |     async for x in PossiblyUnboundAiter():
+13 |         reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be async-iterable
+  --> src/mdtest_snippet.py:12:20
+   |
+11 |     # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
+12 |     async for x in PossiblyUnboundAiter():
+   |                    ^^^^^^^^^^^^^^^^^^^^^^
+13 |         reveal_type(x)  # revealed: int
+   |
+info: Its `__aiter__` attribute (with type `bound method PossiblyUnboundAiter.__aiter__() -> AsyncIterable`) may not be callable
+info: rule `not-iterable` is enabled by default
+
+```

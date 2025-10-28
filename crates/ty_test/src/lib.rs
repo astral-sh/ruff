@@ -6,9 +6,9 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
-use ruff_db::panic::catch_unwind;
+use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
@@ -16,7 +16,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::check_types;
+use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
@@ -319,30 +319,11 @@ fn run_test(
     let mut snapshot_diagnostics = vec![];
 
     let mut any_pull_types_failures = false;
+    let mut panic_info = None;
 
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let pull_types_result = attempt_test(
-                db,
-                pull_types,
-                test_file,
-                "\"pull types\"",
-                Some(
-                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
-                    directive to this test",
-                ),
-            );
-            match pull_types_result {
-                Ok(()) => {}
-                Err(failures) => {
-                    any_pull_types_failures = true;
-                    if !test.should_skip_pulling_types() {
-                        return Some(failures);
-                    }
-                }
-            }
-
             let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
@@ -358,10 +339,17 @@ fn run_test(
                     .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
             );
 
-            let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
+            let mdtest_result = attempt_test(db, check_types, test_file);
             let type_diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
-                Err(failures) => return Some(failures),
+                Err(failures) => {
+                    if test.should_expect_panic().is_ok() {
+                        panic_info = Some(failures.info);
+                        return None;
+                    }
+
+                    return Some(failures.into_file_failures(db, "run mdtest", None));
+                }
             };
 
             diagnostics.extend(type_diagnostics);
@@ -377,13 +365,70 @@ fn run_test(
                     by_line: line_failures,
                 }),
             };
+
+            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+            // since they make snapshots very noisy!
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics);
+                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
+                    diagnostic.id() != DiagnosticId::RevealedType
+                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+                }));
+            }
+
+            let pull_types_result = attempt_test(db, pull_types, test_file);
+            match pull_types_result {
+                Ok(()) => {}
+                Err(failures) => {
+                    any_pull_types_failures = true;
+                    if !test.should_skip_pulling_types() {
+                        return Some(failures.into_file_failures(
+                            db,
+                            "\"pull types\"",
+                            Some(
+                                "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
+                    directive to this test",
+                            ),
+                        ));
+                    }
+                }
             }
 
             failure
         })
         .collect();
+
+    match panic_info {
+        Some(panic_info) => {
+            let expected_message = test
+                .should_expect_panic()
+                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
+
+            let message = panic_info
+                .payload
+                .as_str()
+                .unwrap_or("Box<dyn Any>")
+                .to_string();
+
+            if let Some(expected_message) = expected_message {
+                assert!(
+                    message.contains(expected_message),
+                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    test.name()
+                );
+            }
+        }
+        None => {
+            if let Ok(message) = test.should_expect_panic() {
+                if let Some(message) = message {
+                    panic!(
+                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
+                        test.name()
+                    );
+                }
+                panic!("Test `{}` is expected to panic but it didn't.", test.name());
+            }
+        }
+    }
 
     if test.should_skip_pulling_types() && !any_pull_types_failures {
         let mut by_line = matcher::FailuresByLine::default();
@@ -590,17 +635,32 @@ fn create_diagnostic_snapshot(
 ///
 /// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant.
 /// This will be formatted into a diagnostic message by `ty_test`.
-fn attempt_test<'db, T, F>(
+fn attempt_test<'db, 'a, T, F>(
     db: &'db Db,
     test_fn: F,
-    test_file: &TestFile,
-    action: &str,
-    clarification: Option<&str>,
-) -> Result<T, FileFailures>
+    test_file: &'a TestFile,
+) -> Result<T, AttemptTestError<'a>>
 where
     F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
 {
-    catch_unwind(|| test_fn(db, test_file.file)).map_err(|info| {
+    catch_unwind(|| test_fn(db, test_file.file))
+        .map_err(|info| AttemptTestError { info, test_file })
+}
+
+struct AttemptTestError<'a> {
+    info: PanicError,
+    test_file: &'a TestFile,
+}
+
+impl AttemptTestError<'_> {
+    fn into_file_failures(
+        self,
+        db: &Db,
+        action: &str,
+        clarification: Option<&str>,
+    ) -> FileFailures {
+        let info = self.info;
+
         let mut by_line = matcher::FailuresByLine::default();
         let mut messages = vec![];
         match info.location {
@@ -646,8 +706,8 @@ where
         by_line.push(OneIndexed::from_zero_indexed(0), messages);
 
         FileFailures {
-            backtick_offsets: test_file.backtick_offsets.clone(),
+            backtick_offsets: self.test_file.backtick_offsets.clone(),
             by_line,
         }
-    })
+    }
 }

@@ -51,6 +51,7 @@ use ruff_text_size::TextRange;
 /// )
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct Airflow3SuggestedToMoveToProvider<'a> {
     deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,
@@ -65,7 +66,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
             replacement,
         } = self;
         match replacement {
-            ProviderReplacement::AutoImport {
+            ProviderReplacement::Rename {
                 name: _,
                 module: _,
                 provider,
@@ -88,7 +89,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedToMoveToProvider { replacement, .. } = self;
         match replacement {
-            ProviderReplacement::AutoImport {
+            ProviderReplacement::Rename {
                 module,
                 name,
                 provider,
@@ -130,34 +131,32 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
     let replacement = match qualified_name.segments() {
         // apache-airflow-providers-standard
-        ["airflow", "hooks", "filesystem", "FSHook"] => ProviderReplacement::AutoImport {
+        ["airflow", "hooks", "filesystem", "FSHook"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.hooks.filesystem",
             name: "FSHook",
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "hooks", "package_index", "PackageIndexHook"] => {
-            ProviderReplacement::AutoImport {
-                module: "airflow.providers.standard.hooks.package_index",
-                name: "PackageIndexHook",
-                provider: "standard",
-                version: "0.0.1",
-            }
-        }
-        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::AutoImport {
+        ["airflow", "hooks", "package_index", "PackageIndexHook"] => ProviderReplacement::Rename {
+            module: "airflow.providers.standard.hooks.package_index",
+            name: "PackageIndexHook",
+            provider: "standard",
+            version: "0.0.1",
+        },
+        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.hooks.subprocess",
             name: "SubprocessHook",
             provider: "standard",
             version: "0.0.3",
         },
-        ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::AutoImport {
+        ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.operators.bash",
             name: "BashOperator",
             provider: "standard",
             version: "0.0.1",
         },
         ["airflow", "operators", "datetime", "BranchDateTimeOperator"] => {
-            ProviderReplacement::AutoImport {
+            ProviderReplacement::Rename {
                 module: "airflow.providers.standard.operators.datetime",
                 name: "BranchDateTimeOperator",
                 provider: "standard",
@@ -169,20 +168,20 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "operators",
             "trigger_dagrun",
             "TriggerDagRunOperator",
-        ] => ProviderReplacement::AutoImport {
+        ] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.operators.trigger_dagrun",
             name: "TriggerDagRunOperator",
             provider: "standard",
             version: "0.0.2",
         },
-        ["airflow", "operators", "empty", "EmptyOperator"] => ProviderReplacement::AutoImport {
+        ["airflow", "operators", "empty", "EmptyOperator"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.operators.empty",
             name: "EmptyOperator",
             provider: "standard",
             version: "0.0.2",
         },
         ["airflow", "operators", "latest_only", "LatestOnlyOperator"] => {
-            ProviderReplacement::AutoImport {
+            ProviderReplacement::Rename {
                 module: "airflow.providers.standard.operators.latest_only",
                 name: "LatestOnlyOperator",
                 provider: "standard",
@@ -204,14 +203,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "0.0.1",
         },
         ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => {
-            ProviderReplacement::AutoImport {
+            ProviderReplacement::Rename {
                 module: "airflow.providers.standard.operators.weekday",
                 name: "BranchDayOfWeekOperator",
                 provider: "standard",
                 version: "0.0.1",
             }
         }
-        ["airflow", "sensors", "bash", "BashSensor"] => ProviderReplacement::AutoImport {
+        ["airflow", "sensors", "bash", "BashSensor"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.sensor.bash",
             name: "BashSensor",
             provider: "standard",
@@ -239,13 +238,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.3",
         },
-        ["airflow", "sensors", "filesystem", "FileSensor"] => ProviderReplacement::AutoImport {
+        ["airflow", "sensors", "filesystem", "FileSensor"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.sensors.filesystem",
             name: "FileSensor",
             provider: "standard",
             version: "0.0.2",
         },
-        ["airflow", "sensors", "python", "PythonSensor"] => ProviderReplacement::AutoImport {
+        ["airflow", "sensors", "python", "PythonSensor"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.sensors.python",
             name: "PythonSensor",
             provider: "standard",
@@ -273,7 +272,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::AutoImport {
+        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.sensors.weekday",
             name: "DayOfWeekSensor",
             provider: "standard",
@@ -290,7 +289,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.3",
         },
-        ["airflow", "triggers", "file", "FileTrigger"] => ProviderReplacement::AutoImport {
+        ["airflow", "triggers", "file", "FileTrigger"] => ProviderReplacement::Rename {
             module: "airflow.providers.standard.triggers.file",
             name: "FileTrigger",
             provider: "standard",
@@ -311,7 +310,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     };
 
     let (module, name) = match &replacement {
-        ProviderReplacement::AutoImport { module, name, .. } => (module, *name),
+        ProviderReplacement::Rename { module, name, .. } => (module, *name),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
             (module, name.as_str())
         }

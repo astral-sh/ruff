@@ -197,9 +197,9 @@ from typing_extensions import TypeAliasType, TypeVar
 
 T = TypeVar("T")
 
-IntAnd = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
+IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
-def f(x: IntAnd[str]) -> None:
+def f(x: IntAndT[str]) -> None:
     reveal_type(x)  # revealed: @Todo(Generic manual PEP-695 type alias)
 ```
 
@@ -313,6 +313,23 @@ static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
+### Cyclic defaults
+
+```py
+from typing_extensions import Protocol, TypeVar
+
+T = TypeVar("T", default="C", covariant=True)
+
+class P(Protocol[T]):
+    pass
+
+class C(P[T]):
+    pass
+
+reveal_type(C[int]())  # revealed: C[int]
+reveal_type(C())  # revealed: C[Divergent]
+```
+
 ### Union inside generic
 
 #### With old-style union
@@ -325,7 +342,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: list[Any | str] | str
 ```
 
 #### With new-style union
@@ -336,7 +353,7 @@ type A = list["A" | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: list[Any | str] | str
 ```
 
 #### With Optional
@@ -349,7 +366,7 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str | None] | str | None
+        reveal_type(item)  # revealed: list[Any | str | None] | str | None
 ```
 
 ### Tuple comparison
@@ -359,4 +376,15 @@ type X = tuple[X, int]
 
 def _(x: X):
     reveal_type(x is x)  # revealed: bool
+```
+
+### Recursive invariant
+
+```py
+type X = dict[str, X]
+type Y = X | str | dict[str, Y]
+
+def _(y: Y):
+    if isinstance(y, dict):
+        reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
 ```

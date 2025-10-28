@@ -12,6 +12,7 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use crate::types::TypeContext;
 use crate::{Db, FxOrderMap};
 
 use ordermap::OrderSet;
@@ -62,13 +63,17 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
         Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+            defining_class: self.defining_class.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
         }
     }
 }
@@ -132,7 +137,8 @@ impl TypedDictAssignmentKind {
 }
 
 /// Validates assignment of a value to a specific key on a `TypedDict`.
-/// Returns true if the assignment is valid, false otherwise.
+///
+/// Returns true if the assignment is valid, or false otherwise.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
@@ -157,6 +163,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
             Type::string_literal(db, key),
             &items,
         );
+
         return false;
     };
 
@@ -240,13 +247,16 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 }
 
 /// Validates that all required keys are provided in a `TypedDict` construction.
+///
 /// Reports errors for any keys that are required but not provided.
+///
+/// Returns true if the assignment is valid, or false otherwise.
 pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     provided_keys: &OrderSet<&str>,
     error_node: AnyNodeRef<'ast>,
-) {
+) -> bool {
     let db = context.db();
     let items = typed_dict.items(db);
 
@@ -255,7 +265,12 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
         .filter_map(|(key_name, field)| field.is_required().then_some(key_name.as_str()))
         .collect();
 
-    for missing_key in required_keys.difference(provided_keys) {
+    let missing_keys = required_keys.difference(provided_keys);
+
+    let mut has_missing_key = false;
+    for missing_key in missing_keys {
+        has_missing_key = true;
+
         report_missing_typed_dict_key(
             context,
             error_node,
@@ -263,6 +278,8 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
             missing_key,
         );
     }
+
+    !has_missing_key
 }
 
 pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
@@ -309,27 +326,26 @@ fn validate_from_dict_literal<'db, 'ast>(
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
         // Validate dict entries
         for dict_item in &dict_expr.items {
-            if let Some(ref key_expr) = dict_item.key {
-                if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+            if let Some(ref key_expr) = dict_item.key
+                && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
                     value: key_value, ..
                 }) = key_expr
-                {
-                    let key_str = key_value.to_str();
-                    provided_keys.insert(key_str);
+            {
+                let key_str = key_value.to_str();
+                provided_keys.insert(key_str);
 
-                    // Get the already-inferred argument type
-                    let value_type = expression_type_fn(&dict_item.value);
-                    validate_typed_dict_key_assignment(
-                        context,
-                        typed_dict,
-                        key_str,
-                        value_type,
-                        error_node,
-                        key_expr,
-                        &dict_item.value,
-                        TypedDictAssignmentKind::Constructor,
-                    );
-                }
+                // Get the already-inferred argument type
+                let value_type = expression_type_fn(&dict_item.value);
+                validate_typed_dict_key_assignment(
+                    context,
+                    typed_dict,
+                    key_str,
+                    value_type,
+                    error_node,
+                    key_expr,
+                    &dict_item.value,
+                    TypedDictAssignmentKind::Constructor,
+                );
             }
         }
     }
@@ -373,40 +389,46 @@ fn validate_from_keywords<'db, 'ast>(
     provided_keys
 }
 
-/// Validates a `TypedDict` dictionary literal assignment
+/// Validates a `TypedDict` dictionary literal assignment,
 /// e.g. `person: Person = {"name": "Alice", "age": 30}`
-pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
-    context: &InferContext<'db, 'ast>,
+pub(super) fn validate_typed_dict_dict_literal<'db>(
+    context: &InferContext<'db, '_>,
     typed_dict: TypedDictType<'db>,
-    dict_expr: &'ast ast::ExprDict,
-    error_node: AnyNodeRef<'ast>,
+    dict_expr: &ast::ExprDict,
+    error_node: AnyNodeRef,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
-) -> OrderSet<&'ast str> {
+) -> Result<OrderSet<&'db str>, OrderSet<&'db str>> {
+    let mut valid = true;
     let mut provided_keys = OrderSet::new();
 
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
-        if let Some(key_expr) = &item.key {
-            if let ast::Expr::StringLiteral(key_literal) = key_expr {
-                let key_str = key_literal.value.to_str();
-                provided_keys.insert(key_str);
+        if let Some(key_expr) = &item.key
+            && let Type::StringLiteral(key_str) = expression_type_fn(key_expr)
+        {
+            let key_str = key_str.value(context.db());
+            provided_keys.insert(key_str);
 
-                let value_type = expression_type_fn(&item.value);
-                validate_typed_dict_key_assignment(
-                    context,
-                    typed_dict,
-                    key_str,
-                    value_type,
-                    error_node,
-                    key_expr,
-                    &item.value,
-                    TypedDictAssignmentKind::Constructor,
-                );
-            }
+            let value_type = expression_type_fn(&item.value);
+
+            valid &= validate_typed_dict_key_assignment(
+                context,
+                typed_dict,
+                key_str,
+                value_type,
+                error_node,
+                key_expr,
+                &item.value,
+                TypedDictAssignmentKind::Constructor,
+            );
         }
     }
 
-    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
+    valid &= validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 
-    provided_keys
+    if valid {
+        Ok(provided_keys)
+    } else {
+        Err(provided_keys)
+    }
 }

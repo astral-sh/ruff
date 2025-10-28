@@ -1,4 +1,6 @@
+# ruff: noqa: PYI021
 import sys
+import types
 from collections.abc import Iterable
 from enum import Enum
 from typing import (
@@ -43,6 +45,8 @@ type JustComplex = TypeOf[1.0j]
 # Constraints
 class ConstraintSet:
     def __bool__(self) -> bool: ...
+    def __eq__(self, other: ConstraintSet) -> bool: ...
+    def __ne__(self, other: ConstraintSet) -> bool: ...
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
@@ -58,12 +62,45 @@ def negated_range_constraint(
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been
 # standardized yet (https://peps.python.org/pep-0747).
-def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_subtype_of(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_assignable_to(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_singleton(ty: Any) -> bool: ...
-def is_single_valued(ty: Any) -> bool: ...
+def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `type_a` and `type_b` are
+    `equivalent`_ types.
+
+    .. _equivalent: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
+    """
+
+def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_subtype_of_given(
+    constraints: bool | ConstraintSet, ty: Any, of: Any
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`,
+    assuming that all of the constraints in `constraints` hold.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_assignable_to(ty: Any, to: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
+
+    .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    """
+
+def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `type_a` and `type_b` are disjoint types.
+
+    Two types are disjoint if they have no inhabitants in common.
+    """
+
+def is_singleton(ty: Any) -> bool:
+    """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""
+
+def is_single_valued(ty: Any) -> bool:
+    """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
 # Returns the generic context of a type as a tuple of typevars, or `None` if the
 # type is not generic.
@@ -88,11 +125,16 @@ def all_members(obj: Any) -> tuple[str, ...]: ...
 
 # Returns `True` if the given object has a member with the given name.
 def has_member(obj: Any, name: str) -> bool: ...
+def reveal_protocol_interface(protocol: type) -> None:
+    """
+    Passing a protocol type to this function will cause ty to emit an info-level
+    diagnostic describing the protocol's interface.
 
-# Passing a protocol type to this function will cause ty to emit an info-level
-# diagnostic describing the protocol's interface. Passing a non-protocol type
-# will cause ty to emit an error diagnostic.
-def reveal_protocol_interface(protocol: type) -> None: ...
+    Passing a non-protocol type will cause ty to emit an error diagnostic.
+    """
+
+def reveal_mro(cls: type | types.GenericAlias) -> None:
+    """Reveal the MRO that ty infers for the given class or generic alias."""
 
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.
@@ -103,6 +145,6 @@ class NamedTupleLike(Protocol):
     @classmethod
     def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
-    def _replace(self: Self, /, **kwargs) -> Self: ...
+    def _replace(self, /, **kwargs) -> Self: ...
     if sys.version_info >= (3, 13):
-        def __replace__(self: Self, **kwargs) -> Self: ...
+        def __replace__(self, **kwargs) -> Self: ...
