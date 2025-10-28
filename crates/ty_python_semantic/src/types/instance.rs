@@ -649,7 +649,11 @@ impl<'db> ProtocolInstanceType<'db> {
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
         #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
-        fn inner<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>, _: ()) -> bool {
+        fn is_equivalent_to_object_inner<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> bool {
             Type::object()
                 .satisfies_protocol(
                     db,
@@ -666,7 +670,7 @@ impl<'db> ProtocolInstanceType<'db> {
             true
         }
 
-        inner(db, self, ())
+        is_equivalent_to_object_inner(db, self, ())
     }
 
     /// Return a "normalized" version of this `Protocol` type.
