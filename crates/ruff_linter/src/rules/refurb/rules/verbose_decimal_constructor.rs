@@ -197,7 +197,6 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 /// Normalizes digit separators in a numeric string by:
 /// - Stripping leading and trailing underscores
 /// - Collapsing medial underscore sequences to single underscores
-/// - Do not force thousands separators
 fn normalize_digit_separators(original_str: &str, unary: &str) -> String {
     // Strip leading and trailing underscores
     let trimmed = original_str.trim_matches('_');
