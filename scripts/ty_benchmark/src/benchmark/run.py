@@ -7,7 +7,7 @@ import tempfile
 import typing
 from pathlib import Path
 
-from benchmark import Hyperfine
+from benchmark import Hyperfine, ErrorCounter
 from benchmark.cases import Benchmark, Mypy, Pyright, Tool, Ty, Venv
 from benchmark.projects import ALL as all_projects
 from benchmark.projects import DEFAULT as default_projects
@@ -142,8 +142,9 @@ def main() -> None:
 
                 print(f"{project.name} ({benchmark.value})")
 
+                name = f"{project.name}-{benchmark.value}"
                 hyperfine = Hyperfine(
-                    name=f"{project.name}-{benchmark.value}",
+                    name=name,
                     commands=commands,
                     warmup=warmup,
                     min_runs=min_runs,
@@ -151,3 +152,9 @@ def main() -> None:
                     json=False,
                 )
                 hyperfine.run(cwd=cwd)
+
+                error_counter = ErrorCounter(
+                    name=name,
+                    commands=commands,
+                )
+                _ = error_counter.run(cwd=cwd)

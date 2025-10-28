@@ -74,3 +74,28 @@ class Hyperfine(typing.NamedTuple):
             args,
             cwd=cwd,
         )
+
+
+class ErrorCounter(typing.NamedTuple):
+    name: str
+    commands: list[Command]
+
+    def run(self, *, cwd: Path | None = None) -> int | None:
+        error_counts = {}
+
+        for command in self.commands:
+            if command.name != "ty":
+                continue
+
+            if command.name in error_counts:
+                raise KeyError(f"Key '{self.command.name}' already exists.")
+
+            output = subprocess.run(
+                command.command + ["--output-format=concise"],
+                cwd=cwd,
+                capture_output=True,
+            )
+            decoded_output = output.stdout.decode("utf-8")
+            error_counts[command.name] = len(decoded_output.splitlines())
+
+        return error_counts
