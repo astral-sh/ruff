@@ -259,6 +259,26 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns whether this constraint set satisfies all of the typevars that it mentions.
+    ///
+    /// Each typevar is either _inferable_ or _non-inferable_. (You provide a list of the
+    /// `inferable` typevars; all others are considered non-inferable.) In either case, we
+    /// restrict the constraint set to only consider that typevar. For an inferable typevar, then
+    /// there must be _some_ type that the typevar can specialize to, and which satisfies the
+    /// bounds or constraints of the typevar. For a non-inferable typevar, then the restricted
+    /// constraint set must be satisfied for _all_ types that satisfy the bounds or constraints.
+    ///
+    /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
+    /// even if the constraint set was created to describe a type that contains other typevars,
+    /// since any other typevar cannot affect whether the constraint set is satisfied or not.
+    pub(crate) fn satisfies_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        self.node.satisfies_all_typevars(db, inferable)
+    }
+
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node);
@@ -749,6 +769,13 @@ impl<'db> Node<'db> {
             .or(db, self.negate(db).and(db, else_node))
     }
 
+    fn satisfies(self, db: &'db dyn Db, other: Self) -> Self {
+        let simplified_self = self.simplify(db);
+        let implication = simplified_self.implies(db, other);
+        let (simplified, domain) = implication.simplify_and_domain(db);
+        simplified.and(db, domain)
+    }
+
     fn when_subtype_of_given(
         self,
         db: &'db dyn Db,
@@ -759,21 +786,56 @@ impl<'db> Node<'db> {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
-        let constraint = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => {
-                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs)
-            }
-            (_, Type::TypeVar(bound_typevar)) => {
-                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object())
-            }
+        match (lhs, rhs) {
+            (Type::TypeVar(bound_typevar), _) => self.satisfies(
+                db,
+                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs),
+            ),
+            (_, Type::TypeVar(bound_typevar)) => self.satisfies(
+                db,
+                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object()),
+            ),
             // If neither type is a typevar, then we fall back on a normal subtyping check.
-            _ => return lhs.when_subtype_of(db, rhs, inferable).node,
-        };
+            _ => lhs.when_subtype_of(db, rhs, inferable).node,
+        }
+    }
 
-        let simplified_self = self.simplify(db);
-        let implication = simplified_self.implies(db, constraint);
-        let (simplified, domain) = implication.simplify_and_domain(db);
-        simplified.and(db, domain)
+    fn satisfies_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        match self {
+            Node::AlwaysTrue => return true,
+            Node::AlwaysFalse => return false,
+            Node::Interior(_) => {}
+        }
+
+        let mut typevars = FxHashSet::default();
+        self.for_each_constraint(db, &mut |constraint| {
+            typevars.insert(constraint.typevar(db));
+        });
+
+        for typevar in typevars {
+            // Determine which valid specializations of this typevar are satisfied by the
+            // constraint set.
+            let valid_specializations = typevar.valid_specializations(db).node;
+            let when_satisfied = self.satisfies(db, valid_specializations);
+            let satisfied = if typevar.is_inferable(db, inferable) {
+                // If the typevar is inferable, then we only need one valid specialization to be
+                // satisfied.
+                !when_satisfied.is_never_satisfied()
+            } else {
+                // If the typevar is non-inferable, then we need _all_ valid specializations to be
+                // satisfied.
+                when_satisfied == valid_specializations
+            };
+            if !satisfied {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
