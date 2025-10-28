@@ -671,7 +671,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),
                 )
-                .is_always_satisfied(db)
+                .satisfied_by_all_typevars(db, InferableTypeVars::None)
         }
 
         fn initial<'db>(
