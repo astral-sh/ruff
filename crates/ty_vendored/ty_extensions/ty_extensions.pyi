@@ -67,6 +67,12 @@ class ConstraintSet:
         .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
         """
 
+    def satisfies_all_typevars(self, *inferable: Any) -> bool:
+        """
+        Returns whether this constraint set satisfies all of the typevars that
+        it mentions.
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...

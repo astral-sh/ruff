@@ -9,6 +9,7 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -162,7 +163,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db, dataclass_field_specifiers);
+        self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
 
         // In order of precedence:
         //
@@ -284,7 +285,12 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db, dataclass_field_specifiers: &[Type<'db>]) {
+    fn evaluate_known_cases(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArguments<'_, 'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -1174,6 +1180,26 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetSatisfiesAllTypeVars(tracked),
+                    ) => {
+                        let inferable: Option<FxHashSet<_>> = overload
+                            .arguments_for_parameter(argument_types, 0)
+                            .map(|(_, ty)| {
+                                ty.as_typevar()
+                                    .map(|bound_typevar| bound_typevar.identity(db))
+                            })
+                            .collect();
+                        let Some(inferable) = inferable else {
+                            continue;
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .satisfies_all_typevars(db, InferableTypeVars::One(&inferable));
+                        overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
                     Type::ClassLiteral(class) => match class.known(db) {

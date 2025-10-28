@@ -261,16 +261,18 @@ impl<'db> ConstraintSet<'db> {
 
     /// Returns whether this constraint set satisfies all of the typevars that it mentions.
     ///
-    /// Each typevar is either _inferable_ or _non-inferable_. (You provide a list of the
-    /// `inferable` typevars; all others are considered non-inferable.) In either case, we
-    /// restrict the constraint set to only consider that typevar. For an inferable typevar, then
-    /// there must be _some_ type that the typevar can specialize to, and which satisfies the
-    /// bounds or constraints of the typevar. For a non-inferable typevar, then the restricted
-    /// constraint set must be satisfied for _all_ types that satisfy the bounds or constraints.
+    /// Each typevar has a set of _valid specializations_, which is defined by any upper bound or
+    /// constraints that the typevar has.
+    ///
+    /// Each typevar is also either _inferable_ or _non-inferable_. (You provide a list of the
+    /// `inferable` typevars; all others are considered non-inferable.) For an inferable typevar,
+    /// then there must be _some_ valid specialization that is satisfied by the constraint set. For
+    /// a non-inferable typevar, then _all_ valid specializations must be satisfied.
     ///
     /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
-    /// even if the constraint set was created to describe a type that contains other typevars,
-    /// since any other typevar cannot affect whether the constraint set is satisfied or not.
+    /// since the constraint set cannot place any restrictions on typevars that it does not
+    /// mention. That means that those additional typevars are trivially satisfied by the
+    /// constraint set, regardless of whether they are inferable or not.
     pub(crate) fn satisfies_all_typevars(
         self,
         db: &'db dyn Db,
