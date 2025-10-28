@@ -1291,8 +1291,8 @@ impl<'db> InteriorNode<'db> {
 
                 // We then look for cases where the "constrained" typevar's upper and/or lower
                 // bound matches the "bound" typevar. If so, we're going to add an implication to
-                // the constraint set that replaces the upper/lower bound that matched the bound
-                // typevar with the bound constraint's corresponding bound.
+                // the constraint set that replaces the upper/lower bound that matched with the
+                // bound constraint's corresponding bound.
                 let (new_lower, new_upper) = match (
                     constrained_constraint.lower(db),
                     constrained_constraint.upper(db),
