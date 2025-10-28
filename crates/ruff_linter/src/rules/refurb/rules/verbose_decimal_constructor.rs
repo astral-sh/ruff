@@ -93,19 +93,19 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
             // _after_ trimming whitespace from the string and removing all occurrences of "_".
             let original_str = str_literal.to_str().trim_whitespace();
-            let mut trimmed = Cow::from(original_str);
-            let has_digit_separators = memchr::memchr(b'_', trimmed.as_bytes()).is_some();
-            if has_digit_separators {
-                trimmed = Cow::from(trimmed.replace('_', ""));
-            }
             // Extract the unary sign, if any.
-            let (unary, rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
-                ("+", Cow::from(trimmed))
-            } else if let Some(trimmed) = trimmed.strip_prefix('-') {
-                ("-", Cow::from(trimmed))
+            let (unary, original_str) = if let Some(trimmed) = original_str.strip_prefix('+') {
+                ("+", trimmed)
+            } else if let Some(trimmed) = original_str.strip_prefix('-') {
+                ("-", trimmed)
             } else {
-                ("", trimmed)
+                ("", original_str)
             };
+            let mut rest = Cow::from(original_str);
+            let has_digit_separators = memchr::memchr(b'_', rest.as_bytes()).is_some();
+            if has_digit_separators {
+                rest = Cow::from(rest.replace('_', ""));
+            }
 
             // Early return if we now have an empty string
             // or a very long string:
@@ -200,15 +200,8 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 /// - Collapsing medial underscore sequences to single underscores
 /// - Do not force thousands separators
 fn normalize_digit_separators(original_str: &str, unary: &str) -> String {
-    // Remove the unary sign from the original string to work with the numeric part
-    let without_unary = if original_str.starts_with('+') || original_str.starts_with('-') {
-        &original_str[1..]
-    } else {
-        original_str
-    };
-
     // Strip leading and trailing underscores
-    let trimmed = without_unary.trim_matches('_');
+    let trimmed = original_str.trim_matches('_');
 
     // Collapse medial underscore sequences to single underscores
     let result = trimmed
