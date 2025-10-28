@@ -1,0 +1,395 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+ --> RUF066.py:8:4
+  |
+7 | # Nested containers in lists/tuples
+8 | if item in [[1, 2], [3, 4]]:  # RUF066
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^
+9 |     pass
+  |
+help: Convert to equality comparison
+5  | # =====================================================================
+6  | 
+7  | # Nested containers in lists/tuples
+   - if item in [[1, 2], [3, 4]]:  # RUF066
+8  + if item == [1, 2] or item == [3, 4]:  # RUF066
+9  |     pass
+10 | 
+11 | if item in [{1}, {2}, {3}]:  # RUF066
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:11:4
+   |
+ 9 |     pass
+10 |
+11 | if item in [{1}, {2}, {3}]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+12 |     pass
+   |
+help: Convert to equality comparison
+8  | if item in [[1, 2], [3, 4]]:  # RUF066
+9  |     pass
+10 | 
+   - if item in [{1}, {2}, {3}]:  # RUF066
+11 + if item == {1} or item == {2} or item == {3}:  # RUF066
+12 |     pass
+13 | 
+14 | if item in [{"a": 1}, {"b": 2}]:  # RUF066
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:14:4
+   |
+12 |     pass
+13 |
+14 | if item in [{"a": 1}, {"b": 2}]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |     pass
+   |
+help: Convert to equality comparison
+11 | if item in [{1}, {2}, {3}]:  # RUF066
+12 |     pass
+13 | 
+   - if item in [{"a": 1}, {"b": 2}]:  # RUF066
+14 + if item == {"a": 1} or item == {"b": 2}:  # RUF066
+15 |     pass
+16 | 
+17 | if item in ({1, 2}, {3}):  # RUF066
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:17:4
+   |
+15 |     pass
+16 |
+17 | if item in ({1, 2}, {3}):  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^
+18 |     pass
+   |
+help: Convert to equality comparison
+14 | if item in [{"a": 1}, {"b": 2}]:  # RUF066
+15 |     pass
+16 | 
+   - if item in ({1, 2}, {3}):  # RUF066
+17 + if item == {1, 2} or item == {3}:  # RUF066
+18 |     pass
+19 | 
+20 | # Function calls
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:21:4
+   |
+20 | # Function calls
+21 | if item in [func(), func2()]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |     pass
+   |
+help: Convert to equality comparison
+18 |     pass
+19 | 
+20 | # Function calls
+   - if item in [func(), func2()]:  # RUF066
+21 + if item == func() or item == func2():  # RUF066
+22 |     pass
+23 | 
+24 | if item in {func(), other()}:  # RUF066
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on set with complex elements forces element reconstruction on each test
+  --> RUF066.py:24:4
+   |
+22 |     pass
+23 |
+24 | if item in {func(), other()}:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |     pass
+   |
+help: Convert to equality comparison
+21 | if item in [func(), func2()]:  # RUF066
+22 |     pass
+23 | 
+   - if item in {func(), other()}:  # RUF066
+24 + if item == func() or item == other():  # RUF066
+25 |     pass
+26 | 
+27 | # Names/variables
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:29:4
+   |
+27 | # Names/variables
+28 | x = 10
+29 | if item in [1, 2, x]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^
+30 |     pass
+   |
+help: Convert to equality comparison
+26 | 
+27 | # Names/variables
+28 | x = 10
+   - if item in [1, 2, x]:  # RUF066
+29 + if item == 1 or item == 2 or item == x:  # RUF066
+30 |     pass
+31 | 
+32 | # Operations with names
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:33:4
+   |
+32 | # Operations with names
+33 | if item in [x + 2, x * 3]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+34 |     pass
+   |
+help: Convert to equality comparison
+30 |     pass
+31 | 
+32 | # Operations with names
+   - if item in [x + 2, x * 3]:  # RUF066
+33 + if item == x + 2 or item == x * 3:  # RUF066
+34 |     pass
+35 | 
+36 | if item in {x + 2, x * 3}:  # RUF066
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on set with complex elements forces element reconstruction on each test
+  --> RUF066.py:36:4
+   |
+34 |     pass
+35 |
+36 | if item in {x + 2, x * 3}:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+37 |     pass
+   |
+help: Convert to equality comparison
+33 | if item in [x + 2, x * 3]:  # RUF066
+34 |     pass
+35 | 
+   - if item in {x + 2, x * 3}:  # RUF066
+36 + if item == x + 2 or item == x * 3:  # RUF066
+37 |     pass
+38 | 
+39 | if item in [1 + 2, x + 2]:  # RUF066
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:39:4
+   |
+37 |     pass
+38 |
+39 | if item in [1 + 2, x + 2]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+40 |     pass
+   |
+help: Convert to equality comparison
+36 | if item in {x + 2, x * 3}:  # RUF066
+37 |     pass
+38 | 
+   - if item in [1 + 2, x + 2]:  # RUF066
+39 + if item == 1 + 2 or item == x + 2:  # RUF066
+40 |     pass
+41 | 
+42 | # Lambdas
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:43:4
+   |
+42 | # Lambdas
+43 | if item in [lambda x: x, lambda y: y]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |     pass
+   |
+help: Convert to equality comparison
+40 |     pass
+41 | 
+42 | # Lambdas
+   - if item in [lambda x: x, lambda y: y]:  # RUF066
+43 + if item == (lambda x: x) or item == (lambda y: y):  # RUF066
+44 |     pass
+45 | 
+46 | # Boolean operations (need parentheses)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:51:4
+   |
+49 | c = 3
+50 | d = 4
+51 | if item in [a or b, c and d]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |     pass
+   |
+help: Convert to equality comparison
+48 | b = 2
+49 | c = 3
+50 | d = 4
+   - if item in [a or b, c and d]:  # RUF066
+51 + if item == (a or b) or item == (c and d):  # RUF066
+52 |     pass
+53 | 
+54 | # Comparison expressions (need parentheses)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:56:4
+   |
+54 | # Comparison expressions (need parentheses)
+55 | y = 3
+56 | if item in [y < 10, y > 0]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+57 |     pass
+   |
+help: Convert to equality comparison
+53 | 
+54 | # Comparison expressions (need parentheses)
+55 | y = 3
+   - if item in [y < 10, y > 0]:  # RUF066
+56 + if item == (y < 10) or item == (y > 0):  # RUF066
+57 |     pass
+58 | 
+59 | # F-strings with interpolation
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:60:4
+   |
+59 | # F-strings with interpolation
+60 | if item in [f"hello {x}", f"world {y}"]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+61 |     pass
+   |
+help: Convert to equality comparison
+57 |     pass
+58 | 
+59 | # F-strings with interpolation
+   - if item in [f"hello {x}", f"world {y}"]:  # RUF066
+60 + if item == f"hello {x}" or item == f"world {y}":  # RUF066
+61 |     pass
+62 | 
+63 | # 'not in' operator (also triggers)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:64:4
+   |
+63 | # 'not in' operator (also triggers)
+64 | if item not in [[1], [2]]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+65 |     pass
+   |
+help: Convert to equality comparison
+61 |     pass
+62 | 
+63 | # 'not in' operator (also triggers)
+   - if item not in [[1], [2]]:  # RUF066
+64 + if item != [1] and item != [2]:  # RUF066
+65 |     pass
+66 | 
+67 | # Multiple violations in one expression
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:68:10
+   |
+67 | # Multiple violations in one expression
+68 | result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+   |          ^^^^^^^^^^^^^^^^^^
+69 |
+70 | if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+   |
+help: Convert to equality comparison
+65 |     pass
+66 | 
+67 | # Multiple violations in one expression
+   - result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+68 + result = item == [1] or item == [2] or item in [[3], [4]]  # RUF066 (both)
+69 | 
+70 | if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+71 |     pass
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:68:32
+   |
+67 | # Multiple violations in one expression
+68 | result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+   |                                ^^^^^^^^^^^^^^^^^^
+69 |
+70 | if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+   |
+help: Convert to equality comparison
+65 |     pass
+66 | 
+67 | # Multiple violations in one expression
+   - result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+68 + result = item in [[1], [2]] or item == [3] or item == [4]  # RUF066 (both)
+69 | 
+70 | if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+71 |     pass
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:70:4
+   |
+68 | result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+69 |
+70 | if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+   |    ^^^^^^^^^^^^^^^^^^
+71 |     pass
+   |
+help: Convert to equality comparison
+67 | # Multiple violations in one expression
+68 | result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+69 | 
+   - if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+70 + if item == [1] or item == [2] and item in [[3], [4]]:  # RUF066 (both)
+71 |     pass
+72 | 
+73 | # Many complex elements
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:70:27
+   |
+68 | result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+69 |
+70 | if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+   |                           ^^^^^^^^^^^^^^^^^^
+71 |     pass
+   |
+help: Convert to equality comparison
+67 | # Multiple violations in one expression
+68 | result = item in [[1], [2]] or item in [[3], [4]]  # RUF066 (both)
+69 | 
+   - if item in [[1], [2]] and item in [[3], [4]]:  # RUF066 (both)
+70 + if item in [[1], [2]] and item == [3] or item == [4]:  # RUF066 (both)
+71 |     pass
+72 | 
+73 | # Many complex elements
+note: This is an unsafe fix and may change runtime behavior
+
+RUF066 [*] Membership test on sequence with complex elements forces element reconstruction on each test
+  --> RUF066.py:74:4
+   |
+73 | # Many complex elements
+74 | if item in [[1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11]]:  # RUF066
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 |     pass
+   |
+help: Convert to equality comparison
+71 |     pass
+72 | 
+73 | # Many complex elements
+   - if item in [[1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11]]:  # RUF066
+74 + if item == [1] or item == [2] or item == [3] or item == [4] or item == [5] or item == [6] or item == [7] or item == [8] or item == [9] or item == [10] or item == [11]:  # RUF066
+75 |     pass
+76 | 
+77 | 
+note: This is an unsafe fix and may change runtime behavior

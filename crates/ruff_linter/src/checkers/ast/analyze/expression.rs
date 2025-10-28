@@ -1626,6 +1626,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::InEmptyCollection) {
                 ruff::rules::in_empty_collection(checker, compare);
             }
+            if checker.is_rule_enabled(Rule::InefficientMembershipTest) {
+                ruff::rules::inefficient_membership_test(checker, compare);
+            }
             if checker.is_rule_enabled(Rule::InDictKeys) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
