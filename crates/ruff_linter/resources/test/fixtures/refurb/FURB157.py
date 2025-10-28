@@ -80,3 +80,8 @@ Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999
 # Test cases for non-thousands separators
 Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
 Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+
+# Separators _and_ leading zeros
+Decimal("0001_2345")
+Decimal("000_1_2345")
+Decimal("000_000")

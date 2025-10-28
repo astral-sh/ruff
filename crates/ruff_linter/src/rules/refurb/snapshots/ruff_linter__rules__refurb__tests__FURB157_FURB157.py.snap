@@ -629,6 +629,8 @@ help: Replace with `12_34_56_78`
    - Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
 81 + Decimal(12_34_56_78)  # Safe fix: preserves non-thousands separators
 82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+83 | 
+84 | # Separators _and_ leading zeros
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:82:9
@@ -637,6 +639,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
 82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
    |         ^^^^^^^^^^^
+83 |
+84 | # Separators _and_ leading zeros
    |
 help: Replace with `1234_5678`
 79 | 
@@ -644,3 +648,56 @@ help: Replace with `1234_5678`
 81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
    - Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
 82 + Decimal(1234_5678)    # Safe fix: preserves non-thousands separators
+83 | 
+84 | # Separators _and_ leading zeros
+85 | Decimal("0001_2345")
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:85:9
+   |
+84 | # Separators _and_ leading zeros
+85 | Decimal("0001_2345")
+   |         ^^^^^^^^^^^
+86 | Decimal("000_1_2345")
+87 | Decimal("000_000")
+   |
+help: Replace with `1_2345`
+82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+83 | 
+84 | # Separators _and_ leading zeros
+   - Decimal("0001_2345")
+85 + Decimal(1_2345)
+86 | Decimal("000_1_2345")
+87 | Decimal("000_000")
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:86:9
+   |
+84 | # Separators _and_ leading zeros
+85 | Decimal("0001_2345")
+86 | Decimal("000_1_2345")
+   |         ^^^^^^^^^^^^
+87 | Decimal("000_000")
+   |
+help: Replace with `1_2345`
+83 | 
+84 | # Separators _and_ leading zeros
+85 | Decimal("0001_2345")
+   - Decimal("000_1_2345")
+86 + Decimal(1_2345)
+87 | Decimal("000_000")
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+  --> FURB157.py:87:9
+   |
+85 | Decimal("0001_2345")
+86 | Decimal("000_1_2345")
+87 | Decimal("000_000")
+   |         ^^^^^^^^^
+   |
+help: Replace with `0`
+84 | # Separators _and_ leading zeros
+85 | Decimal("0001_2345")
+86 | Decimal("000_1_2345")
+   - Decimal("000_000")
+87 + Decimal(0)

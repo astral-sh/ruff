@@ -120,6 +120,13 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 return;
             }
 
+            // If the original string had digit separators, normalize them
+            let rest = if has_digit_separators {
+                Cow::from(normalize_digit_separators(original_str))
+            } else {
+                Cow::from(rest)
+            };
+
             // If all the characters are zeros, then the value is zero.
             let rest = match (unary, rest.is_empty()) {
                 // `Decimal("-0")` is not the same as `Decimal("0")`
@@ -128,14 +135,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                     return;
                 }
                 (_, true) => "0",
-                _ => rest,
-            };
-
-            // If the original string had digit separators, normalize them
-            let rest = if has_digit_separators {
-                Cow::from(normalize_digit_separators(original_str))
-            } else {
-                Cow::from(rest)
+                _ => &rest,
             };
 
             let replacement = format!("{unary}{rest}");
@@ -201,7 +201,9 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 /// - Collapsing medial underscore sequences to single underscores
 fn normalize_digit_separators(original_str: &str) -> String {
     // Strip leading and trailing underscores
-    let trimmed = original_str.trim_matches('_');
+    let trimmed = original_str
+        .trim_start_matches(['_', '0'])
+        .trim_end_matches('_');
 
     // Collapse medial underscore sequences to single underscores
     trimmed
