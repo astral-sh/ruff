@@ -81,15 +81,30 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
                     }
                 });
+
+                let name = comp.name.to_string();
+                let import_suffix = comp.module_name.map(|name| format!(" (import {name})"));
+                let (label, label_details) = if snapshot
+                    .resolved_client_capabilities()
+                    .supports_completion_item_label_details()
+                {
+                    let label_details = CompletionItemLabelDetails {
+                        detail: import_suffix,
+                        description: type_display.clone(),
+                    };
+                    (name, Some(label_details))
+                } else {
+                    let label = import_suffix
+                        .map(|suffix| format!("{name}{suffix}"))
+                        .unwrap_or_else(|| name);
+                    (label, None)
+                };
                 CompletionItem {
-                    label: comp.name.into(),
+                    label,
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
-                    detail: type_display.clone(),
-                    label_details: Some(CompletionItemLabelDetails {
-                        detail: comp.module_name.map(|name| format!(" (import {name})")),
-                        description: type_display,
-                    }),
+                    detail: type_display,
+                    label_details,
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
