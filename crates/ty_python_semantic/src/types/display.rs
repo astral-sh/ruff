@@ -532,6 +532,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
                 f.write_str("bound method `ConstraintSet.never`")
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)) => {
+                f.write_str("bound method `ConstraintSet.implies_subtype_of`")
+            }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),

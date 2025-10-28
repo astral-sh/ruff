@@ -295,6 +295,12 @@ impl<'db> ConstraintSet<'db> {
         self
     }
 
+    pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+        ConstraintSet {
+            node: self.node.iff(db, other.node),
+        }
+    }
+
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,

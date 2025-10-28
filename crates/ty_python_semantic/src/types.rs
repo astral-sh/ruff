@@ -4143,6 +4143,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "implies_subtype_of" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                ))
+                .into()
+            }
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -4850,24 +4858,6 @@ impl<'db> Type<'db> {
                                 .type_form()
                                 .with_annotated_type(Type::any()),
                             Parameter::positional_only(Some(Name::new_static("b")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::IsSubtypeOfGiven) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("constraints")))
-                                .with_annotated_type(KnownClass::ConstraintSet.to_instance(db)),
-                            Parameter::positional_only(Some(Name::new_static("ty")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("of")))
                                 .type_form()
                                 .with_annotated_type(Type::any()),
                         ]),
@@ -6922,6 +6912,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -7072,7 +7063,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever,
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -10331,6 +10323,7 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetRange,
     ConstraintSetAlways,
     ConstraintSetNever,
+    ConstraintSetImpliesSubtypeOf(TrackedConstraintSet<'db>),
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10357,7 +10350,8 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::PathOpen
         | KnownBoundMethodType::ConstraintSetRange
         | KnownBoundMethodType::ConstraintSetAlways
-        | KnownBoundMethodType::ConstraintSetNever => {}
+        | KnownBoundMethodType::ConstraintSetNever
+        | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {}
     }
 }
 
@@ -10421,6 +10415,10 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::ConstraintSetNever,
                 KnownBoundMethodType::ConstraintSetNever,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             ) => ConstraintSet::from(true),
 
             (
@@ -10432,7 +10430,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever,
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -10441,7 +10440,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever,
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             ) => ConstraintSet::from(false),
         }
     }
@@ -10492,6 +10492,13 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => ConstraintSet::from(true),
 
             (
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(left_constraints),
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(right_constraints),
+            ) => left_constraints
+                .constraints(db)
+                .iff(db, right_constraints.constraints(db)),
+
+            (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -10500,7 +10507,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever,
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -10509,7 +10517,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever,
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             ) => ConstraintSet::from(false),
         }
     }
@@ -10532,7 +10541,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PathOpen
             | KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
-            | KnownBoundMethodType::ConstraintSetNever => self,
+            | KnownBoundMethodType::ConstraintSetNever
+            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => self,
         }
     }
 
@@ -10547,7 +10557,8 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::PathOpen => KnownClass::MethodType,
             KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
-            | KnownBoundMethodType::ConstraintSetNever => KnownClass::ConstraintSet,
+            | KnownBoundMethodType::ConstraintSetNever
+            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => KnownClass::ConstraintSet,
         }
     }
 
@@ -10669,6 +10680,20 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::empty(),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("ty")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                        Parameter::positional_only(Some(Name::new_static("of")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                    ]),
                     Some(KnownClass::ConstraintSet.to_instance(db)),
                 )))
             }

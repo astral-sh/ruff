@@ -1299,8 +1299,6 @@ pub enum KnownFunction {
     IsEquivalentTo,
     /// `ty_extensions.is_subtype_of`
     IsSubtypeOf,
-    /// `ty_extensions.is_subtype_of_given`
-    IsSubtypeOfGiven,
     /// `ty_extensions.is_assignable_to`
     IsAssignableTo,
     /// `ty_extensions.is_disjoint_from`
@@ -1389,7 +1387,6 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
-            | Self::IsSubtypeOfGiven
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
@@ -1862,7 +1859,6 @@ pub(crate) mod tests {
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
-                | KnownFunction::IsSubtypeOfGiven
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers

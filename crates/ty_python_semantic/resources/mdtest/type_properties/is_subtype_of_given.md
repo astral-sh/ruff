@@ -20,10 +20,10 @@ from ty_extensions import ConstraintSet, is_subtype_of, is_subtype_of_given, sta
 
 def equivalent_to_other_relationships[T]():
     static_assert(is_subtype_of(bool, int))
-    static_assert(is_subtype_of_given(ConstraintSet.always(), bool, int))
+    static_assert(ConstraintSet.always().implies_subtype_of(bool, int))
 
     static_assert(not is_subtype_of(bool, str))
-    static_assert(not is_subtype_of_given(ConstraintSet.always(), bool, str))
+    static_assert(not ConstraintSet.always().implies_subtype_of(bool, str))
 ```
 
 Moreover, for concrete types, the answer does not depend on which constraint set we are considering.
@@ -36,12 +36,12 @@ from ty_extensions import ConstraintSet
 
 def even_given_constraints[T]():
     constraints = ConstraintSet.range(Never, T, int)
-    static_assert(is_subtype_of_given(constraints, bool, int))
-    static_assert(not is_subtype_of_given(constraints, bool, str))
+    static_assert(constraints.implies_subtype_of(bool, int))
+    static_assert(not constraints.implies_subtype_of(bool, str))
 
 def even_given_unsatisfiable_constraints():
-    static_assert(is_subtype_of_given(ConstraintSet.never(), bool, int))
-    static_assert(not is_subtype_of_given(ConstraintSet.never(), bool, str))
+    static_assert(ConstraintSet.never().implies_subtype_of(bool, int))
+    static_assert(not ConstraintSet.never().implies_subtype_of(bool, str))
 ```
 
 ## Type variables
@@ -144,34 +144,34 @@ from typing import Never
 from ty_extensions import ConstraintSet, is_subtype_of_given, static_assert
 
 def given_constraints[T]():
-    static_assert(not is_subtype_of_given(ConstraintSet.always(), T, int))
-    static_assert(not is_subtype_of_given(ConstraintSet.always(), T, bool))
-    static_assert(not is_subtype_of_given(ConstraintSet.always(), T, str))
+    static_assert(not ConstraintSet.always().implies_subtype_of(T, int))
+    static_assert(not ConstraintSet.always().implies_subtype_of(T, bool))
+    static_assert(not ConstraintSet.always().implies_subtype_of(T, str))
 
     # These are vacuously true; false implies anything
-    static_assert(is_subtype_of_given(ConstraintSet.never(), T, int))
-    static_assert(is_subtype_of_given(ConstraintSet.never(), T, bool))
-    static_assert(is_subtype_of_given(ConstraintSet.never(), T, str))
+    static_assert(ConstraintSet.never().implies_subtype_of(T, int))
+    static_assert(ConstraintSet.never().implies_subtype_of(T, bool))
+    static_assert(ConstraintSet.never().implies_subtype_of(T, str))
 
     given_int = ConstraintSet.range(Never, T, int)
-    static_assert(is_subtype_of_given(given_int, T, int))
-    static_assert(not is_subtype_of_given(given_int, T, bool))
-    static_assert(not is_subtype_of_given(given_int, T, str))
+    static_assert(given_int.implies_subtype_of(T, int))
+    static_assert(not given_int.implies_subtype_of(T, bool))
+    static_assert(not given_int.implies_subtype_of(T, str))
 
     given_bool = ConstraintSet.range(Never, T, bool)
-    static_assert(is_subtype_of_given(given_bool, T, int))
-    static_assert(is_subtype_of_given(given_bool, T, bool))
-    static_assert(not is_subtype_of_given(given_bool, T, str))
+    static_assert(given_bool.implies_subtype_of(T, int))
+    static_assert(given_bool.implies_subtype_of(T, bool))
+    static_assert(not given_bool.implies_subtype_of(T, str))
 
     given_both = given_bool & given_int
-    static_assert(is_subtype_of_given(given_both, T, int))
-    static_assert(is_subtype_of_given(given_both, T, bool))
-    static_assert(not is_subtype_of_given(given_both, T, str))
+    static_assert(given_both.implies_subtype_of(T, int))
+    static_assert(given_both.implies_subtype_of(T, bool))
+    static_assert(not given_both.implies_subtype_of(T, str))
 
     given_str = ConstraintSet.range(Never, T, str)
-    static_assert(not is_subtype_of_given(given_str, T, int))
-    static_assert(not is_subtype_of_given(given_str, T, bool))
-    static_assert(is_subtype_of_given(given_str, T, str))
+    static_assert(not given_str.implies_subtype_of(T, int))
+    static_assert(not given_str.implies_subtype_of(T, bool))
+    static_assert(given_str.implies_subtype_of(T, str))
 ```
 
 This might require propagating constraints from other typevars.
@@ -182,17 +182,17 @@ def mutually_constrained[T, U]():
     given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
     # TODO: no static-assert-error
     # error: [static-assert-error]
-    static_assert(is_subtype_of_given(given_int, T, int))
-    static_assert(not is_subtype_of_given(given_int, T, bool))
-    static_assert(not is_subtype_of_given(given_int, T, str))
+    static_assert(given_int.implies_subtype_of(T, int))
+    static_assert(not given_int.implies_subtype_of(T, bool))
+    static_assert(not given_int.implies_subtype_of(T, str))
 
     # If [T ≤ U ∧ U ≤ int], then [T ≤ int] must be true as well.
     given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
     # TODO: no static-assert-error
     # error: [static-assert-error]
-    static_assert(is_subtype_of_given(given_int, T, int))
-    static_assert(not is_subtype_of_given(given_int, T, bool))
-    static_assert(not is_subtype_of_given(given_int, T, str))
+    static_assert(given_int.implies_subtype_of(T, int))
+    static_assert(not given_int.implies_subtype_of(T, bool))
+    static_assert(not given_int.implies_subtype_of(T, str))
 ```
 
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

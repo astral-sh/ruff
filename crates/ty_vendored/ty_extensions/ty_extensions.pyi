@@ -60,6 +60,12 @@ class ConstraintSet:
     def never() -> Self:
         """Returns a constraint set that is never satisfied"""
 
+    def implies_subtype_of(self, ty: Any, of: Any) -> Self:
+        """
+        Returns a constraint set that is satisfied when `ty` is a `subtype`_ of
+        `of`, assuming that all of the constraints in `self` hold.
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...
