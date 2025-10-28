@@ -132,11 +132,13 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             };
 
             // If the original string had digit separators, normalize them
-            let replacement = if has_digit_separators {
-                normalize_digit_separators(original_str, unary)
+            let rest = if has_digit_separators {
+                Cow::from(normalize_digit_separators(original_str))
             } else {
-                format!("{unary}{rest}")
+                Cow::from(rest)
             };
+
+            let replacement = format!("{unary}{rest}");
 
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
@@ -197,18 +199,15 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 /// Normalizes digit separators in a numeric string by:
 /// - Stripping leading and trailing underscores
 /// - Collapsing medial underscore sequences to single underscores
-fn normalize_digit_separators(original_str: &str, unary: &str) -> String {
+fn normalize_digit_separators(original_str: &str) -> String {
     // Strip leading and trailing underscores
     let trimmed = original_str.trim_matches('_');
 
     // Collapse medial underscore sequences to single underscores
-    let result = trimmed
+    trimmed
         .chars()
         .dedup_by(|a, b| *a == '_' && a == b)
-        .collect::<String>();
-
-    // Return the formatted result with unary sign
-    format!("{unary}{result}")
+        .collect()
 }
 
 // ```console
