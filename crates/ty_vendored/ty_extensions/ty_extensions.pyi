@@ -52,6 +52,14 @@ class ConstraintSet:
         that is a supertype of `lower_bound` and a subtype of `upper_bound`.
         """
 
+    @staticmethod
+    def always() -> Self:
+        """Returns a constraint set that is always satisfied"""
+
+    @staticmethod
+    def never() -> Self:
+        """Returns a constraint set that is never satisfied"""
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...
@@ -77,7 +85,7 @@ def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
     """
 
 def is_subtype_of_given(
-    constraints: bool | ConstraintSet, ty: Any, of: Any
+    constraints: ConstraintSet, ty: Any, of: Any
 ) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`,
     assuming that all of the constraints in `constraints` hold.

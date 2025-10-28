@@ -4838,13 +4838,7 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::positional_only(Some(Name::new_static("constraints")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [
-                                        KnownClass::Bool.to_instance(db),
-                                        KnownClass::ConstraintSet.to_instance(db),
-                                    ],
-                                )),
+                                .with_annotated_type(KnownClass::ConstraintSet.to_instance(db)),
                             Parameter::positional_only(Some(Name::new_static("ty")))
                                 .type_form()
                                 .with_annotated_type(Type::any()),
@@ -6901,6 +6895,8 @@ impl<'db> Type<'db> {
                 KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -7049,7 +7045,9 @@ impl<'db> Type<'db> {
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::PathOpen
-                | KnownBoundMethodType::ConstraintSetRange,
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever,
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -10306,6 +10304,8 @@ pub enum KnownBoundMethodType<'db> {
 
     // ConstraintSet methods
     ConstraintSetRange,
+    ConstraintSetAlways,
+    ConstraintSetNever,
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10329,7 +10329,10 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(db, Type::StringLiteral(string_literal));
         }
-        KnownBoundMethodType::PathOpen | KnownBoundMethodType::ConstraintSetRange => {}
+        KnownBoundMethodType::PathOpen
+        | KnownBoundMethodType::ConstraintSetRange
+        | KnownBoundMethodType::ConstraintSetAlways
+        | KnownBoundMethodType::ConstraintSetNever => {}
     }
 }
 
@@ -10385,6 +10388,14 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::ConstraintSetRange,
                 KnownBoundMethodType::ConstraintSetRange,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetAlways,
+                KnownBoundMethodType::ConstraintSetAlways,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetNever,
+                KnownBoundMethodType::ConstraintSetNever,
             ) => ConstraintSet::from(true),
 
             (
@@ -10394,14 +10405,18 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::PathOpen
-                | KnownBoundMethodType::ConstraintSetRange,
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever,
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::PathOpen
-                | KnownBoundMethodType::ConstraintSetRange,
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever,
             ) => ConstraintSet::from(false),
         }
     }
@@ -10441,6 +10456,14 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::ConstraintSetRange,
                 KnownBoundMethodType::ConstraintSetRange,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetAlways,
+                KnownBoundMethodType::ConstraintSetAlways,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetNever,
+                KnownBoundMethodType::ConstraintSetNever,
             ) => ConstraintSet::from(true),
 
             (
@@ -10450,14 +10473,18 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::PathOpen
-                | KnownBoundMethodType::ConstraintSetRange,
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever,
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::PathOpen
-                | KnownBoundMethodType::ConstraintSetRange,
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever,
             ) => ConstraintSet::from(false),
         }
     }
@@ -10478,7 +10505,9 @@ impl<'db> KnownBoundMethodType<'db> {
             }
             KnownBoundMethodType::StrStartswith(_)
             | KnownBoundMethodType::PathOpen
-            | KnownBoundMethodType::ConstraintSetRange => self,
+            | KnownBoundMethodType::ConstraintSetRange
+            | KnownBoundMethodType::ConstraintSetAlways
+            | KnownBoundMethodType::ConstraintSetNever => self,
         }
     }
 
@@ -10491,7 +10520,9 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
             KnownBoundMethodType::PathOpen => KnownClass::MethodType,
-            KnownBoundMethodType::ConstraintSetRange => KnownClass::ConstraintSet,
+            KnownBoundMethodType::ConstraintSetRange
+            | KnownBoundMethodType::ConstraintSetAlways
+            | KnownBoundMethodType::ConstraintSetNever => KnownClass::ConstraintSet,
         }
     }
 
@@ -10591,6 +10622,7 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::PathOpen => {
                 Either::Right(std::iter::once(Signature::todo("`Path.open` return type")))
             }
+
             KnownBoundMethodType::ConstraintSetRange => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new([
@@ -10604,6 +10636,14 @@ impl<'db> KnownBoundMethodType<'db> {
                             .type_form()
                             .with_annotated_type(Type::any()),
                     ]),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetAlways
+            | KnownBoundMethodType::ConstraintSetNever => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::empty(),
                     Some(KnownClass::ConstraintSet.to_instance(db)),
                 )))
             }

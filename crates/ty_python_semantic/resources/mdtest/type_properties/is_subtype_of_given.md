@@ -16,14 +16,14 @@ fully static type that is not a typevar. It can _contain_ a typevar, though — 
 considered concrete.)
 
 ```py
-from ty_extensions import is_subtype_of, is_subtype_of_given, static_assert
+from ty_extensions import ConstraintSet, is_subtype_of, is_subtype_of_given, static_assert
 
 def equivalent_to_other_relationships[T]():
     static_assert(is_subtype_of(bool, int))
-    static_assert(is_subtype_of_given(True, bool, int))
+    static_assert(is_subtype_of_given(ConstraintSet.always(), bool, int))
 
     static_assert(not is_subtype_of(bool, str))
-    static_assert(not is_subtype_of_given(True, bool, str))
+    static_assert(not is_subtype_of_given(ConstraintSet.always(), bool, str))
 ```
 
 Moreover, for concrete types, the answer does not depend on which constraint set we are considering.
@@ -40,8 +40,8 @@ def even_given_constraints[T]():
     static_assert(not is_subtype_of_given(constraints, bool, str))
 
 def even_given_unsatisfiable_constraints():
-    static_assert(is_subtype_of_given(False, bool, int))
-    static_assert(not is_subtype_of_given(False, bool, str))
+    static_assert(is_subtype_of_given(ConstraintSet.never(), bool, int))
+    static_assert(not is_subtype_of_given(ConstraintSet.never(), bool, str))
 ```
 
 ## Type variables
@@ -144,14 +144,14 @@ from typing import Never
 from ty_extensions import ConstraintSet, is_subtype_of_given, static_assert
 
 def given_constraints[T]():
-    static_assert(not is_subtype_of_given(True, T, int))
-    static_assert(not is_subtype_of_given(True, T, bool))
-    static_assert(not is_subtype_of_given(True, T, str))
+    static_assert(not is_subtype_of_given(ConstraintSet.always(), T, int))
+    static_assert(not is_subtype_of_given(ConstraintSet.always(), T, bool))
+    static_assert(not is_subtype_of_given(ConstraintSet.always(), T, str))
 
     # These are vacuously true; false implies anything
-    static_assert(is_subtype_of_given(False, T, int))
-    static_assert(is_subtype_of_given(False, T, bool))
-    static_assert(is_subtype_of_given(False, T, str))
+    static_assert(is_subtype_of_given(ConstraintSet.never(), T, int))
+    static_assert(is_subtype_of_given(ConstraintSet.never(), T, bool))
+    static_assert(is_subtype_of_given(ConstraintSet.never(), T, str))
 
     given_int = ConstraintSet.range(Never, T, int)
     static_assert(is_subtype_of_given(given_int, T, int))

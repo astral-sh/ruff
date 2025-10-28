@@ -2140,11 +2140,20 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
-        #[expect(clippy::single_match)]
         match (self.known(db), name) {
             (Some(KnownClass::ConstraintSet), "range") => {
                 return Member::definitely_declared(Type::KnownBoundMethod(
                     KnownBoundMethodType::ConstraintSetRange,
+                ));
+            }
+            (Some(KnownClass::ConstraintSet), "always") => {
+                return Member::definitely_declared(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetAlways,
+                ));
+            }
+            (Some(KnownClass::ConstraintSet), "never") => {
+                return Member::definitely_declared(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetNever,
                 ));
             }
             _ => {}

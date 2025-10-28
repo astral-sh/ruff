@@ -526,6 +526,12 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
                 f.write_str("bound method `ConstraintSet.range`")
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
+                f.write_str("bound method `ConstraintSet.always`")
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
+                f.write_str("bound method `ConstraintSet.never`")
+            }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
