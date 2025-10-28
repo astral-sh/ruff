@@ -39,7 +39,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
             TextDocument::new(uri, text, version).with_language_id(&language_id),
         );
 
-        let path = document.to_file_path();
+        let path = document.notebook_or_file_path();
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
         // `try_system` call will return `None` which doesn't mean that the file is new, it's just

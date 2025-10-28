@@ -44,12 +44,12 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         .with_failure_code(ErrorCode::InternalError)?;
 
         let document = session.open_notebook_document(notebook);
-        let path = document.to_file_path();
+        let path = document.notebook_or_file_path();
 
         for cell in params.cell_text_documents {
             let cell_document = TextDocument::new(cell.uri, cell.text, cell.version)
                 .with_language_id(&cell.language_id)
-                .with_notebook(path.clone().into_owned());
+                .with_notebook(path.clone());
             session.open_text_document(cell_document);
         }
 

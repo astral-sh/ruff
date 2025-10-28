@@ -9,20 +9,23 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
-
 use ruff_db::system::SystemPathBuf;
-use ty_project::{Db, ProjectDatabase};
+use ty_project::{Db as _, ProjectDatabase};
 
+use crate::Db;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{NotebookDocument, PositionEncoding, Session};
 
+// THe real challenge here is that `to_lsp_range` now needs to
+// map to the cell document instead of the document. This is tricky.
+
 pub(super) struct Diagnostics<'a> {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
     encoding: PositionEncoding,
-    notebook: Option<&'a NotebookDocument>,
+    notebook_document: Option<&'a NotebookDocument>,
 }
 
 impl Diagnostics<'_> {
@@ -53,12 +56,12 @@ impl Diagnostics<'_> {
     }
 
     pub(super) fn to_lsp_diagnostics(&self, db: &ProjectDatabase) -> LspDiagnostics {
-        if let Some(notebook) = self.notebook {
+        if let Some(notebook_document) = self.notebook_document {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
             // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
             // without diagnostics still get updated.
-            for cell_url in notebook.cell_urls() {
+            for cell_url in notebook_document.cell_urls() {
                 cell_diagnostics.entry(cell_url.clone()).or_default();
             }
 
@@ -75,12 +78,13 @@ impl Diagnostics<'_> {
                     continue;
                 };
 
-                let diagnostic = to_lsp_diagnostic(db, diagnostic, location.range, self.encoding);
+                let lsp_diagnostic =
+                    to_lsp_diagnostic(db, diagnostic, location.range, self.encoding);
 
                 cell_diagnostics
                     .entry(location.uri)
                     .or_default()
-                    .push(diagnostic);
+                    .push(lsp_diagnostic);
             }
 
             LspDiagnostics::NotebookDocument(cell_diagnostics)
@@ -168,7 +172,7 @@ pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, clien
         }
     };
 
-    let db = session.project_db(&snapshot.to_file_path());
+    let db = session.project_db(&snapshot.notebook_or_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return;
@@ -283,10 +287,10 @@ pub(super) fn compute_diagnostics<'a>(
     db: &ProjectDatabase,
     snapshot: &'a DocumentSnapshot,
 ) -> Option<Diagnostics<'a>> {
-    let Some(file) = snapshot.to_file(db) else {
+    let Some(file) = snapshot.to_notebook_or_file(db) else {
         tracing::info!(
             "No file found for snapshot for `{}`",
-            snapshot.to_file_path()
+            snapshot.notebook_or_file_path()
         );
         return None;
     };
@@ -296,7 +300,7 @@ pub(super) fn compute_diagnostics<'a>(
     Some(Diagnostics {
         items: diagnostics,
         encoding: snapshot.encoding(),
-        notebook: snapshot.notebook(),
+        notebook_document: snapshot.notebook_document(),
     })
 }
 

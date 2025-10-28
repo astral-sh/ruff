@@ -37,7 +37,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -88,7 +88,7 @@ fn convert_to_lsp_document_symbol(
     symbols: &HierarchicalSymbols,
     id: SymbolId,
     symbol: SymbolInfo<'_>,
-    db: &dyn ty_project::Db,
+    db: &dyn crate::Db,
     file: ruff_db::files::File,
     encoding: PositionEncoding,
 ) -> DocumentSymbol {

@@ -294,7 +294,7 @@ impl Notebook {
         }
     }
 
-    /// Build and return the [`JupyterIndex`].
+    /// Build and return the [`NotebookIndex`].
     ///
     /// ## Notes
     ///
@@ -384,6 +384,10 @@ impl Notebook {
     /// the Jupyter notebook.
     pub fn cell_offsets(&self) -> &CellOffsets {
         &self.cell_offsets
+    }
+
+    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
+        self.cell_offsets.get(cell.to_zero_indexed()).copied()
     }
 
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.

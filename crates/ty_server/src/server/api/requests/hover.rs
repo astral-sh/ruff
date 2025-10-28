@@ -8,7 +8,6 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::{MarkupKind, hover};
 use ty_project::ProjectDatabase;
 
@@ -36,15 +35,13 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
         let offset = params.text_document_position_params.position.to_text_size(
-            &source,
-            &line_index,
+            db,
+            file,
             snapshot.encoding(),
         );
 

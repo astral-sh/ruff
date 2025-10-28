@@ -41,21 +41,7 @@ impl Index {
             return Err(DocumentError::NotFound(key));
         };
 
-        if let Some(notebook_path) = document.as_text().and_then(|text| text.notebook()) {
-            return Ok(DocumentHandle {
-                key,
-                notebook_path: Some(notebook_path.clone()),
-                url: url.clone(),
-                version: document.version(),
-            });
-        }
-
-        Ok(DocumentHandle {
-            notebook_path: document.as_notebook().is_some().then(|| key.to_file_path()),
-            key,
-            url: url.clone(),
-            version: document.version(),
-        })
+        Ok(DocumentHandle::from_document(document))
     }
 
     #[expect(dead_code)]
@@ -184,13 +170,7 @@ impl Index {
     pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
         let key = DocumentKey::from_url(document.url());
 
-        // TODO: Fix file path for notebook cells
-        let handle = DocumentHandle {
-            key: key.clone(),
-            notebook_path: None,
-            url: document.url().clone(),
-            version: document.version(),
-        };
+        let handle = DocumentHandle::from_text_document(&document);
 
         self.documents.insert(key, Document::new_text(document));
 
@@ -198,19 +178,13 @@ impl Index {
     }
 
     pub(super) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+        let handle = DocumentHandle::from_notebook_document(&document);
         let notebook_key = DocumentKey::from_url(document.url());
-        let url = document.url().clone();
-        let version = document.version();
 
         self.documents
-            .insert(notebook_key.clone(), Document::new_notebook(document));
+            .insert(notebook_key, Document::new_notebook(document));
 
-        DocumentHandle {
-            notebook_path: Some(notebook_key.to_file_path()),
-            key: notebook_key,
-            url,
-            version,
-        }
+        handle
     }
 
     pub(super) fn close_document(&mut self, key: &DocumentKey) -> Result<(), DocumentError> {

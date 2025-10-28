@@ -3,7 +3,7 @@ use crate::document::{FileRangeExt, ToRangeExt};
 use lsp_types::Location;
 use ruff_db::files::FileRange;
 use ty_ide::{NavigationTarget, ReferenceTarget};
-use ty_project::Db;
+use crate::Db;
 
 pub(crate) trait ToLink {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location>;

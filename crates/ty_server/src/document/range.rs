@@ -1,17 +1,17 @@
 use super::PositionEncoding;
 use super::notebook;
+use crate::Db;
 use crate::system::file_to_url;
 
+use crate::session::index::Document;
 use lsp_types as types;
-use lsp_types::Location;
+use lsp_types::{Location, Position, Url};
 
 use ruff_db::files::{File, FileRange};
 use ruff_db::source::{line_index, source_text};
-use ruff_notebook::NotebookIndex;
 use ruff_source_file::LineIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::Db;
 
 #[expect(dead_code)]
 pub(crate) struct NotebookRange {
@@ -52,9 +52,7 @@ impl<'db> LspRange<'db> {
     /// Do NOT use this for standalone ranges - use `to_location()` instead to ensure
     /// the URI and range are consistent (especially important for notebook cells).
     pub(crate) fn to_local_range(&self) -> types::Range {
-        let source = source_text(self.db, self.file);
-        let index = line_index(self.db, self.file);
-        text_range_to_lsp_range(self.range, &source, &index, self.encoding)
+        self.to_uri_and_range().1
     }
 
     /// Convert to a Location that can reference any document.
@@ -66,13 +64,57 @@ impl<'db> LspRange<'db> {
     /// - Diagnostics related information
     /// - Any cross-file navigation
     pub(crate) fn to_location(&self) -> Option<Location> {
-        // TODO: Account for the offset of the cell if `file` is a notebook
-        // and resolve the URL to the cell's URI.
-        let uri = file_to_url(self.db, self.file)?;
+        let (uri, range) = self.to_uri_and_range();
+        Some(Location { uri: uri?, range })
+    }
+
+    fn to_uri_and_range(&self) -> (Option<Url>, lsp_types::Range) {
         let source = source_text(self.db, self.file);
         let index = line_index(self.db, self.file);
+        if let Some(notebook) = source.as_notebook() {
+            if let Some(Document::Notebook(notebook_document)) = self.db.document(self.file) {
+                let notebook_index = notebook.index();
+
+                let start = index.source_location(
+                    self.range.start(),
+                    source.as_str(),
+                    self.encoding.into(),
+                );
+                let mut end =
+                    index.source_location(self.range.end(), source.as_str(), self.encoding.into());
+                let starting_cell = notebook_index.cell(start.line);
+
+                // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
+                // we need to move it one character back (which should place it at the end of the last line).
+                // we test this by checking if the ending offset is in a different (or nonexistent) cell compared to the cell of the starting offset.
+                if notebook_index.cell(end.line) != starting_cell {
+                    end.line = end.line.saturating_sub(1);
+                    let offset = self.range.end().checked_sub(1.into()).unwrap_or_default();
+                    end.character_offset = index
+                        .source_location(offset, source.as_str(), self.encoding.into())
+                        .character_offset;
+                }
+
+                let start =
+                    source_location_to_position(&notebook_index.translate_source_location(&start));
+                let end =
+                    source_location_to_position(&notebook_index.translate_source_location(&end));
+
+                let cell = starting_cell
+                    .map(OneIndexed::to_zero_indexed)
+                    .unwrap_or_default();
+
+                let cell_uri = notebook_document.cell_uri_by_index(cell);
+
+                if let Some(cell_uri) = cell_uri {
+                    return (Some(cell_uri.clone()), lsp_types::Range::new(start, end));
+                }
+            }
+        }
+
+        let uri = file_to_url(self.db, self.file);
         let range = text_range_to_lsp_range(self.range, &source, &index, self.encoding);
-        Some(Location { uri, range })
+        (uri, range)
     }
 }
 
@@ -111,30 +153,41 @@ impl<'db> LspPosition<'db> {
     /// `to_location()` instead to ensure the URI and position are consistent
     /// (especially important for notebook cells).
     pub(crate) fn to_local_position(&self) -> types::Position {
-        let source = source_text(self.db, self.file);
-        let index = line_index(self.db, self.file);
-        text_size_to_lsp_position(self.position, &source, &index, self.encoding)
+        self.to_location().1
     }
 
     /// Convert to a Location with a single-point range that can reference any document.
     /// Returns a Location with both URI and a range where start == end.
     ///
     /// Use this for any cross-file navigation where you need both URI and position.
-    #[expect(unused)]
-    pub(crate) fn to_location(&self) -> Option<Location> {
-        // TODO: Account for the offset of the cell if `file` is a notebook
-        // and resolve the URL to the cell's URI.
-        let uri = file_to_url(self.db, self.file)?;
+    pub(crate) fn to_location(&self) -> (Option<lsp_types::Url>, Position) {
         let source = source_text(self.db, self.file);
         let index = line_index(self.db, self.file);
+
+        if let Some(notebook) = source.as_notebook() {
+            if let Some(Document::Notebook(notebook_document)) = self.db.document(self.file) {
+                let start =
+                    index.source_location(self.position, source.as_str(), self.encoding.into());
+                let cell = notebook
+                    .index()
+                    .cell(start.line)
+                    .map(OneIndexed::to_zero_indexed)
+                    .unwrap_or_default();
+
+                let start = source_location_to_position(
+                    &notebook.index().translate_source_location(&start),
+                );
+
+                let cell_uri = notebook_document.cell_uri_by_index(cell);
+
+                return (cell_uri.cloned(), start);
+            }
+        }
+
+        let uri = file_to_url(self.db, self.file);
+
         let position = text_size_to_lsp_position(self.position, &source, &index, self.encoding);
-        Some(Location {
-            uri,
-            range: types::Range {
-                start: position,
-                end: position,
-            },
-        })
+        (uri, position)
     }
 }
 
@@ -148,10 +201,10 @@ pub(crate) trait RangeExt {
 
 impl RangeExt for lsp_types::Range {
     fn to_text_range(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextRange {
-        // TODO: For notebooks, lookup the offset in the right cell.
-        let source = source_text(db, file);
-        let index = line_index(db, file);
-        lsp_range_to_text_range(self, &source, &index, encoding)
+        let start = self.start.to_text_size(db, file, encoding);
+        let end = self.end.to_text_size(db, file, encoding);
+
+        TextRange::new(start, end)
     }
 }
 
@@ -162,12 +215,36 @@ pub(crate) trait PositionExt {
     /// - Determine if the file is a notebook
     /// - Map cell-relative position to absolute position in the notebook file
     /// - Note: The caller also needs access to the URI to determine which cell
-    fn to_text_size(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> TextSize;
+    fn to_text_size(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextSize;
 }
 
 impl PositionExt for lsp_types::Position {
-    fn to_text_size(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> TextSize {
-        lsp_position_to_text_size(self, text, index, encoding)
+    fn to_text_size(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextSize {
+        let source = source_text(db, file);
+        let index = line_index(db, file);
+
+        if let Some(notebook) = source.as_notebook() {
+            let line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
+            let start_offset = notebook
+                .index()
+                .cell(line)
+                .and_then(|cell| notebook.cell_offset(cell))
+                .unwrap_or_default();
+
+            let cell_start_location =
+                index.source_location(start_offset, source.as_str(), encoding.into());
+            assert_eq!(cell_start_location.character_offset, OneIndexed::MIN);
+
+            let absolute_start = SourceLocation {
+                line: cell_start_location
+                    .line
+                    .saturating_add(line.to_zero_indexed()),
+                character_offset: OneIndexed::from_zero_indexed(u32_index_to_usize(self.character)),
+            };
+            return index.offset(absolute_start, &source, encoding.into());
+        }
+
+        lsp_position_to_text_size(self, &source, &index, encoding)
     }
 }
 
@@ -209,15 +286,6 @@ pub(crate) trait ToRangeExt {
         file: File,
         encoding: PositionEncoding,
     ) -> LspRange<'db>;
-
-    #[expect(dead_code)]
-    fn to_notebook_range(
-        &self,
-        text: &str,
-        source_index: &LineIndex,
-        notebook_index: &NotebookIndex,
-        encoding: PositionEncoding,
-    ) -> NotebookRange;
 }
 
 fn u32_index_to_usize(index: u32) -> usize {
@@ -291,39 +359,6 @@ impl ToRangeExt for TextRange {
             range: *self,
             db,
             encoding,
-        }
-    }
-
-    fn to_notebook_range(
-        &self,
-        text: &str,
-        source_index: &LineIndex,
-        notebook_index: &NotebookIndex,
-        encoding: PositionEncoding,
-    ) -> NotebookRange {
-        let start = source_index.source_location(self.start(), text, encoding.into());
-        let mut end = source_index.source_location(self.end(), text, encoding.into());
-        let starting_cell = notebook_index.cell(start.line);
-
-        // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
-        // we need to move it one character back (which should place it at the end of the last line).
-        // we test this by checking if the ending offset is in a different (or nonexistent) cell compared to the cell of the starting offset.
-        if notebook_index.cell(end.line) != starting_cell {
-            end.line = end.line.saturating_sub(1);
-            let offset = self.end().checked_sub(1.into()).unwrap_or_default();
-            end.character_offset = source_index
-                .source_location(offset, text, encoding.into())
-                .character_offset;
-        }
-
-        let start = source_location_to_position(&notebook_index.translate_source_location(&start));
-        let end = source_location_to_position(&notebook_index.translate_source_location(&end));
-
-        NotebookRange {
-            cell: starting_cell
-                .map(OneIndexed::to_zero_indexed)
-                .unwrap_or_default(),
-            range: types::Range { start, end },
         }
     }
 }

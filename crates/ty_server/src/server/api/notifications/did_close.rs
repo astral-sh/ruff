@@ -31,6 +31,8 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
+        // TODO: If this is a text document, don't send a close event, instead, trigger a change event.
+        let path = document.notebook_or_file_path();
         let db = session.project_db_mut(&path);
 
         match &path {

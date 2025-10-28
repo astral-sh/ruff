@@ -276,7 +276,7 @@ where
             });
         };
 
-        let path = document.to_file_path();
+        let path = document.notebook_or_file_path();
         let db = session.project_db(&path).clone();
 
         Box::new(move |client| {

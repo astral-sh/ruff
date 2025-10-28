@@ -1,3 +1,4 @@
+use crate::Db;
 use crate::PositionEncoding;
 use crate::document::ToRangeExt;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
@@ -26,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use ty_project::{Db, ProgressReporter};
+use ty_project::{ProgressReporter, ProjectDatabase};
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
 ///
@@ -230,7 +231,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         state.report_progress(&self.work_done);
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
@@ -260,7 +261,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         state.response.maybe_flush();
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         let mut by_file: BTreeMap<File, Vec<Diagnostic>> = BTreeMap::new();
 
         for diagnostic in diagnostics {

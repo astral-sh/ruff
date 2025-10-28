@@ -11,7 +11,7 @@ use lsp_types::{PositionEncodingKind, Url};
 use crate::system::AnySystemPath;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
-use ruff_db::system::{SystemPathBuf, SystemVirtualPath};
+use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
 
@@ -95,6 +95,13 @@ impl DocumentKey {
             Self::Opaque(uri) => {
                 AnySystemPath::SystemVirtual(SystemVirtualPath::new(uri).to_path_buf())
             }
+        }
+    }
+
+    pub(super) fn into_file_path(self) -> AnySystemPath {
+        match self {
+            Self::File(path) => AnySystemPath::System(path),
+            Self::Opaque(uri) => AnySystemPath::SystemVirtual(SystemVirtualPathBuf::from(uri)),
         }
     }
 }

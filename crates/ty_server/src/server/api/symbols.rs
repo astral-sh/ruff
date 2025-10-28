@@ -1,10 +1,10 @@
 //! Utility functions common to language server request handlers
 //! that return symbol information.
 
+use crate::db::Db;
+use crate::document::{PositionEncoding, ToRangeExt};
 use lsp_types::{SymbolInformation, SymbolKind};
 use ty_ide::SymbolInfo;
-
-use crate::document::{PositionEncoding, ToRangeExt};
 
 /// Convert `ty_ide` `SymbolKind` to LSP `SymbolKind`
 pub(crate) fn convert_symbol_kind(kind: ty_ide::SymbolKind) -> SymbolKind {
@@ -29,7 +29,7 @@ pub(crate) fn convert_symbol_kind(kind: ty_ide::SymbolKind) -> SymbolKind {
 /// Returns `None` if the symbol's range cannot be converted to a location
 /// (e.g., if the file cannot be converted to a URL).
 pub(crate) fn convert_to_lsp_symbol_information(
-    db: &dyn ty_project::Db,
+    db: &dyn Db,
     file: ruff_db::files::File,
     symbol: SymbolInfo<'_>,
     encoding: PositionEncoding,

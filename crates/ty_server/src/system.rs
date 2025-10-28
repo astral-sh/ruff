@@ -15,6 +15,7 @@ use ruff_db::system::{
     SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use ty_ide::cached_vendored_path;
 use ty_python_semantic::Db;
 
@@ -112,25 +113,28 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: AnySystemPath) -> Option<&Document> {
+    fn document(&self, path: AnySystemPath) -> Option<&Document> {
         let index = self.index();
         index.document(&DocumentKey::from(path)).ok()
     }
 
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<&Document> {
+    pub(crate) fn system_path_to_document(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.document(any_path)
     }
 
-    fn system_virtual_path_to_document_ref(&self, path: &SystemVirtualPath) -> Option<&Document> {
+    pub(crate) fn system_virtual_path_to_document(
+        &self,
+        path: &SystemVirtualPath,
+    ) -> Option<&Document> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.document(any_path)
     }
 }
 
 impl System for LSPSystem {
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         if let Some(document) = document {
             Ok(Metadata::new(
@@ -151,8 +155,21 @@ impl System for LSPSystem {
         self.native_system.path_exists_case_sensitive(path, prefix)
     }
 
+    fn source_type(&self, path: &FilePath) -> Option<PySourceType> {
+        let document = match path {
+            FilePath::System(path) => self.system_path_to_document(path),
+            FilePath::SystemVirtual(path) => self.system_virtual_path_to_document(path),
+            FilePath::Vendored(_) => None,
+        }?;
+
+        Some(match document {
+            Document::Text(_) => PySourceType::try_from_extension(path.extension()?)?,
+            Document::Notebook(_) => PySourceType::Ipynb,
+        })
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         match document {
             Some(Document::Text(document)) => Ok(document.contents().to_string()),
@@ -161,7 +178,7 @@ impl System for LSPSystem {
     }
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         match document {
             Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
@@ -172,7 +189,7 @@ impl System for LSPSystem {
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
         let document = self
-            .system_virtual_path_to_document_ref(path)
+            .system_virtual_path_to_document(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         if let Document::Text(document) = &document {
@@ -187,7 +204,7 @@ impl System for LSPSystem {
         path: &SystemVirtualPath,
     ) -> std::result::Result<Notebook, NotebookError> {
         let document = self
-            .system_virtual_path_to_document_ref(path)
+            .system_virtual_path_to_document(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         match document {
