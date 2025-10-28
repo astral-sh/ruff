@@ -63,26 +63,35 @@ def negated_range_constraint(
 # Ideally, these would be annotated using `TypeForm`, but that has not been
 # standardized yet (https://peps.python.org/pep-0747).
 def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
-    """Returns a constraint that is satisfied when `type_a` and `type_b` are
+    """Returns a constraint set that is satisfied when `type_a` and `type_b` are
     `equivalent`_ types.
 
     .. _equivalent: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     """
 
 def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
-    """Returns a constraint that is satisfied when `ty` is a `subtype`_ of `of`.
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_subtype_of_given(
+    constraints: bool | ConstraintSet, ty: Any, of: Any
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`,
+    assuming that all of the constraints in `constraints` hold.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
 
 def is_assignable_to(ty: Any, to: Any) -> ConstraintSet:
-    """Returns a constraint that is satisfied when `ty` is `assignable`_ to `to`.
+    """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
 
     .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     """
 
 def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
-    """Returns a constraint that is satisfied when `type_a` and `type_b` are disjoint types.
+    """Returns a constraint set that is satisfied when `type_a` and `type_b` are disjoint types.
 
     Two types are disjoint if they have no inhabitants in common.
     """
