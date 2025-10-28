@@ -753,34 +753,24 @@ impl<'db> Node<'db> {
         rhs: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> Self {
-        match (lhs, rhs) {
-            // When checking subtyping involving a typevar, we project the BDD so that it only
-            // contains that typevar, and any other typevars that could be its upper/lower bound.
-            // (That is, other typevars that are "later" in our arbitrary ordering of typevars.)
-            //
-            // Having done that, we can turn the subtyping check into a constraint (i.e, "is `T` a
-            // subtype of `int` becomes the constraint `T ≤ int`), and then check when the BDD
-            // implies that constraint.
+        // When checking subtyping involving a typevar, we can turn the subtyping check into a
+        // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
+        // check when the BDD implies that constraint.
+        let constraint = match (lhs, rhs) {
             (Type::TypeVar(bound_typevar), _) => {
-                let constraint = ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs);
-                let simplified_self = self.simplify(db);
-                let implication = simplified_self.implies(db, constraint);
-                let (simplified, domain) = implication.simplify_and_domain(db);
-                simplified.and(db, domain)
+                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs)
             }
-
             (_, Type::TypeVar(bound_typevar)) => {
-                let constraint =
-                    ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object());
-                let simplified_self = self.simplify(db);
-                let implication = simplified_self.implies(db, constraint);
-                let (simplified, domain) = implication.simplify_and_domain(db);
-                simplified.and(db, domain)
+                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object())
             }
-
             // If neither type is a typevar, then we fall back on a normal subtyping check.
-            _ => lhs.when_subtype_of(db, rhs, inferable).node,
-        }
+            _ => return lhs.when_subtype_of(db, rhs, inferable).node,
+        };
+
+        let simplified_self = self.simplify(db);
+        let implication = simplified_self.implies(db, constraint);
+        let (simplified, domain) = implication.simplify_and_domain(db);
+        simplified.and(db, domain)
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
