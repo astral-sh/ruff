@@ -523,6 +523,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::PathOpen) => {
                 f.write_str("bound method `Path.open`")
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
+                f.write_str("bound method `ConstraintSet.range`")
+            }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),

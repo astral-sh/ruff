@@ -32,10 +32,10 @@ there isn't a valid specialization for the typevars we are considering.
 
 ```py
 from typing import Never
-from ty_extensions import range_constraint
+from ty_extensions import ConstraintSet
 
 def even_given_constraints[T]():
-    constraints = range_constraint(Never, T, int)
+    constraints = ConstraintSet.range(Never, T, int)
     static_assert(is_subtype_of_given(constraints, bool, int))
     static_assert(not is_subtype_of_given(constraints, bool, str))
 
@@ -141,7 +141,7 @@ considering.
 
 ```py
 from typing import Never
-from ty_extensions import is_subtype_of_given, range_constraint, static_assert
+from ty_extensions import ConstraintSet, is_subtype_of_given, static_assert
 
 def given_constraints[T]():
     static_assert(not is_subtype_of_given(True, T, int))
@@ -153,12 +153,12 @@ def given_constraints[T]():
     static_assert(is_subtype_of_given(False, T, bool))
     static_assert(is_subtype_of_given(False, T, str))
 
-    given_int = range_constraint(Never, T, int)
+    given_int = ConstraintSet.range(Never, T, int)
     static_assert(is_subtype_of_given(given_int, T, int))
     static_assert(not is_subtype_of_given(given_int, T, bool))
     static_assert(not is_subtype_of_given(given_int, T, str))
 
-    given_bool = range_constraint(Never, T, bool)
+    given_bool = ConstraintSet.range(Never, T, bool)
     static_assert(is_subtype_of_given(given_bool, T, int))
     static_assert(is_subtype_of_given(given_bool, T, bool))
     static_assert(not is_subtype_of_given(given_bool, T, str))
@@ -168,7 +168,7 @@ def given_constraints[T]():
     static_assert(is_subtype_of_given(given_both, T, bool))
     static_assert(not is_subtype_of_given(given_both, T, str))
 
-    given_str = range_constraint(Never, T, str)
+    given_str = ConstraintSet.range(Never, T, str)
     static_assert(not is_subtype_of_given(given_str, T, int))
     static_assert(not is_subtype_of_given(given_str, T, bool))
     static_assert(is_subtype_of_given(given_str, T, str))
@@ -179,7 +179,7 @@ This might require propagating constraints from other typevars.
 ```py
 def mutually_constrained[T, U]():
     # If [T = U ∧ U ≤ int], then [T ≤ int] must be true as well.
-    given_int = range_constraint(U, T, U) & range_constraint(Never, U, int)
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
     # TODO: no static-assert-error
     # error: [static-assert-error]
     static_assert(is_subtype_of_given(given_int, T, int))
@@ -187,7 +187,7 @@ def mutually_constrained[T, U]():
     static_assert(not is_subtype_of_given(given_int, T, str))
 
     # If [T ≤ U ∧ U ≤ int], then [T ≤ int] must be true as well.
-    given_int = range_constraint(Never, T, U) & range_constraint(Never, U, int)
+    given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
     # TODO: no static-assert-error
     # error: [static-assert-error]
     static_assert(is_subtype_of_given(given_int, T, int))

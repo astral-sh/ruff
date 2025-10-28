@@ -81,9 +81,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext,
-    TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, NormalizedVisitor,
+    SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation, UnionBuilder,
+    binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1323,10 +1323,6 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_mro`
     RevealMro,
-    /// `ty_extensions.range_constraint`
-    RangeConstraint,
-    /// `ty_extensions.negated_range_constraint`
-    NegatedRangeConstraint,
 }
 
 impl KnownFunction {
@@ -1400,8 +1396,6 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
-            | Self::RangeConstraint
-            | Self::NegatedRangeConstraint
             | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
@@ -1780,32 +1774,6 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
 
-            KnownFunction::RangeConstraint => {
-                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
-                else {
-                    return;
-                };
-
-                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
-            KnownFunction::NegatedRangeConstraint => {
-                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
-                else {
-                    return;
-                };
-
-                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
             KnownFunction::Open => {
                 // TODO: Temporary special-casing for `builtins.open` to avoid an excessive number of
                 // false positives in lieu of proper support for PEP-613 type aliases.
@@ -1905,8 +1873,6 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
-                | KnownFunction::RangeConstraint
-                | KnownFunction::NegatedRangeConstraint
                 | KnownFunction::RevealMro
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 

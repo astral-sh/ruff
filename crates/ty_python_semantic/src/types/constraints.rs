@@ -304,15 +304,6 @@ impl<'db> ConstraintSet<'db> {
         Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
     }
 
-    pub(crate) fn negated_range(
-        db: &'db dyn Db,
-        lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
-        upper: Type<'db>,
-    ) -> Self {
-        Self::range(db, lower, typevar, upper).negate(db)
-    }
-
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify(db).display(db)
     }

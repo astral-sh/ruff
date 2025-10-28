@@ -8,6 +8,7 @@ from typing import (
     ClassVar,
     LiteralString,
     Protocol,
+    Self,
     _SpecialForm,
 )
 
@@ -44,19 +45,19 @@ type JustComplex = TypeOf[1.0j]
 
 # Constraints
 class ConstraintSet:
+    @staticmethod
+    def range(lower_bound: Any, typevar: Any, upper_bound: Any) -> Self:
+        """
+        Returns a constraint set that requires `typevar` to specialize to a type
+        that is a supertype of `lower_bound` and a subtype of `upper_bound`.
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
-
-def range_constraint(
-    lower_bound: Any, typevar: Any, upper_bound: Any
-) -> ConstraintSet: ...
-def negated_range_constraint(
-    lower_bound: Any, typevar: Any, upper_bound: Any
-) -> ConstraintSet: ...
 
 # Predicates on types
 #
