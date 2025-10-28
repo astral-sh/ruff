@@ -56,6 +56,7 @@ use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 /// This rule's fix is marked as unsafe for cases in which comments would be
 /// dropped from the `return` statement.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct UnnecessaryReturnNone;
 
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
@@ -97,6 +98,7 @@ impl AlwaysFixableViolation for UnnecessaryReturnNone {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct ImplicitReturnValue;
 
 impl AlwaysFixableViolation for ImplicitReturnValue {
@@ -135,6 +137,7 @@ impl AlwaysFixableViolation for ImplicitReturnValue {
 ///     return None
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct ImplicitReturn;
 
 impl AlwaysFixableViolation for ImplicitReturn {
@@ -170,6 +173,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct UnnecessaryAssign {
     name: String,
 }
@@ -212,6 +216,7 @@ impl AlwaysFixableViolation for UnnecessaryAssign {
 ///     return baz
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct SuperfluousElseReturn {
     branch: Branch,
 }
@@ -256,6 +261,7 @@ impl Violation for SuperfluousElseReturn {
 ///     raise Exception(baz)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct SuperfluousElseRaise {
     branch: Branch,
 }
@@ -302,6 +308,7 @@ impl Violation for SuperfluousElseRaise {
 ///         x = 0
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct SuperfluousElseContinue {
     branch: Branch,
 }
@@ -348,6 +355,7 @@ impl Violation for SuperfluousElseContinue {
 ///         x = 0
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct SuperfluousElseBreak {
     branch: Branch,
 }

@@ -89,6 +89,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [typing_TypeVar]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 /// [typing_extensions]: https://typing-extensions.readthedocs.io/en/latest/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct CustomTypeVarForSelf {
     typevar_name: String,
 }

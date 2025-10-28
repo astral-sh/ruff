@@ -31,6 +31,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// {value: value.upper() for value in data}
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct StaticKeyDictComprehension {
     key: SourceCodeSnippet,
 }

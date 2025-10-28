@@ -55,6 +55,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.8.1")]
 pub(crate) struct UnnecessaryRegularExpression {
     replacement: Option<String>,
 }

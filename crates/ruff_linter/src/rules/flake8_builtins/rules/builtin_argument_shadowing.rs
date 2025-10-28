@@ -49,6 +49,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.48")]
 pub(crate) struct BuiltinArgumentShadowing {
     name: String,
 }

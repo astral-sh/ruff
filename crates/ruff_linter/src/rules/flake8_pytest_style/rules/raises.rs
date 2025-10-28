@@ -51,6 +51,7 @@ use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestRaisesWithMultipleStatements;
 
 impl Violation for PytestRaisesWithMultipleStatements {
@@ -102,6 +103,7 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestRaisesTooBroad {
     exception: String,
 }
@@ -147,6 +149,7 @@ impl Violation for PytestRaisesTooBroad {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestRaisesWithoutException;
 
 impl Violation for PytestRaisesWithoutException {

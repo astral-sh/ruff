@@ -21,6 +21,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.172")]
 pub(crate) struct UnusedAnnotation {
     name: String,
 }

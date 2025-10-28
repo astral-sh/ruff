@@ -28,6 +28,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct NonEmptyStubBody;
 
 impl AlwaysFixableViolation for NonEmptyStubBody {

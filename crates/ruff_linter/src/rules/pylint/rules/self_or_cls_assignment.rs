@@ -46,6 +46,7 @@ use crate::checkers::ast::Checker;
 ///         return supercls
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct SelfOrClsAssignment {
     method_type: MethodType,
 }

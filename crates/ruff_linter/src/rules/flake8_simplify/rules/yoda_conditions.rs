@@ -48,6 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.207")]
 pub(crate) struct YodaConditions {
     suggestion: Option<SourceCodeSnippet>,
 }

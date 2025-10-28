@@ -10,6 +10,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
+use crate::types::CallDunderError;
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{
@@ -973,13 +974,33 @@ pub fn definitions_for_unary_op<'db>(
         ast::UnaryOp::Not => "__bool__",
     };
 
-    let Ok(bindings) = operand_ty.try_call_dunder(
+    let bindings = match operand_ty.try_call_dunder(
         db,
         unary_dunder_method,
         CallArguments::none(),
         TypeContext::default(),
-    ) else {
-        return None;
+    ) {
+        Ok(bindings) => bindings,
+        Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
+            // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
+            match operand_ty.try_call_dunder(
+                db,
+                "__len__",
+                CallArguments::none(),
+                TypeContext::default(),
+            ) {
+                Ok(bindings) => bindings,
+                Err(CallDunderError::MethodNotAvailable) => return None,
+                Err(
+                    CallDunderError::PossiblyUnbound(bindings)
+                    | CallDunderError::CallError(_, bindings),
+                ) => *bindings,
+            }
+        }
+        Err(CallDunderError::MethodNotAvailable) => return None,
+        Err(
+            CallDunderError::PossiblyUnbound(bindings) | CallDunderError::CallError(_, bindings),
+        ) => *bindings,
     };
 
     let callable_type = promote_literals_for_self(db, bindings.callable_type());

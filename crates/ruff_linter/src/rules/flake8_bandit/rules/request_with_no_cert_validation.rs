@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-295](https://cwe.mitre.org/data/definitions/295.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct RequestWithNoCertValidation {
     string: String,
 }

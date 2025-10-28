@@ -25,6 +25,7 @@ struct Explanation<'a> {
     explanation: Option<&'a str>,
     preview: bool,
     status: RuleGroup,
+    source_location: SourceLocation,
 }
 
 impl<'a> Explanation<'a> {
@@ -43,6 +44,10 @@ impl<'a> Explanation<'a> {
             explanation: rule.explanation(),
             preview: rule.is_preview(),
             status: rule.group(),
+            source_location: SourceLocation {
+                file: rule.file(),
+                line: rule.line(),
+            },
         }
     }
 }
@@ -126,4 +131,15 @@ pub(crate) fn rules(format: HelpFormat) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The location of the rule's implementation in the Ruff source tree, relative to the repository
+/// root.
+///
+/// For most rules this will point to the `#[derive(ViolationMetadata)]` line above the rule's
+/// struct.
+#[derive(Serialize)]
+struct SourceLocation {
+    file: &'static str,
+    line: u32,
 }

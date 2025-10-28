@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 /// - [OpenStack security: Cross site scripting XSS](https://security.openstack.org/guidelines/dg_cross-site-scripting-xss.html)
 /// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct MakoTemplates;
 
 impl Violation for MakoTemplates {

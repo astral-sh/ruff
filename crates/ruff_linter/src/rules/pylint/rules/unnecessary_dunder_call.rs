@@ -64,6 +64,7 @@ use ruff_python_ast::PythonVersion;
 ///     return x > 2
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.12")]
 pub(crate) struct UnnecessaryDunderCall {
     method: String,
     replacement: Option<String>,

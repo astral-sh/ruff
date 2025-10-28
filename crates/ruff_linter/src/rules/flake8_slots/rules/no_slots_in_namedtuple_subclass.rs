@@ -47,6 +47,7 @@ use crate::rules::flake8_slots::helpers::has_slots;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 
 impl Violation for NoSlotsInNamedtupleSubclass {

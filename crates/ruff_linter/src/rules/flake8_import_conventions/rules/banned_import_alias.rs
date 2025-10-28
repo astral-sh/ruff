@@ -34,6 +34,7 @@ use crate::rules::flake8_import_conventions::settings::BannedAliases;
 /// ## Options
 /// - `lint.flake8-import-conventions.banned-aliases`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct BannedImportAlias {
     name: String,
     asname: String,

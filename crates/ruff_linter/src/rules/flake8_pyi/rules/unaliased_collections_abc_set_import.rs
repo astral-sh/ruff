@@ -40,6 +40,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// `import foo as foo` alias, or are imported via a `*` import. As such, the
 /// fix is marked as safe in more cases for `.pyi` files.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {

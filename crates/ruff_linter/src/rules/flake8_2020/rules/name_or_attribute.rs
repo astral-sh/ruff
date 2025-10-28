@@ -36,6 +36,7 @@ use crate::checkers::ast::Checker;
 /// - [Six documentation: `six.PY2`](https://six.readthedocs.io/#six.PY2)
 /// - [Six documentation: `six.PY3`](https://six.readthedocs.io/#six.PY3)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SixPY3;
 
 impl Violation for SixPY3 {

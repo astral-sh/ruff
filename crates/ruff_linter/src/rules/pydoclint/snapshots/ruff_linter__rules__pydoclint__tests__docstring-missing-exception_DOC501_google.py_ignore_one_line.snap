@@ -61,6 +61,66 @@ DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
 help: Add `FasterThanLightError` to the docstring
 
+DOC501 Raised exception `ZeroDivisionError` missing from docstring
+  --> DOC501_google.py:70:5
+   |
+68 |   # DOC501
+69 |   def calculate_speed(distance: float, time: float) -> float:
+70 | /     """Calculate speed as distance divided by time.
+71 | |
+72 | |     Args:
+73 | |         distance: Distance traveled.
+74 | |         time: Time spent traveling.
+75 | |
+76 | |     Returns:
+77 | |         Speed as distance divided by time.
+78 | |     """
+   | |_______^
+79 |       try:
+80 |           return distance / time
+   |
+help: Add `ZeroDivisionError` to the docstring
+
+DOC501 Raised exception `ValueError` missing from docstring
+  --> DOC501_google.py:88:5
+   |
+86 |   # DOC501
+87 |   def calculate_speed(distance: float, time: float) -> float:
+88 | /     """Calculate speed as distance divided by time.
+89 | |
+90 | |     Args:
+91 | |         distance: Distance traveled.
+92 | |         time: Time spent traveling.
+93 | |
+94 | |     Returns:
+95 | |         Speed as distance divided by time.
+96 | |     """
+   | |_______^
+97 |       try:
+98 |           return distance / time
+   |
+help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `ZeroDivisionError` missing from docstring
+  --> DOC501_google.py:88:5
+   |
+86 |   # DOC501
+87 |   def calculate_speed(distance: float, time: float) -> float:
+88 | /     """Calculate speed as distance divided by time.
+89 | |
+90 | |     Args:
+91 | |         distance: Distance traveled.
+92 | |         time: Time spent traveling.
+93 | |
+94 | |     Returns:
+95 | |         Speed as distance divided by time.
+96 | |     """
+   | |_______^
+97 |       try:
+98 |           return distance / time
+   |
+help: Add `ZeroDivisionError` to the docstring
+
 DOC501 Raised exception `AnotherError` missing from docstring
    --> DOC501_google.py:106:5
     |

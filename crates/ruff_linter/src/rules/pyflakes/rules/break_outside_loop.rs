@@ -18,6 +18,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: `break`](https://docs.python.org/3/reference/simple_stmts.html#the-break-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.36")]
 pub(crate) struct BreakOutsideLoop;
 
 impl Violation for BreakOutsideLoop {

@@ -33,6 +33,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## Options
 /// - `lint.flake8-import-conventions.banned-from`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.263")]
 pub(crate) struct BannedImportFrom {
     name: String,
 }

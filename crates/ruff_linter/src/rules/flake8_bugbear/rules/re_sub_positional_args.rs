@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `re.subn`](https://docs.python.org/3/library/re.html#re.subn)
 /// - [Python documentation: `re.split`](https://docs.python.org/3/library/re.html#re.split)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct ReSubPositionalArgs {
     method: Method,
 }

@@ -36,6 +36,7 @@ use crate::registry::Rule;
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedFunctionArgument {
     name: String,
 }
@@ -76,6 +77,7 @@ impl Violation for UnusedFunctionArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedMethodArgument {
     name: String,
 }
@@ -118,6 +120,7 @@ impl Violation for UnusedMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedClassMethodArgument {
     name: String,
 }
@@ -160,6 +163,7 @@ impl Violation for UnusedClassMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedStaticMethodArgument {
     name: String,
 }
@@ -199,6 +203,7 @@ impl Violation for UnusedStaticMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedLambdaArgument {
     name: String,
 }

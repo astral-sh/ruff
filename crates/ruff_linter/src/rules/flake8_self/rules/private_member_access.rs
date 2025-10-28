@@ -55,6 +55,7 @@ use crate::rules::pylint::helpers::is_dunder_operator_method;
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.240")]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }

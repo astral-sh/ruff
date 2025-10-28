@@ -30,6 +30,7 @@ use super::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct RedundantBackslash;
 
 impl AlwaysFixableViolation for RedundantBackslash {

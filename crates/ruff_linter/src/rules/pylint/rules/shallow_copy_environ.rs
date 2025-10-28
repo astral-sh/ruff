@@ -43,6 +43,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [BPO 15373]: https://bugs.python.org/issue15373
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct ShallowCopyEnviron;
 
 impl AlwaysFixableViolation for ShallowCopyEnviron {

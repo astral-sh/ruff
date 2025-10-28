@@ -28,6 +28,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct UnnecessarySpread;
 
 impl Violation for UnnecessarySpread {

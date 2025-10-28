@@ -29,6 +29,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 /// ## References
 /// - [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct YieldInInit;
 
 impl Violation for YieldInInit {

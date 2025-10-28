@@ -342,6 +342,12 @@ pub struct Completion<'db> {
     pub builtin: bool,
 }
 
+impl<'db> Completion<'db> {
+    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+        self.ty.is_some_and(|ty| ty.is_type_check_only(db))
+    }
+}
+
 pub trait HasType {
     /// Returns the inferred type of `self`.
     ///
@@ -499,8 +505,10 @@ impl HasTrackedScope for ast::Expr {}
 impl HasTrackedScope for ast::ExprRef<'_> {}
 impl HasTrackedScope for &ast::ExprRef<'_> {}
 
-// See https://github.com/astral-sh/ty/issues/572 why this implementation exists
-// even when we never register identifiers during semantic index building.
+// We never explicitly register the scope of an `Identifier`.
+// However, `ExpressionsScopeMap` stores the text ranges of each scope.
+// That allows us to look up the identifier's scope for as long as it's
+// inside an expression (because the ranges overlap).
 impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]

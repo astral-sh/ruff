@@ -47,6 +47,7 @@ use ruff_text_size::Ranged;
 ///     new_path = os.path.join("/tmp/src/", path)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.13.2")]
 pub(crate) struct BlockingPathMethodInAsyncFunction {
     path_library: String,
 }

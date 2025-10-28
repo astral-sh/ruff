@@ -30,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `typing.Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.4")]
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {

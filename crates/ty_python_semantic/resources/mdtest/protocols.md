@@ -25,10 +25,11 @@ A protocol is defined by inheriting from the `Protocol` class, which is annotate
 
 ```py
 from typing import Protocol
+from ty_extensions import reveal_mro
 
 class MyProtocol(Protocol): ...
 
-reveal_type(MyProtocol.__mro__)  # revealed: tuple[<class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_mro(MyProtocol)  # revealed: (<class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 ```
 
 Just like for any other class base, it is an error for `Protocol` to appear multiple times in a
@@ -37,7 +38,7 @@ class's bases:
 ```py
 class Foo(Protocol, Protocol): ...  # error: [duplicate-base]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
 Protocols can also be generic, either by including `Generic[]` in the bases list, subscripting
@@ -64,7 +65,7 @@ class Bar3[T](Protocol[T]):
 
 # Note that this class definition *will* actually succeed at runtime,
 # unlike classes that combine PEP-695 type parameters with inheritance from `Generic[]`
-reveal_type(Bar3.__mro__)  # revealed: tuple[<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_mro(Bar3)  # revealed: (<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 ```
 
 It's an error to include both bare `Protocol` and subscripted `Protocol[]` in the bases list
@@ -74,8 +75,8 @@ simultaneously:
 class DuplicateBases(Protocol, Protocol[T]):  # error: [duplicate-base]
     x: T
 
-# revealed: tuple[<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>]
-reveal_type(DuplicateBases.__mro__)
+# revealed: (<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>)
+reveal_mro(DuplicateBases)
 ```
 
 The introspection helper `typing(_extensions).is_protocol` can be used to verify whether a class is
@@ -124,8 +125,8 @@ it is not sufficient for it to have `Protocol` in its MRO.
 ```py
 class SubclassOfMyProtocol(MyProtocol): ...
 
-# revealed: tuple[<class 'SubclassOfMyProtocol'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(SubclassOfMyProtocol.__mro__)
+# revealed: (<class 'SubclassOfMyProtocol'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(SubclassOfMyProtocol)
 
 reveal_type(is_protocol(SubclassOfMyProtocol))  # revealed: Literal[False]
 ```
@@ -143,8 +144,8 @@ class OtherProtocol(Protocol):
 
 class ComplexInheritance(SubProtocol, OtherProtocol, Protocol): ...
 
-# revealed: tuple[<class 'ComplexInheritance'>, <class 'SubProtocol'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(ComplexInheritance.__mro__)
+# revealed: (<class 'ComplexInheritance'>, <class 'SubProtocol'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(ComplexInheritance)
 
 reveal_type(is_protocol(ComplexInheritance))  # revealed: Literal[True]
 ```
@@ -156,22 +157,22 @@ or `TypeError` is raised at runtime when the class is created.
 # error: [invalid-protocol] "Protocol class `Invalid` cannot inherit from non-protocol class `NotAProtocol`"
 class Invalid(NotAProtocol, Protocol): ...
 
-# revealed: tuple[<class 'Invalid'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(Invalid.__mro__)
+# revealed: (<class 'Invalid'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Invalid)
 
 # error: [invalid-protocol] "Protocol class `AlsoInvalid` cannot inherit from non-protocol class `NotAProtocol`"
 class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
-# revealed: tuple[<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(AlsoInvalid.__mro__)
+# revealed: (<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(AlsoInvalid)
 
 class NotAGenericProtocol[T]: ...
 
 # error: [invalid-protocol] "Protocol class `StillInvalid` cannot inherit from non-protocol class `NotAGenericProtocol`"
 class StillInvalid(NotAGenericProtocol[int], Protocol): ...
 
-# revealed: tuple[<class 'StillInvalid'>, <class 'NotAGenericProtocol[int]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(StillInvalid.__mro__)
+# revealed: (<class 'StillInvalid'>, <class 'NotAGenericProtocol[int]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(StillInvalid)
 ```
 
 But two exceptions to this rule are `object` and `Generic`:
@@ -188,7 +189,7 @@ T = TypeVar("T")
 # type checkers.
 class Fine(Protocol, object): ...
 
-reveal_type(Fine.__mro__)  # revealed: tuple[<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_mro(Fine)  # revealed: (<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
@@ -202,8 +203,8 @@ And multiple inheritance from a mix of protocol and non-protocol classes is fine
 ```py
 class FineAndDandy(MyProtocol, OtherProtocol, NotAProtocol): ...
 
-# revealed: tuple[<class 'FineAndDandy'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'NotAProtocol'>, <class 'object'>]
-reveal_type(FineAndDandy.__mro__)
+# revealed: (<class 'FineAndDandy'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'NotAProtocol'>, <class 'object'>)
+reveal_mro(FineAndDandy)
 ```
 
 But if `Protocol` is not present in the bases list, the resulting class doesn't count as a protocol
@@ -270,11 +271,11 @@ second argument to `issubclass()` at runtime:
 ```py
 import abc
 import typing
-from ty_extensions import TypeOf
+from ty_extensions import TypeOf, reveal_mro
 
 reveal_type(type(Protocol))  # revealed: <class '_ProtocolMeta'>
-# revealed: tuple[<class '_ProtocolMeta'>, <class 'ABCMeta'>, <class 'type'>, <class 'object'>]
-reveal_type(type(Protocol).__mro__)
+# revealed: (<class '_ProtocolMeta'>, <class 'ABCMeta'>, <class 'type'>, <class 'object'>)
+reveal_mro(type(Protocol))
 static_assert(is_subtype_of(TypeOf[Protocol], type))
 static_assert(is_subtype_of(TypeOf[Protocol], abc.ABCMeta))
 static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))

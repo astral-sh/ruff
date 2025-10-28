@@ -28,6 +28,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.6")]
 pub(crate) struct MathConstant {
     literal: String,
     constant: &'static str,

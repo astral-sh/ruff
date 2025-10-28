@@ -36,6 +36,7 @@ use crate::rules::flake8_django::helpers::is_model_form;
 ///         fields = ["title", "content"]
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct DjangoExcludeWithModelForm;
 
 impl Violation for DjangoExcludeWithModelForm {

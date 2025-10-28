@@ -46,6 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [F841]: https://docs.astral.sh/ruff/rules/unused-variable/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct UnusedUnpackedVariable {
     pub name: String,
 }

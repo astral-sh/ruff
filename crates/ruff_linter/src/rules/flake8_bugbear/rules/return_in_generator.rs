@@ -79,6 +79,7 @@ use crate::checkers::ast::Checker;
 ///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.4.8")]
 pub(crate) struct ReturnInGenerator;
 
 impl Violation for ReturnInGenerator {

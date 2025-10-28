@@ -28,6 +28,7 @@ use crate::Violation;
 ///
 /// [B035]: https://docs.astral.sh/ruff/rules/static-key-dict-comprehension/
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.2.0")]
 pub(crate) struct RuffStaticKeyDictComprehension;
 
 impl Violation for RuffStaticKeyDictComprehension {

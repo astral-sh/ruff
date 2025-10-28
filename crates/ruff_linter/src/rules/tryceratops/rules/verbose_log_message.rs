@@ -34,6 +34,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 ///     logger.exception("Found an error")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.250")]
 pub(crate) struct VerboseLogMessage;
 
 impl Violation for VerboseLogMessage {

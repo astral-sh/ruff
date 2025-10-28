@@ -33,6 +33,7 @@ use crate::{Edit, Fix};
 /// )
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.201")]
 pub(crate) struct ExplicitStringConcatenation;
 
 impl AlwaysFixableViolation for ExplicitStringConcatenation {

@@ -429,7 +429,7 @@ impl<'db> NominalInstanceType<'db> {
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied() {
+                if result.union(db, compatible).is_always_satisfied(db) {
                     return result;
                 }
             }
@@ -648,8 +648,12 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_fn=recover, cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
-        fn inner<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>, _: ()) -> bool {
+        #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_equivalent_to_object_inner<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> bool {
             Type::object()
                 .satisfies_protocol(
                     db,
@@ -662,22 +666,11 @@ impl<'db> ProtocolInstanceType<'db> {
                 .satisfies_all_typevars(db, InferableTypeVars::None)
         }
 
-        #[expect(clippy::trivially_copy_pass_by_ref)]
-        fn recover<'db>(
-            _db: &'db dyn Db,
-            _result: &bool,
-            _count: u32,
-            _value: ProtocolInstanceType<'db>,
-            _: (),
-        ) -> salsa::CycleRecoveryAction<bool> {
-            salsa::CycleRecoveryAction::Iterate
-        }
-
         fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
             true
         }
 
-        inner(db, self, ())
+        is_equivalent_to_object_inner(db, self, ())
     }
 
     /// Return a "normalized" version of this `Protocol` type.

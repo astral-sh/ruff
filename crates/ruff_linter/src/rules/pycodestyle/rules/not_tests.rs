@@ -28,6 +28,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NotInTest;
 
 impl AlwaysFixableViolation for NotInTest {
@@ -64,6 +65,7 @@ impl AlwaysFixableViolation for NotInTest {
 ///
 /// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NotIsTest;
 
 impl AlwaysFixableViolation for NotIsTest {

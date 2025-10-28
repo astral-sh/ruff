@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     print(5)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct UselessReturn;
 
 impl AlwaysFixableViolation for UselessReturn {

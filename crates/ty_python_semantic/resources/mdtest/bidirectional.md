@@ -145,3 +145,84 @@ def h[T](x: T, cond: bool) -> T | list[T]:
 def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
+
+## Type context sources
+
+Type context is sourced from various places, including annotated assignments:
+
+```py
+from typing import Literal
+
+a: list[Literal[1]] = [1]
+```
+
+Function parameter annotations:
+
+```py
+def b(x: list[Literal[1]]): ...
+
+b([1])
+```
+
+Bound method parameter annotations:
+
+```py
+class C:
+    def __init__(self, x: list[Literal[1]]): ...
+    def foo(self, x: list[Literal[1]]): ...
+
+C([1]).foo([1])
+```
+
+Declared variable types:
+
+```py
+d: list[Literal[1]]
+d = [1]
+```
+
+Declared attribute types:
+
+```py
+class E:
+    e: list[Literal[1]]
+
+def _(e: E):
+    # TODO: Implement attribute type context.
+    # error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to attribute `e` of type `list[Literal[1]]`"
+    e.e = [1]
+```
+
+Function return types:
+
+```py
+def f() -> list[Literal[1]]:
+    return [1]
+```
+
+## Class constructor parameters
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The parameters of both `__init__` and `__new__` are used as type context sources for constructor
+calls:
+
+```py
+def f[T](x: T) -> list[T]:
+    return [x]
+
+class A:
+    def __new__(cls, value: list[int | str]):
+        return super().__new__(cls, value)
+
+    def __init__(self, value: list[int | None]): ...
+
+A(f(1))
+
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
+A(f([]))
+```

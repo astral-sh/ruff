@@ -84,6 +84,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// [1]: https://github.com/python/cpython/issues/106102
 /// [MRO]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct GenericNotLastBaseClass;
 
 impl Violation for GenericNotLastBaseClass {

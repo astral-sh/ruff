@@ -951,6 +951,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::MisplacedBareRaise) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
             }
+            if checker.is_rule_enabled(Rule::StopIterationReturn) {
+                pylint::rules::stop_iteration_return(checker, raise);
+            }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
             if checker.is_rule_enabled(Rule::GlobalStatement) {

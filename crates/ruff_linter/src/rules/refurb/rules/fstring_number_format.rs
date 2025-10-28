@@ -31,6 +31,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// are display-only, as they may change the runtime behaviour of the program
 /// or introduce syntax errors.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct FStringNumberFormat {
     replacement: Option<SourceCodeSnippet>,
     base: Base,

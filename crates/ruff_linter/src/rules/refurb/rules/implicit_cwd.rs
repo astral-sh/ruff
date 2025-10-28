@@ -29,6 +29,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct ImplicitCwd;
 
 impl Violation for ImplicitCwd {

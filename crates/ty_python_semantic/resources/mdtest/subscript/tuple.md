@@ -125,13 +125,14 @@ The stdlib API `os.stat` is a commonly used API that returns an instance of a tu
 ```py
 import os
 import stat
+from ty_extensions import reveal_mro
 
 reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
 reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
 
-# revealed: tuple[<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[int | float]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(os.stat_result.__mro__)
+# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[int | float]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(os.stat_result)
 
 # There are no specific overloads for the `float` elements in `os.stat_result`,
 # because the fallback `(self, index: SupportsIndex, /) -> int | float` overload
@@ -336,15 +337,17 @@ python-version = "3.9"
 ```
 
 ```py
+from ty_extensions import reveal_mro
+
 class A(tuple[int, str]): ...
 
-# revealed: tuple[<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(A.__mro__)
+# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(A)
 
 class C(tuple): ...
 
-# revealed: tuple[<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(C.__mro__)
+# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(C)
 ```
 
 ## `typing.Tuple`
@@ -376,16 +379,17 @@ python-version = "3.9"
 
 ```py
 from typing import Tuple
+from ty_extensions import reveal_mro
 
 class A(Tuple[int, str]): ...
 
-# revealed: tuple[<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(A.__mro__)
+# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(A)
 
 class C(Tuple): ...
 
-# revealed: tuple[<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(C.__mro__)
+# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(C)
 ```
 
 ### Union subscript access

@@ -18,6 +18,7 @@ use crate::{checkers::ast::Checker, fix};
 /// ## References
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#language-features)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct FutureAnnotationsInStub;
 
 impl Violation for FutureAnnotationsInStub {

@@ -51,6 +51,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 /// Due to the known problem with tuple keys, this fix is unsafe.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.0")]
 pub(crate) struct DictIterMissingItems;
 
 impl AlwaysFixableViolation for DictIterMissingItems {

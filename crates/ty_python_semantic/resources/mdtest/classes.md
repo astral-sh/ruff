@@ -13,6 +13,8 @@ python-version = "3.12"
 ```
 
 ```py
+from ty_extensions import reveal_mro
+
 A = int
 
 class G[T]: ...
@@ -21,5 +23,5 @@ class C(A, G["B"]): ...
 A = str
 B = bytes
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'int'>, <class 'G[bytes]'>, typing.Generic, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'int'>, <class 'G[bytes]'>, typing.Generic, <class 'object'>)
 ```

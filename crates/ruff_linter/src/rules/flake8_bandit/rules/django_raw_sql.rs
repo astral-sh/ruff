@@ -25,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct DjangoRawSql;
 
 impl Violation for DjangoRawSql {

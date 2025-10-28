@@ -345,29 +345,21 @@ impl Matcher {
                         return false;
                     };
 
-                    // reveal_type
-                    if primary_message == "Revealed type"
-                        && primary_annotation == expected_reveal_type_message
+                    // reveal_type, reveal_protocol_interface
+                    if matches!(
+                        primary_message,
+                        "Revealed type" | "Revealed protocol interface"
+                    ) && primary_annotation == expected_reveal_type_message
                     {
                         return true;
                     }
 
-                    // reveal_protocol_interface
-                    if primary_message == "Revealed protocol interface"
-                        && primary_annotation == expected_reveal_type_message
+                    // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
+                    if matches!(
+                        primary_message,
+                        "Assignability holds" | "Subtyping holds" | "Revealed MRO"
+                    ) && primary_annotation == expected_type
                     {
-                        return true;
-                    }
-
-                    // reveal_when_assignable_to
-                    if primary_message == "Assignability holds"
-                        && primary_annotation == expected_type
-                    {
-                        return true;
-                    }
-
-                    // reveal_when_subtype_of
-                    if primary_message == "Subtyping holds" && primary_annotation == expected_type {
                         return true;
                     }
 

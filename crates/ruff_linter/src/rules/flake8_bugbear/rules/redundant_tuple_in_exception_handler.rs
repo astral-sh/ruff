@@ -36,6 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.89")]
 pub(crate) struct RedundantTupleInExceptionHandler {
     name: String,
 }

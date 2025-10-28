@@ -27,6 +27,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.286")]
 pub(crate) struct UnnecessaryRangeStart;
 
 impl AlwaysFixableViolation for UnnecessaryRangeStart {

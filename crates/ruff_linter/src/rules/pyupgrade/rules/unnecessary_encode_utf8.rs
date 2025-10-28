@@ -30,6 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }

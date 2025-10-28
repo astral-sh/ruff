@@ -24,6 +24,7 @@ use crate::checkers::ast::LintContext;
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.254")]
 pub(crate) struct TabIndentation;
 
 impl Violation for TabIndentation {

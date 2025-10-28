@@ -57,6 +57,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// - [Python documentation: `collections`](https://docs.python.org/3/library/collections.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.3")]
 pub(crate) struct SubclassBuiltin {
     subclass: String,
     replacement: String,

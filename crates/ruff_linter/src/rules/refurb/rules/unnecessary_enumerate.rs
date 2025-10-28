@@ -58,6 +58,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 /// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.291")]
 pub(crate) struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
 }

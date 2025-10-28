@@ -65,6 +65,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// ["structured concurrency"]: https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#timeouts-and-cancellation
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct AsyncFunctionWithTimeout {
     module: AsyncModule,
 }

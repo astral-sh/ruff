@@ -45,6 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.287")]
 pub(crate) struct RepeatedAppend {
     name: String,
     replacement: SourceCodeSnippet,

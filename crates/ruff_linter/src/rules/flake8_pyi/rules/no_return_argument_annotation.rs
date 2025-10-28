@@ -41,6 +41,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [bottom type]: https://en.wikipedia.org/wiki/Bottom_type
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.272")]
 pub(crate) struct NoReturnArgumentAnnotationInStub {
     module: TypingModule,
 }

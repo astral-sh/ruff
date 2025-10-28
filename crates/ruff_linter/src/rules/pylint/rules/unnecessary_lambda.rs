@@ -44,6 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// name, as in: `foo(x=1, y=2)`. Since `func` does not define the arguments
 /// `x` and `y`, unlike the lambda, the call would raise a `TypeError`.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.2")]
 pub(crate) struct UnnecessaryLambda;
 
 impl Violation for UnnecessaryLambda {

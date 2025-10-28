@@ -44,6 +44,7 @@ use crate::{FixAvailability, Violation, checkers::ast::Checker};
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.12.0")]
 pub(crate) struct LegacyFormPytestRaises {
     context_type: PytestContextType,
 }

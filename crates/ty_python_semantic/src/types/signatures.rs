@@ -621,7 +621,7 @@ impl<'db> Signature<'db> {
                     db,
                     self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
                 )
-                .is_never_satisfied()
+                .is_never_satisfied(db)
         };
 
         if self.parameters.is_gradual() != other.parameters.is_gradual() {
@@ -787,7 +787,7 @@ impl<'db> Signature<'db> {
                         disjointness_visitor,
                     ),
                 )
-                .is_never_satisfied()
+                .is_never_satisfied(db)
         };
 
         // Return types are covariant.

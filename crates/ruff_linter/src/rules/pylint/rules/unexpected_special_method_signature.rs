@@ -110,6 +110,7 @@ impl ExpectedParams {
 /// ## References
 /// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.263")]
 pub(crate) struct UnexpectedSpecialMethodSignature {
     method_name: String,
     expected_params: ExpectedParams,

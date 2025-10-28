@@ -46,6 +46,7 @@ use ruff_python_ast::ExprCall;
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct OsPathSamefile;
 
 impl Violation for OsPathSamefile {

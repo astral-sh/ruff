@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-argument-from-local.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RedefinedArgumentFromLocal {
     pub(crate) name: String,
 }

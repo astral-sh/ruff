@@ -72,21 +72,23 @@ Inheriting from `Annotated[T, ...]` is equivalent to inheriting from `T` itself.
 
 ```py
 from typing_extensions import Annotated
+from ty_extensions import reveal_mro
 
 class C(Annotated[int, "foo"]): ...
 
-# TODO: Should be `tuple[Literal[C], Literal[int], Literal[object]]`
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, @Todo(Inference of subscript on special form), <class 'object'>]
+# TODO: Should be `(<class 'C'>, <class 'int'>, <class 'object'>)`
+reveal_mro(C)  # revealed: (<class 'C'>, @Todo(Inference of subscript on special form), <class 'object'>)
 ```
 
 ### Not parameterized
 
 ```py
 from typing_extensions import Annotated
+from ty_extensions import reveal_mro
 
 # At runtime, this is an error.
 # error: [invalid-base]
 class C(Annotated): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 ```

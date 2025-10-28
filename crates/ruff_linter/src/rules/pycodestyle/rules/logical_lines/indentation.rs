@@ -38,6 +38,7 @@ use super::LogicalLine;
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct IndentationWithInvalidMultiple {
     indent_width: usize,
 }
@@ -83,6 +84,7 @@ impl Violation for IndentationWithInvalidMultiple {
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct IndentationWithInvalidMultipleComment {
     indent_width: usize,
 }
@@ -116,6 +118,7 @@ impl Violation for IndentationWithInvalidMultipleComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct NoIndentedBlock;
 
 impl Violation for NoIndentedBlock {
@@ -148,6 +151,7 @@ impl Violation for NoIndentedBlock {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct NoIndentedBlockComment;
 
 impl Violation for NoIndentedBlockComment {
@@ -177,6 +181,7 @@ impl Violation for NoIndentedBlockComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct UnexpectedIndentation;
 
 impl Violation for UnexpectedIndentation {
@@ -206,6 +211,7 @@ impl Violation for UnexpectedIndentation {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct UnexpectedIndentationComment;
 
 impl Violation for UnexpectedIndentationComment {
@@ -242,6 +248,7 @@ impl Violation for UnexpectedIndentationComment {
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct OverIndented {
     is_comment: bool,
 }

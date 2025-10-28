@@ -34,6 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// import numpy
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }

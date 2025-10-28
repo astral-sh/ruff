@@ -47,6 +47,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///         return f"{original_speak} But as a dog, it barks!"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct SuperWithoutBrackets;
 
 impl AlwaysFixableViolation for SuperWithoutBrackets {

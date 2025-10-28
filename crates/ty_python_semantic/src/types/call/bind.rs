@@ -17,6 +17,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
@@ -98,6 +99,14 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableBinding<'db>> {
         self.elements.iter()
+    }
+
+    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type,
+            argument_forms: self.argument_forms,
+            elements: self.elements.into_iter().map(f).collect(),
+        }
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -1007,6 +1016,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.body_scope(db),
                                     class_literal.known(db),
                                     class_literal.deprecated(db),
+                                    class_literal.type_check_only(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                 )));
@@ -1117,6 +1127,60 @@ impl<'db> Bindings<'db> {
                             }
                         }
                     },
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
+                        let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
+                            overload.parameter_types()
+                        else {
+                            return;
+                        };
+                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(true);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(false);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                    ) => {
+                        let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).when_subtype_of_given(
+                            db,
+                            *ty_a,
+                            *ty_b,
+                            InferableTypeVars::None,
+                        );
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
 
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
@@ -3521,6 +3585,36 @@ impl<'db> BindingError<'db> {
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
+
+                if let Type::Union(union) = provided_ty {
+                    let union_elements = union.elements(context.db());
+                    let invalid_elements: Vec<Type<'db>> = union
+                        .elements(context.db())
+                        .iter()
+                        .filter(|element| !element.is_assignable_to(context.db(), *expected_ty))
+                        .copied()
+                        .collect();
+                    let first_invalid_element = invalid_elements[0].display(context.db());
+                    if invalid_elements.len() < union_elements.len() {
+                        match &invalid_elements[1..] {
+                            [] => diag.info(format_args!(
+                                "Element `{first_invalid_element}` of this union \
+                                is not assignable to `{expected_ty_display}`",
+                            )),
+                            [single] => diag.info(format_args!(
+                                "Union elements `{first_invalid_element}` and `{}` \
+                                are not assignable to `{expected_ty_display}`",
+                                single.display(context.db()),
+                            )),
+                            rest => diag.info(format_args!(
+                                "Union element `{first_invalid_element}`, \
+                                and {} more union elements, \
+                                are not assignable to `{expected_ty_display}`",
+                                rest.len(),
+                            )),
+                        }
+                    }
+                }
 
                 if let Some(matching_overload) = matching_overload {
                     if let Some((name_span, parameter_span)) =

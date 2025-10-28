@@ -32,6 +32,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// animals = pd.read_csv("animals.csv")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.13.0")]
 pub(crate) struct PandasDfVariableName;
 
 impl Violation for PandasDfVariableName {

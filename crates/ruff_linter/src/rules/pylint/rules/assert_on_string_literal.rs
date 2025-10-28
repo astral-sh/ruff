@@ -26,6 +26,7 @@ enum Kind {
 /// assert "always true"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct AssertOnStringLiteral {
     kind: Kind,
 }

@@ -70,6 +70,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct UnnecessaryDictKwargs;
 
 impl Violation for UnnecessaryDictKwargs {

@@ -45,6 +45,7 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 /// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct TryExceptContinue;
 
 impl Violation for TryExceptContinue {

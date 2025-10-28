@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
 /// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.220")]
 pub(crate) struct Jinja2AutoescapeFalse {
     value: bool,
 }

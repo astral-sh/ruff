@@ -30,6 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// def foo(arg: int = ...) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct NumericLiteralTooLong;
 
 impl AlwaysFixableViolation for NumericLiteralTooLong {

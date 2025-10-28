@@ -42,6 +42,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.0")]
 pub(crate) struct SingleItemMembershipTest {
     membership_test: MembershipTest,
 }

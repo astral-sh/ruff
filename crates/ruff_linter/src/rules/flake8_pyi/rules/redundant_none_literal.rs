@@ -49,6 +49,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct RedundantNoneLiteral {
     union_kind: UnionKind,
 }

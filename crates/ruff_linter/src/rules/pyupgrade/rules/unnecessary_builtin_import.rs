@@ -46,6 +46,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }

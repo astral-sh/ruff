@@ -41,6 +41,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: `Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct PathConstructorCurrentDirectory;
 
 impl AlwaysFixableViolation for PathConstructorCurrentDirectory {

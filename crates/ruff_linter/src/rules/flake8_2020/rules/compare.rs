@@ -41,6 +41,7 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionCmpStr3;
 
 impl Violation for SysVersionCmpStr3 {
@@ -91,6 +92,7 @@ impl Violation for SysVersionCmpStr3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionInfo0Eq3 {
     eq: bool,
 }
@@ -137,6 +139,7 @@ impl Violation for SysVersionInfo0Eq3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionInfo1CmpInt;
 
 impl Violation for SysVersionInfo1CmpInt {
@@ -179,6 +182,7 @@ impl Violation for SysVersionInfo1CmpInt {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionInfoMinorCmpInt;
 
 impl Violation for SysVersionInfoMinorCmpInt {
@@ -222,6 +226,7 @@ impl Violation for SysVersionInfoMinorCmpInt {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionCmpStr10;
 
 impl Violation for SysVersionCmpStr10 {

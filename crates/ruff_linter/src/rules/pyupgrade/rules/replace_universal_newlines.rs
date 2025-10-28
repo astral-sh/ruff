@@ -35,6 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.196")]
 pub(crate) struct ReplaceUniversalNewlines;
 
 impl AlwaysFixableViolation for ReplaceUniversalNewlines {

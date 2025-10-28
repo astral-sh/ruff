@@ -72,6 +72,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the integer literal matches a set of common modes.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.12.1")]
 pub(crate) struct NonOctalPermissions;
 
 impl Violation for NonOctalPermissions {

@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.14.2
+
+Released on 2025-10-23.
+
+### Preview features
+
+- \[`flake8-gettext`\] Resolve qualified names and built-in bindings (`INT001`, `INT002`, `INT003`) ([#19045](https://github.com/astral-sh/ruff/pull/19045))
+
+### Bug fixes
+
+- Avoid reusing nested, interpolated quotes before Python 3.12 ([#20930](https://github.com/astral-sh/ruff/pull/20930))
+- Catch syntax errors in nested interpolations before Python 3.12 ([#20949](https://github.com/astral-sh/ruff/pull/20949))
+- \[`fastapi`\] Handle ellipsis defaults in `FAST002` autofix ([#20810](https://github.com/astral-sh/ruff/pull/20810))
+- \[`flake8-simplify`\] Skip `SIM911` when unknown arguments are present ([#20697](https://github.com/astral-sh/ruff/pull/20697))
+- \[`pyupgrade`\] Always parenthesize assignment expressions in fix for `f-string` (`UP032`) ([#21003](https://github.com/astral-sh/ruff/pull/21003))
+- \[`pyupgrade`\] Fix `UP032` conversion for decimal ints with underscores ([#21022](https://github.com/astral-sh/ruff/pull/21022))
+- \[`fastapi`\] Skip autofix for keyword and `__debug__` path params (`FAST003`) ([#20960](https://github.com/astral-sh/ruff/pull/20960))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Skip `B905` and `B912` for fewer than two iterables and no starred arguments ([#20998](https://github.com/astral-sh/ruff/pull/20998))
+- \[`ruff`\] Use `DiagnosticTag` for more `pyflakes` and `pandas` rules ([#20801](https://github.com/astral-sh/ruff/pull/20801))
+
+### CLI
+
+- Improve JSON output from `ruff rule` ([#20168](https://github.com/astral-sh/ruff/pull/20168))
+
+### Documentation
+
+- Add source to testimonial ([#20971](https://github.com/astral-sh/ruff/pull/20971))
+- Document when a rule was added ([#21035](https://github.com/astral-sh/ruff/pull/21035))
+
+### Other changes
+
+- [syntax-errors] Name is parameter and global ([#20426](https://github.com/astral-sh/ruff/pull/20426))
+- [syntax-errors] Alternative `match` patterns bind different names ([#20682](https://github.com/astral-sh/ruff/pull/20682))
+
+### Contributors
+
+- [@hengky-kurniawan-1](https://github.com/hengky-kurniawan-1)
+- [@ShalokShalom](https://github.com/ShalokShalom)
+- [@robsdedude](https://github.com/robsdedude)
+- [@LoicRiegel](https://github.com/LoicRiegel)
+- [@TaKO8Ki](https://github.com/TaKO8Ki)
+- [@dylwil3](https://github.com/dylwil3)
+- [@11happy](https://github.com/11happy)
+- [@ntBre](https://github.com/ntBre)
+
 ## 0.14.1
 
 Released on 2025-10-16.

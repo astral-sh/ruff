@@ -20,6 +20,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-locals`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.9")]
 pub(crate) struct TooManyLocals {
     current_amount: usize,
     max_amount: usize,

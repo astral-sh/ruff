@@ -48,6 +48,7 @@ use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeFromtimestamp {

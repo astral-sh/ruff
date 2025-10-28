@@ -11,7 +11,7 @@ At its simplest, to define a generic class using PEP 695 syntax, you add a list 
 `ParamSpec`s or `TypeVarTuple`s after the class name.
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions import generic_context, reveal_mro
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
@@ -77,13 +77,13 @@ T = TypeVar("T")
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
 
-reveal_type(BothGenericSyntaxes.__mro__)  # revealed: tuple[<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(BothGenericSyntaxes)  # revealed: (<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>)
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 # error: [invalid-base] "Cannot inherit from plain `Generic`"
 class DoublyInvalid[T](Generic): ...
 
-reveal_type(DoublyInvalid.__mro__)  # revealed: tuple[<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(DoublyInvalid)  # revealed: (<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>)
 ```
 
 Generic classes implicitly inherit from `Generic`:
@@ -91,26 +91,26 @@ Generic classes implicitly inherit from `Generic`:
 ```py
 class Foo[T]: ...
 
-# revealed: tuple[<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>]
-reveal_type(Foo.__mro__)
-# revealed: tuple[<class 'Foo[int]'>, typing.Generic, <class 'object'>]
-reveal_type(Foo[int].__mro__)
+# revealed: (<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Foo)
+# revealed: (<class 'Foo[int]'>, typing.Generic, <class 'object'>)
+reveal_mro(Foo[int])
 
 class A: ...
 class Bar[T](A): ...
 
-# revealed: tuple[<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>]
-reveal_type(Bar.__mro__)
-# revealed: tuple[<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>]
-reveal_type(Bar[int].__mro__)
+# revealed: (<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>)
+reveal_mro(Bar)
+# revealed: (<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>)
+reveal_mro(Bar[int])
 
 class B: ...
 class Baz[T](A, B): ...
 
-# revealed: tuple[<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
-reveal_type(Baz.__mro__)
-# revealed: tuple[<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
-reveal_type(Baz[int].__mro__)
+# revealed: (<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
+reveal_mro(Baz)
+# revealed: (<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
+reveal_mro(Baz[int])
 ```
 
 ## Specializing generic classes explicitly

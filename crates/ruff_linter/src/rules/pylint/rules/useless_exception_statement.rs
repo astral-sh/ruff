@@ -34,6 +34,7 @@ use ruff_python_ast::PythonVersion;
 /// This rule's fix is marked as unsafe, as converting a useless exception
 /// statement to a `raise` statement will change the program's behavior.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct UselessExceptionStatement;
 
 impl Violation for UselessExceptionStatement {

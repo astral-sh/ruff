@@ -21,6 +21,8 @@ def _(flag: bool):
 ## Narrowing in `and`
 
 ```py
+from typing import final
+
 def _(flag: bool):
     class A: ...
     x: A | None = A() if flag else None
@@ -28,6 +30,15 @@ def _(flag: bool):
     isinstance(x, A) and reveal_type(x)  # revealed: A
     x is None and reveal_type(x)  # revealed: None
     reveal_type(x)  # revealed: A | None
+
+@final
+class FinalClass: ...
+
+# We know that no subclass of `FinalClass` can exist,
+# therefore no subtype of `FinalClass` can define `__bool__`
+# or `__len__`, therefore `FinalClass` can safely be considered
+# always-truthy, therefore this always resolves to `None`
+reveal_type(FinalClass() and None)  # revealed: None
 ```
 
 ## Multiple `and` arms

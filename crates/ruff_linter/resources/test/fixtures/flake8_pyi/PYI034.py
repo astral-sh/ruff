@@ -359,3 +359,29 @@ class Generic5(list[PotentialTypeVar]):
     def __new__(cls: type[Generic5]) -> Generic5: ...
     def __enter__(self: Generic5) -> Generic5: ...
 
+
+# Test cases based on issue #20781 - metaclasses that triggers IsMetaclass::Maybe
+class MetaclassInWhichSelfCannotBeUsed5(type(Protocol)):
+    def __new__(
+        cls, name: str, bases: tuple[type[Any], ...], attrs: dict[str, Any], **kwargs: Any
+    ) -> MetaclassInWhichSelfCannotBeUsed5:
+        new_class = super().__new__(cls, name, bases, attrs, **kwargs)
+        return new_class
+
+
+import django.db.models.base
+
+
+class MetaclassInWhichSelfCannotBeUsed6(django.db.models.base.ModelBase):
+    def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MetaclassInWhichSelfCannotBeUsed6:
+        ...
+
+
+class MetaclassInWhichSelfCannotBeUsed7(django.db.models.base.ModelBase):
+    def __new__(cls, /, name: str, bases: tuple[object, ...], attrs: dict[str, object], **kwds: object) -> MetaclassInWhichSelfCannotBeUsed7:
+        ...
+
+
+class MetaclassInWhichSelfCannotBeUsed8(django.db.models.base.ModelBase):
+    def __new__(cls, name: builtins.str, bases: tuple, attributes: dict, /, **kw) -> MetaclassInWhichSelfCannotBeUsed8:
+        ...

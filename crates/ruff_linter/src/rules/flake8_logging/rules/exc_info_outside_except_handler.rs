@@ -44,6 +44,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// The fix is always marked as unsafe, as it changes runtime behavior.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ExcInfoOutsideExceptHandler;
 
 impl Violation for ExcInfoOutsideExceptHandler {

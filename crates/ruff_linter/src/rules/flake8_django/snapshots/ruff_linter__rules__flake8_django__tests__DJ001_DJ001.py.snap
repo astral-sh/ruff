@@ -186,3 +186,32 @@ DJ001 Avoid using `null=True` on string-based fields such as `URLField`
 30 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+DJ001 Avoid using `null=True` on string-based fields such as `CharField`
+  --> DJ001.py:52:35
+   |
+51 | class IncorrectModelWithSimpleAnnotations(models.Model):
+52 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
+54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
+   |
+
+DJ001 Avoid using `null=True` on string-based fields such as `TextField`
+  --> DJ001.py:53:35
+   |
+51 | class IncorrectModelWithSimpleAnnotations(models.Model):
+52 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
+   |
+
+DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
+  --> DJ001.py:54:35
+   |
+52 |     charfield: models.CharField = models.CharField(max_length=255, null=True)
+53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
+54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |

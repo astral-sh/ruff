@@ -51,6 +51,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Errors and Exceptions](https://docs.python.org/3/tutorial/errors.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct TryConsiderElse;
 
 impl Violation for TryConsiderElse {

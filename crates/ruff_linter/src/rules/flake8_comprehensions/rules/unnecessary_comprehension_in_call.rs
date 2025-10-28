@@ -67,6 +67,7 @@ use crate::{Edit, Fix, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct UnnecessaryComprehensionInCall {
     comprehension_kind: ComprehensionKind,
 }

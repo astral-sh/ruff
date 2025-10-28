@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {

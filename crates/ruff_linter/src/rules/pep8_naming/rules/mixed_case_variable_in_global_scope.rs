@@ -52,6 +52,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#global-variable-names
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.89")]
 pub(crate) struct MixedCaseVariableInGlobalScope {
     name: String,
 }

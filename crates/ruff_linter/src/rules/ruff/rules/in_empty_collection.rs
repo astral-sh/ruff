@@ -25,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// print("got it!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.11.9")]
 pub(crate) struct InEmptyCollection;
 
 impl Violation for InEmptyCollection {
