@@ -900,6 +900,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ByteStringUsage) {
                 flake8_pyi::rules::bytestring_import(checker, import_from);
             }
+            if checker.is_rule_enabled(Rule::DirectMemberImport) {
+                ruff::rules::direct_member_import(checker, import_from);
+            }
         }
         Stmt::Raise(raise @ ast::StmtRaise { exc, .. }) => {
             if checker.is_rule_enabled(Rule::RaiseNotImplemented) {

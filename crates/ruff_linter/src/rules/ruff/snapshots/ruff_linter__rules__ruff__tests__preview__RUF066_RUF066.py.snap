@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF066 Prefer importing the module `os` instead of member `path`
+ --> RUF066.py:4:16
+  |
+3 | # Should trigger violations
+4 | from os import path  # RUF066
+  |                ^^^^
+5 | from pathlib import Path  # RUF066
+6 | from collections import defaultdict  # RUF066
+  |
+
+RUF066 Prefer importing the module `pathlib` instead of member `Path`
+ --> RUF066.py:5:21
+  |
+3 | # Should trigger violations
+4 | from os import path  # RUF066
+5 | from pathlib import Path  # RUF066
+  |                     ^^^^
+6 | from collections import defaultdict  # RUF066
+7 | from json import loads, dumps  # RUF066 (twice)
+  |
+
+RUF066 Prefer importing the module `collections` instead of member `defaultdict`
+ --> RUF066.py:6:25
+  |
+4 | from os import path  # RUF066
+5 | from pathlib import Path  # RUF066
+6 | from collections import defaultdict  # RUF066
+  |                         ^^^^^^^^^^^
+7 | from json import loads, dumps  # RUF066 (twice)
+  |
+
+RUF066 Prefer importing the module `json` instead of member `loads`
+ --> RUF066.py:7:18
+  |
+5 | from pathlib import Path  # RUF066
+6 | from collections import defaultdict  # RUF066
+7 | from json import loads, dumps  # RUF066 (twice)
+  |                  ^^^^^
+8 |
+9 | # Should NOT trigger - typing imports are exempt (per Google Style Guide 2.2.4.1)
+  |
+
+RUF066 Prefer importing the module `json` instead of member `dumps`
+ --> RUF066.py:7:25
+  |
+5 | from pathlib import Path  # RUF066
+6 | from collections import defaultdict  # RUF066
+7 | from json import loads, dumps  # RUF066 (twice)
+  |                         ^^^^^
+8 |
+9 | # Should NOT trigger - typing imports are exempt (per Google Style Guide 2.2.4.1)
+  |
