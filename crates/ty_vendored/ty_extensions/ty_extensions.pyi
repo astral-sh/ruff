@@ -8,7 +8,6 @@ from typing import (
     ClassVar,
     LiteralString,
     Protocol,
-    Self,
     _SpecialForm,
 )
 
@@ -64,6 +63,8 @@ class ConstraintSet:
         """
         Returns a constraint set that is satisfied when `ty` is a `subtype`_ of
         `of`, assuming that all of the constraints in `self` hold.
+
+        .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
         """
 
     def __bool__(self) -> bool: ...
@@ -86,15 +87,6 @@ def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
 
 def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
-
-    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
-    """
-
-def is_subtype_of_given(
-    constraints: ConstraintSet, ty: Any, of: Any
-) -> ConstraintSet:
-    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`,
-    assuming that all of the constraints in `constraints` hold.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
