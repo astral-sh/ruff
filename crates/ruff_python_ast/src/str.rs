@@ -307,12 +307,6 @@ pub fn leading_quote(content: &str) -> Option<&str> {
 
 /// Return the trailing quote string for a string, template, or bytes literal (e.g., `"""`).
 pub fn trailing_quote(content: &str) -> Option<&str> {
-    // Tokens like "'" or "\"" represent unterminated literals that end with a single quote
-    // character, so they can't provide both the opening and closing delimiter.
-    if content.len() <= 1 {
-        return None;
-    }
-
     if content.ends_with("'''") {
         Some("'''")
     } else if content.ends_with("\"\"\"") {

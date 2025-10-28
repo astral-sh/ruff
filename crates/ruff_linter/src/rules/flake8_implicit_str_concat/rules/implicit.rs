@@ -3,9 +3,10 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -167,7 +168,8 @@ pub(crate) fn implicit(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             ) {
-                if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                if let Some(fix) = concatenate_strings(a_token, b_token, a_range, b_range, locator)
+                {
                     diagnostic.set_fix(fix);
                 }
             }
@@ -175,7 +177,17 @@ pub(crate) fn implicit(
     }
 }
 
-fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator) -> Option<Fix> {
+fn concatenate_strings(
+    a_token: &Token,
+    b_token: &Token,
+    a_range: TextRange,
+    b_range: TextRange,
+    locator: &Locator,
+) -> Option<Fix> {
+    if a_token.string_flags()?.is_unclosed() || b_token.string_flags()?.is_unclosed() {
+        return None;
+    }
+
     let a_text = locator.slice(a_range);
     let b_text = locator.slice(b_range);
 
