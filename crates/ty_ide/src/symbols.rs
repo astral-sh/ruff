@@ -334,7 +334,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
-        symbols: visitor.symbols,
+        symbols: visitor.into_symbols(),
     }
 }
 
@@ -356,7 +356,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
-        symbols: visitor.symbols,
+        symbols: visitor.into_symbols(),
     }
 }
 
@@ -367,6 +367,13 @@ struct SymbolTree {
     kind: SymbolKind,
     name_range: TextRange,
     full_range: TextRange,
+    re_export: Option<ReExport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+enum ReExport {
+    Normal,
+    RedundantAlias,
 }
 
 /// A visitor over all symbols in a single file.
@@ -382,6 +389,44 @@ struct SymbolVisitor {
 }
 
 impl SymbolVisitor {
+    fn into_symbols(self) -> IndexVec<SymbolId, SymbolTree> {
+        // We want to filter out some of the symbols we collected.
+        // But, we always assigned IDs to each symbol based on
+        // their position in a sequence. So when we filter some
+        // out, we need to remap the identifiers.
+        //
+        // N.B. This can be skipped when `global_only` is true,
+        // since in that case, none of the symbols have a parent
+        // ID by construction.
+        let mut remap = IndexVec::with_capacity(self.symbols.len());
+        let mut new = IndexVec::with_capacity(self.symbols.len());
+        for mut symbol in self.symbols {
+            if symbol.re_export == Some(ReExport::Normal) {
+                remap.push(None);
+                continue;
+            }
+            if let Some(ref mut parent) = symbol.parent {
+                // OK because the visitor guarantees that
+                // all parents have IDs less than their
+                // children. So its ID has already been
+                // remapped.
+                if let Some(new_parent) = remap[*parent] {
+                    *parent = new_parent;
+                } else {
+                    // The parent symbol was dropped, so
+                    // all of its children should be as
+                    // well.
+                    remap.push(None);
+                    continue;
+                }
+            }
+            let new_id = new.next_index();
+            remap.push(Some(new_id));
+            new.push(symbol);
+        }
+        new
+    }
+
     fn visit_body(&mut self, body: &[ast::Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
@@ -399,6 +444,30 @@ impl SymbolVisitor {
         let symbol_id = self.symbols.next_index();
         self.symbols.push(symbol);
         symbol_id
+    }
+
+    fn add_import_alias(&mut self, stmt: &ast::Stmt, alias: &ast::Alias) -> SymbolId {
+        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+        let kind = if Self::is_constant_name(name.as_str()) {
+            SymbolKind::Constant
+        } else {
+            SymbolKind::Variable
+        };
+        let re_export = Some(
+            if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
+                ReExport::RedundantAlias
+            } else {
+                ReExport::Normal
+            },
+        );
+        self.add_symbol(SymbolTree {
+            parent: None,
+            name: name.id.to_string(),
+            kind,
+            name_range: name.range(),
+            full_range: stmt.range(),
+            re_export,
+        })
     }
 
     fn push_symbol(&mut self, symbol: SymbolTree) {
@@ -445,6 +514,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind,
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
 
                 if self.global_only {
@@ -474,6 +544,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind: SymbolKind::Class,
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
 
                 if self.global_only {
@@ -513,6 +584,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                         kind,
                         name_range: name.range(),
                         full_range: stmt.range(),
+                        re_export: None,
                     };
                     self.add_symbol(symbol);
                 }
@@ -543,8 +615,29 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind,
                     name_range: name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
                 self.add_symbol(symbol);
+            }
+
+            ast::Stmt::Import(import) => {
+                // We only consider imports in global scope.
+                if self.in_function {
+                    return;
+                }
+                for alias in &import.names {
+                    self.add_import_alias(stmt, alias);
+                }
+            }
+
+            ast::Stmt::ImportFrom(import_from) => {
+                // We only consider imports in global scope.
+                if self.in_function {
+                    return;
+                }
+                for alias in &import_from.names {
+                    self.add_import_alias(stmt, alias);
+                }
             }
 
             _ => {
@@ -556,9 +649,16 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
 
 #[cfg(test)]
 mod tests {
-    fn matches(query: &str, symbol: &str) -> bool {
-        super::QueryPattern::new(query).is_match_symbol_name(symbol)
-    }
+    use camino::Utf8Component;
+    use insta::internals::SettingsBindDropGuard;
+
+    use ruff_db::Db;
+    use ruff_db::files::{FileRootKind, system_path_to_file};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_trivia::textwrap::dedent;
+    use ty_project::{ProjectMetadata, TestDb};
+
+    use super::symbols_for_file_global_only;
 
     #[test]
     fn various_yes() {
@@ -589,5 +689,176 @@ mod tests {
         assert!(!matches("abc", "bac"));
         assert!(!matches("abcd", "abc"));
         assert!(!matches("δΘπ", "θΔΠ"));
+    }
+
+    #[test]
+    fn exports_simple() {
+        insta::assert_snapshot!(
+            public_test("\
+FOO = 1
+foo = 1
+class Foo:
+    BAR = 1
+def quux():
+    baz = 1
+").exports(),
+            @r"
+        FOO :: Constant
+        foo :: Variable
+        Foo :: Class
+        quux :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_conditional_true() {
+        insta::assert_snapshot!(
+            public_test("\
+foo = 1
+if True:
+    bar = 1
+").exports(),
+            @r"
+        foo :: Variable
+        bar :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_conditional_false() {
+        // FIXME: This shouldn't include `bar`.
+        insta::assert_snapshot!(
+            public_test("\
+foo = 1
+if False:
+    bar = 1
+").exports(),
+            @r"
+        foo :: Variable
+        bar :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_type_checking() {
+        insta::assert_snapshot!(
+            public_test("\
+from typing import TYPE_CHECKING
+
+foo = 1
+if TYPE_CHECKING:
+    bar = 1
+").exports(),
+            @r"
+        foo :: Variable
+        bar :: Variable
+        ",
+        );
+    }
+
+    fn matches(query: &str, symbol: &str) -> bool {
+        super::QueryPattern::new(query).is_match_symbol_name(symbol)
+    }
+
+    fn public_test(code: &str) -> PublicTest {
+        PublicTestBuilder::default().source("test.py", code).build()
+    }
+
+    struct PublicTest {
+        db: TestDb,
+        _insta_settings_guard: SettingsBindDropGuard,
+    }
+
+    impl PublicTest {
+        /// Returns the exports from `test.py`.
+        ///
+        /// This is, conventionally, the default module file path used. For
+        /// example, it's used by the `public_test` convenience constructor.
+        fn exports(&self) -> String {
+            self.exports_for("test.py")
+        }
+
+        /// Returns the exports from the module at the given path.
+        ///
+        /// The path given must have been written to this test's salsa DB.
+        fn exports_for(&self, path: impl AsRef<SystemPath>) -> String {
+            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
+            let symbols = symbols_for_file_global_only(&self.db, file);
+            symbols
+                .iter()
+                .map(|(_, symbol)| {
+                    format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind)
+                })
+                .collect::<Vec<String>>()
+                .join("\n")
+        }
+    }
+
+    #[derive(Default)]
+    struct PublicTestBuilder {
+        /// A list of source files, corresponding to the
+        /// file's path and its contents.
+        sources: Vec<Source>,
+    }
+
+    impl PublicTestBuilder {
+        pub(super) fn build(&self) -> PublicTest {
+            let mut db = TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
+
+            db.init_program().unwrap();
+
+            for &Source {
+                ref path,
+                ref contents,
+            } in &self.sources
+            {
+                db.write_file(path, contents)
+                    .expect("write to memory file system to be successful");
+
+                // Add a root for the top-most component.
+                let top = path.components().find_map(|c| match c {
+                    Utf8Component::Normal(c) => Some(c),
+                    _ => None,
+                });
+                if let Some(top) = top {
+                    let top = SystemPath::new(top);
+                    if db.system().is_directory(top) {
+                        db.files()
+                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                    }
+                }
+            }
+
+            // N.B. We don't set anything custom yet, but we leave
+            // this here for when we invevitable add a filter.
+            let insta_settings = insta::Settings::clone_current();
+            let insta_settings_guard = insta_settings.bind_to_scope();
+            PublicTest {
+                db,
+                _insta_settings_guard: insta_settings_guard,
+            }
+        }
+
+        pub(super) fn source(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+            contents: impl AsRef<str>,
+        ) -> &mut PublicTestBuilder {
+            let path = path.into();
+            let contents = dedent(contents.as_ref()).into_owned();
+            self.sources.push(Source { path, contents });
+            self
+        }
+    }
+
+    struct Source {
+        path: SystemPathBuf,
+        contents: String,
     }
 }
