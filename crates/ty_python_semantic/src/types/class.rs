@@ -34,11 +34,11 @@ use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomi
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownBoundMethodType, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    exceeds_max_specialization_depth, infer_definition_types,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
+    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -2138,25 +2138,6 @@ impl<'db> ClassLiteral<'db> {
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
                 return Member::definitely_declared(Type::PropertyInstance(property));
             }
-        }
-
-        match (self.known(db), name) {
-            (Some(KnownClass::ConstraintSet), "range") => {
-                return Member::definitely_declared(Type::KnownBoundMethod(
-                    KnownBoundMethodType::ConstraintSetRange,
-                ));
-            }
-            (Some(KnownClass::ConstraintSet), "always") => {
-                return Member::definitely_declared(Type::KnownBoundMethod(
-                    KnownBoundMethodType::ConstraintSetAlways,
-                ));
-            }
-            (Some(KnownClass::ConstraintSet), "never") => {
-                return Member::definitely_declared(Type::KnownBoundMethod(
-                    KnownBoundMethodType::ConstraintSetNever,
-                ));
-            }
-            _ => {}
         }
 
         let body_scope = self.body_scope(db);

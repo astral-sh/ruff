@@ -4120,6 +4120,31 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(class)
+                if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetRange,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "always" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetAlways,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "never" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetNever,
+                ))
+                .into()
+            }
+
+            Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
                 Place::bound(Type::WrapperDescriptor(
