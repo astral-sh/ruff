@@ -70,3 +70,8 @@ builtins.getattr(foo, "bar")
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/18353
 setattr(foo, "__debug__", 0)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/21126
+# Non-NFKC attribute names should be ignored (e.g., "ſ" normalizes to "s")
+getattr(foo, "ſ")
+setattr(foo, "ſ", 1)
