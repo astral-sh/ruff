@@ -1931,6 +1931,33 @@ impl<'db> SatisfiedClauses<'db> {
     }
 }
 
+/// Returns a constraint set describing the valid specializations of a typevar.
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => ConstraintSet::from(true),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
+                db,
+                self,
+                Type::Never,
+                bound,
+                TypeRelation::Assignability,
+            ),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().when_any(db, |constraint| {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        self,
+                        *constraint,
+                        *constraint,
+                        TypeRelation::Assignability,
+                    )
+                })
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1972,32 +1999,5 @@ mod tests {
         let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);
-    }
-}
-
-/// Returns a constraint set describing the valid specializations of a typevar.
-impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
-        match self.typevar(db).bound_or_constraints(db) {
-            None => ConstraintSet::from(true),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
-                db,
-                self,
-                Type::Never,
-                bound,
-                TypeRelation::Assignability,
-            ),
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                constraints.elements(db).iter().when_any(db, |constraint| {
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        self,
-                        *constraint,
-                        *constraint,
-                        TypeRelation::Assignability,
-                    )
-                })
-            }
-        }
     }
 }
