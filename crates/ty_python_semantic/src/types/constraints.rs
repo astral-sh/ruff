@@ -831,7 +831,9 @@ impl<'db> Node<'db> {
             } else {
                 // If the typevar is non-inferable, then we need _all_ valid specializations to
                 // satisify the constraint set.
-                when_satisfied == valid_specializations
+                when_satisfied
+                    .iff(db, valid_specializations)
+                    .is_always_satisfied(db)
             };
             if !satisfied {
                 return false;
