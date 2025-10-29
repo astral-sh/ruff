@@ -177,7 +177,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 is_allow_newline_after_block_open_enabled(f.context())
                     && matches!(self.kind, SuiteKind::Function)
                     && matches!(first, SuiteChildStatement::Other(_))
-                    && !comments.has_leading(first)
                     && !contains_only_an_ellipsis(statements, f.context().comments());
 
             if allow_newline_after_block_open

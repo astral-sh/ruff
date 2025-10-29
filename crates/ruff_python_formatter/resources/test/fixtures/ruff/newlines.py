@@ -364,6 +364,13 @@ def preserved5():
     # trailing comment prevents collapsing the stub
 
 
+def preserved6():
+
+    # Comment
+
+    return 1
+
+
 # But we still discard these newlines:
 def removed1():
 
@@ -374,17 +381,10 @@ def removed1():
 
 def removed2():
 
-    # Comment
-
-    return 1
-
-
-def removed3():
-
     ...
 
 
-def removed4():
+def removed3():
 
     ...  # trailing same-line comment does not prevent collapsing the stub
 

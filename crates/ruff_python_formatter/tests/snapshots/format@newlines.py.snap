@@ -370,6 +370,13 @@ def preserved5():
     # trailing comment prevents collapsing the stub
 
 
+def preserved6():
+
+    # Comment
+
+    return 1
+
+
 # But we still discard these newlines:
 def removed1():
 
@@ -380,17 +387,10 @@ def removed1():
 
 def removed2():
 
-    # Comment
-
-    return 1
-
-
-def removed3():
-
     ...
 
 
-def removed4():
+def removed3():
 
     ...  # trailing same-line comment does not prevent collapsing the stub
 
@@ -818,6 +818,12 @@ def preserved5():
     # trailing comment prevents collapsing the stub
 
 
+def preserved6():
+    # Comment
+
+    return 1
+
+
 # But we still discard these newlines:
 def removed1():
     "Docstring"
@@ -825,16 +831,10 @@ def removed1():
     return 1
 
 
-def removed2():
-    # Comment
-
-    return 1
+def removed2(): ...
 
 
-def removed3(): ...
-
-
-def removed4(): ...  # trailing same-line comment does not prevent collapsing the stub
+def removed3(): ...  # trailing same-line comment does not prevent collapsing the stub
 
 
 # And we discard empty lines after the first:
@@ -933,7 +933,7 @@ def partially_preserved1():
      def inner():
          print("with a body")
          return 1
-@@ -408,6 +421,7 @@
+@@ -408,11 +421,13 @@
  
  
  def preserved5():
@@ -941,7 +941,13 @@ def partially_preserved1():
      ...
      # trailing comment prevents collapsing the stub
  
-@@ -433,4 +447,5 @@
+ 
+ def preserved6():
++
+     # Comment
+ 
+     return 1
+@@ -433,4 +448,5 @@
  
  # And we discard empty lines after the first:
  def partially_preserved1():
