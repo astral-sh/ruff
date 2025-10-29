@@ -1,6 +1,5 @@
 use crate::TextDocument;
 use crate::server::Result;
-use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::session::{Client, Session};
 use lsp_types as types;
@@ -30,16 +29,7 @@ impl super::SyncNotificationHandler for DidOpen {
 
         session.open_text_document(uri.clone(), document);
 
-        // Publish diagnostics if the client doesn't support pull diagnostics
-        if !session.resolved_client_capabilities().pull_diagnostics {
-            let snapshot = session
-                .take_snapshot(uri.clone())
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
-                })
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-            publish_diagnostics_for_document(&snapshot, client)?;
-        }
+        publish_diagnostics_for_document(session, &uri, client)?;
 
         Ok(())
     }

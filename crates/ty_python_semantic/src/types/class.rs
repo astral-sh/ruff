@@ -71,6 +71,7 @@ use rustc_hash::FxHashSet;
 
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     Box::default()
@@ -78,6 +79,7 @@ fn explicit_bases_cycle_initial<'db>(
 
 fn inheritance_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
     None
@@ -85,6 +87,7 @@ fn inheritance_cycle_initial<'db>(
 
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _class_body_scope: ScopeId<'db>,
     _name: String,
     _target_method_decorator: MethodDecorator,
@@ -94,6 +97,7 @@ fn implicit_attribute_initial<'db>(
 
 fn try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     self_: ClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
 ) -> Result<Mro<'db>, MroError<'db>> {
@@ -104,13 +108,18 @@ fn try_mro_cycle_initial<'db>(
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassLiteral<'db>) -> bool {
+fn is_typed_dict_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: ClassLiteral<'db>,
+) -> bool {
     false
 }
 
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self_: ClassLiteral<'db>,
 ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
     Err(MetaclassError {
@@ -169,6 +178,7 @@ impl<'db> CodeGeneratorKind<'db> {
 
         fn code_generator_of_class_initial<'db>(
             _db: &'db dyn Db,
+            _id: salsa::Id,
             _class: ClassLiteral<'db>,
             _specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
@@ -1181,7 +1191,11 @@ impl<'db> ClassType<'db> {
     }
 }
 
-fn into_callable_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
+fn into_callable_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: ClassType<'db>,
+) -> Type<'db> {
     Type::Never
 }
 
@@ -1295,7 +1309,7 @@ impl<'db> Field<'db> {
     /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
         self.declared_ty
-            .into_nominal_instance()
+            .as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
     }
 }
@@ -1334,6 +1348,7 @@ impl get_size2::GetSize for ClassLiteral<'_> {}
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
     None

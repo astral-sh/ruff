@@ -480,6 +480,11 @@ pub fn python_files_in_path<'a>(
         .ok_or_else(|| anyhow!("Expected at least one path to search for Python files"))?;
     // Create the `WalkBuilder`.
     let mut builder = WalkBuilder::new(first_path);
+
+    if let Ok(cwd) = std::env::current_dir() {
+        builder.current_dir(cwd);
+    }
+
     for path in rest_paths {
         builder.add(path);
     }

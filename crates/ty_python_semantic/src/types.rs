@@ -371,6 +371,7 @@ impl Default for MemberLookupPolicy {
 
 fn member_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
@@ -380,6 +381,7 @@ fn member_lookup_cycle_initial<'db>(
 
 fn class_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
@@ -389,6 +391,7 @@ fn class_lookup_cycle_initial<'db>(
 
 fn variance_cycle_initial<'db, T>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: T,
     _typevar: BoundTypeVarInstance<'db>,
 ) -> TypeVarVariance {
@@ -812,17 +815,17 @@ impl<'db> Type<'db> {
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NoneType))
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool))
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
             .is_some()
     }
@@ -852,7 +855,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NotImplementedType))
     }
 
@@ -899,7 +902,7 @@ impl<'db> Type<'db> {
     ) -> Option<Specialization<'db>> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
-            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+            Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
             _ => return None,
         }
         .class(db);
@@ -939,7 +942,7 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     fn tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| instance.tuple_spec(db))
     }
 
@@ -954,7 +957,7 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| instance.own_tuple_spec(db))
     }
 
@@ -1044,7 +1047,7 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn expect_class_literal(self) -> ClassLiteral<'db> {
+    pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.as_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
     }
@@ -1058,7 +1061,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::EnumLiteral(enum_literal) => Some(enum_literal),
             _ => None,
@@ -1067,7 +1070,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+    pub(crate) const fn expect_enum_literal(self) -> EnumLiteralType<'db> {
         self.as_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
     }
@@ -1076,7 +1079,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
-    pub(crate) fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
+    pub(crate) const fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
             _ => None,
@@ -1126,7 +1129,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_union(self) -> UnionType<'db> {
+    pub(crate) const fn expect_union(self) -> UnionType<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
@@ -4120,6 +4123,39 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(class)
+                if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetRange,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "always" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetAlways,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "never" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetNever,
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "implies_subtype_of" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                ))
+                .into()
+            }
+
+            Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
                 Place::bound(Type::WrapperDescriptor(
@@ -4299,7 +4335,7 @@ impl<'db> Type<'db> {
                     // It will need a special handling, so it remember the origin type to properly
                     // resolve the attribute.
                     if matches!(
-                        self.into_nominal_instance()
+                        self.as_nominal_instance()
                             .and_then(|instance| instance.known_class(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
@@ -4511,7 +4547,7 @@ impl<'db> Type<'db> {
                     // if a tuple subclass defines a `__bool__` method with a return type
                     // that is inconsistent with the tuple's length. Otherwise, the special
                     // handling for tuples here isn't sound.
-                    if let Some(instance) = self.into_nominal_instance() {
+                    if let Some(instance) = self.as_nominal_instance() {
                         if let Some(tuple_spec) = instance.tuple_spec(db) {
                             Ok(tuple_spec.truthiness())
                         } else if instance.class(db).is_final(db) {
@@ -4832,51 +4868,6 @@ impl<'db> Type<'db> {
                     ),
                 )
                 .into(),
-
-                Some(KnownFunction::IsSubtypeOfGiven) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("constraints")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [
-                                        KnownClass::Bool.to_instance(db),
-                                        KnownClass::ConstraintSet.to_instance(db),
-                                    ],
-                                )),
-                            Parameter::positional_only(Some(Name::new_static("ty")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("of")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::RangeConstraint | KnownFunction::NegatedRangeConstraint) => {
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("lower_bound")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("typevar")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("upper_bound")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(KnownClass::ConstraintSet.to_instance(db)),
-                        ),
-                    )
-                    .into()
-                }
 
                 Some(KnownFunction::IsSingleton | KnownFunction::IsSingleValued) => {
                     Binding::single(
@@ -6918,7 +6909,14 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen)
+            | Type::KnownBoundMethod(
+                KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::PathOpen
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
@@ -7064,7 +7062,12 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
-                KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen,
+                KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::PathOpen
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -7420,6 +7423,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_redundant_with_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _subtype: Type<'db>,
     _supertype: Type<'db>,
 ) -> bool {
@@ -7428,6 +7432,7 @@ fn is_redundant_with_cycle_initial<'db>(
 
 fn apply_specialization_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: Type<'db>,
     _specialization: Specialization<'db>,
 ) -> Type<'db> {
@@ -8498,6 +8503,7 @@ impl<'db> TypeVarInstance<'db> {
 
 fn lazy_bound_or_constraints_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: TypeVarInstance<'db>,
 ) -> Option<TypeVarBoundOrConstraints<'db>> {
     None
@@ -8505,6 +8511,7 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
 
 fn lazy_default_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     None
@@ -10032,6 +10039,7 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 fn into_callable_type_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     _self: BoundMethodType<'db>,
 ) -> CallableType<'db> {
     CallableType::bottom(db)
@@ -10318,6 +10326,12 @@ pub enum KnownBoundMethodType<'db> {
     StrStartswith(StringLiteralType<'db>),
     /// Method wrapper for `Path.open`,
     PathOpen,
+
+    // ConstraintSet methods
+    ConstraintSetRange,
+    ConstraintSetAlways,
+    ConstraintSetNever,
+    ConstraintSetImpliesSubtypeOf(TrackedConstraintSet<'db>),
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10341,7 +10355,11 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(db, Type::StringLiteral(string_literal));
         }
-        KnownBoundMethodType::PathOpen => {}
+        KnownBoundMethodType::PathOpen
+        | KnownBoundMethodType::ConstraintSetRange
+        | KnownBoundMethodType::ConstraintSetAlways
+        | KnownBoundMethodType::ConstraintSetNever
+        | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {}
     }
 }
 
@@ -10393,9 +10411,23 @@ impl<'db> KnownBoundMethodType<'db> {
                 ConstraintSet::from(self == other)
             }
 
-            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen) => {
-                ConstraintSet::from(true)
-            }
+            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen)
+            | (
+                KnownBoundMethodType::ConstraintSetRange,
+                KnownBoundMethodType::ConstraintSetRange,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetAlways,
+                KnownBoundMethodType::ConstraintSetAlways,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetNever,
+                KnownBoundMethodType::ConstraintSetNever,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+            ) => ConstraintSet::from(true),
 
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
@@ -10403,13 +10435,21 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen,
+                | KnownBoundMethodType::PathOpen
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen,
+                | KnownBoundMethodType::PathOpen
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             ) => ConstraintSet::from(false),
         }
     }
@@ -10445,9 +10485,26 @@ impl<'db> KnownBoundMethodType<'db> {
                 ConstraintSet::from(self == other)
             }
 
-            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen) => {
-                ConstraintSet::from(true)
-            }
+            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen)
+            | (
+                KnownBoundMethodType::ConstraintSetRange,
+                KnownBoundMethodType::ConstraintSetRange,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetAlways,
+                KnownBoundMethodType::ConstraintSetAlways,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetNever,
+                KnownBoundMethodType::ConstraintSetNever,
+            ) => ConstraintSet::from(true),
+
+            (
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(left_constraints),
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(right_constraints),
+            ) => left_constraints
+                .constraints(db)
+                .iff(db, right_constraints.constraints(db)),
 
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
@@ -10455,13 +10512,21 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen,
+                | KnownBoundMethodType::PathOpen
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen,
+                | KnownBoundMethodType::PathOpen
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             ) => ConstraintSet::from(false),
         }
     }
@@ -10480,7 +10545,12 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(db, visitor))
             }
-            KnownBoundMethodType::StrStartswith(_) | KnownBoundMethodType::PathOpen => self,
+            KnownBoundMethodType::StrStartswith(_)
+            | KnownBoundMethodType::PathOpen
+            | KnownBoundMethodType::ConstraintSetRange
+            | KnownBoundMethodType::ConstraintSetAlways
+            | KnownBoundMethodType::ConstraintSetNever
+            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => self,
         }
     }
 
@@ -10493,6 +10563,10 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
             KnownBoundMethodType::PathOpen => KnownClass::MethodType,
+            KnownBoundMethodType::ConstraintSetRange
+            | KnownBoundMethodType::ConstraintSetAlways
+            | KnownBoundMethodType::ConstraintSetNever
+            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => KnownClass::ConstraintSet,
         }
     }
 
@@ -10591,6 +10665,45 @@ impl<'db> KnownBoundMethodType<'db> {
             }
             KnownBoundMethodType::PathOpen => {
                 Either::Right(std::iter::once(Signature::todo("`Path.open` return type")))
+            }
+
+            KnownBoundMethodType::ConstraintSetRange => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("lower_bound")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                        Parameter::positional_only(Some(Name::new_static("typevar")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                        Parameter::positional_only(Some(Name::new_static("upper_bound")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                    ]),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetAlways
+            | KnownBoundMethodType::ConstraintSetNever => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::empty(),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("ty")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                        Parameter::positional_only(Some(Name::new_static("of")))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                    ]),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
             }
         }
     }
@@ -10902,12 +11015,17 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: PEP695TypeAliasType<'db>,
 ) -> Option<GenericContext<'db>> {
     None
 }
 
-fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {
+fn value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: PEP695TypeAliasType<'db>,
+) -> Type<'db> {
     Type::Never
 }
 

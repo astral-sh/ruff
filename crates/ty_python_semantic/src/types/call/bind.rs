@@ -705,33 +705,6 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::IsSubtypeOfGiven) => {
-                            let [Some(constraints), Some(ty_a), Some(ty_b)] =
-                                overload.parameter_types()
-                            else {
-                                continue;
-                            };
-
-                            let constraints = match constraints {
-                                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) => {
-                                    tracked.constraints(db)
-                                }
-                                Type::BooleanLiteral(b) => ConstraintSet::from(*b),
-                                _ => continue,
-                            };
-
-                            let result = constraints.when_subtype_of_given(
-                                db,
-                                *ty_a,
-                                *ty_b,
-                                InferableTypeVars::None,
-                            );
-                            let tracked = TrackedConstraintSet::new(db, result);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::ConstraintSet(tracked),
-                            ));
-                        }
-
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
@@ -1148,6 +1121,60 @@ impl<'db> Bindings<'db> {
                             }
                         }
                     },
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
+                        let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
+                            overload.parameter_types()
+                        else {
+                            return;
+                        };
+                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(true);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(false);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                    ) => {
+                        let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).when_subtype_of_given(
+                            db,
+                            *ty_a,
+                            *ty_b,
+                            InferableTypeVars::None,
+                        );
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
 
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {

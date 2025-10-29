@@ -44,19 +44,35 @@ type JustComplex = TypeOf[1.0j]
 
 # Constraints
 class ConstraintSet:
+    @staticmethod
+    def range(lower_bound: Any, typevar: Any, upper_bound: Any) -> Self:
+        """
+        Returns a constraint set that requires `typevar` to specialize to a type
+        that is a supertype of `lower_bound` and a subtype of `upper_bound`.
+        """
+
+    @staticmethod
+    def always() -> Self:
+        """Returns a constraint set that is always satisfied"""
+
+    @staticmethod
+    def never() -> Self:
+        """Returns a constraint set that is never satisfied"""
+
+    def implies_subtype_of(self, ty: Any, of: Any) -> Self:
+        """
+        Returns a constraint set that is satisfied when `ty` is a `subtype`_ of
+        `of`, assuming that all of the constraints in `self` hold.
+
+        .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
-
-def range_constraint(
-    lower_bound: Any, typevar: Any, upper_bound: Any
-) -> ConstraintSet: ...
-def negated_range_constraint(
-    lower_bound: Any, typevar: Any, upper_bound: Any
-) -> ConstraintSet: ...
 
 # Predicates on types
 #
@@ -71,15 +87,6 @@ def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
 
 def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
-
-    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
-    """
-
-def is_subtype_of_given(
-    constraints: bool | ConstraintSet, ty: Any, of: Any
-) -> ConstraintSet:
-    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`,
-    assuming that all of the constraints in `constraints` hold.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
