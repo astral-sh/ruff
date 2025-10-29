@@ -1,0 +1,48 @@
+from django.urls import path
+from . import views
+
+# Errors - leading slash
+urlpatterns = [
+    path("/help/", views.help_view),  # DJ015
+    path("/about/", views.about_view),  # DJ015
+    path("/contact/", views.contact_view),  # DJ015
+    path("/api/users/", views.users_view),  # DJ015
+    path("/blog/posts/", views.posts_view),  # DJ015
+]
+
+# OK - no leading slash
+urlpatterns_ok = [
+    path("help/", views.help_view),
+    path("about/", views.about_view),
+    path("contact/", views.contact_view),
+    path("api/users/", views.users_view),
+    path("blog/posts/", views.posts_view),
+]
+
+# OK - just root path
+urlpatterns_root = [
+    path("/", views.index_view),
+    path("", views.home_view),
+]
+
+# OK - with path parameters
+urlpatterns_params = [
+    path("users/<int:id>/", views.user_detail),
+    path("posts/<slug:slug>/", views.post_detail),
+]
+
+# Mixed cases
+urlpatterns_mixed = [
+    path("good/", views.good_view),
+    path("/bad/", views.bad_view),  # DJ015
+    path("also-good/", views.also_good_view),
+    path("/also-bad/", views.also_bad_view),  # DJ015
+]
+
+# Edge cases with different quote styles
+urlpatterns_quotes = [
+    path('/single-quote/', views.single_quote_view),  # DJ015
+    path("/double-quote/", views.double_quote_view),  # DJ015
+    path('''/triple-single/''', views.triple_single_view),  # DJ015
+    path("""/triple-double/""", views.triple_double_view),  # DJ015
+]

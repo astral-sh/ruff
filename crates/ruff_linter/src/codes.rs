@@ -1101,6 +1101,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Django, "012") => rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
         (Flake8Django, "014") => rules::flake8_django::rules::DjangoURLPathWithoutTrailingSlash,
+        (Flake8Django, "015") => rules::flake8_django::rules::DjangoURLPathWithLeadingSlash,
 
         // flynt
         // Reserved: (Flynt, "001") => Rule: :StringConcatenationToFString,
