@@ -1295,7 +1295,7 @@ impl<'db> Field<'db> {
     /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
         self.declared_ty
-            .into_nominal_instance()
+            .as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
     }
 }

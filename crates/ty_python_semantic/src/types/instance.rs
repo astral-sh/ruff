@@ -88,7 +88,7 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
-    pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
+    pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
             Type::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
