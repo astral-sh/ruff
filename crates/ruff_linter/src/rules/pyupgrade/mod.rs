@@ -64,6 +64,7 @@ mod tests {
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_3.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
@@ -133,6 +134,20 @@ mod tests {
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_3.py"))]
+    fn rules_py313(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("rules_py313__{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
