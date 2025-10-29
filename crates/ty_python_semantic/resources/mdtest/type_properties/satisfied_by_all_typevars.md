@@ -117,7 +117,7 @@ def unbounded[T]():
 
 If a typevar has an upper bound, then it must specialize to a type that is a subtype of that bound.
 For a non-inferable typevar, that means the constraint set must be satisfied for every type that
-satisfied the upper bound.
+satisfies the upper bound.
 
 ```py
 def bounded[T: Base]():
@@ -131,7 +131,7 @@ def bounded[T: Base]():
 
 If a typevar has constraints, then it must specialize to one of those specific types. (Not to a
 subtype of one of those types!) For a non-inferable typevar, that means we need the constraint set
-to be satisfied by all one of the constraints.
+to be satisfied by all of those constraints.
 
 ```py
 def constrained[T: (Base, Unrelated)]():
