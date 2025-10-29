@@ -540,6 +540,8 @@ impl Display for DisplayRepresentation<'_> {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
                     WrapperDescriptorKind::PropertyDunderGet => ("__get__", "property"),
                     WrapperDescriptorKind::PropertyDunderSet => ("__set__", "property"),
+                    WrapperDescriptorKind::ClassmethodDunderGet => ("__get__", "classmethod"),
+                    WrapperDescriptorKind::StaticmethodDunderGet => ("__get__", "staticmethod"),
                 };
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }

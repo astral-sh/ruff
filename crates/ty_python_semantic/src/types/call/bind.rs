@@ -25,8 +25,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownFunction, OverloadLiteral,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionType, KnownFunction,
+    OverloadLiteral,
 };
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
@@ -337,44 +337,58 @@ impl<'db> Bindings<'db> {
                         if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                             overload.parameter_types()
                         {
-                            if function.is_classmethod(db) {
-                                match overload.parameter_types() {
-                                    [_, _, Some(owner)] => {
-                                        overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *owner),
-                                        ));
-                                    }
-
-                                    [_, Some(instance), None] => {
-                                        overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(
-                                                db,
-                                                *function,
-                                                instance.to_meta_type(db),
-                                            ),
-                                        ));
-                                    }
-
-                                    _ => {}
+                            match overload.parameter_types() {
+                                [_, Some(instance), _] if instance.is_none(db) => {
+                                    overload.set_return_type(*function_ty);
                                 }
-                            } else if function
-                                .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                            {
-                                overload.set_return_type(*function_ty);
-                            } else {
-                                match overload.parameter_types() {
-                                    [_, Some(instance), _] if instance.is_none(db) => {
-                                        overload.set_return_type(*function_ty);
-                                    }
-                                    [_, Some(instance), _] => {
-                                        overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *instance),
-                                        ));
-                                    }
-
-                                    _ => {}
+                                [_, Some(instance), _] => {
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, *function, *instance),
+                                    ));
                                 }
+
+                                _ => {}
                             }
+                        }
+                    }
+
+                    Type::WrapperDescriptor(WrapperDescriptorKind::ClassmethodDunderGet) => {
+                        if let [Some(Type::FunctionLiteral(function)), ..] =
+                            overload.parameter_types()
+                        {
+                            debug_assert!(function.is_classmethod(db));
+                            debug_assert!(!function.is_staticmethod(db));
+
+                            match overload.parameter_types() {
+                                [_, _, Some(owner)] => {
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, *function, *owner),
+                                    ));
+                                }
+
+                                [_, Some(instance), None] => {
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(
+                                            db,
+                                            *function,
+                                            instance.to_meta_type(db),
+                                        ),
+                                    ));
+                                }
+
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    Type::WrapperDescriptor(WrapperDescriptorKind::StaticmethodDunderGet) => {
+                        if let [Some(Type::FunctionLiteral(function)), ..] =
+                            overload.parameter_types()
+                        {
+                            debug_assert!(function.is_staticmethod(db));
+                            debug_assert!(!function.is_classmethod(db));
+                            overload
+                                .set_return_type(Type::Callable(function.into_callable_type(db)));
                         }
                     }
 
@@ -3402,6 +3416,8 @@ impl<'db> CallableDescription<'db> {
                 kind: "wrapper descriptor",
                 name: match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
+                    WrapperDescriptorKind::ClassmethodDunderGet => "classmethod.__get__",
+                    WrapperDescriptorKind::StaticmethodDunderGet => "staticmethod.__get__",
                     WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
                 },

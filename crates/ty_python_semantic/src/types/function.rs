@@ -778,6 +778,16 @@ impl<'db> FunctionType<'db> {
         self.known(db) == Some(known_function)
     }
 
+    pub(crate) fn fallback_class(self, db: &'db dyn Db) -> KnownClass {
+        if self.is_classmethod(db) {
+            KnownClass::Classmethod
+        } else if self.is_staticmethod(db) {
+            KnownClass::Staticmethod
+        } else {
+            KnownClass::FunctionType
+        }
+    }
+
     /// Returns if any of the overloads of this function have a particular decorator.
     ///
     /// Some decorators are expected to appear on every overload; others are expected to appear

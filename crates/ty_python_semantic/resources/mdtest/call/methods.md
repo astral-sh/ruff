@@ -495,8 +495,8 @@ class C:
     def f(x: int) -> str:
         return "a"
 
-reveal_type(C.f)  # revealed: def f(x: int) -> str
-reveal_type(C().f)  # revealed: def f(x: int) -> str
+reveal_type(C.f)  # revealed: (x: int) -> str
+reveal_type(C().f)  # revealed: (x: int) -> str
 ```
 
 The method can then be called like a regular function from either the class or an instance, with no
@@ -521,8 +521,8 @@ When a static method is accessed on a derived class, it behaves identically:
 class Derived(C):
     pass
 
-reveal_type(Derived.f)  # revealed: def f(x: int) -> str
-reveal_type(Derived().f)  # revealed: def f(x: int) -> str
+reveal_type(Derived.f)  # revealed: (x: int) -> str
+reveal_type(Derived().f)  # revealed: (x: int) -> str
 
 reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str

@@ -12,7 +12,7 @@ X = GenericAlias(type, ())
 A = NewType("A", int)
 # TODO: typeshed for `typing.GenericAlias` uses `type` for the first argument. `NewType` should be special-cased
 # to be compatible with `type`
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `type`, found `NewType`"
+# error: [invalid-argument-type] "Argument is incorrect: Expected `type`, found `NewType`"
 B = GenericAlias(A, ())
 
 def _(

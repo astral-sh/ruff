@@ -1251,7 +1251,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
             Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
-            Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
+            Type::FunctionLiteral(function) => Some(function.fallback_class(db).to_instance(db)),
             Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
             _ => None,
         }
@@ -3091,11 +3091,12 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::FunctionLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
+            (Type::FunctionLiteral(function), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::FunctionLiteral(function)) => {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
-                KnownClass::FunctionType
+                function
+                    .fallback_class(db)
                     .when_subclass_of(db, instance.class(db))
                     .negate(db)
             }
@@ -3487,7 +3488,26 @@ impl<'db> Type<'db> {
                         ))
                         .into(),
                     ),
-                    (Some(KnownClass::FunctionType), "__set__" | "__delete__") => {
+                    (Some(KnownClass::Classmethod), "__get__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::ClassmethodDunderGet,
+                        ))
+                        .into(),
+                    ),
+                    (Some(KnownClass::Staticmethod), "__get__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::StaticmethodDunderGet,
+                        ))
+                        .into(),
+                    ),
+                    (
+                        Some(
+                            KnownClass::FunctionType
+                            | KnownClass::Classmethod
+                            | KnownClass::Staticmethod,
+                        ),
+                        "__set__" | "__delete__",
+                    ) => {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
                         Some(Place::Undefined.into())
                     }
@@ -3581,16 +3601,21 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    #[allow(unused_variables)]
-    // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
-    fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
-        self.find_name_in_mro_with_policy(
-            db,
-            "__new__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-        )
+    fn lookup_dunder_new(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        fn lookup_dunder_new_inner<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            _: (),
+        ) -> Option<PlaceAndQualifiers<'db>> {
+            let mut flags = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
+            if !ty.is_subtype_of(db, KnownClass::Type.to_instance(db)) {
+                flags |= MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
+            }
+            ty.find_name_in_mro_with_policy(db, "__new__", flags)
+        }
+
+        lookup_dunder_new_inner(db, self, ())
     }
 
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
@@ -3662,7 +3687,8 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
-            Type::FunctionLiteral(_) => KnownClass::FunctionType
+            Type::FunctionLiteral(function) => function
+                .fallback_class(db)
                 .to_instance(db)
                 .instance_member(db, name),
 
@@ -6086,7 +6112,7 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_method = self_type.lookup_dunder_new(db, ());
+        let new_method = self_type.lookup_dunder_new(db);
 
         // Construct an instance type that we can use to look up the `__init__` instance method.
         // This performs the same logic as `Type::to_instance`, except for generic class literals.
@@ -6594,7 +6620,7 @@ impl<'db> Type<'db> {
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
             Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
-            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::FunctionLiteral(function) => function.fallback_class(db).to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
@@ -10708,6 +10734,10 @@ impl<'db> KnownBoundMethodType<'db> {
 pub enum WrapperDescriptorKind {
     /// `FunctionType.__get__`
     FunctionTypeDunderGet,
+    /// `classmethod.__get__`
+    ClassmethodDunderGet,
+    /// `staticmethod.__get__`
+    StaticmethodDunderGet,
     /// `property.__get__`
     PropertyDunderGet,
     /// `property.__set__`
@@ -10761,6 +10791,12 @@ impl WrapperDescriptorKind {
         match self {
             WrapperDescriptorKind::FunctionTypeDunderGet => {
                 Either::Left(dunder_get_signatures(db, KnownClass::FunctionType).into_iter())
+            }
+            WrapperDescriptorKind::ClassmethodDunderGet => {
+                Either::Left(dunder_get_signatures(db, KnownClass::Classmethod).into_iter())
+            }
+            WrapperDescriptorKind::StaticmethodDunderGet => {
+                Either::Left(dunder_get_signatures(db, KnownClass::Staticmethod).into_iter())
             }
             WrapperDescriptorKind::PropertyDunderGet => {
                 Either::Left(dunder_get_signatures(db, KnownClass::Property).into_iter())
