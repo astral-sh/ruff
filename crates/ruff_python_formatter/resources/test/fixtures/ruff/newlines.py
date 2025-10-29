@@ -371,6 +371,15 @@ def preserved6():
     return 1
 
 
+def preserved7():
+
+    # comment
+    # another line
+    # and a third
+
+    return 0
+
+
 # But we still discard these newlines:
 def removed1():
 
@@ -394,3 +403,23 @@ def partially_preserved1():
 
 
     return 1
+
+
+# We only preserve blank lines, not add new ones
+def untouched1():
+    # comment
+
+    return 0
+
+
+def untouched2():
+    # comment
+    return 0
+
+
+def untouched3():
+    # comment
+    # another line
+    # and a third
+
+    return 0

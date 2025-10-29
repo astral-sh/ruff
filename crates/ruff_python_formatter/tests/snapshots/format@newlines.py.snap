@@ -377,6 +377,15 @@ def preserved6():
     return 1
 
 
+def preserved7():
+
+    # comment
+    # another line
+    # and a third
+
+    return 0
+
+
 # But we still discard these newlines:
 def removed1():
 
@@ -400,6 +409,26 @@ def partially_preserved1():
 
 
     return 1
+
+
+# We only preserve blank lines, not add new ones
+def untouched1():
+    # comment
+
+    return 0
+
+
+def untouched2():
+    # comment
+    return 0
+
+
+def untouched3():
+    # comment
+    # another line
+    # and a third
+
+    return 0
 ```
 
 ## Output
@@ -824,6 +853,14 @@ def preserved6():
     return 1
 
 
+def preserved7():
+    # comment
+    # another line
+    # and a third
+
+    return 0
+
+
 # But we still discard these newlines:
 def removed1():
     "Docstring"
@@ -840,6 +877,26 @@ def removed3(): ...  # trailing same-line comment does not prevent collapsing th
 # And we discard empty lines after the first:
 def partially_preserved1():
     return 1
+
+
+# We only preserve blank lines, not add new ones
+def untouched1():
+    # comment
+
+    return 0
+
+
+def untouched2():
+    # comment
+    return 0
+
+
+def untouched3():
+    # comment
+    # another line
+    # and a third
+
+    return 0
 ```
 
 
@@ -933,7 +990,7 @@ def partially_preserved1():
      def inner():
          print("with a body")
          return 1
-@@ -408,11 +421,13 @@
+@@ -408,17 +421,20 @@
  
  
  def preserved5():
@@ -947,10 +1004,19 @@ def partially_preserved1():
      # Comment
  
      return 1
-@@ -433,4 +448,5 @@
+ 
+ 
+ def preserved7():
++
+     # comment
+     # another line
+     # and a third
+@@ -441,6 +457,7 @@
  
  # And we discard empty lines after the first:
  def partially_preserved1():
 +
      return 1
+ 
+ 
 ```
