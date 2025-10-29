@@ -58,8 +58,12 @@ impl Violation for Airflow3Removal {
         } = self;
         match replacement {
             Replacement::None
-            | Replacement::AttrName(_)
             | Replacement::Message(_)
+            | Replacement::AttrName(_)
+            | Replacement::AttrNameWithMessage {
+                attr_name: _,
+                message: _,
+            }
             | Replacement::Rename { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
@@ -71,8 +75,11 @@ impl Violation for Airflow3Removal {
         let Airflow3Removal { replacement, .. } = self;
         match replacement {
             Replacement::None => None,
-            Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
+            Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
+            Replacement::AttrNameWithMessage { attr_name, message } => {
+                Some(format!("Use `{attr_name}` instead; {message}"))
+            }
             Replacement::Rename { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
@@ -98,7 +105,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
                 check_call_arguments(checker, &qualified_name, arguments);
             }
-            check_method(checker, call_expr);
+            check_method(checker, call_expr, arguments);
             check_context_key_usage_in_call(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
@@ -467,7 +474,7 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
 /// manager = DatasetManager()
 /// manager.register_datsaet_change()
 /// ```
-fn check_method(checker: &Checker, call_expr: &ExprCall) {
+fn check_method(checker: &Checker, call_expr: &ExprCall, arguments: &Arguments) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {
         return;
     };
@@ -486,10 +493,28 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             _ => return,
         },
         ["airflow", "lineage", "hook", "HookLineageCollector"] => match attr.as_str() {
-            "create_dataset" => Replacement::AttrName("create_asset"),
             "add_input_dataset" => Replacement::AttrName("add_input_asset"),
             "add_output_dataset" => Replacement::AttrName("add_output_asset"),
             "collected_datasets" => Replacement::AttrName("collected_assets"),
+            "create_dataset" => {
+                if arguments.find_positional(0).is_some() {
+                    Replacement::AttrNameWithMessage {
+                        attr_name: "create_asset",
+                        message: "Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error",
+                    }
+                } else {
+                    Replacement::AttrName("create_asset")
+                }
+            }
+            "create_asset" => {
+                if arguments.find_positional(0).is_some() {
+                    Replacement::Message(
+                        "Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error",
+                    )
+                } else {
+                    return;
+                }
+            }
             _ => return,
         },
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
