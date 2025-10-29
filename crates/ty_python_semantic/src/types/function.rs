@@ -185,6 +185,16 @@ pub struct DataclassTransformerParams<'db> {
 
 impl get_size2::GetSize for DataclassTransformerParams<'_> {}
 
+/// Whether a function should implicitly be treated as a staticmethod based on its name.
+pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
+    matches!(function_name, "__new__")
+}
+
+/// Whether a function should implicitly be treated as a classmethod based on its name.
+pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
+    matches!(function_name, "__init_subclass__" | "__class_getitem__")
+}
+
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
 ///
@@ -257,17 +267,15 @@ impl<'db> OverloadLiteral<'db> {
     /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
     /// staticmethod.
     pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
-        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD) || self.name(db) == "__new__"
+        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+            || is_implicit_staticmethod(self.name(db))
     }
 
     /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
     pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
-            || matches!(
-                self.name(db).as_str(),
-                "__init_subclass__" | "__class_getitem__"
-            )
+            || is_implicit_classmethod(self.name(db))
     }
 
     fn node<'ast>(

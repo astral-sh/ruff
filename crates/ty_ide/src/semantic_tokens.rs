@@ -1413,7 +1413,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         "property" @ 168..176: Decorator
         "prop" @ 185..189: Method [definition]
         "self" @ 190..194: SelfParameter
-        "self" @ 212..216: Variable
+        "self" @ 212..216: TypeParameter
         "CONSTANT" @ 217..225: Variable [readonly]
         "obj" @ 227..230: Variable
         "MyClass" @ 233..240: Class
