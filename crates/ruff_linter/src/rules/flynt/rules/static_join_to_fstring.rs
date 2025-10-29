@@ -109,10 +109,14 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         // use non-raw representation. This handles cases where raw strings would create invalid
         // syntax or behavior changes.
         if any_raw && !content.is_empty() {
-            let needs_non_raw = content.contains(['\n', '\r', '\0']) || {
+            let needs_non_raw = content.contains(['\r', '\0']) || {
                 // Check if content contains characters that would break raw string syntax
                 let quote_char = flags.quote_str();
-                content.contains(quote_char) || content.contains('\\')
+                // A raw string cannot end with a single backslash if it's immediately
+                // followed by the quote delimiter, as that would be invalid syntax.
+                let ends_with_backslash = content.ends_with('\\')
+                    && (content.len() == 1 || content.chars().nth_back(1) != Some('\\'));
+                content.contains(quote_char) || ends_with_backslash
             };
 
             if needs_non_raw {
