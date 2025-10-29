@@ -375,7 +375,7 @@ impl Violation for SuspiciousEvalUsage {
 ///
 ///
 /// def render_username(username):
-///     return django.utils.html.format_html("<i>{}</i>", username)  # username is escaped.
+///     return format_html("<i>{}</i>", username)  # username is escaped.
 /// ```
 ///
 /// ## References
