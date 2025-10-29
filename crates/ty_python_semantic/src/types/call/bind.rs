@@ -3422,6 +3422,20 @@ impl<'db> CallableDescription<'db> {
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
                 },
             }),
+            Type::Callable(callable)
+                if callable
+                    .signatures(db)
+                    .iter()
+                    .next()
+                    .and_then(Signature::definition)
+                    .and_then(|def| def.name(db))
+                    .is_some_and(|name| name == "__new__") =>
+            {
+                Some(CallableDescription {
+                    kind: "function",
+                    name: "__new__",
+                })
+            }
             _ => None,
         }
     }
