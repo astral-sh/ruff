@@ -1,0 +1,77 @@
+---
+source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+---
+DJ014 URL route `help` is missing a trailing slash
+ --> DJ014.py:6:10
+  |
+4 | # Errors - missing trailing slash
+5 | urlpatterns = [
+6 |     path("help", views.help_view),  # DJ014
+  |          ^^^^^^
+7 |     path("about", views.about_view),  # DJ014
+8 |     path("contact", views.contact_view),  # DJ014
+  |
+
+DJ014 URL route `about` is missing a trailing slash
+ --> DJ014.py:7:10
+  |
+5 | urlpatterns = [
+6 |     path("help", views.help_view),  # DJ014
+7 |     path("about", views.about_view),  # DJ014
+  |          ^^^^^^^
+8 |     path("contact", views.contact_view),  # DJ014
+9 |     path("api/users", views.users_view),  # DJ014
+  |
+
+DJ014 URL route `contact` is missing a trailing slash
+  --> DJ014.py:8:10
+   |
+ 6 |     path("help", views.help_view),  # DJ014
+ 7 |     path("about", views.about_view),  # DJ014
+ 8 |     path("contact", views.contact_view),  # DJ014
+   |          ^^^^^^^^^
+ 9 |     path("api/users", views.users_view),  # DJ014
+10 |     path("blog/posts", views.posts_view),  # DJ014
+   |
+
+DJ014 URL route `api/users` is missing a trailing slash
+  --> DJ014.py:9:10
+   |
+ 7 |     path("about", views.about_view),  # DJ014
+ 8 |     path("contact", views.contact_view),  # DJ014
+ 9 |     path("api/users", views.users_view),  # DJ014
+   |          ^^^^^^^^^^^
+10 |     path("blog/posts", views.posts_view),  # DJ014
+11 | ]
+   |
+
+DJ014 URL route `blog/posts` is missing a trailing slash
+  --> DJ014.py:10:10
+   |
+ 8 |     path("contact", views.contact_view),  # DJ014
+ 9 |     path("api/users", views.users_view),  # DJ014
+10 |     path("blog/posts", views.posts_view),  # DJ014
+   |          ^^^^^^^^^^^^
+11 | ]
+   |
+
+DJ014 URL route `bad` is missing a trailing slash
+  --> DJ014.py:37:10
+   |
+35 | urlpatterns_mixed = [
+36 |     path("good/", views.good_view),
+37 |     path("bad", views.bad_view),  # DJ014
+   |          ^^^^^
+38 |     path("also-good/", views.also_good_view),
+39 |     path("also-bad", views.also_bad_view),  # DJ014
+   |
+
+DJ014 URL route `also-bad` is missing a trailing slash
+  --> DJ014.py:39:10
+   |
+37 |     path("bad", views.bad_view),  # DJ014
+38 |     path("also-good/", views.also_good_view),
+39 |     path("also-bad", views.also_bad_view),  # DJ014
+   |          ^^^^^^^^^^
+40 | ]
+   |

@@ -1181,6 +1181,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DjangoLocalsInRenderFunction) {
                 flake8_django::rules::locals_in_render_function(checker, call);
             }
+            if checker.is_rule_enabled(Rule::DjangoURLPathWithoutTrailingSlash) {
+                flake8_django::rules::url_path_without_trailing_slash(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnsupportedMethodCallOnAll) {
                 flake8_pyi::rules::unsupported_method_call_on_all(checker, func);
             }
