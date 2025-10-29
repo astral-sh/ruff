@@ -812,17 +812,17 @@ impl<'db> Type<'db> {
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NoneType))
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool))
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
             .is_some()
     }
@@ -852,7 +852,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NotImplementedType))
     }
 
@@ -899,7 +899,7 @@ impl<'db> Type<'db> {
     ) -> Option<Specialization<'db>> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
-            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+            Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
             _ => return None,
         }
         .class(db);
@@ -939,7 +939,7 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     fn tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| instance.tuple_spec(db))
     }
 
@@ -954,7 +954,7 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| instance.own_tuple_spec(db))
     }
 
@@ -1044,7 +1044,7 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn expect_class_literal(self) -> ClassLiteral<'db> {
+    pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.as_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
     }
@@ -1058,7 +1058,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::EnumLiteral(enum_literal) => Some(enum_literal),
             _ => None,
@@ -1067,7 +1067,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+    pub(crate) const fn expect_enum_literal(self) -> EnumLiteralType<'db> {
         self.as_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
     }
@@ -1076,7 +1076,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
-    pub(crate) fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
+    pub(crate) const fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
             _ => None,
@@ -1126,7 +1126,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_union(self) -> UnionType<'db> {
+    pub(crate) const fn expect_union(self) -> UnionType<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
@@ -4332,7 +4332,7 @@ impl<'db> Type<'db> {
                     // It will need a special handling, so it remember the origin type to properly
                     // resolve the attribute.
                     if matches!(
-                        self.into_nominal_instance()
+                        self.as_nominal_instance()
                             .and_then(|instance| instance.known_class(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
@@ -4544,7 +4544,7 @@ impl<'db> Type<'db> {
                     // if a tuple subclass defines a `__bool__` method with a return type
                     // that is inconsistent with the tuple's length. Otherwise, the special
                     // handling for tuples here isn't sound.
-                    if let Some(instance) = self.into_nominal_instance() {
+                    if let Some(instance) = self.as_nominal_instance() {
                         if let Some(tuple_spec) = instance.tuple_spec(db) {
                             Ok(tuple_spec.truthiness())
                         } else if instance.class(db).is_final(db) {
