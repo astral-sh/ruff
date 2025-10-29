@@ -26,33 +26,3 @@ help: Move into type-checking block
 13 |     x: os
 14 | 
 note: This is an unsafe fix and may change runtime behavior
-
-TC003 [*] Move standard library import `dataclasses.KW_ONLY` into a type-checking block
-  --> TC003.py:20:25
-   |
-19 | # regression test for https://github.com/astral-sh/ruff/issues/21121
-20 | from dataclasses import KW_ONLY, dataclass
-   |                         ^^^^^^^
-   |
-help: Move into type-checking block
-2  | 
-3  | For typing-only import detection tests, see `TC002.py`.
-4  | """
-5  + from __future__ import annotations
-6  | 
-7  | 
-8  | def f():
---------------------------------------------------------------------------------
-18 | 
-19 | 
-20 | # regression test for https://github.com/astral-sh/ruff/issues/21121
-   - from dataclasses import KW_ONLY, dataclass
-21 + from dataclasses import dataclass
-22 + from typing import TYPE_CHECKING
-23 + 
-24 + if TYPE_CHECKING:
-25 +     from dataclasses import KW_ONLY
-26 | 
-27 | 
-28 | @dataclass
-note: This is an unsafe fix and may change runtime behavior

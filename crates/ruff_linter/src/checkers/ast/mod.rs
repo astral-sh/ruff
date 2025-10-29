@@ -1400,10 +1400,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     AnnotationContext::RuntimeRequired => {
                         self.visit_runtime_required_annotation(annotation);
                     }
-                    AnnotationContext::RuntimeEvaluated => {
-                        self.visit_runtime_evaluated_annotation(annotation);
-                    }
-                    AnnotationContext::TypingOnly
+                    AnnotationContext::RuntimeEvaluated | AnnotationContext::TypingOnly
                         if flake8_type_checking::helpers::is_dataclass_meta_annotation(
                             annotation,
                             self.semantic(),
@@ -1417,6 +1414,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             // Ex) `InitVar`
                             self.visit_runtime_required_annotation(annotation);
                         }
+                    }
+                    AnnotationContext::RuntimeEvaluated => {
+                        self.visit_runtime_evaluated_annotation(annotation);
                     }
                     AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
