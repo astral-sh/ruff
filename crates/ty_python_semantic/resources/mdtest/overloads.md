@@ -598,7 +598,7 @@ class CheckClassMethod:
     # error: [invalid-overload]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
-            # error: [call-non-callable] "Object of type `CheckClassMethod` is not callable"
+            # error: [call-non-callable]
             return cls(x)
         return None
 

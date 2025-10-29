@@ -179,7 +179,7 @@ class B:
     @some_decorator
     def decorated_static_method(self):
         reveal_type(self)  # revealed: Unknown
-
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
     @some_decorator
     @staticmethod
     def decorated_static_method_2(self):
