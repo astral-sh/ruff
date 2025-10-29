@@ -1592,6 +1592,23 @@ a = Test()
         ");
     }
 
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1451>.
+    /// We must ensure we respect re-import convention for stub files for
+    /// imports in builtins.pyi.
+    #[test]
+    fn goto_definition_unimported_symbol_imported_in_builtins() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+Traceb<CURSOR>ackType
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)

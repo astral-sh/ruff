@@ -615,6 +615,7 @@ pub fn definitions_for_name<'db>(
         };
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
+            .filter(|def| def.is_reexported(db))
             .flat_map(|def| {
                 resolve_definition(
                     db,
