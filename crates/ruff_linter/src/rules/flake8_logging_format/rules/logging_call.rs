@@ -1,6 +1,6 @@
-use ruff_python_ast::InterpolatedStringElement;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
-
+use ruff_python_ast::{FStringPart, InterpolatedStringElement};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::{Ranged, TextRange};
@@ -38,28 +38,31 @@ fn logging_f_string(
     let mut format_string = String::new();
     let mut args: Vec<&str> = Vec::new();
 
+    let f_string_flags = f_string.value.f_strings().next().map(|f| f.flags);
+    let is_raw = f_string_flags.is_some_and(|flags| flags.prefix().is_raw());
+
     // Try to reuse the first part's quote style when building the replacement.
     // Default to double quotes if we can't determine it.
     let quote_str = f_string
         .value
         .iter()
         .map(|part| match part {
-            ast::FStringPart::Literal(literal) => literal.flags.quote_str(),
-            ast::FStringPart::FString(f) => f.flags.quote_str(),
+            FStringPart::Literal(literal) => literal.flags.quote_str(),
+            FStringPart::FString(f) => f.flags.quote_str(),
         })
         .next()
         .unwrap_or("\"");
 
     for part in &f_string.value {
         match part {
-            ast::FStringPart::Literal(literal) => {
+            FStringPart::Literal(literal) => {
                 let literal_text = literal.as_str();
                 if literal_text.contains('%') {
                     return;
                 }
                 format_string.push_str(literal_text);
             }
-            ast::FStringPart::FString(f) => {
+            FStringPart::FString(f) => {
                 for element in &f.elements {
                     match element {
                         InterpolatedStringElement::Literal(lit) => {
@@ -99,13 +102,23 @@ fn logging_f_string(
     }
 
     let replacement = format!(
-        "{q}{format_string}{q}, {args}",
+        "{prefix}{q}{format_string}{q}, {args}",
+        prefix = if is_raw { "r" } else { "" },
         q = quote_str,
-        format_string = format_string,
         args = args.join(", ")
     );
 
-    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
+    // Replace the full message argument, including redundant grouping parentheses
+    // around the f-string expression (e.g., `logging.warning((f"{Ellipsis}"))`).
+    let replace_range = parenthesized_range(
+        msg.into(),
+        (arguments).into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or_else(|| msg.range());
+
+    let fix = Fix::safe_edit(Edit::range_replacement(replacement, replace_range));
     diagnostic.set_fix(fix);
 }
 
