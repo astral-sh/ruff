@@ -179,9 +179,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     && matches!(first, SuiteChildStatement::Other(_))
                     && !contains_only_an_ellipsis(statements, f.context().comments());
 
-            if allow_newline_after_block_open
-                && lines_before(first.start(), f.context().source()) > 1
-            {
+            let start = comments
+                .leading(first)
+                .first()
+                .map_or_else(|| first.start(), Ranged::start);
+
+            if allow_newline_after_block_open && lines_before(start, f.context().source()) > 1 {
                 empty_line().fmt(f)?;
             }
 
