@@ -9,8 +9,8 @@ use regex::Regex;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexVec, newtype_index};
+use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
 
@@ -392,7 +392,7 @@ struct SymbolVisitor {
 }
 
 impl SymbolVisitor {
-    fn visit_body(&mut self, body: &[Stmt]) {
+    fn visit_body(&mut self, body: &[ast::Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
         }
@@ -433,9 +433,9 @@ impl SymbolVisitor {
 }
 
 impl SourceOrderVisitor<'_> for SymbolVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         match stmt {
-            Stmt::FunctionDef(func_def) => {
+            ast::Stmt::FunctionDef(func_def) => {
                 let kind = if self
                     .iter_symbol_stack()
                     .any(|s| s.kind == SymbolKind::Class)
@@ -477,7 +477,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 self.pop_symbol();
             }
 
-            Stmt::ClassDef(class_def) => {
+            ast::Stmt::ClassDef(class_def) => {
                 let symbol = SymbolTree {
                     parent: None,
                     name: class_def.name.to_string(),
@@ -497,13 +497,15 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 self.pop_symbol();
             }
 
-            Stmt::Assign(assign) => {
+            ast::Stmt::Assign(assign) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
                 }
                 for target in &assign.targets {
-                    let Expr::Name(name) = target else { continue };
+                    let ast::Expr::Name(name) = target else {
+                        continue;
+                    };
                     let kind = if Self::is_constant_name(name.id.as_str()) {
                         SymbolKind::Constant
                     } else if self
@@ -526,12 +528,12 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 }
             }
 
-            Stmt::AnnAssign(ann_assign) => {
+            ast::Stmt::AnnAssign(ann_assign) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
                 }
-                let Expr::Name(name) = &*ann_assign.target else {
+                let ast::Expr::Name(name) = &*ann_assign.target else {
                     return;
                 };
                 let kind = if Self::is_constant_name(name.id.as_str()) {
