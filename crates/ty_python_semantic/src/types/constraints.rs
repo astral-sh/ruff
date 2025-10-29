@@ -259,26 +259,26 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
-    /// Returns whether this constraint set satisfies all of the typevars that it mentions.
+    /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
     ///
     /// Each typevar has a set of _valid specializations_, which is defined by any upper bound or
     /// constraints that the typevar has.
     ///
     /// Each typevar is also either _inferable_ or _non-inferable_. (You provide a list of the
     /// `inferable` typevars; all others are considered non-inferable.) For an inferable typevar,
-    /// then there must be _some_ valid specialization that is satisfied by the constraint set. For
-    /// a non-inferable typevar, then _all_ valid specializations must be satisfied.
+    /// then there must be _some_ valid specialization that satisfies the constraint set. For a
+    /// non-inferable typevar, then _all_ valid specializations must satisfy it.
     ///
     /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
-    /// since the constraint set cannot place any restrictions on typevars that it does not
-    /// mention. That means that those additional typevars are trivially satisfied by the
-    /// constraint set, regardless of whether they are inferable or not.
-    pub(crate) fn satisfies_all_typevars(
+    /// since the constraint set cannot be affected by any typevars that it does not mention. That
+    /// means that those additional typevars trivially satisfy the constraint set, regardless of
+    /// whether they are inferable or not.
+    pub(crate) fn satisfied_by_all_typevars(
         self,
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
-        self.node.satisfies_all_typevars(db, inferable)
+        self.node.satisfied_by_all_typevars(db, inferable)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -802,7 +802,7 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn satisfies_all_typevars(
+    fn satisfied_by_all_typevars(
         self,
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
@@ -819,17 +819,18 @@ impl<'db> Node<'db> {
         });
 
         for typevar in typevars {
-            // Determine which valid specializations of this typevar are satisfied by the
-            // constraint set.
+            // Determine which valid specializations of this typevar satisfy the constraint set.
             let valid_specializations = typevar.valid_specializations(db).node;
-            let when_satisfied = self.satisfies(db, valid_specializations);
+            let when_satisfied = valid_specializations
+                .satisfies(db, self)
+                .and(db, valid_specializations);
             let satisfied = if typevar.is_inferable(db, inferable) {
-                // If the typevar is inferable, then we only need one valid specialization to be
-                // satisfied.
+                // If the typevar is inferable, then we only need one valid specialization to
+                // satisify the constraint set.
                 !when_satisfied.is_never_satisfied()
             } else {
-                // If the typevar is non-inferable, then we need _all_ valid specializations to be
-                // satisfied.
+                // If the typevar is non-inferable, then we need _all_ valid specializations to
+                // satisify the constraint set.
                 when_satisfied == valid_specializations
             };
             if !satisfied {

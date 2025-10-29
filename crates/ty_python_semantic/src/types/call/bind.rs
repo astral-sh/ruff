@@ -1183,7 +1183,7 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetSatisfiesAllTypeVars(tracked),
+                        KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ) => {
                         let inferable: Option<FxHashSet<_>> = overload
                             .arguments_for_parameter(argument_types, 0)
@@ -1198,7 +1198,7 @@ impl<'db> Bindings<'db> {
 
                         let result = tracked
                             .constraints(db)
-                            .satisfies_all_typevars(db, InferableTypeVars::One(&inferable));
+                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
