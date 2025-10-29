@@ -826,11 +826,11 @@ impl<'db> Node<'db> {
                 .and(db, valid_specializations);
             let satisfied = if typevar.is_inferable(db, inferable) {
                 // If the typevar is inferable, then we only need one valid specialization to
-                // satisify the constraint set.
+                // satisfy the constraint set.
                 !when_satisfied.is_never_satisfied()
             } else {
                 // If the typevar is non-inferable, then we need _all_ valid specializations to
-                // satisify the constraint set.
+                // satisfy the constraint set.
                 when_satisfied
                     .iff(db, valid_specializations)
                     .is_always_satisfied(db)
