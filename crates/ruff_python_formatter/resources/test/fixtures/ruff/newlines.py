@@ -346,6 +346,18 @@ def preserved2():
 
     pass
 
+def preserved3():
+
+    def inner(): ...
+
+def preserved4():
+
+    def inner():
+        print("with a body")
+        return 1
+
+    return 2
+
 
 # But we still discard these newlines:
 def removed1():

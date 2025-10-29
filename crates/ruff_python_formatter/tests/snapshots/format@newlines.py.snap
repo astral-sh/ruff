@@ -352,6 +352,18 @@ def preserved2():
 
     pass
 
+def preserved3():
+
+    def inner(): ...
+
+def preserved4():
+
+    def inner():
+        print("with a body")
+        return 1
+
+    return 2
+
 
 # But we still discard these newlines:
 def removed1():
@@ -779,6 +791,18 @@ def preserved2():
     pass
 
 
+def preserved3():
+    def inner(): ...
+
+
+def preserved4():
+    def inner():
+        print("with a body")
+        return 1
+
+    return 2
+
+
 # But we still discard these newlines:
 def removed1():
     "Docstring"
@@ -868,7 +892,7 @@ def partially_preserved1():
  finally:
  
      def a():
-@@ -388,10 +397,12 @@
+@@ -388,18 +397,22 @@
  
  # In preview, we preserve these newlines at the start of functions:
  def preserved1():
@@ -881,7 +905,17 @@ def partially_preserved1():
      pass
  
  
-@@ -413,4 +424,5 @@
+ def preserved3():
++
+     def inner(): ...
+ 
+ 
+ def preserved4():
++
+     def inner():
+         print("with a body")
+         return 1
+@@ -425,4 +438,5 @@
  
  # And we discard empty lines after the first:
  def partially_preserved1():
