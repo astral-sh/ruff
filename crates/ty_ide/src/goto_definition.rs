@@ -1594,7 +1594,7 @@ a = Test()
 
     /// Regression test for <https://github.com/astral-sh/ty/issues/1451>.
     /// We must ensure we respect re-import convention for stub files for
-    /// imports in builtins.py
+    /// imports in builtins.pyi.
     #[test]
     fn goto_definition_unimported_symbol_imported_in_builtins() {
         let test = CursorTest::builder()
