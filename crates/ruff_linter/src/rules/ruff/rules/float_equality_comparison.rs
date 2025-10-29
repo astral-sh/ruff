@@ -42,13 +42,13 @@ use crate::{FixAvailability, Violation};
 /// - [NumPy documentation: `numpy.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.3")]
-pub(crate) struct FloatComparison {
+pub(crate) struct FloatEqualityComparison {
     pub left: String,
     pub right: String,
     pub operand: String,
 }
 
-impl Violation for FloatComparison {
+impl Violation for FloatEqualityComparison {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -61,7 +61,7 @@ impl Violation for FloatComparison {
 }
 
 /// RUF067
-pub(crate) fn float_comparison(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let locator = checker.locator();
     let semantic = checker.semantic();
 
@@ -74,7 +74,7 @@ pub(crate) fn float_comparison(checker: &Checker, compare: &ast::ExprCompare) {
         .map(|((left, right), op)| (left, right, op))
     {
         checker.report_diagnostic(
-            FloatComparison {
+            FloatEqualityComparison {
                 left: locator.slice(left.range()).to_string(),
                 right: locator.slice(right.range()).to_string(),
                 operand: operand.to_string(),
