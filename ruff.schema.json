@@ -299,7 +299,6 @@
     },
     "flake8-django": {
       "description": "Options for the `flake8-django` plugin.",
-      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8DjangoOptions"
@@ -307,7 +306,8 @@
         {
           "type": "null"
         }
-      ]
+      ],
+      "deprecated": true
     },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
@@ -1155,7 +1155,7 @@
       "type": "object",
       "properties": {
         "additional-path-functions": {
-          "description": "Additional qualified paths to Django URL path functions beyond the default `django.urls.path`. This allows the rule to check URL patterns defined using custom path functions or re-exported path functions from other modules.\n\nFor example, if you have a custom module `mytools` that re-exports Django's path function, you can add `\"mytools.path\"` to this list.",
+          "description": "Additional qualified paths to Django URL path functions beyond\nthe default `django.urls.path`. This allows the rule to check\nURL patterns defined using custom path functions or re-exported\npath functions from other modules.\n\nFor example, if you have a custom module `mytools` that re-exports\nDjango's path function, you can add `\"mytools.path\"` to this list.",
           "type": [
             "array",
             "null"
