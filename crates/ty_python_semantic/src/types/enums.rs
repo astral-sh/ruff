@@ -39,6 +39,7 @@ impl EnumMetadata<'_> {
 #[allow(clippy::unnecessary_wraps)]
 fn enum_metadata_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
     Some(EnumMetadata::empty())

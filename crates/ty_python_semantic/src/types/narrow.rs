@@ -120,6 +120,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
 
 fn constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
     None
@@ -127,6 +128,7 @@ fn constraints_for_expression_cycle_initial<'db>(
 
 fn negative_constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
     None
