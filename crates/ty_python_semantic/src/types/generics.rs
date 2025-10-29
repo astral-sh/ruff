@@ -627,6 +627,7 @@ impl<'db> GenericContext<'db> {
 
 fn inferable_typevars_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: GenericContext<'db>,
 ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
     FxHashSet::default()

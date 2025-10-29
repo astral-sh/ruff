@@ -1195,6 +1195,7 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
 
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
     CallableSignature::single(Signature::bottom())
@@ -1202,6 +1203,7 @@ fn signature_cycle_initial<'db>(
 
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
     Signature::bottom()

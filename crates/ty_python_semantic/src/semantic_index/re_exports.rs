@@ -30,7 +30,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{Db, module_name::ModuleName, resolve_module};
 
-fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
+fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
     Box::default()
 }
 
