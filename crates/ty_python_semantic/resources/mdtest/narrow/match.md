@@ -252,3 +252,51 @@ match x:
 
 reveal_type(x)  # revealed: object
 ```
+
+## Narrowing on `Self` in `match` statements
+
+When performing narrowing on `self` inside methods on enums, we take into account that `Self` might
+refer to a subtype of the enum class, like `Literal[Answer.YES]`. This is why we do not simplify
+`Self & ~Literal[Answer.YES]` to `Literal[Answer.NO, Answer.MAYBE]`. Otherwise, we wouldn't be able
+to return `self` in the `assert_yes` method below:
+
+```py
+from enum import Enum
+from typing_extensions import Self, assert_never
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    MAYBE = 2
+
+    def is_yes(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes
+
+        match self:
+            case Answer.YES:
+                reveal_type(self)  # revealed: Self@is_yes
+                return True
+            case Answer.NO | Answer.MAYBE:
+                reveal_type(self)  # revealed: Self@is_yes & ~Literal[Answer.YES]
+                return False
+            case _:
+                assert_never(self)  # no error
+
+    def assert_yes(self) -> Self:
+        reveal_type(self)  # revealed: Self@assert_yes
+
+        match self:
+            case Answer.YES:
+                reveal_type(self)  # revealed: Self@assert_yes
+                return self
+            case _:
+                reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
+                raise ValueError("Answer is not YES")
+
+Answer.YES.is_yes()
+
+try:
+    reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
+except ValueError:
+    pass
+```

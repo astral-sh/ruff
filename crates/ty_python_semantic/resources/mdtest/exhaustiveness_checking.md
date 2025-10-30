@@ -379,3 +379,22 @@ def as_pattern_non_exhaustive(subject: int | str):
             # this diagnostic is correct: the inferred type of `subject` is `str`
             assert_never(subject)  # error: [type-assertion-failure]
 ```
+
+## Exhaustiveness checking for methods of enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = "yes"
+    NO = "no"
+
+    def is_yes(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes
+
+        match self:
+            case Answer.YES:
+                return True
+            case Answer.NO:
+                return False
+```
