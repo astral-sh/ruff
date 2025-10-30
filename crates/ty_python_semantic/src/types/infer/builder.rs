@@ -57,11 +57,12 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PROTOCOL,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    INVALID_NAMED_TUPLE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC,
+    INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -1293,6 +1294,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVar(typevar) => {
                 self.infer_typevar_deferred(typevar.node(self.module()));
+            }
+            DefinitionKind::ParamSpec(paramspec) => {
+                self.infer_paramspec_deferred(paramspec.node(self.module()));
             }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(assignment.value(self.module()));
@@ -3196,16 +3200,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::TypeParamParamSpec {
             range: _,
             node_index: _,
-            name: _,
+            name,
             default,
         } = node;
-        self.infer_optional_expression(default.as_deref(), TypeContext::default());
-        let pep_695_todo = Type::Dynamic(DynamicType::TodoPEP695ParamSpec);
+        if default.is_some() {
+            self.deferred.insert(definition);
+        }
+        let identity = TypeVarIdentity::new(
+            self.db(),
+            &name.id,
+            Some(definition),
+            TypeVarKind::Pep695ParamSpec,
+        );
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            self.db(),
+            identity,
+            None, // ParamSpec, when declared using PEP 695 syntax, has no bounds or constraints
+            None, // explicit_variance
+            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
+        )));
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
+    }
+
+    fn infer_paramspec_deferred(&mut self, node: &ast::TypeParamParamSpec) {
+        let ast::TypeParamParamSpec {
+            range: _,
+            node_index: _,
+            name: _,
+            default,
+        } = node;
+        let previous_deferred_state =
+            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+        // TODO: How to represent this properly?
+        // match default {
+        //     ast::Expr::List(ast::ExprList { elts, .. }) => {}
+        //     ast::Expr::EllipsisLiteral(_) => {}
+        //     ast::Expr::Name(_) => {}
+        //     _ => {
+        //         if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default) {
+        //             builder.into_diagnostic(
+        //                 "The default value to `ParamSpec` must be either a list of types, \
+        //                 `ParamSpec`, or `...`",
+        //             );
+        //         }
+        //     }
+        // }
+        // TODO: This is not correct because a list of types is allowed but this call will always
+        // raise a diagnostic for that.
+        self.infer_optional_type_expression(default.as_deref());
+        self.deferred_state = previous_deferred_state;
     }
 
     fn infer_typevartuple_definition(
@@ -4204,17 +4251,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         TypeContext::default(),
                     );
 
-                    let typevar_class = callable_type
+                    let ty = match callable_type
                         .as_class_literal()
                         .and_then(|cls| cls.known(self.db()))
-                        .filter(|cls| {
-                            matches!(cls, KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
-                        });
-
-                    let ty = if let Some(typevar_class) = typevar_class {
-                        self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
-                    } else {
-                        self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                    {
+                        Some(
+                            typevar_class @ (KnownClass::TypeVar | KnownClass::ExtensionsTypeVar),
+                        ) => {
+                            self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
+                        }
+                        Some(KnownClass::ParamSpec) => {
+                            self.infer_paramspec(target, call_expr, definition)
+                        }
+                        Some(_) | None => {
+                            self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                        }
                     };
 
                     self.store_expression_type(value, ty);
@@ -4249,6 +4300,160 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         target_ty
+    }
+
+    fn infer_paramspec(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, node) {
+                builder.into_diagnostic(message);
+            }
+            // If the call doesn't create a valid paramspec, we'll emit diagnostics and fall back to
+            // just creating a regular instance of `typing.ParamSpec`.
+            KnownClass::ParamSpec.to_instance(context.db())
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+        let assume_all_features = self.in_stub();
+        let python_version = Program::get(db).python_version(db);
+        let have_features_from =
+            |version: PythonVersion| assume_all_features || python_version >= version;
+
+        let mut default = None;
+        let mut name_param_ty = None;
+
+        if arguments.args.len() > 1 {
+            return error(
+                &self.context,
+                "`ParamSpec` can only have one positional argument",
+                call_expr,
+            );
+        }
+
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `ParamSpec` creation",
+                starred,
+            );
+        }
+
+        for kwarg in &arguments.keywords {
+            let Some(identifier) = kwarg.arg.as_ref() else {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `ParamSpec` creation",
+                    kwarg,
+                );
+            };
+            match identifier.id().as_str() {
+                "name" => {
+                    // Duplicate keyword argument is a syntax error, so we don't have to check if
+                    // `name_param_ty.is_some()` here.
+                    if !arguments.args.is_empty() {
+                        return error(
+                            &self.context,
+                            "The `name` parameter of `ParamSpec` can only be provided once",
+                            kwarg,
+                        );
+                    }
+                    name_param_ty =
+                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                }
+                "bound" | "covariant" | "contravariant" | "infer_variance" => {
+                    return error(
+                        &self.context,
+                        "The variance and bound arguments for `ParamSpec` do not have defined semantics yet",
+                        call_expr,
+                    );
+                }
+                "default" => {
+                    if !have_features_from(PythonVersion::PY313) {
+                        // We don't return here; this error is informational since this will error
+                        // at runtime, but the user's intent is plain, we may as well respect it.
+                        error(
+                            &self.context,
+                            "The `default` parameter of `typing.ParamSpec` was added in Python 3.13",
+                            kwarg,
+                        );
+                    }
+                    default = Some(TypeVarDefaultEvaluation::Lazy);
+                }
+                name => {
+                    // We don't return here; this error is informational since this will error
+                    // at runtime, but it will likely cause fewer cascading errors if we just
+                    // ignore the unknown keyword and still understand as much of the typevar as we
+                    // can.
+                    error(
+                        &self.context,
+                        format_args!("Unknown keyword argument `{name}` in `ParamSpec` creation"),
+                        kwarg,
+                    );
+                    self.infer_expression(&kwarg.value, TypeContext::default());
+                }
+            }
+        }
+
+        let Some(name_param_ty) = name_param_ty.or_else(|| {
+            arguments
+                .find_positional(0)
+                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+        }) else {
+            return error(
+                &self.context,
+                "The `name` parameter of `ParamSpec` is required.",
+                call_expr,
+            );
+        };
+
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+            return error(
+                &self.context,
+                "The first argument to `ParamSpec` must be a string literal",
+                call_expr,
+            );
+        };
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `ParamSpec` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name_param != target_name {
+            return error(
+                &self.context,
+                format_args!(
+                    "The name of a `ParamSpec` (`{name_param}`) must match \
+                    the name of the variable it is assigned to (`{target_name}`)"
+                ),
+                target,
+            );
+        }
+
+        if default.is_some() {
+            self.deferred.insert(definition);
+        }
+
+        let identity =
+            TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::ParamSpec);
+        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db, identity, None, None, default,
+        )))
     }
 
     fn infer_legacy_typevar(
@@ -6808,22 +7013,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_class_type(self.db())
                     .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
-                if matches!(
-                    class.known(self.db()),
-                    Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar)
-                ) {
-                    // Inference of correctly-placed `TypeVar` definitions is done in
-                    // `TypeInferenceBuilder::infer_legacy_typevar`, and doesn't use the full
-                    // call-binding machinery. If we reach here, it means that someone is trying to
-                    // instantiate a `typing.TypeVar` in an invalid context.
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "A `TypeVar` definition must be a simple variable assignment",
-                        );
+                // Inference of correctly-placed `TypeVar` and `ParamSpec` definitions is done in
+                // `TypeInferenceBuilder::infer_legacy_typevar` and
+                // `TypeInferenceBuilder::infer_paramspec`, and doesn't use the full
+                // call-binding machinery. If we reach here, it means that someone is trying to
+                // instantiate a `typing.TypeVar` and `typing.ParamSpec` in an invalid context.
+                match class.known(self.db()) {
+                    Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar) => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                        {
+                            builder.into_diagnostic(
+                                "A `TypeVar` definition must be a simple variable assignment",
+                            );
+                        }
                     }
+                    Some(KnownClass::ParamSpec) => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_PARAMSPEC, call_expression)
+                        {
+                            builder.into_diagnostic(
+                                "A `ParamSpec` definition must be a simple variable assignment",
+                            );
+                        }
+                    }
+                    _ => {}
                 }
 
                 let db = self.db();

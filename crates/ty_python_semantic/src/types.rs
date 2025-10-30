@@ -7633,6 +7633,9 @@ impl<'db> KnownInstanceType<'db> {
     fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
+            Self::TypeVar(typevar_instance) if typevar_instance.kind(db).is_paramspec() => {
+                KnownClass::ParamSpec
+            }
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
                 KnownClass::GenericAlias
@@ -7697,7 +7700,13 @@ impl<'db> KnownInstanceType<'db> {
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
-                    KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+                    KnownInstanceType::TypeVar(typevar_instance) => {
+                        if typevar_instance.kind(self.db).is_paramspec() {
+                            f.write_str("typing.ParamSpec")
+                        } else {
+                            f.write_str("typing.TypeVar")
+                        }
+                    }
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
                         f.write_str("dataclasses.Field")?;
@@ -8123,11 +8132,19 @@ pub enum TypeVarKind {
     Pep695,
     /// `typing.Self`
     TypingSelf,
+    /// `P = ParamSpec("P")`
+    ParamSpec,
+    /// `def foo[**P]() -> None: ...`
+    Pep695ParamSpec,
 }
 
 impl TypeVarKind {
     const fn is_self(self) -> bool {
         matches!(self, Self::TypingSelf)
+    }
+
+    const fn is_paramspec(self) -> bool {
+        matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
     }
 }
 
@@ -8480,6 +8497,15 @@ impl<'db> TypeVarInstance<'db> {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 Some(definition_expression_type(db, definition, expr))
+            }
+            // PEP 695 ParamSpec
+            DefinitionKind::ParamSpec(paramspec) => {
+                let paramspec_node = paramspec.node(&module);
+                Some(definition_expression_type(
+                    db,
+                    definition,
+                    paramspec_node.default.as_ref()?,
+                ))
             }
             _ => None,
         }
