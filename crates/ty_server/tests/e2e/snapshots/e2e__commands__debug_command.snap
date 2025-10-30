@@ -61,6 +61,7 @@ Settings: Settings {
         "invalid-named-tuple": Error (Default),
         "invalid-overload": Error (Default),
         "invalid-parameter-default": Error (Default),
+        "invalid-paramspec": Error (Default),
         "invalid-protocol": Error (Default),
         "invalid-raise": Error (Default),
         "invalid-return-type": Error (Default),
