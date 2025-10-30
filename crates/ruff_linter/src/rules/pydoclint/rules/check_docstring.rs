@@ -1,9 +1,11 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
+use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -17,6 +19,7 @@ use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::registry::Rule;
+use crate::rules::pydocstyle::rules::UndocumentedParam;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
@@ -464,6 +467,7 @@ impl GenericSection {
 #[derive(Debug, Clone)]
 struct ParameterEntry<'a> {
     name: &'a str,
+    has_definition: bool,
     range: TextRange,
 }
 
@@ -523,6 +527,16 @@ impl<'a> ParametersSection<'a> {
             range: section.section_name_range(),
         }
     }
+
+    fn extends_from_section(&mut self, section: &SectionContext<'a>, style: Option<SectionStyle>) {
+        let mut new_entries = parse_parameters(
+            section.following_lines_str(),
+            section.following_range().start(),
+            style,
+        );
+
+        self.parameters.append(&mut new_entries);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -538,9 +552,21 @@ impl<'a> DocstringSections<'a> {
         let mut docstring_sections = Self::default();
         for section in sections {
             match section.kind() {
-                SectionKind::Args | SectionKind::Arguments | SectionKind::Parameters => {
-                    docstring_sections.parameters =
-                        Some(ParametersSection::from_section(&section, style));
+                SectionKind::Args
+                | SectionKind::Arguments
+                | SectionKind::Parameters
+                | SectionKind::KeywordArgs
+                | SectionKind::KeywordArguments
+                | SectionKind::OtherArgs
+                | SectionKind::OtherArguments
+                | SectionKind::OtherParams
+                | SectionKind::OtherParameters => {
+                    if let Some(ref mut parameters_section) = docstring_sections.parameters {
+                        parameters_section.extends_from_section(&section, style);
+                    } else {
+                        docstring_sections.parameters =
+                            Some(ParametersSection::from_section(&section, style));
+                    }
                 }
                 SectionKind::Raises => {
                     docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
@@ -569,11 +595,12 @@ fn parse_parameters(
 ) -> Vec<ParameterEntry<'_>> {
     match style {
         Some(SectionStyle::Google) => parse_parameters_google(content, content_start),
+
         Some(SectionStyle::Numpy) => parse_parameters_numpy(content, content_start),
         None => {
-            let entries = parse_parameters_google(content, content_start);
+            let entries = parse_parameters_numpy(content, content_start);
             if entries.is_empty() {
-                parse_parameters_numpy(content, content_start)
+                parse_parameters_google(content, content_start)
             } else {
                 entries
             }
@@ -607,7 +634,7 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
                 .next()
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
-                let Some((before_colon, _)) = entry.split_once(':') else {
+                let Some((before_colon, after_colon)) = entry.split_once(':') else {
                     continue;
                 };
                 if let Some(param) = before_colon.split_whitespace().next() {
@@ -615,14 +642,23 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
                     if is_identifier(param_name) {
                         let param_start = line_start + indentation.text_len();
                         let param_end = param_start + param.text_len();
+                        let has_definition = !after_colon.trim().is_empty();
 
                         entries.push(ParameterEntry {
                             name: param_name,
+                            has_definition,
                             range: TextRange::new(
                                 content_start + param_start,
                                 content_start + param_end,
                             ),
                         });
+                    }
+                }
+            } else {
+                // this is a follow up of the previous entry.
+                if !entry.trim().is_empty() {
+                    if let Some(last) = entries.last_mut() {
+                        last.has_definition = true;
                     }
                 }
             }
@@ -644,10 +680,14 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
 fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
     let mut entries: Vec<ParameterEntry> = Vec::new();
     let mut lines = content.lines();
-    let Some(dashes) = lines.next() else {
+    let Some(dashes_line) = lines.next() else {
         return entries;
     };
-    let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
+    let dashes = dashes_line.trim_start();
+    if dashes.is_empty() || !dashes.chars().all(|c| c == '-') {
+        return entries;
+    }
+    let indentation = &dashes_line[..dashes_line.len() - dashes.len()];
 
     let mut current_pos = content.full_line_end(dashes.text_len());
     for potential in lines {
@@ -669,6 +709,7 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
 
                         entries.push(ParameterEntry {
                             name: param_name,
+                            has_definition: true,
                             range: TextRange::new(
                                 content_start + param_start,
                                 content_start + param_end,
@@ -691,9 +732,9 @@ fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName
         Some(SectionStyle::Google) => parse_raises_google(content),
         Some(SectionStyle::Numpy) => parse_raises_numpy(content),
         None => {
-            let entries = parse_raises_google(content);
+            let entries = parse_raises_numpy(content);
             if entries.is_empty() {
-                parse_raises_numpy(content)
+                parse_raises_google(content)
             } else {
                 entries
             }
@@ -733,10 +774,14 @@ fn parse_raises_google(content: &str) -> Vec<QualifiedName<'_>> {
 fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut lines = content.lines();
-    let Some(dashes) = lines.next() else {
+    let Some(dashes_line) = lines.next() else {
         return entries;
     };
-    let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
+    let dashes = dashes_line.trim_start();
+    if dashes.is_empty() || !dashes.chars().all(|c| c == '-') {
+        return entries;
+    }
+    let indentation = &dashes_line[..dashes_line.len() - dashes.len()];
     for potential in lines {
         if let Some(entry) = potential.strip_prefix(indentation) {
             if let Some(first_char) = entry.chars().next() {
@@ -1130,14 +1175,24 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
-fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
+#[derive(Debug)]
+struct SignatureParameter<'a> {
+    name: &'a str,
+    is_variadic: bool,
+}
+
+fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<SignatureParameter<'a>> {
     let mut parameters = Vec::new();
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
     for param in &function.parameters {
-        parameters.push(param.name());
+        parameters.push(SignatureParameter {
+            name: param.name(),
+            is_variadic: param.is_variadic(),
+        });
     }
+
     parameters
 }
 
@@ -1173,10 +1228,6 @@ pub(crate) fn check_docstring(
 
     let semantic = checker.semantic();
 
-    if function_type::is_stub(function_def, semantic) {
-        return;
-    }
-
     // Prioritize the specified convention over the determined style.
     let docstring_sections = match convention {
         Some(Convention::Google) => {
@@ -1195,6 +1246,49 @@ pub(crate) fn check_docstring(
     };
 
     let signature_parameters = parameters_from_signature(docstring);
+
+    // DOC101
+    if checker.settings().preview.is_enabled() {
+        if checker.is_rule_enabled(Rule::UndocumentedParam) {
+            if let Some(parameters_section) = docstring_sections.parameters.as_ref() {
+                let mut missing_parameters = Vec::new();
+
+                // Here we check if the function is a method (and not a staticmethod)
+                // in which case we skip the first argument which should be `self` or
+                // `cls`, and does not need to be documented.
+                for signature_param in signature_parameters.iter().skip(usize::from(
+                    docstring.definition.is_method()
+                        && !is_staticmethod(&function_def.decorator_list, semantic),
+                )) {
+                    if !(checker.settings().pydocstyle.ignore_var_parameters()
+                        && signature_param.is_variadic)
+                        && !signature_param.name.starts_with('_')
+                        && !parameters_section.parameters.iter().any(|param| {
+                            &param.name == &signature_param.name && param.has_definition
+                        })
+                    {
+                        missing_parameters.push(signature_param.name.to_string());
+                    }
+                }
+
+                if !missing_parameters.is_empty() {
+                    if let Some(definition) = docstring.definition.name() {
+                        checker.report_diagnostic(
+                            UndocumentedParam {
+                                definition: definition.to_string(),
+                                names: missing_parameters,
+                            },
+                            function_def.identifier(),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    if function_type::is_stub(function_def, semantic) {
+        return;
+    }
 
     // DOC201
     if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
@@ -1290,7 +1384,10 @@ pub(crate) fn check_docstring(
         if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
             if let Some(docstring_params) = docstring_sections.parameters {
                 for docstring_param in &docstring_params.parameters {
-                    if !signature_parameters.contains(&docstring_param.name) {
+                    if !signature_parameters
+                        .iter()
+                        .any(|param| &param.name == &docstring_param.name)
+                    {
                         checker.report_diagnostic(
                             DocstringExtraneousParameter {
                                 id: docstring_param.name.to_string(),

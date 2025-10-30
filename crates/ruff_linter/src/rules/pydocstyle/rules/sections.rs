@@ -1237,9 +1237,9 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 #[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UndocumentedParam {
     /// The name of the function being documented.
-    definition: String,
+    pub(crate) definition: String,
     /// The names of the undocumented parameters.
-    names: Vec<String>,
+    pub(crate) names: Vec<String>,
 }
 
 impl Violation for UndocumentedParam {
@@ -1820,16 +1820,18 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
         }
     }
 
-    if !missing_arg_names.is_empty() {
-        if let Some(definition) = docstring.definition.name() {
-            let names = missing_arg_names.into_iter().sorted().collect();
-            checker.report_diagnostic(
-                UndocumentedParam {
-                    definition: definition.to_string(),
-                    names,
-                },
-                function.identifier(),
-            );
+    if checker.settings().preview.is_disabled() {
+        if !missing_arg_names.is_empty() {
+            if let Some(definition) = docstring.definition.name() {
+                let names = missing_arg_names.into_iter().sorted().collect();
+                checker.report_diagnostic(
+                    UndocumentedParam {
+                        definition: definition.to_string(),
+                        names,
+                    },
+                    function.identifier(),
+                );
+            }
         }
     }
 }
