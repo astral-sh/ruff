@@ -1408,6 +1408,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     {
                         self.visit_runtime_required_annotation(annotation);
                     }
+                    AnnotationContext::RuntimeEvaluated => {
+                        self.visit_runtime_evaluated_annotation(annotation);
+                    }
                     AnnotationContext::TypingOnly
                         if flake8_type_checking::helpers::is_dataclass_meta_annotation(
                             annotation,
@@ -1422,9 +1425,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             // Ex) `InitVar`
                             self.visit_runtime_required_annotation(annotation);
                         }
-                    }
-                    AnnotationContext::RuntimeEvaluated => {
-                        self.visit_runtime_evaluated_annotation(annotation);
                     }
                     AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
