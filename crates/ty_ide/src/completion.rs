@@ -213,10 +213,9 @@ pub fn completion<'db>(
 ) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
 
-    if is_in_comment(&parsed, offset)
-        || is_in_string(&parsed, offset)
-        || is_in_definition_place(&parsed, offset)
-    {
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+
+    if is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(tokens) {
         return vec![];
     }
 
@@ -833,8 +832,7 @@ fn find_typed_text(
 
 /// Whether the given offset within the parsed module is within
 /// a comment or not.
-fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = tokens_start_before(parsed.tokens(), offset);
+fn is_in_comment(tokens: &[Token]) -> bool {
     tokens.last().is_some_and(|t| t.kind().is_comment())
 }
 
@@ -843,8 +841,7 @@ fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
 ///
 /// Note that this will return `false` when positioned within an
 /// interpolation block in an f-string or a t-string.
-fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = tokens_start_before(parsed.tokens(), offset);
+fn is_in_string(tokens: &[Token]) -> bool {
     tokens.last().is_some_and(|t| {
         matches!(
             t.kind(),
@@ -856,14 +853,17 @@ fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
 /// If the tokens end with `class f` or `def f` we return true.
 /// If the tokens end with `class` or `def`, we return false.
 /// This is fine because we don't provide completions anyway.
-fn is_in_definition_place(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = tokens_start_before(parsed.tokens(), offset);
-
+fn is_in_definition_place(tokens: &[Token]) -> bool {
     tokens
         .len()
         .checked_sub(2)
         .and_then(|i| tokens.get(i))
-        .is_some_and(|t| matches!(t.kind(), TokenKind::Def | TokenKind::Class))
+        .is_some_and(|t| {
+            matches!(
+                t.kind(),
+                TokenKind::Def | TokenKind::Class | TokenKind::Type
+            )
+        })
 }
 
 /// Order completions according to the following rules:
@@ -4113,6 +4113,28 @@ class f<CURSOR>
         let builder = completion_test_builder(
             "\
 class <CURSOR>
+        ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
+    }
+
+    #[test]
+    fn no_completions_in_type_def_name() {
+        let builder = completion_test_builder(
+            "\
+type f<CURSOR> = int
+    ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
+    }
+
+    #[test]
+    fn no_completions_in_type_def_empty_name() {
+        let builder = completion_test_builder(
+            "\
+type <CURSOR>
         ",
         );
 
