@@ -45,31 +45,27 @@ def even_given_unsatisfiable_constraints():
 
 ## Type variables
 
-The interesting case is typevars. The other typing relationships (TODO: will) all "punt" on the
-question when considering a typevar, by translating the desired relationship into a constraint set.
+The interesting case is typevars. The other typing relationships all "punt" on the question when
+considering a typevar, by translating the desired relationship into a constraint set.
 
 ```py
 from typing import Any
 from ty_extensions import is_assignable_to, is_subtype_of
 
 def assignability[T]():
-    # TODO: revealed: ty_extensions.ConstraintSet[T@assignability ≤ bool]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability ≤ bool)]
     reveal_type(is_assignable_to(T, bool))
-    # TODO: revealed: ty_extensions.ConstraintSet[T@assignability ≤ int]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability ≤ int)]
     reveal_type(is_assignable_to(T, int))
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability = *)]
     reveal_type(is_assignable_to(T, object))
 
 def subtyping[T]():
-    # TODO: revealed: ty_extensions.ConstraintSet[T@subtyping ≤ bool]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping ≤ bool)]
     reveal_type(is_subtype_of(T, bool))
-    # TODO: revealed: ty_extensions.ConstraintSet[T@subtyping ≤ int]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping ≤ int)]
     reveal_type(is_subtype_of(T, int))
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping = *)]
     reveal_type(is_subtype_of(T, object))
 ```
 
@@ -88,49 +84,37 @@ class Contravariant[T]:
         pass
 
 def assignability[T]():
-    # aka [T@assignability ≤ object], which is always satisfiable
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability = *)]
     reveal_type(is_assignable_to(T, Any))
 
-    # aka [Never ≤ T@assignability], which is always satisfiable
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability = *)]
     reveal_type(is_assignable_to(Any, T))
 
-    # TODO: revealed: ty_extensions.ConstraintSet[T@assignability ≤ Covariant[object]]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability ≤ Covariant[object])]
     reveal_type(is_assignable_to(T, Covariant[Any]))
-    # TODO: revealed: ty_extensions.ConstraintSet[Covariant[Never] ≤ T@assignability]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(Covariant[Never] ≤ T@assignability)]
     reveal_type(is_assignable_to(Covariant[Any], T))
 
-    # TODO: revealed: ty_extensions.ConstraintSet[T@assignability ≤ Contravariant[Never]]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@assignability ≤ Contravariant[Never])]
     reveal_type(is_assignable_to(T, Contravariant[Any]))
-    # TODO: revealed: ty_extensions.ConstraintSet[Contravariant[object] ≤ T@assignability]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(Contravariant[object] ≤ T@assignability)]
     reveal_type(is_assignable_to(Contravariant[Any], T))
 
 def subtyping[T]():
-    # aka [T@assignability ≤ object], which is always satisfiable
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping = Never)]
     reveal_type(is_subtype_of(T, Any))
 
-    # aka [Never ≤ T@assignability], which is always satisfiable
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping = object)]
     reveal_type(is_subtype_of(Any, T))
 
-    # TODO: revealed: ty_extensions.ConstraintSet[T@subtyping ≤ Covariant[Never]]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping ≤ Covariant[Never])]
     reveal_type(is_subtype_of(T, Covariant[Any]))
-    # TODO: revealed: ty_extensions.ConstraintSet[Covariant[object] ≤ T@subtyping]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(Covariant[object] ≤ T@subtyping)]
     reveal_type(is_subtype_of(Covariant[Any], T))
 
-    # TODO: revealed: ty_extensions.ConstraintSet[T@subtyping ≤ Contravariant[object]]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@subtyping ≤ Contravariant[object])]
     reveal_type(is_subtype_of(T, Contravariant[Any]))
-    # TODO: revealed: ty_extensions.ConstraintSet[Contravariant[Never] ≤ T@subtyping]
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(Contravariant[Never] ≤ T@subtyping)]
     reveal_type(is_subtype_of(Contravariant[Any], T))
 ```
 
