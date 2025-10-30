@@ -588,6 +588,28 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+### `__new__`
+
+`__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
+argument:
+
+```py
+from typing_extensions import Self
+
+reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
+reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
+# revealed: Overload[(cls, x: @Todo(Support for `typing.TypeAlias`) = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type(int.__new__)
+# revealed: Overload[(cls, x: @Todo(Support for `typing.TypeAlias`) = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type((42).__new__)
+
+class X:
+    def __init__(self, val: int): ...
+    def make_another(self) -> Self:
+        reveal_type(self.__new__)  # revealed: def __new__(cls) -> Self@__new__
+        return self.__new__(X)
+```
+
 ## Builtin functions and methods
 
 Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
