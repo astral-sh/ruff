@@ -6957,7 +6957,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 if matches!(
                     bound_typevar.typevar(db).kind(db),
-                    TypeVarKind::Legacy | TypeVarKind::TypingSelf
+                    TypeVarKind::Legacy | TypeVarKind::TypingSelf | TypeVarKind::ParamSpec
                 ) && binding_context.is_none_or(|binding_context| {
                     bound_typevar.binding_context(db) == BindingContext::Definition(binding_context)
                 }) {
