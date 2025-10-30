@@ -212,7 +212,11 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
-    if is_in_comment(&parsed, offset) || is_in_string(&parsed, offset) {
+
+    if is_in_comment(&parsed, offset)
+        || is_in_string(&parsed, offset)
+        || is_in_definition_place(&parsed, offset)
+    {
         return vec![];
     }
 
@@ -847,6 +851,19 @@ fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
             TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
         )
     })
+}
+
+fn is_in_definition_place(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+
+    // If the tokens end with `class f` or `def f` we return true.
+    // If the tokens end with `class` or `def`, we return false.
+    // This is fine because we don't provide completions anyway.
+    tokens
+        .len()
+        .checked_sub(2)
+        .and_then(|i| tokens.get(i))
+        .is_some_and(|t| matches!(t.kind(), TokenKind::Def | TokenKind::Class))
 }
 
 /// Order completions according to the following rules:
@@ -4056,6 +4073,50 @@ def f[T](x: T):
 ",
         );
         test.build().contains("__repr__");
+    }
+
+    #[test]
+    fn no_completions_in_function_def_name() {
+        let builder = completion_test_builder(
+            "\
+def f<CURSOR>
+    ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
+    }
+
+    #[test]
+    fn no_completions_in_function_def_empty_name() {
+        let builder = completion_test_builder(
+            "\
+    def <CURSOR>
+        ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
+    }
+
+    #[test]
+    fn no_completions_in_class_def_name() {
+        let builder = completion_test_builder(
+            "\
+class f<CURSOR>
+    ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
+    }
+
+    #[test]
+    fn no_completions_in_class_def_empty_name() {
+        let builder = completion_test_builder(
+            "\
+    class <CURSOR>
+        ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
