@@ -4090,7 +4090,7 @@ def f<CURSOR>
     fn no_completions_in_function_def_empty_name() {
         let builder = completion_test_builder(
             "\
-    def <CURSOR>
+def <CURSOR>
         ",
         );
 
@@ -4112,7 +4112,7 @@ class f<CURSOR>
     fn no_completions_in_class_def_empty_name() {
         let builder = completion_test_builder(
             "\
-    class <CURSOR>
+class <CURSOR>
         ",
         );
 
