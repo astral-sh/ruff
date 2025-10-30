@@ -571,8 +571,6 @@ reveal_type(C("42").get_name())  # revealed: str
 ### Built-in `staticmethod` descriptor
 
 ```py
-import inspect
-
 class C:
     @staticmethod
     def helper(value: str) -> str:
