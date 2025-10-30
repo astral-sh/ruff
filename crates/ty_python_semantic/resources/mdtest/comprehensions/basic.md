@@ -3,71 +3,47 @@
 ## Basic comprehensions
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
+# revealed: int
+[reveal_type(x) for x in range(3)]
 
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
+class Row:
+    def __next__(self) -> range:
+        return range(3)
+
+class Table:
+    def __iter__(self) -> Row:
+        return Row()
+
+# revealed: tuple[int, range]
+[reveal_type((cell, row)) for row in Table() for cell in row]
 
 # revealed: int
-[reveal_type(x) for x in IntIterable()]
-
-class IteratorOfIterables:
-    def __next__(self) -> IntIterable:
-        return IntIterable()
-
-class IterableOfIterables:
-    def __iter__(self) -> IteratorOfIterables:
-        return IteratorOfIterables()
-
-# revealed: tuple[int, IntIterable]
-[reveal_type((x, y)) for y in IterableOfIterables() for x in y]
+{reveal_type(x): 0 for x in range(3)}
 
 # revealed: int
-{reveal_type(x): 0 for x in IntIterable()}
-
-# revealed: int
-{0: reveal_type(x) for x in IntIterable()}
+{0: reveal_type(x) for x in range(3)}
 ```
 
 ## Nested comprehension
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 # revealed: tuple[int, int]
-[[reveal_type((x, y)) for x in IntIterable()] for y in IntIterable()]
+[[reveal_type((x, y)) for x in range(3)] for y in range(3)]
 ```
 
 ## Comprehension referencing outer comprehension
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
+class Row:
+    def __next__(self) -> range:
+        return range(3)
 
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
+class Table:
+    def __iter__(self) -> Row:
+        return Row()
 
-class IteratorOfIterables:
-    def __next__(self) -> IntIterable:
-        return IntIterable()
-
-class IterableOfIterables:
-    def __iter__(self) -> IteratorOfIterables:
-        return IteratorOfIterables()
-
-# revealed: tuple[int, IntIterable]
-[[reveal_type((x, y)) for x in y] for y in IterableOfIterables()]
+# revealed: tuple[int, range]
+[[reveal_type((cell, row)) for cell in row] for row in Table()]
 ```
 
 ## Comprehension with unbound iterable
@@ -79,17 +55,9 @@ Iterating over an unbound iterable yields `Unknown`:
 # revealed: Unknown
 [reveal_type(z) for z in x]
 
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 # error: [not-iterable] "Object of type `int` is not iterable"
 # revealed: tuple[int, Unknown]
-[reveal_type((x, z)) for x in IntIterable() for z in x]
+[reveal_type((x, z)) for x in range(3) for z in x]
 ```
 
 ## Starred expressions
@@ -99,16 +67,8 @@ Starred expressions must be iterable
 ```py
 class NotIterable: ...
 
-class Iterator:
-    def __next__(self) -> int:
-        return 42
-
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
-
 # This is fine:
-x = [*Iterable()]
+x = [*range(3)]
 
 # error: [not-iterable] "Object of type `NotIterable` is not iterable"
 y = [*NotIterable()]
@@ -138,16 +98,8 @@ This tests that we understand that `async` comprehensions do *not* work accordin
 iteration protocol
 
 ```py
-class Iterator:
-    def __next__(self) -> int:
-        return 42
-
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
-
 async def _():
-    # error: [not-iterable] "Object of type `Iterable` is not async-iterable"
+    # error: [not-iterable] "Object of type `range` is not async-iterable"
     # revealed: Unknown
-    [reveal_type(x) async for x in Iterable()]
+    [reveal_type(x) async for x in range(3)]
 ```
