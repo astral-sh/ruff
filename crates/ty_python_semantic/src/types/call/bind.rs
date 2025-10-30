@@ -163,7 +163,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
+        self.evaluate_known_cases(db, dataclass_field_specifiers);
 
         // In order of precedence:
         //
@@ -285,12 +285,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(
-        &mut self,
-        db: &'db dyn Db,
-        argument_types: &CallArguments<'_, 'db>,
-        dataclass_field_specifiers: &[Type<'db>],
-    ) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db, dataclass_field_specifiers: &[Type<'db>]) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
