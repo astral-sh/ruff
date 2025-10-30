@@ -1051,16 +1051,10 @@ impl<'db> ClassType<'db> {
             return Type::Callable(metaclass_dunder_call_function.into_callable_type(db));
         }
 
-        let dunder_new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            )
-            .place;
+        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
 
         let dunder_new_signature = dunder_new_function_symbol
-            .ignore_possibly_undefined()
+            .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
             .and_then(|ty| match ty {
                 Type::FunctionLiteral(function) => Some(function.signature(db)),
                 Type::Callable(callable) => Some(callable.signatures(db)),
