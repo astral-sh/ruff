@@ -3412,10 +3412,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     where
         F: Fn(&mut Self, TypeContext<'db>) -> Type<'db>,
     {
-        self.infer_target_impl(target, value, &|builder, tcx| match target {
-            ast::Expr::Name(_) => None,
-            _ => Some(infer_value_expr(builder, tcx)),
-        });
+        match target {
+            ast::Expr::Name(_) => {
+                self.infer_target_impl(target, value, None);
+            }
+
+            _ => self.infer_target_impl(
+                target,
+                value,
+                Some(&|builder, tcx| infer_value_expr(builder, tcx)),
+            ),
+        }
     }
 
     /// Make sure that the subscript assignment `obj[slice] = value` is valid.
@@ -4200,20 +4207,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn infer_target_impl(
         &mut self,
         target: &ast::Expr,
         value: &ast::Expr,
-        infer_assigned_ty: &dyn Fn(&mut Self, TypeContext<'db>) -> Option<Type<'db>>,
+        infer_assigned_ty: Option<&dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>>,
     ) {
         match target {
             ast::Expr::Name(name) => {
-                infer_assigned_ty(self, TypeContext::default());
+                if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    infer_assigned_ty(self, TypeContext::default());
+                }
+
                 self.infer_definition(name);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let assigned_ty = infer_assigned_ty(self, TypeContext::default());
+                let assigned_ty = infer_assigned_ty.map(|f| f(self, TypeContext::default()));
 
                 if let Some(tuple_spec) =
                     assigned_ty.and_then(|ty| ty.tuple_instance_spec(self.db()))
@@ -4221,13 +4232,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let assigned_tys = tuple_spec.all_elements().copied().collect::<Vec<_>>();
 
                     for (i, element) in elts.iter().enumerate() {
-                        self.infer_target_impl(element, value, &|_, _| {
-                            assigned_tys.get(i).copied()
-                        });
+                        match assigned_tys.get(i).copied() {
+                            None => self.infer_target_impl(element, value, None),
+                            Some(ty) => self.infer_target_impl(element, value, Some(&|_, _| ty)),
+                        }
                     }
                 } else {
                     for element in elts {
-                        self.infer_target_impl(element, value, &|_, _| None);
+                        self.infer_target_impl(element, value, None);
                     }
                 }
             }
@@ -4241,31 +4253,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let object_ty = self.infer_expression(object, TypeContext::default());
 
-                let infer_assigned_ty = &|builder: &mut Self, tcx| {
-                    let assigned_ty = infer_assigned_ty(builder, tcx).unwrap_or(Type::unknown());
-                    builder.store_expression_type(target, assigned_ty);
-                    assigned_ty
-                };
+                if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    let infer_assigned_ty = &|builder: &mut Self, tcx| {
+                        let assigned_ty = infer_assigned_ty(builder, tcx);
+                        builder.store_expression_type(target, assigned_ty);
+                        assigned_ty
+                    };
 
-                self.validate_attribute_assignment(
-                    attr_expr,
-                    object_ty,
-                    attr.id(),
-                    infer_assigned_ty,
-                    true,
-                );
+                    self.validate_attribute_assignment(
+                        attr_expr,
+                        object_ty,
+                        attr.id(),
+                        infer_assigned_ty,
+                        true,
+                    );
+                }
             }
             ast::Expr::Subscript(subscript_expr) => {
-                let assigned_ty = infer_assigned_ty(self, TypeContext::default());
+                let assigned_ty = infer_assigned_ty.map(|f| f(self, TypeContext::default()));
                 self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
 
                 if let Some(assigned_ty) = assigned_ty {
                     self.validate_subscript_assignment(subscript_expr, value, assigned_ty);
                 }
             }
+
+            // TODO: Remove this once we handle all possible assignment targets.
             _ => {
-                // TODO: Remove this once we handle all possible assignment targets.
-                infer_assigned_ty(self, TypeContext::default());
+                if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    infer_assigned_ty(self, TypeContext::default());
+                }
+
                 self.infer_expression(target, TypeContext::default());
             }
         }
