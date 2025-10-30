@@ -4058,6 +4058,85 @@ def f[T](x: T):
         test.build().contains("__repr__");
     }
 
+    #[test]
+    fn reexport_simple_import_noauto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import foo
+foo.ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"ZQZQ :: Current module");
+    }
+
+    #[test]
+    fn reexport_simple_import_auto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"ZQZQ :: bar");
+    }
+
+    #[test]
+    fn reexport_redundant_convention_import_noauto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import foo
+foo.ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ as ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"ZQZQ :: Current module");
+    }
+
+    #[test]
+    fn reexport_redundant_convention_import_auto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ as ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @r"
+        ZQZQ :: bar
+        ZQZQ :: foo
+        ");
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///

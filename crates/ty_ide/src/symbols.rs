@@ -9,8 +9,8 @@ use regex::Regex;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexVec, newtype_index};
+use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
 
@@ -334,7 +334,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
-        symbols: visitor.symbols,
+        symbols: visitor.into_symbols(),
     }
 }
 
@@ -356,7 +356,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
-        symbols: visitor.symbols,
+        symbols: visitor.into_symbols(),
     }
 }
 
@@ -367,6 +367,13 @@ struct SymbolTree {
     kind: SymbolKind,
     name_range: TextRange,
     full_range: TextRange,
+    re_export: Option<ReExport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+enum ReExport {
+    Normal,
+    RedundantAlias,
 }
 
 /// A visitor over all symbols in a single file.
@@ -382,7 +389,45 @@ struct SymbolVisitor {
 }
 
 impl SymbolVisitor {
-    fn visit_body(&mut self, body: &[Stmt]) {
+    fn into_symbols(self) -> IndexVec<SymbolId, SymbolTree> {
+        // We want to filter out some of the symbols we collected.
+        // But, we always assigned IDs to each symbol based on
+        // their position in a sequence. So when we filter some
+        // out, we need to remap the identifiers.
+        //
+        // N.B. This can be skipped when `global_only` is true,
+        // since in that case, none of the symbols have a parent
+        // ID by construction.
+        let mut remap = IndexVec::with_capacity(self.symbols.len());
+        let mut new = IndexVec::with_capacity(self.symbols.len());
+        for mut symbol in self.symbols {
+            if symbol.re_export == Some(ReExport::Normal) {
+                remap.push(None);
+                continue;
+            }
+            if let Some(ref mut parent) = symbol.parent {
+                // OK because the visitor guarantees that
+                // all parents have IDs less than their
+                // children. So its ID has already been
+                // remapped.
+                if let Some(new_parent) = remap[*parent] {
+                    *parent = new_parent;
+                } else {
+                    // The parent symbol was dropped, so
+                    // all of its children should be as
+                    // well.
+                    remap.push(None);
+                    continue;
+                }
+            }
+            let new_id = new.next_index();
+            remap.push(Some(new_id));
+            new.push(symbol);
+        }
+        new
+    }
+
+    fn visit_body(&mut self, body: &[ast::Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
         }
@@ -399,6 +444,30 @@ impl SymbolVisitor {
         let symbol_id = self.symbols.next_index();
         self.symbols.push(symbol);
         symbol_id
+    }
+
+    fn add_import_alias(&mut self, stmt: &ast::Stmt, alias: &ast::Alias) -> SymbolId {
+        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+        let kind = if Self::is_constant_name(name.as_str()) {
+            SymbolKind::Constant
+        } else {
+            SymbolKind::Variable
+        };
+        let re_export = Some(
+            if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
+                ReExport::RedundantAlias
+            } else {
+                ReExport::Normal
+            },
+        );
+        self.add_symbol(SymbolTree {
+            parent: None,
+            name: name.id.to_string(),
+            kind,
+            name_range: name.range(),
+            full_range: stmt.range(),
+            re_export,
+        })
     }
 
     fn push_symbol(&mut self, symbol: SymbolTree) {
@@ -423,9 +492,9 @@ impl SymbolVisitor {
 }
 
 impl SourceOrderVisitor<'_> for SymbolVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         match stmt {
-            Stmt::FunctionDef(func_def) => {
+            ast::Stmt::FunctionDef(func_def) => {
                 let kind = if self
                     .iter_symbol_stack()
                     .any(|s| s.kind == SymbolKind::Class)
@@ -445,6 +514,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind,
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
 
                 if self.global_only {
@@ -467,13 +537,14 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 self.pop_symbol();
             }
 
-            Stmt::ClassDef(class_def) => {
+            ast::Stmt::ClassDef(class_def) => {
                 let symbol = SymbolTree {
                     parent: None,
                     name: class_def.name.to_string(),
                     kind: SymbolKind::Class,
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
 
                 if self.global_only {
@@ -487,13 +558,15 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 self.pop_symbol();
             }
 
-            Stmt::Assign(assign) => {
+            ast::Stmt::Assign(assign) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
                 }
                 for target in &assign.targets {
-                    let Expr::Name(name) = target else { continue };
+                    let ast::Expr::Name(name) = target else {
+                        continue;
+                    };
                     let kind = if Self::is_constant_name(name.id.as_str()) {
                         SymbolKind::Constant
                     } else if self
@@ -511,17 +584,18 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                         kind,
                         name_range: name.range(),
                         full_range: stmt.range(),
+                        re_export: None,
                     };
                     self.add_symbol(symbol);
                 }
             }
 
-            Stmt::AnnAssign(ann_assign) => {
+            ast::Stmt::AnnAssign(ann_assign) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
                 }
-                let Expr::Name(name) = &*ann_assign.target else {
+                let ast::Expr::Name(name) = &*ann_assign.target else {
                     return;
                 };
                 let kind = if Self::is_constant_name(name.id.as_str()) {
@@ -541,8 +615,29 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind,
                     name_range: name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
                 self.add_symbol(symbol);
+            }
+
+            ast::Stmt::Import(import) => {
+                // We only consider imports in global scope.
+                if self.in_function {
+                    return;
+                }
+                for alias in &import.names {
+                    self.add_import_alias(stmt, alias);
+                }
+            }
+
+            ast::Stmt::ImportFrom(import_from) => {
+                // We only consider imports in global scope.
+                if self.in_function {
+                    return;
+                }
+                for alias in &import_from.names {
+                    self.add_import_alias(stmt, alias);
+                }
             }
 
             _ => {
