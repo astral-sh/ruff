@@ -859,12 +859,17 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
         .checked_sub(2)
         .and_then(|i| tokens.get(i))
         .is_some_and(|t| {
-            matches!(
+            if matches!(
                 t.kind(),
                 TokenKind::Def | TokenKind::Class | TokenKind::Type
-            ) || file.read_to_string(db).is_ok_and(|source| {
-                source[t.range().start().to_usize()..t.range().end().to_usize()] == *"type"
-            })
+            ) {
+                true
+            } else if t.kind() == TokenKind::Name {
+                let source = source_text(db, file);
+                &source[t.range()] == "type"
+            } else {
+                false
+            }
         })
 }
 
