@@ -132,7 +132,7 @@ def bounded[T: Base]():
     constraints = ConstraintSet.range(Never, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T ≤ Unrelated).
-    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
 
     # Never is the only type that satisfies both (T ≤ Base) and (T ≤ Unrelated). So there is no
     # valid specialization that satisfies (T ≤ Unrelated ∧ T ≠ Never).
