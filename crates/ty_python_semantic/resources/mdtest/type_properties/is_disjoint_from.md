@@ -87,6 +87,31 @@ static_assert(is_disjoint_from(memoryview, Foo))
 static_assert(is_disjoint_from(type[memoryview], type[Foo]))
 ```
 
+## Specialized `@final` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_disjoint_from
+
+@final
+class Foo[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+static_assert(not is_disjoint_from(Foo[A], Foo[B]))
+
+# TODO: `int` and `str` are disjoint bases, so these should be disjoint.
+static_assert(not is_disjoint_from(Foo[int], Foo[str]))
+```
+
 ## "Disjoint base" builtin types
 
 Most other builtins can be subclassed and can even be used in multiple inheritance. However, builtin
