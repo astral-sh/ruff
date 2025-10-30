@@ -3236,14 +3236,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return;
         };
-
         let previous_deferred_state =
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+        let default_ty = self.infer_paramspec_default(default);
+        self.store_expression_type(default, default_ty);
+        self.deferred_state = previous_deferred_state;
+    }
 
+    fn infer_paramspec_default(&mut self, default: &ast::Expr) -> Type<'db> {
         // This is the same logic as `TypeInferenceBuilder::infer_callable_parameter_types` except
         // for the subscript branch which is required for `Concatenate` but that cannot be
         // specified in this context.
-        let default_ty = match &**default {
+        match default {
             ast::Expr::EllipsisLiteral(_) => {
                 CallableType::single(self.db(), Signature::new(Parameters::gradual_form(), None))
             }
@@ -3289,8 +3293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if is_paramspec {
                     name_ty
                 } else {
-                    if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, &**default)
-                    {
+                    if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default) {
                         builder.into_diagnostic(
                             "The default value to `ParamSpec` must be either a list of types, \
                         `ParamSpec`, or `...`",
@@ -3300,7 +3303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             _ => {
-                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, &**default) {
+                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default) {
                     builder.into_diagnostic(
                         "The default value to `ParamSpec` must be either a list of types, \
                         `ParamSpec`, or `...`",
@@ -3308,10 +3311,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 Type::unknown()
             }
-        };
-
-        self.store_expression_type(default, default_ty);
-        self.deferred_state = previous_deferred_state;
+        }
     }
 
     fn infer_typevartuple_definition(
@@ -4761,8 +4761,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
-        // Infer deferred bounds/constraints/defaults of a legacy TypeVar.
-        let ast::Expr::Call(ast::ExprCall { arguments, .. }) = value else {
+        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec.
+        let ast::Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = value
+        else {
             return;
         };
         for arg in arguments.args.iter().skip(1) {
@@ -4771,10 +4774,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(bound) = arguments.find_keyword("bound") {
             self.infer_type_expression(&bound.value);
         }
-        // TODO: We need to differentiate between the `default` argument to `TypeVar` and
-        // `ParamSpec` because the types they accept are different.
         if let Some(default) = arguments.find_keyword("default") {
-            self.infer_type_expression(&default.value);
+            let func_ty = self.get_or_infer_expression(func, TypeContext::default());
+            if func_ty.as_class_literal().is_some_and(|class_literal| {
+                class_literal.is_known(self.db(), KnownClass::ParamSpec)
+            }) {
+                self.infer_paramspec_default(&default.value);
+            } else {
+                self.infer_type_expression(&default.value);
+            }
         }
     }
 

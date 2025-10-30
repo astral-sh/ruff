@@ -88,9 +88,9 @@ python-version = "3.13"
 ```py
 from typing import ParamSpec
 
-# TODO: This is not an error
-# error: [invalid-type-form]
-P = ParamSpec("P", default=[int, str])
+P1 = ParamSpec("P1", default=[int, str])
+P2 = ParamSpec("P2", default=...)
+P3 = ParamSpec("P3", default=P2)
 ```
 
 ### PEP 695
