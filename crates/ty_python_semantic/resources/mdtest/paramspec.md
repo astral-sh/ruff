@@ -117,6 +117,8 @@ ParamSpec, when defined using the new syntax, does not allow defining bounds or 
 This results in a lot of syntax errors mainly because the AST doesn't accept them in this position.
 We could do a better job in recovering from these errors.
 
+<!-- blacken-docs:off -->
+
 ```py
 # error: [invalid-syntax]
 # error: [invalid-syntax]
@@ -129,3 +131,5 @@ def foo[**P: int]() -> None:
     # error: [invalid-syntax]
     pass
 ```
+
+<!-- blacken-docs:on -->
