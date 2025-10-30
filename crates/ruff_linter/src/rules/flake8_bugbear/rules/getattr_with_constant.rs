@@ -66,14 +66,15 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     if is_mangled_private(value.to_str()) {
         return;
     }
+    if !checker.semantic().match_builtin_expr(func, "getattr") {
+        return;
+    }
+
     // Ignore non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
     // attribute syntax (e.g., `obj.attr`) would normalize the name and potentially change
     // program behavior.
     let attr_name = value.to_str();
     if attr_name.nfkc().collect::<String>() != attr_name {
-        return;
-    }
-    if !checker.semantic().match_builtin_expr(func, "getattr") {
         return;
     }
 
