@@ -1040,7 +1040,7 @@ impl<'db> Node<'db> {
                 // If the typevar is in inferable position, we need to verify that some valid
                 // specialization satisfies the constraint set.
                 let valid_specializations = typevar.valid_specializations(db);
-                if !some_specialization_satisfies(valid_specializations) {
+                if !some_specialization_satisfies(valid_specializations.node) {
                     return false;
                 }
             } else {
@@ -2965,7 +2965,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// Returns the valid specializations of a typevar. This is used when checking a constraint set
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
-    fn valid_specializations(self, db: &'db dyn Db) -> Node<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
         // For gradual upper bounds and constraints, we are free to choose any materialization that
         // makes the check succeed. In inferable positions, it is most helpful to choose a
         // materialization that is as permissive as possible, since that maximizes the number of
@@ -2977,10 +2977,10 @@ impl<'db> BoundTypeVarInstance<'db> {
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
-            None => Node::AlwaysTrue,
+            None => ConstraintSet::from(true),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
-                ConstrainedTypeVar::new_node(db, self, Type::Never, bound)
+                ConstrainedTypeVar::new_node(db, self, Type::Never, bound).into()
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = Node::AlwaysFalse;
@@ -2992,7 +2992,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper),
                     );
                 }
-                specializations
+                specializations.into()
             }
         }
     }
@@ -3066,7 +3066,7 @@ impl<'db> GenericContext<'db> {
         let abstracted = self
             .variables(db)
             .fold(constraints.node, |constraints, bound_typevar| {
-                constraints.and(db, bound_typevar.valid_specializations(db))
+                constraints.and(db, bound_typevar.valid_specializations(db).node)
             });
 
         // Then we find all of the "representative types" for each typevar in the constraint set.
