@@ -55,7 +55,9 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
                 let mut lsp_range = None;
                 for &range in &ranges {
                     lsp_range = Some(LspSelectionRange {
-                        range: range.to_lsp_range(&source, &line_index, snapshot.encoding()),
+                        range: range
+                            .as_lsp_range(db, file, snapshot.encoding())
+                            .to_local_range(),
                         parent: lsp_range.map(Box::new),
                     });
                 }

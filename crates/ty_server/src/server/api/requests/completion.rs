@@ -73,9 +73,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
                 let type_display = comp.ty.map(|ty| ty.display(db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
-                    let range =
-                        edit.range()
-                            .to_lsp_range(&source, &line_index, snapshot.encoding());
+                    let range = edit
+                        .range()
+                        .as_lsp_range(db, file, snapshot.encoding())
+                        .to_local_range();
                     TextEdit {
                         range,
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),

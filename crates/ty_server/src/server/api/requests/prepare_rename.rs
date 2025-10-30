@@ -51,7 +51,9 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let lsp_range = range.to_lsp_range(&source, &line_index, snapshot.encoding());
+        let lsp_range = range
+            .as_lsp_range(db, file, snapshot.encoding())
+            .to_local_range();
 
         Ok(Some(PrepareRenameResponse::Range(lsp_range)))
     }

@@ -58,7 +58,8 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
             .map(|target| {
                 let range = target
                     .range()
-                    .to_lsp_range(&source, &line_index, snapshot.encoding());
+                    .as_lsp_range(db, file, snapshot.encoding())
+                    .to_local_range();
 
                 let kind = match target.kind() {
                     ReferenceKind::Read => Some(DocumentHighlightKind::READ),

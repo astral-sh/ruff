@@ -2,8 +2,6 @@ use std::borrow::Cow;
 
 use lsp_types::request::DocumentSymbolRequest;
 use lsp_types::{DocumentSymbol, DocumentSymbolParams, SymbolInformation, Url};
-use ruff_db::source::{line_index, source_text};
-use ruff_source_file::LineIndex;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
 use ty_project::ProjectDatabase;
 
@@ -30,7 +28,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: DocumentSymbolParams,
+        _params: DocumentSymbolParams,
     ) -> crate::server::Result<Option<lsp_types::DocumentSymbolResponse>> {
         if snapshot
             .workspace_settings()
@@ -42,9 +40,6 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         let Some(file) = snapshot.to_file(db) else {
             return Ok(None);
         };
-
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
 
         // Check if the client supports hierarchical document symbols
         let supports_hierarchical = snapshot
@@ -65,8 +60,8 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
                         &symbols,
                         id,
                         symbol,
-                        &source,
-                        &line_index,
+                        db,
+                        file,
                         snapshot.encoding(),
                     )
                 })
@@ -77,14 +72,8 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             // Return flattened symbols as SymbolInformation
             let lsp_symbols: Vec<SymbolInformation> = symbols
                 .iter()
-                .map(|(_, symbol)| {
-                    convert_to_lsp_symbol_information(
-                        symbol,
-                        &params.text_document.uri,
-                        &source,
-                        &line_index,
-                        snapshot.encoding(),
-                    )
+                .filter_map(|(_, symbol)| {
+                    convert_to_lsp_symbol_information(db, file, symbol, snapshot.encoding())
                 })
                 .collect();
 
@@ -99,8 +88,8 @@ fn convert_to_lsp_document_symbol(
     symbols: &HierarchicalSymbols,
     id: SymbolId,
     symbol: SymbolInfo<'_>,
-    source: &str,
-    line_index: &LineIndex,
+    db: &dyn ty_project::Db,
+    file: ruff_db::files::File,
     encoding: PositionEncoding,
 ) -> DocumentSymbol {
     let symbol_kind = convert_symbol_kind(symbol.kind);
@@ -112,15 +101,19 @@ fn convert_to_lsp_document_symbol(
         tags: None,
         #[allow(deprecated)]
         deprecated: None,
-        range: symbol.full_range.to_lsp_range(source, line_index, encoding),
-        selection_range: symbol.name_range.to_lsp_range(source, line_index, encoding),
+        range: symbol
+            .full_range
+            .as_lsp_range(db, file, encoding)
+            .to_local_range(),
+        selection_range: symbol
+            .name_range
+            .as_lsp_range(db, file, encoding)
+            .to_local_range(),
         children: Some(
             symbols
                 .children(id)
                 .map(|(child_id, child)| {
-                    convert_to_lsp_document_symbol(
-                        symbols, child_id, child, source, line_index, encoding,
-                    )
+                    convert_to_lsp_document_symbol(symbols, child_id, child, db, file, encoding)
                 })
                 .collect(),
         ),

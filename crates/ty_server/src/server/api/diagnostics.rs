@@ -3,13 +3,13 @@ use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
-    NumberOrString, PublishDiagnosticsParams, Range, Url,
+    NumberOrString, PublishDiagnosticsParams, Url,
 };
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
-use ruff_db::source::{line_index, source_text};
+
 use ruff_db::system::SystemPathBuf;
 use ty_project::{Db, ProjectDatabase};
 
@@ -62,19 +62,23 @@ impl Diagnostics<'_> {
                 cell_diagnostics.entry(cell_url.clone()).or_default();
             }
 
-            for (cell_index, diagnostic) in self.items.iter().map(|diagnostic| {
-                (
-                    // TODO: Use the cell index instead using `SourceKind`
-                    usize::default(),
-                    to_lsp_diagnostic(db, diagnostic, self.encoding),
-                )
-            }) {
-                let Some(cell_uri) = notebook.cell_uri_by_index(cell_index) else {
-                    tracing::warn!("Unable to find notebook cell at index {cell_index}");
+            for diagnostic in &self.items {
+                let location = diagnostic.primary_span().and_then(|span| {
+                    let file = span.expect_ty_file();
+                    span.range()?
+                        .as_lsp_range(db, file, self.encoding)
+                        .to_location()
+                });
+
+                let Some(location) = location else {
+                    tracing::warn!("Unable to find notebook cell");
                     continue;
                 };
+
+                let diagnostic = to_lsp_diagnostic(db, diagnostic, location.range, self.encoding);
+
                 cell_diagnostics
-                    .entry(cell_uri.clone())
+                    .entry(location.uri)
                     .or_default()
                     .push(diagnostic);
             }
@@ -84,7 +88,20 @@ impl Diagnostics<'_> {
             LspDiagnostics::TextDocument(
                 self.items
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.encoding))
+                    .map(|diagnostic| {
+                        let range = diagnostic
+                            .primary_span()
+                            .and_then(|span| {
+                                let file = span.expect_ty_file();
+                                Some(
+                                    span.range()?
+                                        .as_lsp_range(db, file, self.encoding)
+                                        .to_local_range(),
+                                )
+                            })
+                            .unwrap_or_default();
+                        to_lsp_diagnostic(db, diagnostic, range, self.encoding)
+                    })
                     .collect(),
             )
         }
@@ -238,7 +255,20 @@ pub(crate) fn publish_settings_diagnostics(
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
-            .map(|diagnostic| to_lsp_diagnostic(db, &diagnostic, session_encoding))
+            .map(|diagnostic| {
+                let range = diagnostic
+                    .primary_span()
+                    .and_then(|span| {
+                        let file = span.expect_ty_file();
+                        Some(
+                            span.range()?
+                                .as_lsp_range(db, file, session_encoding)
+                                .to_local_range(),
+                        )
+                    })
+                    .unwrap_or_default();
+                to_lsp_diagnostic(db, &diagnostic, range, session_encoding)
+            })
             .collect::<Vec<_>>();
 
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -275,20 +305,9 @@ pub(super) fn compute_diagnostics<'a>(
 pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
+    range: lsp_types::Range,
     encoding: PositionEncoding,
 ) -> Diagnostic {
-    let range = if let Some(span) = diagnostic.primary_span() {
-        let file = span.expect_ty_file();
-        let index = line_index(db, file);
-        let source = source_text(db, file);
-
-        span.range()
-            .map(|range| range.to_lsp_range(&source, &index, encoding))
-            .unwrap_or_default()
-    } else {
-        Range::default()
-    };
-
     let severity = match diagnostic.severity() {
         Severity::Info => DiagnosticSeverity::INFORMATION,
         Severity::Warning => DiagnosticSeverity::WARNING,
@@ -365,7 +384,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.as_lsp_range(db, encoding).to_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -383,7 +402,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.as_lsp_range(db, encoding).to_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,

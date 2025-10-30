@@ -1,5 +1,5 @@
 use crate::PositionEncoding;
-use crate::document::DocumentKey;
+use crate::document::ToRangeExt;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -359,6 +359,7 @@ impl<'a> ResponseWriter<'a> {
     }
 
     fn write_diagnostics_for_file(&mut self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+        // TODO: This needs to send one report for each notebook cell.
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
@@ -389,7 +390,19 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
+                    .map(|diagnostic| {
+                        let range = diagnostic
+                            .primary_span()
+                            .and_then(|span| {
+                                Some(
+                                    span.range()?
+                                        .as_lsp_range(db, file, self.position_encoding)
+                                        .to_local_range(),
+                                )
+                            })
+                            .unwrap_or_default();
+                        to_lsp_diagnostic(db, diagnostic, range, self.position_encoding)
+                    })
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
