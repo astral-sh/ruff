@@ -26,8 +26,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownFunction, OverloadLiteral,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionType, KnownFunction,
+    OverloadLiteral,
 };
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
@@ -363,9 +363,7 @@ impl<'db> Bindings<'db> {
 
                                     _ => {}
                                 }
-                            } else if function
-                                .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                            {
+                            } else if function.is_staticmethod(db) {
                                 overload.set_return_type(*function_ty);
                             } else {
                                 match overload.parameter_types() {
@@ -1189,7 +1187,7 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
                         let Some(tuple) = inferable
-                            .into_nominal_instance()
+                            .as_nominal_instance()
                             .and_then(|instance| instance.tuple_spec(db))
                         else {
                             continue;

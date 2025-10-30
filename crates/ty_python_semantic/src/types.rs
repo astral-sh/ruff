@@ -371,6 +371,7 @@ impl Default for MemberLookupPolicy {
 
 fn member_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
@@ -380,6 +381,7 @@ fn member_lookup_cycle_initial<'db>(
 
 fn class_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
@@ -389,6 +391,7 @@ fn class_lookup_cycle_initial<'db>(
 
 fn variance_cycle_initial<'db, T>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: T,
     _typevar: BoundTypeVarInstance<'db>,
 ) -> TypeVarVariance {
@@ -812,17 +815,17 @@ impl<'db> Type<'db> {
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NoneType))
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool))
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
             .is_some()
     }
@@ -852,7 +855,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NotImplementedType))
     }
 
@@ -899,7 +902,7 @@ impl<'db> Type<'db> {
     ) -> Option<Specialization<'db>> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
-            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+            Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
             _ => return None,
         }
         .class(db);
@@ -939,7 +942,7 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     fn tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| instance.tuple_spec(db))
     }
 
@@ -954,7 +957,7 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.into_nominal_instance()
+        self.as_nominal_instance()
             .and_then(|instance| instance.own_tuple_spec(db))
     }
 
@@ -1044,7 +1047,7 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn expect_class_literal(self) -> ClassLiteral<'db> {
+    pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.as_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
     }
@@ -1058,7 +1061,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::EnumLiteral(enum_literal) => Some(enum_literal),
             _ => None,
@@ -1067,7 +1070,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+    pub(crate) const fn expect_enum_literal(self) -> EnumLiteralType<'db> {
         self.as_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
     }
@@ -1076,7 +1079,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
-    pub(crate) fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
+    pub(crate) const fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
             _ => None,
@@ -1126,7 +1129,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_union(self) -> UnionType<'db> {
+    pub(crate) const fn expect_union(self) -> UnionType<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
@@ -3581,16 +3584,21 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    #[allow(unused_variables)]
-    // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
-    fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
-        self.find_name_in_mro_with_policy(
-            db,
-            "__new__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-        )
+    fn lookup_dunder_new(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        fn lookup_dunder_new_inner<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            _: (),
+        ) -> Option<PlaceAndQualifiers<'db>> {
+            let mut flags = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
+            if !ty.is_subtype_of(db, KnownClass::Type.to_instance(db)) {
+                flags |= MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
+            }
+            ty.find_name_in_mro_with_policy(db, "__new__", flags)
+        }
+
+        lookup_dunder_new_inner(db, self, ())
     }
 
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
@@ -4340,7 +4348,7 @@ impl<'db> Type<'db> {
                     // It will need a special handling, so it remember the origin type to properly
                     // resolve the attribute.
                     if matches!(
-                        self.into_nominal_instance()
+                        self.as_nominal_instance()
                             .and_then(|instance| instance.known_class(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
@@ -4552,7 +4560,7 @@ impl<'db> Type<'db> {
                     // if a tuple subclass defines a `__bool__` method with a return type
                     // that is inconsistent with the tuple's length. Otherwise, the special
                     // handling for tuples here isn't sound.
-                    if let Some(instance) = self.into_nominal_instance() {
+                    if let Some(instance) = self.as_nominal_instance() {
                         if let Some(tuple_spec) = instance.tuple_spec(db) {
                             Ok(tuple_spec.truthiness())
                         } else if instance.class(db).is_final(db) {
@@ -6094,7 +6102,7 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_method = self_type.lookup_dunder_new(db, ());
+        let new_method = self_type.lookup_dunder_new(db);
 
         // Construct an instance type that we can use to look up the `__init__` instance method.
         // This performs the same logic as `Type::to_instance`, except for generic class literals.
@@ -7430,6 +7438,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_redundant_with_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _subtype: Type<'db>,
     _supertype: Type<'db>,
 ) -> bool {
@@ -7438,6 +7447,7 @@ fn is_redundant_with_cycle_initial<'db>(
 
 fn apply_specialization_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: Type<'db>,
     _specialization: Specialization<'db>,
 ) -> Type<'db> {
@@ -8508,6 +8518,7 @@ impl<'db> TypeVarInstance<'db> {
 
 fn lazy_bound_or_constraints_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: TypeVarInstance<'db>,
 ) -> Option<TypeVarBoundOrConstraints<'db>> {
     None
@@ -8515,6 +8526,7 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
 
 fn lazy_default_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     None
@@ -10042,6 +10054,7 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 fn into_callable_type_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     _self: BoundMethodType<'db>,
 ) -> CallableType<'db> {
     CallableType::bottom(db)
@@ -11044,12 +11057,17 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: PEP695TypeAliasType<'db>,
 ) -> Option<GenericContext<'db>> {
     None
 }
 
-fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {
+fn value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: PEP695TypeAliasType<'db>,
+) -> Type<'db> {
     Type::Never
 }
 

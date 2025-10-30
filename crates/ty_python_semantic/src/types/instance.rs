@@ -88,7 +88,7 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
-    pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
+    pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
             Type::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
@@ -666,7 +666,12 @@ impl<'db> ProtocolInstanceType<'db> {
                 .is_always_satisfied(db)
         }
 
-        fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
+        fn initial<'db>(
+            _db: &'db dyn Db,
+            _id: salsa::Id,
+            _value: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> bool {
             true
         }
 

@@ -788,18 +788,18 @@ impl<'db> Node<'db> {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
-        match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => self.satisfies(
-                db,
-                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs),
-            ),
-            (_, Type::TypeVar(bound_typevar)) => self.satisfies(
-                db,
-                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object()),
-            ),
+        let constraint = match (lhs, rhs) {
+            (Type::TypeVar(bound_typevar), _) => {
+                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs)
+            }
+            (_, Type::TypeVar(bound_typevar)) => {
+                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object())
+            }
             // If neither type is a typevar, then we fall back on a normal subtyping check.
-            _ => lhs.when_subtype_of(db, rhs, inferable).node,
-        }
+            _ => return lhs.when_subtype_of(db, rhs, inferable).node,
+        };
+
+        self.satisfies(db, constraint)
     }
 
     fn satisfied_by_all_typevars(

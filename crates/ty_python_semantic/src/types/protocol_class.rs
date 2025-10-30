@@ -866,6 +866,7 @@ fn cached_protocol_interface<'db>(
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(db)
