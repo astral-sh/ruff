@@ -67,10 +67,12 @@ class ConstraintSet:
         .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
         """
 
-    def satisfied_by_all_typevars(self, *, inferable: Any) -> bool:
+    def satisfied_by_all_typevars(self, *, inferable: tuple[Any, ...]) -> bool:
         """
         Returns whether this constraint set is satisfied by all of the typevars
-        that it mentions.
+        that it mentions. You must provide a tuple of the typevars that should
+        be considered `inferable`. All other typevars mentioned in the
+        constraint set will be considered non-inferable.
         """
 
     def __bool__(self) -> bool: ...
