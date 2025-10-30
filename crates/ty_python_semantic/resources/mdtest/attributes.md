@@ -300,14 +300,6 @@ reveal_type(c_instance.b)  # revealed: Unknown | list[Literal[2, 3]]
 #### Attributes defined in for-loop (unpacking)
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 1
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 class TupleIterator:
     def __next__(self) -> tuple[int, str]:
         return (1, "a")
@@ -320,7 +312,7 @@ class NonIterable: ...
 
 class C:
     def __init__(self):
-        for self.x in IntIterable():
+        for self.x in range(3):
             pass
 
         for _, self.y in TupleIterable():
@@ -378,14 +370,6 @@ reveal_type(c_instance.y)  # revealed: Unknown | int
 #### Attributes defined in comprehensions
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 1
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 class TupleIterator:
     def __next__(self) -> tuple[int, str]:
         return (1, "a")
@@ -398,7 +382,7 @@ class C:
     def __init__(self) -> None:
         # TODO: Should not emit this diagnostic
         # error: [unresolved-attribute]
-        [... for self.a in IntIterable()]
+        [... for self.a in range(3)]
         # TODO: Should not emit this diagnostic
         # error: [unresolved-attribute]
         # error: [unresolved-attribute]
@@ -406,11 +390,11 @@ class C:
         # TODO: Should not emit this diagnostic
         # error: [unresolved-attribute]
         # error: [unresolved-attribute]
-        [... for self.d in IntIterable() for self.e in IntIterable()]
+        [... for self.d in range(3) for self.e in range(3)]
         # TODO: Should not emit this diagnostic
         # error: [unresolved-attribute]
-        [[... for self.f in IntIterable()] for _ in IntIterable()]
-        [[... for self.g in IntIterable()] for self in [D()]]
+        [[... for self.f in range(3)] for _ in range(3)]
+        [[... for self.g in range(3)] for self in [D()]]
 
 class D:
     g: int
@@ -2058,16 +2042,8 @@ mod.global_symbol = 1
 # TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
 
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
-for mod.global_symbol in IntIterable():
+for mod.global_symbol in range(3):
     pass
 ```
 

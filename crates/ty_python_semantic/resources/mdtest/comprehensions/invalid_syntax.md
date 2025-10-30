@@ -1,14 +1,6 @@
 # Comprehensions with invalid syntax
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 # Missing 'in' keyword.
 
 # It's reasonably clear here what they *meant* to write,
@@ -16,7 +8,7 @@ class IntIterable:
 
 # error: [invalid-syntax] "Expected 'in', found name"
 # revealed: int
-[reveal_type(a) for a IntIterable()]
+[reveal_type(a) for a range(3)]
 
 
 # Missing iteration variable
@@ -25,7 +17,7 @@ class IntIterable:
 # error: [invalid-syntax] "Expected 'in', found name"
 # error: [unresolved-reference]
 # revealed: Unknown
-[reveal_type(b) for in IntIterable()]
+[reveal_type(b) for in range(3)]
 
 
 # Missing iterable
