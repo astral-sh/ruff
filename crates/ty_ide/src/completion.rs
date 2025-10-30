@@ -853,12 +853,12 @@ fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
     })
 }
 
+/// If the tokens end with `class f` or `def f` we return true.
+/// If the tokens end with `class` or `def`, we return false.
+/// This is fine because we don't provide completions anyway.
 fn is_in_definition_place(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
     let tokens = tokens_start_before(parsed.tokens(), offset);
 
-    // If the tokens end with `class f` or `def f` we return true.
-    // If the tokens end with `class` or `def`, we return false.
-    // This is fine because we don't provide completions anyway.
     tokens
         .len()
         .checked_sub(2)
