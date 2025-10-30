@@ -266,9 +266,6 @@ fn definition_cycle_initial<'db>(
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
-///
-/// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
-/// file, or in a file with `from __future__ import annotations`, or stringified annotations.
 #[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recovery, cycle_initial=deferred_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,

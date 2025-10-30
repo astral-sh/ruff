@@ -360,6 +360,27 @@ impl<'db> ClassBase<'db> {
             }
         }
     }
+
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ClassBaseDisplay<'db> {
+            db: &'db dyn Db,
+            base: ClassBase<'db>,
+        }
+
+        impl std::fmt::Display for ClassBaseDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.base {
+                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
+                    ClassBase::Class(class) => Type::from(class).display(self.db).fmt(f),
+                    ClassBase::Protocol => f.write_str("typing.Protocol"),
+                    ClassBase::Generic => f.write_str("typing.Generic"),
+                    ClassBase::TypedDict => f.write_str("typing.TypedDict"),
+                }
+            }
+        }
+
+        ClassBaseDisplay { db, base: self }
+    }
 }
 
 impl<'db> From<ClassType<'db>> for ClassBase<'db> {

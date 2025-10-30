@@ -78,6 +78,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
+    is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
@@ -2592,16 +2593,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        let method = infer_definition_types(db, method_definition)
-            .declaration_type(method_definition)
-            .inner_type()
-            .as_function_literal()?;
+        let function_node = function_definition.node(self.module());
+        let function_name = &function_node.name;
 
-        if method.is_classmethod(db) {
-            // TODO: set the type for `cls` argument
+        // TODO: handle implicit type of `cls` for classmethods
+        if is_implicit_classmethod(function_name) || is_implicit_staticmethod(function_name) {
             return None;
-        } else if method.is_staticmethod(db) {
-            return None;
+        }
+
+        let inference = infer_definition_types(db, method_definition);
+        for decorator in &function_node.decorator_list {
+            let decorator_ty = inference.expression_type(&decorator.expression);
+            if decorator_ty.as_class_literal().is_some_and(|class| {
+                matches!(
+                    class.known(db),
+                    Some(KnownClass::Classmethod | KnownClass::Staticmethod)
+                )
+            }) {
+                return None;
+            }
         }
 
         let class_definition = self.index.expect_single_definition(class);

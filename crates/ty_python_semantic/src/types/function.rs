@@ -82,10 +82,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, RecursiveTypeNormalizedVisitor, SpecialFormType, TrackedConstraintSet,
-    Truthiness, Type, TypeContext, TypeMapping, TypeRelation, UnionBuilder, UnionType,
-    binding_type, todo_type, walk_signature,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping,
+    TypeRelation, UnionBuilder, UnionType, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -228,6 +227,16 @@ pub struct DataclassTransformerParams<'db> {
 
 impl get_size2::GetSize for DataclassTransformerParams<'_> {}
 
+/// Whether a function should implicitly be treated as a staticmethod based on its name.
+pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
+    matches!(function_name, "__new__")
+}
+
+/// Whether a function should implicitly be treated as a classmethod based on its name.
+pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
+    matches!(function_name, "__init_subclass__" | "__class_getitem__")
+}
+
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
 ///
@@ -300,17 +309,15 @@ impl<'db> OverloadLiteral<'db> {
     /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
     /// staticmethod.
     pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
-        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD) || self.name(db) == "__new__"
+        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+            || is_implicit_staticmethod(self.name(db))
     }
 
     /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
     pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
-            || matches!(
-                self.name(db).as_str(),
-                "__init_subclass__" | "__class_getitem__"
-            )
+            || is_implicit_classmethod(self.name(db))
     }
 
     fn node<'ast>(
@@ -1400,10 +1407,8 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.range_constraint`
-    RangeConstraint,
-    /// `ty_extensions.negated_range_constraint`
-    NegatedRangeConstraint,
+    /// `ty_extensions.reveal_mro`
+    RevealMro,
 }
 
 impl KnownFunction {
@@ -1476,8 +1481,7 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
-            | Self::RangeConstraint
-            | Self::NegatedRangeConstraint
+            | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
 
@@ -1700,6 +1704,85 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::RevealMro => {
+                let [Some(param_type)] = parameter_types else {
+                    return;
+                };
+                let mut good_argument = true;
+                let classes = match param_type {
+                    Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
+                    Type::GenericAlias(generic_alias) => vec![ClassType::Generic(*generic_alias)],
+                    Type::Union(union) => {
+                        let elements = union.elements(db);
+                        let mut classes = Vec::with_capacity(elements.len());
+                        for element in elements {
+                            match element {
+                                Type::ClassLiteral(class) => {
+                                    classes.push(ClassType::NonGeneric(*class));
+                                }
+                                Type::GenericAlias(generic_alias) => {
+                                    classes.push(ClassType::Generic(*generic_alias));
+                                }
+                                _ => {
+                                    good_argument = false;
+                                    break;
+                                }
+                            }
+                        }
+                        classes
+                    }
+                    _ => {
+                        good_argument = false;
+                        vec![]
+                    }
+                };
+                if !good_argument {
+                    let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    else {
+                        return;
+                    };
+                    let mut diagnostic =
+                        builder.into_diagnostic("Invalid argument to `reveal_mro`");
+                    diagnostic.set_primary_message(format_args!(
+                        "Can only pass a class object, generic alias or a union thereof"
+                    ));
+                    return;
+                }
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed MRO");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    let mut message = String::new();
+                    for (i, class) in classes.iter().enumerate() {
+                        message.push('(');
+                        for class in class.iter_mro(db) {
+                            message.push_str(&class.display(db).to_string());
+                            // Omit the comma for the last element (which is always `object`)
+                            if class
+                                .into_class()
+                                .is_none_or(|base| !base.is_object(context.db()))
+                            {
+                                message.push_str(", ");
+                            }
+                        }
+                        // If the last element was also the first element
+                        // (i.e., it's a length-1 tuple -- which can only happen if we're revealing
+                        // the MRO for `object` itself), add a trailing comma so that it's still a
+                        // valid tuple display.
+                        if class.is_object(db) {
+                            message.push(',');
+                        }
+                        message.push(')');
+                        if i < classes.len() - 1 {
+                            message.push_str(" | ");
+                        }
+                    }
+                    diag.annotate(Annotation::primary(span).message(message));
+                }
+            }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
                 let [Some(first_arg), Some(second_argument)] = parameter_types else {
                     return;
@@ -1774,33 +1857,6 @@ impl KnownFunction {
                 };
 
                 overload.set_return_type(Type::module_literal(db, file, module));
-            }
-
-            KnownFunction::RangeConstraint => {
-                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
-                else {
-                    return;
-                };
-
-                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
-            KnownFunction::NegatedRangeConstraint => {
-                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
-                else {
-                    return;
-                };
-
-                let constraints =
-                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
             }
 
             KnownFunction::Open => {
@@ -1901,8 +1957,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
-                | KnownFunction::RangeConstraint
-                | KnownFunction::NegatedRangeConstraint
+                | KnownFunction::RevealMro
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

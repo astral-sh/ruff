@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
         const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
+        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
     }
 }
 
@@ -156,6 +157,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports dynamic registration for rename capabilities.
     pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
         self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
+    }
+
+    /// Returns `true` if the client supports "label details" in completion items.
+    pub(crate) const fn supports_completion_item_label_details(self) -> bool {
+        self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -312,6 +318,15 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::WORK_DONE_PROGRESS;
+        }
+
+        if text_document
+            .and_then(|text_document| text_document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| completion_item.label_details_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT;
         }
 
         flags

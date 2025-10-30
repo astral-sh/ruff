@@ -116,7 +116,7 @@ A.implicit_self(1)
 Passing `self` implicitly also verifies the type:
 
 ```py
-from typing import Never
+from typing import Never, Callable
 
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
@@ -139,6 +139,9 @@ The first parameter of instance methods always has type `Self`, if it is not exp
 The name `self` is not special in any way.
 
 ```py
+def some_decorator(f: Callable) -> Callable:
+    return f
+
 class B:
     def name_does_not_matter(this) -> Self:
         reveal_type(this)  # revealed: Self@name_does_not_matter
@@ -153,18 +156,45 @@ class B:
         reveal_type(self)  # revealed: Self@keyword_only
         return self
 
+    @some_decorator
+    def decorated_method(self) -> Self:
+        reveal_type(self)  # revealed: Self@decorated_method
+        return self
+
     @property
     def a_property(self) -> Self:
-        # TODO: Should reveal Self@a_property
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@a_property
         return self
+
+    async def async_method(self) -> Self:
+        reveal_type(self)  # revealed: Self@async_method
+        return self
+
+    @staticmethod
+    def static_method(self):
+        # The parameter can be called `self`, but it is not treated as `Self`
+        reveal_type(self)  # revealed: Unknown
+
+    @staticmethod
+    @some_decorator
+    def decorated_static_method(self):
+        reveal_type(self)  # revealed: Unknown
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
+    @some_decorator
+    @staticmethod
+    def decorated_static_method_2(self):
+        reveal_type(self)  # revealed: Unknown
 
 reveal_type(B().name_does_not_matter())  # revealed: B
 reveal_type(B().positional_only(1))  # revealed: B
 reveal_type(B().keyword_only(x=1))  # revealed: B
+reveal_type(B().decorated_method())  # revealed: Unknown
 
 # TODO: this should be B
 reveal_type(B().a_property)  # revealed: Unknown
+
+async def _():
+    reveal_type(await B().async_method())  # revealed: B
 ```
 
 This also works for generic classes:

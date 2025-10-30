@@ -1376,7 +1376,7 @@ impl<'db> Field<'db> {
     /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
         self.declared_ty
-            .into_nominal_instance()
+            .as_nominal_instance()
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
     }
 }
@@ -2054,11 +2054,6 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if name == "__mro__" {
-            let tuple_elements = self.iter_mro(db, specialization);
-            return Place::bound(Type::heterogeneous_tuple(db, tuple_elements)).into();
-        }
-
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
     }
 

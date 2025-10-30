@@ -186,7 +186,7 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Instance(instance) => instance
                 .normalized_impl(db, visitor)
-                .into_nominal_instance()
+                .as_nominal_instance()
                 .map(Self::Instance)
                 .unwrap_or(Self::Dynamic(DynamicType::Any)),
         }
