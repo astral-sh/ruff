@@ -59,13 +59,29 @@ pub struct Options {
     )]
     pub cache_dir: Option<String>,
 
-    /// A path to a local `pyproject.toml` file to merge into this
+    /// A path to a local `pyproject.toml` or `ruff.toml` file to merge into this
     /// configuration. User home directory and environment variables will be
     /// expanded.
     ///
-    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
-    /// this base configuration file, then merge in any properties defined
-    /// in the current configuration file.
+    /// To resolve the current configuration file, Ruff will first load
+    /// this base configuration file, then merge in properties defined
+    /// in the current configuration file. Most settings follow simple override
+    /// behavior where the child value replaces the parent value. However,
+    /// rule selection (`lint.select` and `lint.ignore`) has special merging
+    /// behavior: if the child configuration specifies `lint.select`, it
+    /// establishes a new baseline rule set and the parent's `lint.ignore`
+    /// rules are discarded; if the child configuration omits `lint.select`,
+    /// the parent's rule selection is inherited and both parent and child
+    /// `lint.ignore` rules are accumulated together.
+    ///
+    /// When multiple configuration sources are present, Ruff uses the
+    /// "highest-priority" `select` as the basis for the rule set, then applies
+    /// `extend-select` and `ignore` adjustments. CLI options are given higher
+    /// priority than configuration file options, and the current configuration
+    /// file is given higher priority than any extended parent configuration.
+    /// However, this priority model only applies when `lint.select` is explicitly
+    /// specified in the higher-priority source; without an explicit `select`,
+    /// `ignore` rules accumulate rather than override.
     #[option(
         default = r#"null"#,
         value_type = "str",
