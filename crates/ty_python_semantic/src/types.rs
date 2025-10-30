@@ -4119,14 +4119,26 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
 
-            Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
-                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
-            )
-            .into(),
-            Type::FunctionLiteral(function) if name == "__call__" => Place::bound(
-                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)),
-            )
-            .into(),
+            Type::FunctionLiteral(function) if name == "__get__" => {
+                let ty = if function.is_staticmethod(db) {
+                    KnownBoundMethodType::StaticmethodDunderGet(function)
+                } else if function.is_classmethod(db) {
+                    KnownBoundMethodType::ClassmethodDunderGet(function)
+                } else {
+                    KnownBoundMethodType::FunctionTypeDunderGet(function)
+                };
+                Place::bound(Type::KnownBoundMethod(ty)).into()
+            }
+            Type::FunctionLiteral(function)
+                if name == "__call__"
+                    && !function.is_classmethod(db)
+                    && !function.is_staticmethod(db) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::FunctionTypeDunderCall(function),
+                ))
+                .into()
+            }
             Type::PropertyInstance(property) if name == "__get__" => Place::bound(
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)),
             )
@@ -4183,6 +4195,22 @@ impl<'db> Type<'db> {
             {
                 Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::FunctionTypeDunderGet,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "__get__" && class.is_known(db, KnownClass::Classmethod) =>
+            {
+                Place::bound(Type::WrapperDescriptor(
+                    WrapperDescriptorKind::ClassmethodDunderGet,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "__get__" && class.is_known(db, KnownClass::Staticmethod) =>
+            {
+                Place::bound(Type::WrapperDescriptor(
+                    WrapperDescriptorKind::StaticmethodDunderGet,
                 ))
                 .into()
             }
@@ -6830,6 +6858,18 @@ impl<'db> Type<'db> {
                 ))
             }
 
+            Type::KnownBoundMethod(KnownBoundMethodType::StaticmethodDunderGet(function)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::StaticmethodDunderGet(
+                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
+
+            Type::KnownBoundMethod(KnownBoundMethodType::ClassmethodDunderGet(function)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::ClassmethodDunderGet(
+                    function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
+
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
                     function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -7009,7 +7049,9 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::FunctionTypeDunderGet(function)
-                | KnownBoundMethodType::FunctionTypeDunderCall(function),
+                | KnownBoundMethodType::FunctionTypeDunderCall(function)
+                | KnownBoundMethodType::ClassmethodDunderGet(function)
+                | KnownBoundMethodType::StaticmethodDunderGet(function),
             ) => {
                 function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -10330,6 +10372,10 @@ impl<'db> CallableType<'db> {
 pub enum KnownBoundMethodType<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(FunctionType<'db>),
+    /// Method wrapper for `some_static_method.__get__`
+    StaticmethodDunderGet(FunctionType<'db>),
+    /// Method wrapper for `some_class_method.__get__`
+    ClassmethodDunderGet(FunctionType<'db>),
     /// Method wrapper for `some_function.__call__`
     FunctionTypeDunderCall(FunctionType<'db>),
     /// Method wrapper for `some_property.__get__`
@@ -10358,16 +10404,14 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     visitor: &V,
 ) {
     match method_wrapper {
-        KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+        KnownBoundMethodType::FunctionTypeDunderGet(function)
+        | KnownBoundMethodType::FunctionTypeDunderCall(function)
+        | KnownBoundMethodType::ClassmethodDunderGet(function)
+        | KnownBoundMethodType::StaticmethodDunderGet(function) => {
             visitor.visit_function_type(db, function);
         }
-        KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-            visitor.visit_function_type(db, function);
-        }
-        KnownBoundMethodType::PropertyDunderGet(property) => {
-            visitor.visit_property_instance_type(db, property);
-        }
-        KnownBoundMethodType::PropertyDunderSet(property) => {
+        KnownBoundMethodType::PropertyDunderGet(property)
+        | KnownBoundMethodType::PropertyDunderSet(property) => {
             visitor.visit_property_instance_type(db, property);
         }
         KnownBoundMethodType::StrStartswith(string_literal) => {
@@ -10395,6 +10439,30 @@ impl<'db> KnownBoundMethodType<'db> {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(self_function),
                 KnownBoundMethodType::FunctionTypeDunderGet(other_function),
+            ) => self_function.has_relation_to_impl(
+                db,
+                other_function,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
+
+            (
+                KnownBoundMethodType::ClassmethodDunderGet(self_function),
+                KnownBoundMethodType::ClassmethodDunderGet(other_function),
+            ) => self_function.has_relation_to_impl(
+                db,
+                other_function,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
+
+            (
+                KnownBoundMethodType::StaticmethodDunderGet(self_function),
+                KnownBoundMethodType::StaticmethodDunderGet(other_function),
             ) => self_function.has_relation_to_impl(
                 db,
                 other_function,
@@ -10449,6 +10517,8 @@ impl<'db> KnownBoundMethodType<'db> {
 
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::ClassmethodDunderGet(_)
+                | KnownBoundMethodType::StaticmethodDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
@@ -10459,6 +10529,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::ClassmethodDunderGet(_)
+                | KnownBoundMethodType::StaticmethodDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
@@ -10483,11 +10555,18 @@ impl<'db> KnownBoundMethodType<'db> {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(self_function),
                 KnownBoundMethodType::FunctionTypeDunderGet(other_function),
-            ) => self_function.is_equivalent_to_impl(db, other_function, inferable, visitor),
-
-            (
+            )
+            | (
                 KnownBoundMethodType::FunctionTypeDunderCall(self_function),
                 KnownBoundMethodType::FunctionTypeDunderCall(other_function),
+            )
+            | (
+                KnownBoundMethodType::StaticmethodDunderGet(self_function),
+                KnownBoundMethodType::StaticmethodDunderGet(other_function),
+            )
+            | (
+                KnownBoundMethodType::ClassmethodDunderGet(self_function),
+                KnownBoundMethodType::ClassmethodDunderGet(other_function),
             ) => self_function.is_equivalent_to_impl(db, other_function, inferable, visitor),
 
             (
@@ -10527,6 +10606,8 @@ impl<'db> KnownBoundMethodType<'db> {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::ClassmethodDunderGet(_)
+                | KnownBoundMethodType::StaticmethodDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
@@ -10537,6 +10618,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::ClassmethodDunderGet(_)
+                | KnownBoundMethodType::StaticmethodDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
@@ -10556,6 +10639,12 @@ impl<'db> KnownBoundMethodType<'db> {
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
                 KnownBoundMethodType::FunctionTypeDunderCall(function.normalized_impl(db, visitor))
+            }
+            KnownBoundMethodType::StaticmethodDunderGet(function) => {
+                KnownBoundMethodType::StaticmethodDunderGet(function.normalized_impl(db, visitor))
+            }
+            KnownBoundMethodType::ClassmethodDunderGet(function) => {
+                KnownBoundMethodType::ClassmethodDunderGet(function.normalized_impl(db, visitor))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
                 KnownBoundMethodType::PropertyDunderGet(property.normalized_impl(db, visitor))
@@ -10579,6 +10668,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::FunctionTypeDunderCall(_)
             | KnownBoundMethodType::PropertyDunderGet(_)
             | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
+            KnownBoundMethodType::ClassmethodDunderGet(_)
+            | KnownBoundMethodType::StaticmethodDunderGet(_) => KnownClass::WrapperDescriptorType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
             KnownBoundMethodType::PathOpen => KnownClass::MethodType,
             KnownBoundMethodType::ConstraintSetRange
@@ -10613,7 +10704,9 @@ impl<'db> KnownBoundMethodType<'db> {
             // [`WrapperDescriptorKind::signatures`], since this one is just that signature
             // with the `self` parameters removed.
             KnownBoundMethodType::FunctionTypeDunderGet(_)
-            | KnownBoundMethodType::PropertyDunderGet(_) => Either::Left(Either::Left(
+            | KnownBoundMethodType::PropertyDunderGet(_)
+            | KnownBoundMethodType::ClassmethodDunderGet(_)
+            | KnownBoundMethodType::StaticmethodDunderGet(_) => Either::Left(Either::Left(
                 [
                     Signature::new(
                         Parameters::new([

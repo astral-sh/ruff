@@ -302,27 +302,7 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                         function,
                     )) => {
-                        if function.is_classmethod(db) {
-                            match overload.parameter_types() {
-                                [_, Some(owner)] => {
-                                    overload.set_return_type(Type::BoundMethod(
-                                        BoundMethodType::new(db, function, *owner),
-                                    ));
-                                }
-                                [Some(instance), None] => {
-                                    overload.set_return_type(Type::BoundMethod(
-                                        BoundMethodType::new(
-                                            db,
-                                            function,
-                                            instance.to_meta_type(db),
-                                        ),
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        } else if function.is_staticmethod(db) {
-                            overload.set_return_type(Type::FunctionLiteral(function));
-                        } else if let [Some(first), _] = overload.parameter_types() {
+                        if let [Some(first), _] = overload.parameter_types() {
                             if first.is_none(db) {
                                 overload.set_return_type(Type::FunctionLiteral(function));
                             } else {
@@ -331,6 +311,30 @@ impl<'db> Bindings<'db> {
                                 )));
                             }
                         }
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ClassmethodDunderGet(
+                        function,
+                    )) => match overload.parameter_types() {
+                        [_, Some(owner)] => {
+                            overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                db, function, *owner,
+                            )));
+                        }
+                        [Some(instance), None] => {
+                            overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                db,
+                                function,
+                                instance.to_meta_type(db),
+                            )));
+                        }
+                        _ => {}
+                    },
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::StaticmethodDunderGet(
+                        function,
+                    )) => {
+                        overload.set_return_type(Type::Callable(function.into_callable_type(db)));
                     }
 
                     Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {

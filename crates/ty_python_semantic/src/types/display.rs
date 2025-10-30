@@ -504,6 +504,20 @@ impl Display for DisplayRepresentation<'_> {
                     function = function.name(self.db),
                 )
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::StaticmethodDunderGet(function)) => {
+                write!(
+                    f,
+                    "<method-wrapper `__get__` of staticmethod `{function}`>",
+                    function = function.name(self.db),
+                )
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::ClassmethodDunderGet(function)) => {
+                write!(
+                    f,
+                    "<method-wrapper `__get__` of classmethod `{function}`>",
+                    function = function.name(self.db),
+                )
+            }
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 write!(
                     f,
@@ -800,11 +814,18 @@ impl Display for DisplayFunctionType<'_> {
                     settings: self.settings.clone(),
                 };
 
+                let prelude = if self.ty.is_classmethod(self.db) {
+                    "classmethod"
+                } else if self.ty.is_staticmethod(self.db) {
+                    "staticmethod"
+                } else {
+                    "def"
+                };
+
                 write!(
                     f,
-                    "def {name}{type_parameters}{signature}",
+                    "{prelude} {name}{type_parameters}{signature}",
                     name = self.ty.name(self.db),
-                    type_parameters = type_parameters,
                     signature = signature.display_with(self.db, self.settings.clone())
                 )
             }

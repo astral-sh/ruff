@@ -403,21 +403,29 @@ reveal_type(Derived().f(1))  # revealed: str
 
 ### Accessing the classmethod as a static member
 
-Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
-currently don't model this explicitly:
+Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We model
+this explicitly:
 
 ```py
+import types
 from inspect import getattr_static
+from ty_extensions import static_assert, TypeOf, is_subtype_of, is_assignable_to
 
 class C:
     @classmethod
     def f(cls): ...
 
-reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(getattr_static(C, "f"))  # revealed: classmethod f(cls) -> Unknown
+reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of classmethod `f`>
+static_assert(not is_assignable_to(TypeOf[getattr_static(C, "f")], types.FunctionType))
+static_assert(is_subtype_of(TypeOf[getattr_static(C, "f")], classmethod))
+reveal_type(getattr_static(C, "f").__func__)  # revealed: (...) -> Unknown
+
+# TODO: should emit `[unresolved-attribute]` and infer `Unknown`
+reveal_type(getattr_static(C, "f").__kwdefaults__)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
 ```
 
-But we correctly model how the `classmethod` descriptor works:
+And we correctly model how the `classmethod` descriptor works:
 
 ```py
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: bound method <class 'C'>.f() -> Unknown
@@ -538,21 +546,31 @@ class C:
     def f(): ...
 ```
 
-Accessing the staticmethod as a static member. This will reveal the raw function, as `staticmethod`
-is transparent when accessed via `getattr_static`.
+Accessing the staticmethod as a static member. This will reveal the raw staticmethod rather than
+calling `__get__` to return the underlying function
 
 ```py
-reveal_type(getattr_static(C, "f"))  # revealed: def f() -> Unknown
+import types
+from ty_extensions import is_assignable_to, is_subtype_of, TypeOf, static_assert
+
+reveal_type(getattr_static(C, "f"))  # revealed: staticmethod f() -> Unknown
+static_assert(not is_assignable_to(TypeOf[getattr_static(C, "f")], types.FunctionType))
+static_assert(is_subtype_of(TypeOf[getattr_static(C, "f")], staticmethod))
+reveal_type(getattr_static(C, "f").__func__)  # revealed: (...) -> Unknown
+
+# TODO: should emit `[unresolved-attribute]` and infer `Unknown`
+reveal_type(getattr_static(C, "f").__kwdefaults__)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
 ```
 
 The `__get__` of a `staticmethod` object simply returns the underlying function. It ignores both the
 instance and owner arguments.
 
 ```py
-reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: def f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: def f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: def f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of staticmethod `f`>
+reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: () -> Unknown
+reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: () -> Unknown
+reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: () -> Unknown
+reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: () -> Unknown
 ```
 
 ### Staticmethods mixed with other decorators
