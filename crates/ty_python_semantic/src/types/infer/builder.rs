@@ -3231,27 +3231,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             name: _,
-            default,
-        } = node;
+            default: Some(default),
+        } = node
+        else {
+            return;
+        };
+
         let previous_deferred_state =
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
-        // TODO: How to represent this properly?
-        // match default {
-        //     ast::Expr::List(ast::ExprList { elts, .. }) => {}
-        //     ast::Expr::EllipsisLiteral(_) => {}
-        //     ast::Expr::Name(_) => {}
-        //     _ => {
-        //         if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default) {
-        //             builder.into_diagnostic(
-        //                 "The default value to `ParamSpec` must be either a list of types, \
-        //                 `ParamSpec`, or `...`",
-        //             );
-        //         }
-        //     }
-        // }
-        // TODO: This is not correct because a list of types is allowed but this call will always
-        // raise a diagnostic for that.
-        self.infer_optional_type_expression(default.as_deref());
+
+        // This is the same logic as `TypeInferenceBuilder::infer_callable_parameter_types` except
+        // for the subscript branch which is required for `Concatenate` but that cannot be
+        // specified in this context.
+        let default_ty = match &**default {
+            ast::Expr::EllipsisLiteral(_) => {
+                CallableType::single(self.db(), Signature::new(Parameters::gradual_form(), None))
+            }
+            ast::Expr::List(ast::ExprList { elts, .. }) => {
+                let mut parameter_types = Vec::with_capacity(elts.len());
+
+                // Whether to infer `Todo` for the parameters
+                let mut return_todo = false;
+
+                for param in elts {
+                    let param_type = self.infer_type_expression(param);
+                    // This is similar to what we currently do for inferring tuple type expression.
+                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
+                    // when trying to check for assignability or any other relation. For example,
+                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
+                    return_todo |= param_type.is_todo()
+                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    parameter_types.push(param_type);
+                }
+
+                let parameters = if return_todo {
+                    // TODO: `Unpack`
+                    Parameters::todo()
+                } else {
+                    Parameters::new(parameter_types.iter().map(|param_type| {
+                        Parameter::positional_only(None).with_annotated_type(*param_type)
+                    }))
+                };
+
+                CallableType::single(self.db(), Signature::new(parameters, None))
+            }
+            ast::Expr::Name(name) => {
+                let name_ty = self.infer_name_load(name);
+                let is_paramspec = match name_ty {
+                    Type::KnownInstance(known_instance) => {
+                        known_instance.class(self.db()) == KnownClass::ParamSpec
+                    }
+                    Type::NominalInstance(nominal) => {
+                        nominal.has_known_class(self.db(), KnownClass::ParamSpec)
+                    }
+                    _ => false,
+                };
+                if is_paramspec {
+                    name_ty
+                } else {
+                    if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, &**default)
+                    {
+                        builder.into_diagnostic(
+                            "The default value to `ParamSpec` must be either a list of types, \
+                        `ParamSpec`, or `...`",
+                        );
+                    }
+                    Type::unknown()
+                }
+            }
+            _ => {
+                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, &**default) {
+                    builder.into_diagnostic(
+                        "The default value to `ParamSpec` must be either a list of types, \
+                        `ParamSpec`, or `...`",
+                    );
+                }
+                Type::unknown()
+            }
+        };
+
+        self.store_expression_type(default, default_ty);
         self.deferred_state = previous_deferred_state;
     }
 
@@ -4712,6 +4771,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(bound) = arguments.find_keyword("bound") {
             self.infer_type_expression(&bound.value);
         }
+        // TODO: We need to differentiate between the `default` argument to `TypeVar` and
+        // `ParamSpec` because the types they accept are different.
         if let Some(default) = arguments.find_keyword("default") {
             self.infer_type_expression(&default.value);
         }
