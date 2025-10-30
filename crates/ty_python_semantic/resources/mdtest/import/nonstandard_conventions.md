@@ -59,7 +59,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -89,7 +89,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -122,7 +122,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -152,7 +152,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -178,7 +178,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -201,7 +201,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -226,9 +226,9 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
-# error: "has no attribute `imported_m`"
+# error: "has no member `imported_m`"
 reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 ```
 
@@ -251,7 +251,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 reveal_type(mypackage.imported_m.X)  # revealed: int
 ```
@@ -378,7 +378,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -401,7 +401,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -428,7 +428,7 @@ import mypackage
 from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -452,7 +452,7 @@ import mypackage
 from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
-# error: "has no attribute `imported`"
+# error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -486,9 +486,9 @@ import mypackage
 from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(imported.fails.Y)  # revealed: Unknown
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -521,7 +521,7 @@ from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
 reveal_type(imported.fails.Y)  # revealed: int
-# error: "has no attribute `fails`"
+# error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -571,7 +571,7 @@ from mypackage import funcmod
 x = funcmod(1)
 ```
 
-## Fractal Re-export Nameclash Problems (Not-Stub Check)
+## Fractal Re-export Nameclash Problems (Non-Stub Check)
 
 `mypackage/__init__.py`:
 
