@@ -3574,8 +3574,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut first_tcx = None;
 
-        // A wrapper over `infer_value_ty` that allows inferring the value type multiple times, e.g. when
-        // resolving a class attribute.
+        // A wrapper over `infer_value_ty` that allows inferring the value type multiple times
+        // during attribute resolution.
         let pure_infer_value_ty = infer_value_ty;
         let mut infer_value_ty = |builder: &mut Self, tcx: TypeContext<'db>| -> Type<'db> {
             // Each type is a valid independent inference of the given argument, so we take the intersection
@@ -3771,8 +3771,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypedDict(_) => {
-                // TODO: We could use the annotated parameter type(s) of `__setattr__` as type context here,
-                // however, we would still have to perform the first inference without type context.
+                // TODO: We could use the annotated parameter type of `__setattr__` as type context here.
+                // However, we would still have to perform the first inference without type context.
                 let value_ty = infer_value_ty(self, TypeContext::default());
 
                 // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
@@ -3876,8 +3876,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
                                 qualifiers,
                             } => {
-                                let value_ty =
-                                    infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
                                 if invalid_assignment_to_final(self, qualifiers) {
                                     return false;
                                 }
@@ -3886,6 +3884,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     if let Place::Defined(meta_dunder_set, _, _) =
                                         meta_attr_ty.class_member(db, "__set__".into()).place
                                     {
+                                        // TODO: We could use the annotated parameter type of `__set__` as
+                                        // type context here.
                                         let dunder_set_result = meta_dunder_set.try_call(
                                             db,
                                             &CallArguments::positional([
@@ -3911,6 +3911,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                                         dunder_set_result.is_ok()
                                     } else {
+                                        let value_ty = infer_value_ty(
+                                            self,
+                                            TypeContext::new(Some(meta_attr_ty)),
+                                        );
+
                                         ensure_assignable_to(self, value_ty, meta_attr_ty)
                                     };
 
@@ -4012,11 +4017,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
                         qualifiers,
                     } => {
-                        // We may have to perform multi-inference if the meta attribute is possibly unbound,
-                        // in which case we are required to perform the first inference without type context.
-                        infer_value_ty(self, TypeContext::default());
+                        // We may have to perform multi-inference if the meta attribute is possibly unbound.
+                        // However, we are required to perform the first inference without type context.
+                        let value_ty = infer_value_ty(self, TypeContext::default());
 
-                        let value_ty = infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
                         if invalid_assignment_to_final(self, qualifiers) {
                             return false;
                         }
@@ -4024,6 +4028,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let assignable_to_meta_attr = if let Place::Defined(meta_dunder_set, _, _) =
                             meta_attr_ty.class_member(db, "__set__".into()).place
                         {
+                            // TODO: We could use the annotated parameter type of `__set__` as
+                            // type context here.
                             let dunder_set_result = meta_dunder_set.try_call(
                                 db,
                                 &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
@@ -4043,6 +4049,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             dunder_set_result.is_ok()
                         } else {
+                            let value_ty =
+                                infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
                             ensure_assignable_to(self, value_ty, meta_attr_ty)
                         };
 
