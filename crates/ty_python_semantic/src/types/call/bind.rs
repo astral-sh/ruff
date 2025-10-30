@@ -1185,9 +1185,18 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ) => {
-                        let inferable: Option<FxHashSet<_>> = overload
-                            .arguments_for_parameter(argument_types, 0)
-                            .map(|(_, ty)| {
+                        let [Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Some(tuple) = inferable
+                            .into_nominal_instance()
+                            .and_then(|instance| instance.tuple_spec(db))
+                        else {
+                            continue;
+                        };
+                        let inferable: Option<FxHashSet<_>> = tuple
+                            .fixed_elements()
+                            .map(|ty| {
                                 ty.as_typevar()
                                     .map(|bound_typevar| bound_typevar.identity(db))
                             })

@@ -10728,9 +10728,9 @@ impl<'db> KnownBoundMethodType<'db> {
 
             KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new([Parameter::variadic(Name::new_static("inferable"))
+                    Parameters::new([Parameter::keyword_only(Name::new_static("inferable"))
                         .type_form()
-                        .with_annotated_type(Type::any())]),
+                        .with_annotated_type(Type::homogeneous_tuple(db, Type::any()))]),
                     Some(KnownClass::Bool.to_instance(db)),
                 )))
             }

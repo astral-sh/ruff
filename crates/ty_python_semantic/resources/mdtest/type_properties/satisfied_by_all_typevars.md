@@ -39,12 +39,12 @@ typevar, that means we just need a single type (any type at all!) that satisfies
 
 ```py
 def unbounded[T]():
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars(T))
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(T))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
 ```
 
 If a typevar has an upper bound, then it must specialize to a type that is a subtype of that bound.
@@ -53,19 +53,19 @@ and the upper bound.
 
 ```py
 def bounded[T: Base]():
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars(T))
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(T))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
 
     # This succeeds because T can specialize to Never
     constraints = ConstraintSet.range(Never, T, Unrelated)
-    static_assert(constraints.satisfied_by_all_typevars(T))
+    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
 
     # If we explicitly disallow Never, then it fails
     constraints = constraints & ~ConstraintSet.range(Never, T, Never)
-    static_assert(not constraints.satisfied_by_all_typevars(T))
+    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[T]))
 ```
 
 If a typevar has constraints, then it must specialize to one of those specific types. (Not to a
@@ -74,13 +74,13 @@ be satisfied by any one of the constraints.
 
 ```py
 def constrained[T: (Base, Unrelated)]():
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars(T))
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(T))
-    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(T))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
     # Sub is not Base! Constraints must be exact, not subtypes
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(T))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
 ```
 
 ## Non-inferable typevars
@@ -107,12 +107,12 @@ typevar, that means the constraint set must be satisfied for every possible type
 
 ```py
 def unbounded[T]():
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[()]))
 ```
 
 If a typevar has an upper bound, then it must specialize to a type that is a subtype of that bound.
@@ -121,12 +121,12 @@ satisfies the upper bound.
 
 ```py
 def bounded[T: Base]():
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars())
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
-    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[()]))
 ```
 
 If a typevar has constraints, then it must specialize to one of those specific types. (Not to a
@@ -135,24 +135,24 @@ to be satisfied by all of those constraints.
 
 ```py
 def constrained[T: (Base, Unrelated)]():
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[()]))
 
     constraints = ConstraintSet.range(Never, T, Super) | ConstraintSet.range(Never, T, Unrelated)
-    static_assert(constraints.satisfied_by_all_typevars())
+    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[()]))
     constraints = ConstraintSet.range(Never, T, Base) | ConstraintSet.range(Never, T, Unrelated)
-    static_assert(constraints.satisfied_by_all_typevars())
+    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[()]))
     constraints = ConstraintSet.range(Never, T, Sub) | ConstraintSet.range(Never, T, Unrelated)
-    static_assert(not constraints.satisfied_by_all_typevars())
+    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
 
     constraints = ConstraintSet.range(Super, T, Super) | ConstraintSet.range(Unrelated, T, Unrelated)
-    static_assert(not constraints.satisfied_by_all_typevars())
+    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
     constraints = ConstraintSet.range(Base, T, Base) | ConstraintSet.range(Unrelated, T, Unrelated)
-    static_assert(constraints.satisfied_by_all_typevars())
+    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[()]))
     constraints = ConstraintSet.range(Sub, T, Sub) | ConstraintSet.range(Unrelated, T, Unrelated)
-    static_assert(not constraints.satisfied_by_all_typevars())
+    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
 ```
