@@ -3578,11 +3578,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // during attribute resolution.
         let pure_infer_value_ty = infer_value_ty;
         let mut infer_value_ty = |builder: &mut Self, tcx: TypeContext<'db>| -> Type<'db> {
-            // Each type is a valid independent inference of the given argument, so we take the intersection
-            // of any inferred types.
+            // Overwrite the previously inferred value, preferring later inferences, which are
+            // likely more precise. Note that we still ensure each inference is assignable to
+            // its declared type, so this mainly affects the IDE hover type.
             let prev_multi_inference_state = mem::replace(
                 &mut builder.multi_inference_state,
-                MultiInferenceState::Intersect,
+                MultiInferenceState::Overwrite,
             );
 
             // If we are inferring the argument multiple times, silence diagnostics to avoid duplicated warnings.
@@ -5974,6 +5975,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             MultiInferenceState::Panic => {
                 let previous = self.expressions.insert(expression.into(), ty);
                 assert_eq!(previous, None);
+            }
+
+            MultiInferenceState::Overwrite => {
+                self.expressions.insert(expression.into(), ty);
             }
 
             MultiInferenceState::Intersect => {
@@ -10268,16 +10273,16 @@ enum MultiInferenceState {
     #[default]
     Panic,
 
+    /// Overwrite the previously inferred value.
+    Overwrite,
+
     /// Store the intersection of all types inferred for the expression.
     Intersect,
 }
 
 impl MultiInferenceState {
     fn is_panic(self) -> bool {
-        match self {
-            MultiInferenceState::Panic => true,
-            MultiInferenceState::Intersect => false,
-        }
+        matches!(self, MultiInferenceState::Panic)
     }
 }
 
