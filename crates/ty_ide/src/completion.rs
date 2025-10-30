@@ -215,7 +215,7 @@ pub fn completion<'db>(
 
     let tokens = tokens_start_before(parsed.tokens(), offset);
 
-    if is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(tokens) {
+    if is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, tokens, file) {
         return vec![];
     }
 
@@ -853,7 +853,7 @@ fn is_in_string(tokens: &[Token]) -> bool {
 /// If the tokens end with `class f` or `def f` we return true.
 /// If the tokens end with `class` or `def`, we return false.
 /// This is fine because we don't provide completions anyway.
-fn is_in_definition_place(tokens: &[Token]) -> bool {
+fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
     tokens
         .len()
         .checked_sub(2)
@@ -862,7 +862,9 @@ fn is_in_definition_place(tokens: &[Token]) -> bool {
             matches!(
                 t.kind(),
                 TokenKind::Def | TokenKind::Class | TokenKind::Type
-            )
+            ) || file.read_to_string(db).is_ok_and(|source| {
+                source[t.range().start().to_usize()..t.range().end().to_usize()] == *"type"
+            })
         })
 }
 
@@ -4125,6 +4127,17 @@ class <CURSOR>
             "\
 type f<CURSOR> = int
     ",
+        );
+
+        builder.auto_import().build().not_contains("fabs");
+    }
+
+    #[test]
+    fn no_completions_in_maybe_type_def_name() {
+        let builder = completion_test_builder(
+            "\
+type f<CURSOR>
+       ",
         );
 
         builder.auto_import().build().not_contains("fabs");
