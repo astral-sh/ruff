@@ -2221,23 +2221,11 @@ from ty_extensions import CallableTypeOf, TypeOf, is_subtype_of, static_assert
 def identity[T](t: T) -> T:
     return t
 
-# TODO: Confusingly, these are not the same results as the corresponding checks in
-# is_assignable_to.md, even though all of these types are fully static. We have some heuristics that
-# currently conflict with each other, that we are in the process of removing with the constraint set
-# work.
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(TypeOf[identity], Callable[[int], int]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(TypeOf[identity], Callable[[str], str]))
 static_assert(not is_subtype_of(TypeOf[identity], Callable[[str], int]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
 static_assert(not is_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
 ```

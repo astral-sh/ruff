@@ -1248,14 +1248,10 @@ def identity[T](t: T) -> T:
 
 static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
 
 static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[str], str]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(not is_assignable_to(CallableTypeOf[identity], Callable[[str], int]))
 ```
 
