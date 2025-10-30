@@ -69,6 +69,55 @@ match x:
 reveal_type(x)  # revealed: object
 ```
 
+## Class patterns with generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def f(x: Covariant[int]):
+    match x:
+        case Covariant():
+            reveal_type(x)  # revealed: Covariant[int]
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+```
+
+## Class patterns with generic `@final` classes
+
+These work the same as non-`@final` classes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never, final
+
+@final
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def f(x: Covariant[int]):
+    match x:
+        case Covariant():
+            reveal_type(x)  # revealed: Covariant[int]
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on

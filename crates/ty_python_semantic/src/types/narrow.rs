@@ -962,10 +962,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module)
-            .to_instance(self.db)?;
+        let class =
+            infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module)
+                .as_class_literal()?
+                .top_materialization(self.db);
 
-        let ty = ty.negate_if(self.db, !is_positive);
+        let ty = Type::instance(self.db, class).negate_if(self.db, !is_positive);
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
