@@ -632,7 +632,7 @@ impl<'db> GenericContext<'db> {
     ) -> Self {
         let variables = self
             .variables(db)
-            .map(|bound_typevar| bound_typevar.recursive_type_normalized(db, visitor));
+            .map(|bound_typevar| bound_typevar.recursive_type_normalized_impl(db, visitor));
 
         Self::from_typevar_instances(db, variables)
     }
@@ -1079,7 +1079,7 @@ impl<'db> Specialization<'db> {
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .map(|ty| ty.recursive_type_normalized_impl(db, visitor))
             .collect();
         let tuple_inner = self
             .tuple_inner(db)

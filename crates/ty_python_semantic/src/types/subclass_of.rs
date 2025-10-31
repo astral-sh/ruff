@@ -193,7 +193,7 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,

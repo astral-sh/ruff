@@ -205,7 +205,7 @@ impl<'db> SuperOwnerKind<'db> {
                 SuperOwnerKind::Class(class.recursive_type_normalized(db, visitor))
             }
             SuperOwnerKind::Instance(instance) => {
-                SuperOwnerKind::Instance(instance.recursive_type_normalized(db, visitor))
+                SuperOwnerKind::Instance(instance.recursive_type_normalized_impl(db, visitor))
             }
         }
     }
@@ -598,7 +598,7 @@ impl<'db> BoundSuperType<'db> {
         )
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,

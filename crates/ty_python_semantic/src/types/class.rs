@@ -296,7 +296,7 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -447,7 +447,9 @@ impl<'db> ClassType<'db> {
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.recursive_type_normalized(db, visitor)),
+            Self::Generic(generic) => {
+                Self::Generic(generic.recursive_type_normalized_impl(db, visitor))
+            }
         }
     }
 

@@ -84,7 +84,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, NormalizedVisitor,
     RecursiveTypeNormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping,
-    TypeRelation, UnionBuilder, UnionType, binding_type, todo_type, walk_signature,
+    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -114,11 +114,11 @@ fn return_type_cycle_recover<'db>(
     _function: FunctionType<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
     let div = Type::divergent(id);
-    let visitor = RecursiveTypeNormalizedVisitor::new(div);
-    salsa::CycleRecoveryAction::Fallback(
-        UnionType::from_elements(db, [*previous_return_type, *return_type])
-            .recursive_type_normalized(db, &visitor),
-    )
+    salsa::CycleRecoveryAction::Fallback(return_type.cycle_normalized(
+        db,
+        *previous_return_type,
+        div,
+    ))
 }
 
 fn return_type_cycle_initial<'db>(
@@ -1094,7 +1094,7 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    pub(crate) fn recursive_type_normalized(
+    pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,

@@ -542,7 +542,7 @@ impl<'db> Signature<'db> {
                 .collect(),
             return_ty: self
                 .return_ty
-                .map(|return_ty| return_ty.recursive_type_normalized(db, visitor)),
+                .map(|return_ty| return_ty.recursive_type_normalized_impl(db, visitor)),
         }
     }
 
@@ -1779,22 +1779,24 @@ impl<'db> Parameter<'db> {
             form,
         } = self;
 
-        let annotated_type = annotated_type.map(|ty| ty.recursive_type_normalized(db, visitor));
+        let annotated_type =
+            annotated_type.map(|ty| ty.recursive_type_normalized_impl(db, visitor));
 
         let kind = match kind {
             ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
                 name: name.clone(),
-                default_type: default_type.map(|ty| ty.recursive_type_normalized(db, visitor)),
+                default_type: default_type.map(|ty| ty.recursive_type_normalized_impl(db, visitor)),
             },
             ParameterKind::PositionalOrKeyword { name, default_type } => {
                 ParameterKind::PositionalOrKeyword {
                     name: name.clone(),
-                    default_type: default_type.map(|ty| ty.recursive_type_normalized(db, visitor)),
+                    default_type: default_type
+                        .map(|ty| ty.recursive_type_normalized_impl(db, visitor)),
                 }
             }
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
                 name: name.clone(),
-                default_type: default_type.map(|ty| ty.recursive_type_normalized(db, visitor)),
+                default_type: default_type.map(|ty| ty.recursive_type_normalized_impl(db, visitor)),
             },
             ParameterKind::Variadic { name } => ParameterKind::Variadic { name: name.clone() },
             ParameterKind::KeywordVariadic { name } => {

@@ -350,7 +350,7 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -717,7 +717,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         _db: &'db dyn Db,
         _visitor: &RecursiveTypeNormalizedVisitor<'db>,

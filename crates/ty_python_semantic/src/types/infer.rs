@@ -53,8 +53,8 @@ use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, CycleRecoveryType, KnownClass, RecursiveTypeNormalizedVisitor, Truthiness, Type,
-    TypeAndQualifiers, UnionBuilder, UnionType, declaration_type,
+    ClassLiteral, CycleRecoveryType, KnownClass, Truthiness, Type, TypeAndQualifiers, UnionBuilder,
+    declaration_type,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -98,11 +98,9 @@ fn scope_cycle_recover<'db>(
     let mut expressions = expressions.clone();
 
     let div = Type::divergent(id);
-    let visitor = RecursiveTypeNormalizedVisitor::new(div);
     for (expr, ty) in &mut expressions {
         let previous_ty = previous_inference.expression_type(*expr);
-        *ty = UnionType::from_elements(db, [*ty, previous_ty])
-            .recursive_type_normalized(db, &visitor);
+        *ty = ty.cycle_normalized(db, previous_ty, div);
     }
 
     let extra = extra.as_ref().map(|extra| {
@@ -191,11 +189,9 @@ fn definition_cycle_recover_inner<'db>(
     let mut declarations = declarations.clone();
 
     let div = Type::divergent(id);
-    let visitor = RecursiveTypeNormalizedVisitor::new(div);
     for (expr, ty) in &mut expressions {
         let previous_ty = previous_inference.expression_type(*expr);
-        *ty = UnionType::from_elements(db, [*ty, previous_ty])
-            .recursive_type_normalized(db, &visitor);
+        *ty = ty.cycle_normalized(db, previous_ty, div);
     }
     for (binding, binding_ty) in &mut bindings {
         if let Some((_, previous_binding)) = previous_inference
@@ -203,10 +199,9 @@ fn definition_cycle_recover_inner<'db>(
             .iter()
             .find(|(previous_binding, _)| previous_binding == binding)
         {
-            *binding_ty = UnionType::from_elements(db, [*binding_ty, *previous_binding])
-                .recursive_type_normalized(db, &visitor);
+            *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, div);
         } else {
-            *binding_ty = binding_ty.recursive_type_normalized(db, &visitor);
+            *binding_ty = binding_ty.recursive_type_normalized(db, div);
         }
     }
     for (declaration, declaration_ty) in &mut declarations {
@@ -216,12 +211,11 @@ fn definition_cycle_recover_inner<'db>(
             .find(|(previous_declaration, _)| previous_declaration == declaration)
         {
             *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                UnionType::from_elements(db, [decl_ty, previous_declaration.inner_type()])
-                    .recursive_type_normalized(db, &visitor)
+                decl_ty.cycle_normalized(db, previous_declaration.inner_type(), div)
             });
         } else {
             *declaration_ty =
-                declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, &visitor));
+                declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, div));
         }
     }
 
@@ -370,7 +364,6 @@ fn expression_cycle_recover<'db>(
     } = inference;
 
     let div = Type::divergent(id);
-    let visitor = RecursiveTypeNormalizedVisitor::new(div);
     let extra = extra.as_ref().map(|extra| {
         let mut bindings = extra.bindings.clone();
         for (binding, binding_ty) in &mut bindings {
@@ -382,10 +375,9 @@ fn expression_cycle_recover<'db>(
                         .find(|(previous_binding, _)| previous_binding == binding)
                 })
             {
-                *binding_ty = UnionType::from_elements(db, [*binding_ty, *previous_binding])
-                    .recursive_type_normalized(db, &visitor);
+                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, div);
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, &visitor);
+                *binding_ty = binding_ty.recursive_type_normalized(db, div);
             }
         }
         Box::new(ExpressionInferenceExtra {
@@ -398,8 +390,7 @@ fn expression_cycle_recover<'db>(
     let mut expressions = expressions.clone();
     for (expr, ty) in &mut expressions {
         let previous_ty = previous_inference.expression_type(*expr);
-        *ty = UnionType::from_elements(db, [*ty, previous_ty])
-            .recursive_type_normalized(db, &visitor);
+        *ty = ty.cycle_normalized(db, previous_ty, div);
     }
     salsa::CycleRecoveryAction::Fallback(ExpressionInference {
         expressions,
@@ -468,11 +459,7 @@ fn single_expression_cycle_recover<'db>(
     _input: InferExpression<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
     let div = Type::divergent(id);
-    let visitor = RecursiveTypeNormalizedVisitor::new(div);
-    let ty = UnionType::from_elements(db, [*result, *previous_cycle_value])
-        .recursive_type_normalized(db, &visitor);
-
-    salsa::CycleRecoveryAction::Fallback(ty)
+    salsa::CycleRecoveryAction::Fallback(result.cycle_normalized(db, *previous_cycle_value, div))
 }
 
 fn single_expression_cycle_initial<'db>(
@@ -638,11 +625,9 @@ fn unpack_cycle_recover<'db>(
     let mut targets = result.targets().clone();
 
     let div = Type::divergent(id);
-    let visitor = RecursiveTypeNormalizedVisitor::new(div);
     for (expr, ty) in &mut targets {
         let previous_ty = previous_cycle_result.expression_type(*expr);
-        *ty = UnionType::from_elements(db, [*ty, previous_ty])
-            .recursive_type_normalized(db, &visitor);
+        *ty = ty.cycle_normalized(db, previous_ty, div);
     }
 
     salsa::CycleRecoveryAction::Fallback(UnpackResult::new(

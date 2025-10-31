@@ -408,7 +408,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.recursive_type_normalized(db, visitor)),
+                .map(|ty| ty.recursive_type_normalized_impl(db, visitor)),
         )
     }
 
@@ -786,14 +786,14 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         let prefix = self
             .prefix
             .iter()
-            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .map(|ty| ty.recursive_type_normalized_impl(db, visitor))
             .collect::<Box<_>>();
         let suffix = self
             .suffix
             .iter()
-            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .map(|ty| ty.recursive_type_normalized_impl(db, visitor))
             .collect::<Box<_>>();
-        let variable = self.variable.recursive_type_normalized(db, visitor);
+        let variable = self.variable.recursive_type_normalized_impl(db, visitor);
         Self {
             prefix,
             variable,
