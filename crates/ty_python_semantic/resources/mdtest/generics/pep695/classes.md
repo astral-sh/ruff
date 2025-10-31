@@ -315,6 +315,8 @@ If either method comes from a generic base class, we don't currently use its inf
 to specialize the class.
 
 ```py
+from typing import Literal
+
 class C[T, U]:
     def __new__(cls, *args, **kwargs) -> "C[T, U]":
         return object.__new__(cls)
@@ -322,20 +324,22 @@ class C[T, U]:
 class D[V](C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[int]
+reveal_type(D(1))  # revealed: D[Literal[1]]
 ```
 
 ### Generic class inherits `__init__` from generic base class
 
 ```py
+from typing import Literal
+
 class C[T, U]:
     def __init__(self, t: T, u: U) -> None: ...
 
 class D[T, U](C[T, U]):
     pass
 
-reveal_type(C(1, "str"))  # revealed: C[int, str]
-reveal_type(D(1, "str"))  # revealed: D[int, str]
+reveal_type(C(1, "str"))  # revealed: C[Literal[1], Literal["str"]]
+reveal_type(D(1, "str"))  # revealed: D[Literal[1], Literal["str"]]
 ```
 
 ### Generic class inherits `__init__` from `dict`
@@ -358,7 +362,7 @@ context. But from the user's point of view, this is another example of the above
 ```py
 class C[T, U](tuple[T, U]): ...
 
-reveal_type(C((1, 2)))  # revealed: C[int, int]
+reveal_type(C((1, 2)))  # revealed: C[Literal[1], Literal[2]]
 ```
 
 ### Upcasting a `tuple` to its `Sequence` supertype

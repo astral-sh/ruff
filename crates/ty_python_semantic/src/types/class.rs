@@ -1475,7 +1475,7 @@ impl<'db> ClassLiteral<'db> {
     /// promote any typevars that are inferred as a literal to the corresponding instance type.
     fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
-            .map(|generic_context| generic_context.promote_literals(db))
+            .map(|generic_context| generic_context.set_inherited(db))
     }
 
     pub(super) fn file(self, db: &dyn Db) -> File {

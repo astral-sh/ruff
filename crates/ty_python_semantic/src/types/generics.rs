@@ -184,20 +184,28 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct GenericContextTypeVar<'db> {
     bound_typevar: BoundTypeVarInstance<'db>,
-    should_promote_literals: bool,
+    is_inherited: bool,
 }
 
 impl<'db> GenericContextTypeVar<'db> {
     fn new(bound_typevar: BoundTypeVarInstance<'db>) -> Self {
         Self {
             bound_typevar,
-            should_promote_literals: false,
+            is_inherited: false,
         }
     }
 
-    fn promote_literals(mut self) -> Self {
-        self.should_promote_literals = true;
+    pub fn is_inherited(&self) -> bool {
+        self.is_inherited
+    }
+
+    fn set_inherited(mut self) -> Self {
+        self.is_inherited = true;
         self
+    }
+
+    pub fn bound_typevar(&self) -> BoundTypeVarInstance<'db> {
+        self.bound_typevar
     }
 }
 
@@ -262,14 +270,13 @@ impl<'db> GenericContext<'db> {
         Self::from_variables(db, type_params.into_iter().map(GenericContextTypeVar::new))
     }
 
-    /// Returns a copy of this generic context where we will promote literal types in any inferred
-    /// specializations.
-    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Self {
+    /// Mark the variables in this generic context as inherited from an outer class definition.
+    pub(crate) fn set_inherited(self, db: &'db dyn Db) -> Self {
         Self::from_variables(
             db,
             self.variables_inner(db)
                 .values()
-                .map(|variable| variable.promote_literals()),
+                .map(|variable| variable.set_inherited()),
         )
     }
 
@@ -1321,31 +1328,30 @@ impl<'db> SpecializationBuilder<'db> {
         &self.types
     }
 
-    pub(crate) fn build(
-        &mut self,
+    pub(crate) fn mapped(
+        &self,
         generic_context: GenericContext<'db>,
-        tcx: TypeContext<'db>,
-    ) -> Specialization<'db> {
-        let tcx_specialization = tcx
-            .annotation
-            .and_then(|annotation| annotation.class_specialization(self.db));
+        f: impl Fn(GenericContextTypeVar<'db>, Type<'db>) -> Type<'db>,
+    ) -> Self {
+        let mut types = self.types.clone();
+        for (identity, variable) in generic_context.variables_inner(self.db) {
+            if let Some(ty) = types.get_mut(identity) {
+                *ty = f(*variable, *ty);
+            }
+        }
 
-        let types =
-            (generic_context.variables_inner(self.db).iter()).map(|(identity, variable)| {
-                let mut ty = self.types.get(identity).copied();
+        Self {
+            db: self.db,
+            inferable: self.inferable,
+            types,
+        }
+    }
 
-                // When inferring a specialization for a generic class typevar from a constructor call,
-                // promote any typevars that are inferred as a literal to the corresponding instance type.
-                if variable.should_promote_literals {
-                    let tcx = tcx_specialization.and_then(|specialization| {
-                        specialization.get(self.db, variable.bound_typevar)
-                    });
-
-                    ty = ty.map(|ty| ty.promote_literals(self.db, TypeContext::new(tcx)));
-                }
-
-                ty
-            });
+    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
+        let types = generic_context
+            .variables_inner(self.db)
+            .iter()
+            .map(|(identity, _)| self.types.get(identity).copied());
 
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)

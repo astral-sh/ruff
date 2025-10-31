@@ -16,28 +16,19 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import Literal
+
 def list1[T](x: T) -> list[T]:
     return [x]
 
-l1 = list1(1)
+l1: list[Literal[1]] = list1(1)
 reveal_type(l1)  # revealed: list[Literal[1]]
-l2: list[int] = list1(1)
+
+l2 = list1(1)
 reveal_type(l2)  # revealed: list[int]
 
-# `list[Literal[1]]` and `list[int]` are incompatible, since `list[T]` is invariant in `T`.
-# error: [invalid-assignment] "Object of type `list[Literal[1]]` is not assignable to `list[int]`"
-l2 = l1
-
-intermediate = list1(1)
-# TODO: the error will not occur if we can infer the type of `intermediate` to be `list[int]`
-# error: [invalid-assignment] "Object of type `list[Literal[1]]` is not assignable to `list[int]`"
-l3: list[int] = intermediate
-# TODO: it would be nice if this were `list[int]`
-reveal_type(intermediate)  # revealed: list[Literal[1]]
-reveal_type(l3)  # revealed: list[int]
-
-l4: list[int | str] | None = list1(1)
-reveal_type(l4)  # revealed: list[int | str]
+l3: list[int | str] | None = list1(1)
+reveal_type(l3)  # revealed: list[int | str]
 
 def _(l: list[int] | None = None):
     l1 = l or list()
@@ -233,6 +224,9 @@ def _(flag: bool):
 
     def _(c: C):
         c.x = lst(1)
+
+        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
+        # error: [invalid-assignment]
         C.x = lst(1)
 ```
 

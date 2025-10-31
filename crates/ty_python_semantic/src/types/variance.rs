@@ -92,6 +92,10 @@ impl TypeVarVariance {
             TypeVarVariance::Covariant | TypeVarVariance::Bivariant
         )
     }
+
+    pub(crate) const fn is_invariant(self) -> bool {
+        matches!(self, TypeVarVariance::Invariant)
+    }
 }
 
 impl std::iter::FromIterator<Self> for TypeVarVariance {

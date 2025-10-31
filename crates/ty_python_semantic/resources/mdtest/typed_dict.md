@@ -126,21 +126,21 @@ Also, the value types ​​declared in a `TypedDict` affect generic call infere
 
 ```py
 class Plot(TypedDict):
-    y: list[int]
-    x: list[int] | None
+    y: list[int | None]
+    x: list[int | None] | None
 
 plot1: Plot = {"y": [1, 2, 3], "x": None}
 
 def homogeneous_list[T](*args: T) -> list[T]:
     return list(args)
 
-reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[Literal[1, 2, 3]]
+reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[int]
 plot2: Plot = {"y": homogeneous_list(1, 2, 3), "x": None}
-reveal_type(plot2["y"])  # revealed: list[int]
+reveal_type(plot2["y"])  # revealed: list[int | None]
 
 plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
-reveal_type(plot3["y"])  # revealed: list[int]
-reveal_type(plot3["x"])  # revealed: list[int] | None
+reveal_type(plot3["y"])  # revealed: list[int | None]
+reveal_type(plot3["x"])  # revealed: list[int | None] | None
 
 Y = "y"
 X = "x"

@@ -30,7 +30,8 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
+    GenericContextTypeVar, InferableTypeVars, Specialization, SpecializationBuilder,
+    SpecializationError,
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
@@ -2762,6 +2763,51 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .or(self.signature.return_ty)
             .zip(self.call_expression_tcx.annotation);
 
+        let tcx_specialization = self
+            .call_expression_tcx
+            .annotation
+            .and_then(|annotation| annotation.class_specialization(self.db));
+
+        let promote_literals = |typevar: GenericContextTypeVar<'db>, ty: Type<'db>| -> Type<'db> {
+            let bound_typevar = typevar.bound_typevar();
+
+            if typevar.is_inherited() && bound_typevar.variance(self.db).is_invariant() {
+                return ty.promote_literals(
+                    self.db,
+                    TypeContext::new(
+                        tcx_specialization
+                            .and_then(|specialization| specialization.get(self.db, bound_typevar)),
+                    ),
+                );
+            }
+
+            let Some(return_specialization) = self
+                .signature
+                .return_ty
+                .and_then(|return_ty| return_ty.class_specialization(self.db))
+            else {
+                return ty;
+            };
+
+            if let Some((typevar, _)) = return_specialization
+                .generic_context(self.db)
+                .variables(self.db)
+                .zip(return_specialization.types(self.db))
+                .find(|(_, ty)| **ty == Type::TypeVar(bound_typevar))
+                .filter(|(typevar, _)| typevar.variance(self.db).is_invariant())
+            {
+                return ty.promote_literals(
+                    self.db,
+                    TypeContext::new(
+                        tcx_specialization
+                            .and_then(|specialization| specialization.get(self.db, typevar)),
+                    ),
+                );
+            }
+
+            ty
+        };
+
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
@@ -2811,7 +2857,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         // Build the specialization first without inferring the complete type context.
-        let isolated_specialization = builder.build(generic_context, self.call_expression_tcx);
+        let isolated_specialization = builder
+            .mapped(generic_context, promote_literals)
+            .build(generic_context);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
@@ -2836,7 +2884,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
             // Otherwise, build the specialization again after inferring the complete type context.
-            let specialization = builder.build(generic_context, self.call_expression_tcx);
+            let specialization = builder
+                .mapped(generic_context, promote_literals)
+                .build(generic_context);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
             Some((Some(specialization), return_ty))
