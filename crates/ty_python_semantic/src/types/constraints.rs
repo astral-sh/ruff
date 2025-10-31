@@ -70,6 +70,14 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 
+fn simplify_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    this: InteriorNode<'db>,
+) -> (Node<'db>, Node<'db>) {
+    (Node::Interior(this), Node::AlwaysTrue)
+}
+
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
@@ -1394,7 +1402,7 @@ impl<'db> InteriorNode<'db> {
     /// are mentioned in the BDD. For instance, if one constraint implies another (`x → y`), then
     /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
     /// can rewrite any occurrences of `x ∨ y` into `y`.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=simplify_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
