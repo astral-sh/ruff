@@ -143,8 +143,6 @@ def main() -> None:
 
                 print(f"{project.name} ({benchmark.value})")
 
-                name = f"{project.name}-{benchmark.value}"
-
                 if args.ty:
                     _ = count_errors_produced_by_ty(
                         benchmark=benchmark,
@@ -154,7 +152,7 @@ def main() -> None:
                     )
 
                 hyperfine = Hyperfine(
-                    name=name,
+                    name=f"{project.name}-{benchmark.value}",
                     commands=commands,
                     warmup=warmup,
                     min_runs=min_runs,
@@ -176,5 +174,4 @@ def count_errors_produced_by_ty(
     )
     decoded_output = output.stdout.decode("utf-8")
     error_count = len(decoded_output.splitlines())
-    breakpoint()
     return error_count
