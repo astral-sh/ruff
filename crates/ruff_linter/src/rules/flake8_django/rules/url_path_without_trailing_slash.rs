@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for DjangoURLPathWithoutTrailingSlash {
     }
 }
 
-/// DJ014
+/// DJ100
 pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::ExprCall) {
     // Check if this is a call to django.urls.path or any additional configured path functions
     let is_path_function = checker

@@ -19,8 +19,8 @@ mod tests {
     #[test_case(Rule::DjangoExcludeWithModelForm, Path::new("DJ006.py"))]
     #[test_case(Rule::DjangoAllWithModelForm, Path::new("DJ007.py"))]
     #[test_case(Rule::DjangoModelWithoutDunderStr, Path::new("DJ008.py"))]
-    #[test_case(Rule::DjangoURLPathWithoutTrailingSlash, Path::new("DJ014.py"))]
-    #[test_case(Rule::DjangoURLPathWithLeadingSlash, Path::new("DJ015.py"))]
+    #[test_case(Rule::DjangoURLPathWithoutTrailingSlash, Path::new("DJ100.py"))]
+    #[test_case(Rule::DjangoURLPathWithLeadingSlash, Path::new("DJ101.py"))]
     #[test_case(Rule::DjangoUnorderedBodyContentInModel, Path::new("DJ012.py"))]
     #[test_case(Rule::DjangoNonLeadingReceiverDecorator, Path::new("DJ013.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -34,23 +34,23 @@ mod tests {
     }
 
     #[test]
-    fn test_additional_path_functions_dj014() -> Result<()> {
+    fn test_additional_path_functions_dj100() -> Result<()> {
         let mut settings =
             settings::LinterSettings::for_rule(Rule::DjangoURLPathWithoutTrailingSlash);
         settings.flake8_django.additional_path_functions = vec!["mytools.path".to_string()];
 
-        let diagnostics = test_path(Path::new("flake8_django/DJ014_custom_paths.py"), &settings)?;
-        assert_diagnostics!("DJ014_custom_paths.py", diagnostics);
+        let diagnostics = test_path(Path::new("flake8_django/DJ100_custom_paths.py"), &settings)?;
+        assert_diagnostics!("DJ100_custom_paths.py", diagnostics);
         Ok(())
     }
 
     #[test]
-    fn test_additional_path_functions_dj015() -> Result<()> {
+    fn test_additional_path_functions_dj101() -> Result<()> {
         let mut settings = settings::LinterSettings::for_rule(Rule::DjangoURLPathWithLeadingSlash);
         settings.flake8_django.additional_path_functions = vec!["mytools.path".to_string()];
 
-        let diagnostics = test_path(Path::new("flake8_django/DJ015_custom_paths.py"), &settings)?;
-        assert_diagnostics!("DJ015_custom_paths.py", diagnostics);
+        let diagnostics = test_path(Path::new("flake8_django/DJ101_custom_paths.py"), &settings)?;
+        assert_diagnostics!("DJ101_custom_paths.py", diagnostics);
         Ok(())
     }
 }
