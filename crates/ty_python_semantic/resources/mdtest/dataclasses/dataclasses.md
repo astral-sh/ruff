@@ -838,6 +838,42 @@ class WrappedIntAndExtraData[T](Wrap[int]):
 reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
+### Non-dataclass inheriting from generic dataclass
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1427>.
+
+When a non-dataclass inherits from a generic dataclass, the generic type parameters should still be
+properly inferred when calling the inherited `__init__` method.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class ParentDataclass[T]:
+    value: T
+
+# Non-dataclass inheriting from generic dataclass
+class ChildOfParentDataclass[T](ParentDataclass[T]): ...
+
+def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
+    return ChildOfParentDataclass(x)
+
+# Verify the __init__ signatures
+# TODO: ParentDataclass.__init__ should show generic types, not Unknown
+reveal_type(ParentDataclass.__init__)  # revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
+# TODO: self type should be ChildOfParentDataclass, not ParentDataclass
+reveal_type(
+    ChildOfParentDataclass.__init__
+)  # revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+
+# Test that the function works correctly
+result_int = uses_dataclass(42)
+reveal_type(result_int)  # revealed: ChildOfParentDataclass[Literal[42]]
+
+result_str = uses_dataclass("hello")
+reveal_type(result_str)  # revealed: ChildOfParentDataclass[Literal["hello"]]
+```
+
 ## Descriptor-typed fields
 
 ### Same type in `__get__` and `__set__`
