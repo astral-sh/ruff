@@ -129,3 +129,15 @@ def generator_with_lambda():
     yield 1
     func = lambda x: x  # Just a regular lambda
     yield 2
+
+# See: https://github.com/astral-sh/ruff/issues/21162
+def f():
+    def g():
+        yield 1
+    raise StopIteration
+
+
+def g():
+    def f():
+        raise StopIteration
+    yield 1
