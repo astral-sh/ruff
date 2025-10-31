@@ -424,7 +424,7 @@ def f[T](x: T) -> list[T]:
     return [x]
 
 a = f("a")
-reveal_type(a)  # revealed: list[Literal["a"]]
+reveal_type(a)  # revealed: list[str]
 
 b: list[int | Literal["a"]] = f("a")
 reveal_type(b)  # revealed: list[Literal["a"] | int]
@@ -439,10 +439,10 @@ reveal_type(d)  # revealed: list[tuple[int, int] | int]
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
 
-# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `list[int]`"
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
 g: list[int] = f("a")
 
-# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `tuple[int]`"
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `tuple[int]`"
 h: tuple[int] = f("a")
 
 def f2[T: int](x: T) -> T:

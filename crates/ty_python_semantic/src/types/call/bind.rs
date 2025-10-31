@@ -35,11 +35,11 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
-    todo_type,
+    ApplyTypeMappingVisitor, BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams,
+    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    NominalInstanceType, PromoteLiteralsMode, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2775,11 +2775,50 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let specialization = builder.build(generic_context, *self.call_expression_tcx);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
-            Some((Some(specialization), return_ty))
+            Some((specialization, return_ty))
         };
 
-        (self.specialization, self.return_ty) =
-            try_infer_tcx().unwrap_or((Some(isolated_specialization), isolated_return_ty));
+        let (specialization, mut return_ty) =
+            try_infer_tcx().unwrap_or((isolated_specialization, isolated_return_ty));
+
+        // Promote literal elements of known collection types, as we do for collection literals.
+        for known_collection in [KnownClass::List, KnownClass::Set, KnownClass::Dict] {
+            let Some(collection_class) = known_collection.try_to_class_literal(self.db) else {
+                continue;
+            };
+
+            let Some(return_specialization) =
+                return_ty.specialization_of(self.db, Some(collection_class))
+            else {
+                continue;
+            };
+
+            let tcx_types = self
+                .call_expression_tcx
+                .annotation
+                .and_then(|tcx| tcx.specialization_of(self.db, Some(collection_class)))
+                .map(|specialization| specialization.types(self.db))
+                .unwrap_or(&[]);
+
+            // Note that we perform literal promotion on the element type directly, as we
+            // are otherwise not allowed to promote invariant generics.
+            let promoted = return_specialization.apply_type_mapping_impl(
+                self.db,
+                &TypeMapping::PromoteLiterals(PromoteLiteralsMode::On),
+                tcx_types,
+                &ApplyTypeMappingVisitor::default(),
+            );
+
+            return_ty = Type::instance(
+                self.db,
+                collection_class.apply_specialization(self.db, |_| promoted),
+            );
+
+            break;
+        }
+
+        self.return_ty = return_ty;
+        self.specialization = Some(specialization);
     }
 
     fn check_argument_type(
