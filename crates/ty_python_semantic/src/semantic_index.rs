@@ -112,9 +112,10 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
     let Some(file) = importing_module.file(db) else {
         return Box::default();
     };
-    if !file.is_package_stub(db) {
+    if !file.is_package(db) {
         return Box::default();
     }
+    let is_stub = file.is_package_stub(db);
     semantic_index(db, file)
         .maybe_imported_modules
         .iter()
@@ -126,19 +127,34 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
                 import.level,
             )
             .ok()?;
-            // We only actually care if this is a direct submodule of the package
-            // so this part should actually be exactly the importing module.
-            let importing_module_name = importing_module.name(db);
-            if importing_module_name != &submodule {
-                return None;
+
+            if is_stub {
+                // We only actually care if this is a direct submodule of the package
+                // so this part should actually be exactly the importing module.
+                let importing_module_name = importing_module.name(db);
+                if importing_module_name != &submodule {
+                    return None;
+                }
+                submodule.extend(&ModuleName::new(import.submodule.as_str())?);
+                // Throw out the result if this doesn't resolve to an actual module.
+                // This is quite expensive, but we've gone through a lot of hoops to
+                // get here so it won't happen too much.
+                resolve_module(db, &submodule)?;
+                // Return only the relative part
+                submodule.relative_to(importing_module_name)
+            } else {
+                // NO
+                let importing_module_name = importing_module.name(db);
+                let relative = submodule.relative_to(importing_module_name);
+                if let Some(final_part) = ModuleName::new(import.submodule.as_str())
+                    && let Some(relative) = &relative
+                {
+                    if relative.components().next() == Some(&final_part) {
+                        return None;
+                    }
+                }
+                relative
             }
-            submodule.extend(&ModuleName::new(import.submodule.as_str())?);
-            // Throw out the result if this doesn't resolve to an actual module.
-            // This is quite expensive, but we've gone through a lot of hoops to
-            // get here so it won't happen too much.
-            resolve_module(db, &submodule)?;
-            // Return only the relative part
-            submodule.relative_to(importing_module_name)
         })
         .collect()
 }
