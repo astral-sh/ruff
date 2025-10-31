@@ -257,4 +257,169 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 75 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
 76 | 
 77 | # Non-errors.
-78 |
+78 | 
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103.py:149:6
+    |
+147 |         f.write(line)
+148 |
+149 | with Path("file.txt").open("w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+150 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test")`
+68  | 
+69  | 
+70  | from builtins import open as o
+71  + import pathlib
+72  | 
+73  | 
+74  | # FURB103
+--------------------------------------------------------------------------------
+147 |     for line in text:
+148 |         f.write(line)
+149 | 
+    - with Path("file.txt").open("w") as f:
+    -     f.write("test")
+150 + Path("file.txt").write_text("test")
+151 | 
+152 | with Path("file.txt").open("wb") as f:
+153 |     f.write(b"test")
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
+   --> FURB103.py:152:6
+    |
+150 |     f.write("test")
+151 |
+152 | with Path("file.txt").open("wb") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+153 |     f.write(b"test")
+    |
+help: Replace with `Path("file.txt").write_bytes(b"test")`
+68  | 
+69  | 
+70  | from builtins import open as o
+71  + import pathlib
+72  | 
+73  | 
+74  | # FURB103
+--------------------------------------------------------------------------------
+150 | with Path("file.txt").open("w") as f:
+151 |     f.write("test")
+152 | 
+    - with Path("file.txt").open("wb") as f:
+    -     f.write(b"test")
+153 + Path("file.txt").write_bytes(b"test")
+154 | 
+155 | with Path("file.txt").open(mode="w") as f:
+156 |     f.write("test")
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103.py:155:6
+    |
+153 |     f.write(b"test")
+154 |
+155 | with Path("file.txt").open(mode="w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+156 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test")`
+68  | 
+69  | 
+70  | from builtins import open as o
+71  + import pathlib
+72  | 
+73  | 
+74  | # FURB103
+--------------------------------------------------------------------------------
+153 | with Path("file.txt").open("wb") as f:
+154 |     f.write(b"test")
+155 | 
+    - with Path("file.txt").open(mode="w") as f:
+    -     f.write("test")
+156 + Path("file.txt").write_text("test")
+157 | 
+158 | with Path("file.txt").open("w", encoding="utf8") as f:
+159 |     f.write("test")
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
+   --> FURB103.py:158:6
+    |
+156 |     f.write("test")
+157 |
+158 | with Path("file.txt").open("w", encoding="utf8") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+159 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test", encoding="utf8")`
+68  | 
+69  | 
+70  | from builtins import open as o
+71  + import pathlib
+72  | 
+73  | 
+74  | # FURB103
+--------------------------------------------------------------------------------
+156 | with Path("file.txt").open(mode="w") as f:
+157 |     f.write("test")
+158 | 
+    - with Path("file.txt").open("w", encoding="utf8") as f:
+    -     f.write("test")
+159 + Path("file.txt").write_text("test", encoding="utf8")
+160 | 
+161 | with Path("file.txt").open("w", errors="ignore") as f:
+162 |     f.write("test")
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
+   --> FURB103.py:161:6
+    |
+159 |     f.write("test")
+160 |
+161 | with Path("file.txt").open("w", errors="ignore") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+162 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test", errors="ignore")`
+68  | 
+69  | 
+70  | from builtins import open as o
+71  + import pathlib
+72  | 
+73  | 
+74  | # FURB103
+--------------------------------------------------------------------------------
+159 | with Path("file.txt").open("w", encoding="utf8") as f:
+160 |     f.write("test")
+161 | 
+    - with Path("file.txt").open("w", errors="ignore") as f:
+    -     f.write("test")
+162 + Path("file.txt").write_text("test", errors="ignore")
+163 | 
+164 | with Path(foo()).open("w") as f:
+165 |     f.write("test")
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
+   --> FURB103.py:164:6
+    |
+162 |     f.write("test")
+163 |
+164 | with Path(foo()).open("w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+165 |     f.write("test")
+    |
+help: Replace with `Path(foo()).write_text("test")`
+68  | 
+69  | 
+70  | from builtins import open as o
+71  + import pathlib
+72  | 
+73  | 
+74  | # FURB103
+--------------------------------------------------------------------------------
+162 | with Path("file.txt").open("w", errors="ignore") as f:
+163 |     f.write("test")
+164 | 
+    - with Path(foo()).open("w") as f:
+    -     f.write("test")
+165 + Path(foo()).write_text("test")
