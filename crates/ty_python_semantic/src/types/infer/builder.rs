@@ -3884,7 +3884,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
                                 qualifiers,
                             } => {
-                                if invalid_assignment_to_final(self, qualifiers) {
+                                // Check if this is a Final attribute assignment in __init__
+                                // Issue #1409: Allow Final instance attribute initialization in __init__
+                                let is_init_final_assignment = qualifiers
+                                    .contains(TypeQualifiers::FINAL)
+                                    && self
+                                        .current_function_definition()
+                                        .is_some_and(|func| func.name.id == "__init__");
+
+                                if !is_init_final_assignment
+                                    && invalid_assignment_to_final(self, qualifiers)
+                                {
                                     return false;
                                 }
 
@@ -3984,7 +3994,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self,
                                         TypeContext::new(Some(instance_attr_ty)),
                                     );
-                                    if invalid_assignment_to_final(self, qualifiers) {
+                                    // Check if this is a Final attribute assignment in __init__
+                                    // Issue #1409: Allow Final instance attribute initialization in __init__
+                                    let is_init_final_assignment = qualifiers
+                                        .contains(TypeQualifiers::FINAL)
+                                        && self
+                                            .current_function_definition()
+                                            .is_some_and(|func| func.name.id == "__init__");
+
+                                    if !is_init_final_assignment
+                                        && invalid_assignment_to_final(self, qualifiers)
+                                    {
                                         return false;
                                     }
 
