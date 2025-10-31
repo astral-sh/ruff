@@ -53,9 +53,9 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
 
 pub(super) fn close_document(document: &DocumentHandle, session: &mut Session, client: &Client) {
     let path = document.notebook_or_file_path();
-    let db = session.project_db_mut(&path);
+    let db = session.project_db_mut(path);
 
-    match &*path {
+    match path {
         AnySystemPath::System(system_path) => {
             if let Some(file) = db.files().try_system(db, system_path) {
                 db.project().close_file(db, file);

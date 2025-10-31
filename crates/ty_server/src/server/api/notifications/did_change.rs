@@ -44,7 +44,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
 
 pub(super) fn file_changed(document: &DocumentHandle, session: &mut Session, client: &Client) {
     let path = document.notebook_or_file_path();
-    let changes = match &*path {
+    let changes = match path {
         AnySystemPath::System(system_path) => {
             vec![ChangeEvent::file_content_changed(system_path.clone())]
         }
@@ -53,7 +53,7 @@ pub(super) fn file_changed(document: &DocumentHandle, session: &mut Session, cli
         }
     };
 
-    session.apply_changes(&path, changes);
+    session.apply_changes(path, changes);
 
     publish_diagnostics(session, document.url(), client);
 }

@@ -159,9 +159,9 @@ pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, clien
         && session.client_capabilities().supports_pull_diagnostics()
     {
         return;
-    };
+    }
 
-    let db = session.project_db(&snapshot.notebook_or_file_path());
+    let db = session.project_db(snapshot.notebook_or_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return;
@@ -259,9 +259,9 @@ pub(crate) fn publish_settings_diagnostics(
     }
 }
 
-pub(super) fn compute_diagnostics<'a>(
+pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
-    snapshot: &'a DocumentSnapshot,
+    snapshot: &DocumentSnapshot,
 ) -> Option<Diagnostics> {
     let Some(file) = snapshot.to_notebook_or_file(db) else {
         tracing::info!(

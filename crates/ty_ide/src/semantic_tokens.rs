@@ -230,7 +230,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             // should be excluded.
             if range
                 .intersect(range_filter)
-                .is_none_or(|range| range.is_empty())
+                .is_none_or(ruff_text_size::TextRange::is_empty)
             {
                 return;
             }

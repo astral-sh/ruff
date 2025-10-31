@@ -121,7 +121,7 @@ impl NotebookDocument {
         let added = array
             .cells
             .as_ref()
-            .map(|cells| cells.len())
+            .map(std::vec::Vec::len)
             .unwrap_or_default();
 
         self.cells.drain(start..start + delete);

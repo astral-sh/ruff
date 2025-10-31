@@ -277,7 +277,7 @@ where
         };
 
         let path = document.notebook_or_file_path();
-        let db = session.project_db(&path).clone();
+        let db = session.project_db(path).clone();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();

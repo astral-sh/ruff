@@ -38,14 +38,14 @@ impl std::fmt::Debug for LspRange<'_> {
     }
 }
 
-impl<'db> LspRange<'db> {
+impl LspRange<'_> {
     /// Convert to an LSP Range for use within the same document/cell.
     /// Returns only the LSP Range without any URI information.
     ///
     /// Use this when you already have a URI context and this range is guaranteed
     /// to be within the same document/cell:
-    /// - Selection ranges within a LocationLink (where target_uri provides context)
-    /// - Additional ranges in the same cell (e.g., selection_range when you already have target_range)
+    /// - Selection ranges within a `LocationLink` (where `target_uri` provides context)
+    /// - Additional ranges in the same cell (e.g., `selection_range` when you already have `target_range`)
     ///
     /// Do NOT use this for standalone ranges - use `to_location()` instead to ensure
     /// the URI and range are consistent (especially important for notebook cells).
@@ -138,7 +138,7 @@ impl std::fmt::Debug for LspPosition<'_> {
     }
 }
 
-impl<'db> LspPosition<'db> {
+impl LspPosition<'_> {
     /// Convert to an LSP Position for use within the same document/cell.
     /// Returns only the LSP Position without any URI information.
     ///
@@ -188,7 +188,7 @@ impl<'db> LspPosition<'db> {
 }
 
 pub(crate) trait RangeExt {
-    /// Convert an LSP Range to internal TextRange.
+    /// Convert an LSP Range to internal `TextRange`.
     ///
     /// For notebook support, the caller should have the URI to determine which cell
     /// the range refers to, and pass the corresponding file.
@@ -217,7 +217,7 @@ impl RangeExt for lsp_types::Range {
 }
 
 pub(crate) trait PositionExt {
-    /// Convert an LSP Position to internal TextSize.
+    /// Convert an LSP Position to internal `TextSize`.
     ///
     /// TODO: For notebook support, this will need `db` and `file` parameters to:
     /// - Determine if the file is a notebook
@@ -263,30 +263,30 @@ impl PositionExt for lsp_types::Position {
             return index.offset(absolute_start, &source, encoding.into());
         }
 
-        lsp_position_to_text_size(self, &source, &index, encoding)
+        lsp_position_to_text_size(*self, &source, &index, encoding)
     }
 }
 
 pub(crate) trait TextSizeExt {
     /// Converts this position to an `LspPosition`, which then requires an explicit
     /// decision about how to use it (as a local position or as a location).
-    fn to_lsp_position<'db>(
+    fn to_lsp_position(
         self,
-        db: &'db dyn Db,
+        db: &dyn Db,
         file: File,
         encoding: PositionEncoding,
-    ) -> LspPosition<'db>
+    ) -> LspPosition<'_>
     where
         Self: Sized;
 }
 
 impl TextSizeExt for TextSize {
-    fn to_lsp_position<'db>(
+    fn to_lsp_position(
         self,
-        db: &'db dyn Db,
+        db: &dyn Db,
         file: File,
         encoding: PositionEncoding,
-    ) -> LspPosition<'db> {
+    ) -> LspPosition<'_> {
         LspPosition {
             file,
             position: self,
@@ -333,10 +333,10 @@ fn text_range_to_lsp_range(
     }
 }
 
-/// Helper function to convert an LSP Position to internal TextSize.
+/// Helper function to convert an LSP Position to internal `TextSize`.
 /// This is used internally by the `PositionExt` trait and other helpers.
 fn lsp_position_to_text_size(
-    position: &lsp_types::Position,
+    position: lsp_types::Position,
     text: &str,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -351,18 +351,18 @@ fn lsp_position_to_text_size(
     )
 }
 
-/// Helper function to convert an LSP Range to internal TextRange.
+/// Helper function to convert an LSP Range to internal `TextRange`.
 /// This is used internally by the `RangeExt` trait and in special cases
 /// where `db` and `file` are not available (e.g., when applying document changes).
 pub(crate) fn lsp_range_to_text_range(
-    range: &lsp_types::Range,
+    range: lsp_types::Range,
     text: &str,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> TextRange {
     TextRange::new(
-        lsp_position_to_text_size(&range.start, text, index, encoding),
-        lsp_position_to_text_size(&range.end, text, index, encoding),
+        lsp_position_to_text_size(range.start, text, index, encoding),
+        lsp_position_to_text_size(range.end, text, index, encoding),
     )
 }
 

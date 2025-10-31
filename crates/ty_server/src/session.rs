@@ -1384,6 +1384,7 @@ impl DocumentHandle {
         }
     }
 
+    #[expect(unused)]
     pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
         match self {
             Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
@@ -1391,6 +1392,7 @@ impl DocumentHandle {
         }
     }
 
+    #[expect(unused)]
     pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
         match self {
             DocumentHandle::Notebook { path, .. } => Some(path),

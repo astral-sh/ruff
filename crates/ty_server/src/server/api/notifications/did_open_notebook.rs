@@ -49,7 +49,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             session.open_text_document(cell_document);
         }
 
-        opened_document(document, session, client);
+        opened_document(&document, session, client);
 
         Ok(())
     }

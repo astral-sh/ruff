@@ -352,7 +352,7 @@ impl Notebook {
         // Add an entry for the row just past the end of the document.
         // This row doesn't really exist but `line_index(EOF)` can return that index
         if let Some(last_cell) = row_to_cell.last().copied() {
-            row_to_cell.push(last_cell)
+            row_to_cell.push(last_cell);
         }
 
         if let Some(last_row) = row_to_row_in_cell.last().copied() {
