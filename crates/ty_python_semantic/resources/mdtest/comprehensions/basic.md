@@ -111,16 +111,16 @@ The type of the comprehension expression itself should reflect the inferred elem
 ```py
 from typing import TypedDict, Literal
 
-# revealed: list[int]
+# revealed: list[int | Unknown]
 reveal_type([x for x in range(10)])
 
-# revealed: set[int]
+# revealed: set[int | Unknown]
 reveal_type({x for x in range(10)})
 
-# revealed: dict[int, str]
+# revealed: dict[int | Unknown, str | Unknown]
 reveal_type({x: str(x) for x in range(10)})
 
-# revealed: list[tuple[int, Unknown | str]]
+# revealed: list[tuple[int, Unknown | str] | Unknown]
 reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
 
 squares: list[int | None] = [x**2 for x in range(10)]
@@ -132,8 +132,8 @@ Inference for comprehensions takes the type context into account:
 ```py
 # Without type context:
 reveal_type([x for x in [1, 2, 3]])  # revealed: list[Unknown | int]
-reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[Unknown | int, str]
-reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[str, Unknown | int]
+reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[Unknown | int, str | Unknown]
+reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[str | Unknown, Unknown | int]
 reveal_type({x for x in [1, 2, 3]})  # revealed: set[Unknown | int]
 
 # With type context:
@@ -150,10 +150,8 @@ This also works for nested comprehensions:
 
 ```py
 table = [[(x, y) for x in range(3)] for y in range(3)]
-reveal_type(table)  # revealed: list[list[tuple[int, int]]]
+reveal_type(table)  # revealed: list[list[tuple[int, int] | Unknown] | Unknown]
 
-# TODO: no error here
-# error: [invalid-assignment]
 table_with_content: list[list[tuple[int, int, str | None]]] = [[(x, y, None) for x in range(3)] for y in range(3)]
 reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | None]]]
 ```
@@ -174,9 +172,9 @@ invalid: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 We promote literals to avoid overly-precise types in invariant positions:
 
 ```py
-reveal_type([x for x in ("a", "b", "c")])  # revealed: list[str]
-reveal_type({x for x in (1, 2, 3)})  # revealed: set[int]
-reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[str, int]
+reveal_type([x for x in ("a", "b", "c")])  # revealed: list[str | Unknown]
+reveal_type({x for x in (1, 2, 3)})  # revealed: set[int | Unknown]
+reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[str | Unknown, int | Unknown]
 ```
 
 Type context can prevent this promotion from happening:

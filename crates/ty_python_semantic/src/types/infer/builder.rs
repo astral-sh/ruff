@@ -6484,9 +6484,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             collection_class.to_specialized_instance(
                 self.db(),
-                inferred_element_types
-                    .iter()
-                    .map(|ty| ty.promote_literals(self.db(), TypeContext::default())),
+                inferred_element_types.iter().map(|ty| {
+                    UnionType::from_elements(
+                        self.db(),
+                        [
+                            ty.promote_literals(self.db(), TypeContext::default()),
+                            Type::unknown(),
+                        ],
+                    )
+                }),
             )
         }
     }
