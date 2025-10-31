@@ -148,7 +148,7 @@ pub(crate) fn analyze_graph(
                     let source_kind = match SourceKind::from_path(path.as_std_path(), source_type) {
                         Ok(Some(source_kind)) => source_kind,
                         Ok(None) => {
-                            debug!("Skipping non-Python notebook: {}", path);
+                            debug!("Skipping non-Python notebook: {path}");
                             return;
                         }
                         Err(err) => {
