@@ -128,10 +128,6 @@ pub(crate) fn analyze_graph(
                     },
                     Some(language) => PySourceType::from(language),
                 };
-                if matches!(source_type, PySourceType::Ipynb) {
-                    debug!("Ignoring Jupyter notebook: {}", path.display());
-                    continue;
-                }
 
                 // Convert to system paths.
                 let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
