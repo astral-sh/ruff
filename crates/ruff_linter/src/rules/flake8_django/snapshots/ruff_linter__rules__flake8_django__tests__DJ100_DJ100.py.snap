@@ -1,0 +1,176 @@
+---
+source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+---
+DJ100 [*] URL route `help` is missing a trailing slash
+ --> DJ100.py:6:10
+  |
+4 | # Errors - missing trailing slash
+5 | urlpatterns = [
+6 |     path("help", views.help_view),  # DJ100
+  |          ^^^^^^
+7 |     path("about", views.about_view),  # DJ100
+8 |     path("contact", views.contact_view),  # DJ100
+  |
+help: Add trailing slash
+3 | 
+4 | # Errors - missing trailing slash
+5 | urlpatterns = [
+  -     path("help", views.help_view),  # DJ100
+6 +     path("help/", views.help_view),  # DJ100
+7 |     path("about", views.about_view),  # DJ100
+8 |     path("contact", views.contact_view),  # DJ100
+9 |     path("api/users", views.users_view),  # DJ100
+
+DJ100 [*] URL route `about` is missing a trailing slash
+ --> DJ100.py:7:10
+  |
+5 | urlpatterns = [
+6 |     path("help", views.help_view),  # DJ100
+7 |     path("about", views.about_view),  # DJ100
+  |          ^^^^^^^
+8 |     path("contact", views.contact_view),  # DJ100
+9 |     path("api/users", views.users_view),  # DJ100
+  |
+help: Add trailing slash
+4  | # Errors - missing trailing slash
+5  | urlpatterns = [
+6  |     path("help", views.help_view),  # DJ100
+   -     path("about", views.about_view),  # DJ100
+7  +     path("about/", views.about_view),  # DJ100
+8  |     path("contact", views.contact_view),  # DJ100
+9  |     path("api/users", views.users_view),  # DJ100
+10 |     path("blog/posts", views.posts_view),  # DJ100
+
+DJ100 [*] URL route `contact` is missing a trailing slash
+  --> DJ100.py:8:10
+   |
+ 6 |     path("help", views.help_view),  # DJ100
+ 7 |     path("about", views.about_view),  # DJ100
+ 8 |     path("contact", views.contact_view),  # DJ100
+   |          ^^^^^^^^^
+ 9 |     path("api/users", views.users_view),  # DJ100
+10 |     path("blog/posts", views.posts_view),  # DJ100
+   |
+help: Add trailing slash
+5  | urlpatterns = [
+6  |     path("help", views.help_view),  # DJ100
+7  |     path("about", views.about_view),  # DJ100
+   -     path("contact", views.contact_view),  # DJ100
+8  +     path("contact/", views.contact_view),  # DJ100
+9  |     path("api/users", views.users_view),  # DJ100
+10 |     path("blog/posts", views.posts_view),  # DJ100
+11 | ]
+
+DJ100 [*] URL route `api/users` is missing a trailing slash
+  --> DJ100.py:9:10
+   |
+ 7 |     path("about", views.about_view),  # DJ100
+ 8 |     path("contact", views.contact_view),  # DJ100
+ 9 |     path("api/users", views.users_view),  # DJ100
+   |          ^^^^^^^^^^^
+10 |     path("blog/posts", views.posts_view),  # DJ100
+11 | ]
+   |
+help: Add trailing slash
+6  |     path("help", views.help_view),  # DJ100
+7  |     path("about", views.about_view),  # DJ100
+8  |     path("contact", views.contact_view),  # DJ100
+   -     path("api/users", views.users_view),  # DJ100
+9  +     path("api/users/", views.users_view),  # DJ100
+10 |     path("blog/posts", views.posts_view),  # DJ100
+11 | ]
+12 | 
+
+DJ100 [*] URL route `blog/posts` is missing a trailing slash
+  --> DJ100.py:10:10
+   |
+ 8 |     path("contact", views.contact_view),  # DJ100
+ 9 |     path("api/users", views.users_view),  # DJ100
+10 |     path("blog/posts", views.posts_view),  # DJ100
+   |          ^^^^^^^^^^^^
+11 | ]
+   |
+help: Add trailing slash
+7  |     path("about", views.about_view),  # DJ100
+8  |     path("contact", views.contact_view),  # DJ100
+9  |     path("api/users", views.users_view),  # DJ100
+   -     path("blog/posts", views.posts_view),  # DJ100
+10 +     path("blog/posts/", views.posts_view),  # DJ100
+11 | ]
+12 | 
+13 | # OK - has trailing slash
+
+DJ100 [*] URL route `bad` is missing a trailing slash
+  --> DJ100.py:37:10
+   |
+35 | urlpatterns_mixed = [
+36 |     path("good/", views.good_view),
+37 |     path("bad", views.bad_view),  # DJ100
+   |          ^^^^^
+38 |     path("also-good/", views.also_good_view),
+39 |     path("also-bad", views.also_bad_view),  # DJ100
+   |
+help: Add trailing slash
+34 | # Mixed cases
+35 | urlpatterns_mixed = [
+36 |     path("good/", views.good_view),
+   -     path("bad", views.bad_view),  # DJ100
+37 +     path("bad/", views.bad_view),  # DJ100
+38 |     path("also-good/", views.also_good_view),
+39 |     path("also-bad", views.also_bad_view),  # DJ100
+40 | ]
+
+DJ100 [*] URL route `also-bad` is missing a trailing slash
+  --> DJ100.py:39:10
+   |
+37 |     path("bad", views.bad_view),  # DJ100
+38 |     path("also-good/", views.also_good_view),
+39 |     path("also-bad", views.also_bad_view),  # DJ100
+   |          ^^^^^^^^^^
+40 | ]
+   |
+help: Add trailing slash
+36 |     path("good/", views.good_view),
+37 |     path("bad", views.bad_view),  # DJ100
+38 |     path("also-good/", views.also_good_view),
+   -     path("also-bad", views.also_bad_view),  # DJ100
+39 +     path("also-bad/", views.also_bad_view),  # DJ100
+40 | ]
+41 | 
+42 | # Error - missing trail slash and argument should stay in message
+
+DJ100 [*] URL route `bad/<slug:slug>` is missing a trailing slash
+  --> DJ100.py:44:10
+   |
+42 | # Error - missing trail slash and argument should stay in message
+43 | urlpatterns_params_bad = [
+44 |     path("bad/<slug:slug>", views.bad_view),  # DJ100
+   |          ^^^^^^^^^^^^^^^^^
+45 |     path("<slug:slug>", views.bad_view),  # DJ100
+46 | ]
+   |
+help: Add trailing slash
+41 | 
+42 | # Error - missing trail slash and argument should stay in message
+43 | urlpatterns_params_bad = [
+   -     path("bad/<slug:slug>", views.bad_view),  # DJ100
+44 +     path("bad/<slug:slug>/", views.bad_view),  # DJ100
+45 |     path("<slug:slug>", views.bad_view),  # DJ100
+46 | ]
+
+DJ100 [*] URL route `<slug:slug>` is missing a trailing slash
+  --> DJ100.py:45:10
+   |
+43 | urlpatterns_params_bad = [
+44 |     path("bad/<slug:slug>", views.bad_view),  # DJ100
+45 |     path("<slug:slug>", views.bad_view),  # DJ100
+   |          ^^^^^^^^^^^^^
+46 | ]
+   |
+help: Add trailing slash
+42 | # Error - missing trail slash and argument should stay in message
+43 | urlpatterns_params_bad = [
+44 |     path("bad/<slug:slug>", views.bad_view),  # DJ100
+   -     path("<slug:slug>", views.bad_view),  # DJ100
+45 +     path("<slug:slug>/", views.bad_view),  # DJ100
+46 | ]

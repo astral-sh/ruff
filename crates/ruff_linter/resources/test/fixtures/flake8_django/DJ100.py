@@ -3,11 +3,11 @@ from . import views
 
 # Errors - missing trailing slash
 urlpatterns = [
-    path("help", views.help_view),  # DJ014
-    path("about", views.about_view),  # DJ014
-    path("contact", views.contact_view),  # DJ014
-    path("api/users", views.users_view),  # DJ014
-    path("blog/posts", views.posts_view),  # DJ014
+    path("help", views.help_view),  # DJ100
+    path("about", views.about_view),  # DJ100
+    path("contact", views.contact_view),  # DJ100
+    path("api/users", views.users_view),  # DJ100
+    path("blog/posts", views.posts_view),  # DJ100
 ]
 
 # OK - has trailing slash
@@ -34,13 +34,13 @@ urlpatterns_params = [
 # Mixed cases
 urlpatterns_mixed = [
     path("good/", views.good_view),
-    path("bad", views.bad_view),  # DJ014
+    path("bad", views.bad_view),  # DJ100
     path("also-good/", views.also_good_view),
-    path("also-bad", views.also_bad_view),  # DJ014
+    path("also-bad", views.also_bad_view),  # DJ100
 ]
 
 # Error - missing trail slash and argument should stay in message
 urlpatterns_params_bad = [
-    path("bad/<slug:slug>", views.bad_view),  # DJ014
-    path("<slug:slug>", views.bad_view),  # DJ014
+    path("bad/<slug:slug>", views.bad_view),  # DJ100
+    path("<slug:slug>", views.bad_view),  # DJ100
 ]
