@@ -890,7 +890,10 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
-    /// TODO
+    /// from typing import ParamSpec
+    ///
+    /// P1 = ParamSpec("P1")  # okay
+    /// P2 = ParamSpec("S2")  # error: ParamSpec name must match the variable it's assigned to
     /// ```
     ///
     /// ## References
