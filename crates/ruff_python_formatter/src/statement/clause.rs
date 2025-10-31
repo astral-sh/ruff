@@ -8,7 +8,7 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
-use crate::statement::suite::{SuiteKind, contains_only_an_ellipsis};
+use crate::statement::suite::{SuiteKind, as_only_an_ellipsis};
 use crate::verbatim::write_suppressed_clause_header;
 use crate::{has_skip_comment, prelude::*};
 
@@ -449,17 +449,10 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
             || matches!(self.kind, SuiteKind::Function | SuiteKind::Class);
 
         if should_collapse_stub
-            && contains_only_an_ellipsis(self.body, f.context().comments())
+            && let Some(ellipsis) = as_only_an_ellipsis(self.body, f.context().comments())
             && self.trailing_comments.is_empty()
         {
-            write!(
-                f,
-                [
-                    space(),
-                    self.body.format().with_options(self.kind),
-                    hard_line_break()
-                ]
-            )
+            write!(f, [space(), ellipsis.format(), hard_line_break()])
         } else {
             write!(
                 f,

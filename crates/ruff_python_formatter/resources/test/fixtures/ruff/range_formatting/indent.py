@@ -61,3 +61,9 @@ def test6 ():
     print("Format" )
     print(3 +  4)<RANGE_END>
     print("Format to fix indentation" )
+
+
+def test7 ():
+    <RANGE_START>print("Format" )
+    print(3 +  4)<RANGE_END>
+    print("Format to fix indentation" )
