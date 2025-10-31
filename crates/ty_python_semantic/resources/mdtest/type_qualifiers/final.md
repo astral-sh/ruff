@@ -448,13 +448,12 @@ class DeclaredAndAssignedInClass:
     attr2: Final[int] = 10
 
 # Case 3: Reassignment when already assigned in class body
-# Known limitation: Detecting this requires flow analysis
 class ReassignmentFromClass:
     attr3: Final[int] = 10
 
     def __init__(self):
-        # TODO: Should ideally error - already assigned in class body
-        self.attr3 = 20  # Currently allowed
+        # error: [invalid-assignment]
+        self.attr3 = 20  # Error: already assigned in class body
 
 # Case 4: Multiple assignments within __init__ itself
 # Known limitation: Requires flow-sensitive analysis to detect

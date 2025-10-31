@@ -3630,30 +3630,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assignable
             };
 
-        // Check if we're in an __init__ method (where Final attributes can be initialized).
-        let is_in_init = || {
-            self.current_function_definition()
-                .is_some_and(|func| func.name.id == "__init__")
-        };
-
         // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
         // Per PEP 591, Final instance attributes can be assigned in __init__ methods.
+        //
+        // Known limitation (requires flow-sensitive analysis):
+        // - Allows multiple assignments within __init__ (e.g., self.x = 1; self.x = 2)
         let invalid_assignment_to_final = |builder: &Self, qualifiers: TypeQualifiers| -> bool {
-            if qualifiers.contains(TypeQualifiers::FINAL) && !is_in_init() {
+            // Check if it's a Final attribute
+            if !qualifiers.contains(TypeQualifiers::FINAL) {
+                return false;
+            }
+
+            // Check if we're in an __init__ method (where Final attributes can be initialized).
+            let is_in_init = builder
+                .current_function_definition()
+                .is_some_and(|func| func.name.id == "__init__");
+
+            // Not in __init__ - always disallow
+            if !is_in_init {
                 if emit_diagnostics {
                     if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
                     {
                         builder.into_diagnostic(format_args!(
                             "Cannot assign to final attribute `{attribute}` \
-                                         on type `{}`",
+                                             on type `{}`",
                             object_ty.display(db)
                         ));
                     }
                 }
-                true
-            } else {
-                false
+                return true;
             }
+
+            // We're in __init__ - check if class-level attribute already has a value
+            if let Some(class_ty) = builder.class_context_of_current_method() {
+                let class_definition = class_ty.class_literal(db).0;
+                let class_scope_id = class_definition.body_scope(db).file_scope_id(db);
+                let place_table = builder.index.place_table(class_scope_id);
+
+                if let Some(symbol_id) = place_table.symbol_id(attribute) {
+                    let use_def = builder.index.use_def_map(class_scope_id);
+                    let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
+
+                    // Check if any declaration is an annotated assignment with a value
+                    for decl_with_constraint in declarations {
+                        if let Some(definition) = decl_with_constraint.declaration.definition() {
+                            if let DefinitionKind::AnnotatedAssignment(ann_assign) =
+                                definition.kind(db)
+                            {
+                                // Check if the annotated assignment has a value
+                                if ann_assign.value(builder.module()).is_some() {
+                                    // Class-level Final has a value - disallow reassignment
+                                    if emit_diagnostics {
+                                        if let Some(diag_builder) =
+                                            builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                        {
+                                            diag_builder.into_diagnostic(format_args!(
+                                                    "Cannot assign to final attribute `{attribute}` in `__init__` \
+                                                     because it already has a value at class level"
+                                                ));
+                                        }
+                                    }
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // In __init__ and no class-level value - allow
+            false
         };
 
         match object_ty {
