@@ -41,7 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Django documentation: URL dispatcher](https://docs.djangoproject.com/en/stable/topics/http/urls/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.14.1")]
+#[violation_metadata(preview_since = "v0.14.4")]
 pub(crate) struct DjangoURLPathWithoutTrailingSlash {
     url_pattern: String,
 }
