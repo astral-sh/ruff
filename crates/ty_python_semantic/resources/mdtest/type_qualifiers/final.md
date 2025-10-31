@@ -488,7 +488,7 @@ and the conformance suite requires this behavior.
 import sys
 from typing import Final
 
-class ConditionalAssignment:
+class ConditionalAssignmentTyped:
     X: Final[int]
 
     def __init__(self, cond: bool):
@@ -496,6 +496,15 @@ class ConditionalAssignment:
             self.X = 42  # OK: Assignment in __init__
         else:
             self.X = 56  # OK: Multiple conditional assignments in __init__ are allowed
+
+class ConditionalAssignmentUntyped:
+    Y: Final[int]
+
+    def __init__(self, cond):
+        if cond:
+            self.Y = 1  # OK: Assignment in __init__
+        else:
+            self.Y = 2  # OK: Multiple conditional assignments in __init__ are allowed
 ```
 
 ## Full diagnostics
