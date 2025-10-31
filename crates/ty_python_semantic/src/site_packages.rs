@@ -46,7 +46,7 @@ type StdlibDiscoveryResult<T> = Result<T, StdlibDiscoveryError>;
 /// were the case, the system environment's `site-packages` directory
 /// *might* be added to the `SitePackagesPaths` twice, but we wouldn't
 /// want duplicates to appear in this set.
-#[derive(PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct SitePackagesPaths(IndexSet<SystemPathBuf>);
 
 impl SitePackagesPaths {
@@ -111,7 +111,7 @@ impl SitePackagesPaths {
     }
 }
 
-impl fmt::Debug for SitePackagesPaths {
+impl fmt::Display for SitePackagesPaths {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.0.iter()).finish()
     }
@@ -549,7 +549,7 @@ System site-packages will not be used for module resolution.",
         }
 
         tracing::debug!(
-            "Resolved site-packages directories for this virtual environment are: {site_packages_directories:?}"
+            "Resolved site-packages directories for this virtual environment are: {site_packages_directories}"
         );
         Ok(site_packages_directories)
     }
@@ -829,7 +829,7 @@ impl SystemEnvironment {
         )?;
 
         tracing::debug!(
-            "Resolved site-packages directories for this environment are: {site_packages_directories:?}"
+            "Resolved site-packages directories for this environment are: {site_packages_directories}"
         );
         Ok(site_packages_directories)
     }
@@ -2382,5 +2382,16 @@ mod tests {
         assert_eq!(version.0, "3.13");
         assert_eq!(&pyvenv_cfg[version.1], version.0);
         assert_eq!(parsed.implementation, PythonImplementation::PyPy);
+    }
+
+    #[test]
+    fn site_packages_paths_display() {
+        let paths = SitePackagesPaths::default();
+        assert_eq!(paths.to_string(), "[]");
+
+        let mut paths = SitePackagesPaths::default();
+        paths.insert(SystemPathBuf::from("/path/to/site/packages"));
+
+        assert_eq!(paths.to_string(), r#"["/path/to/site/packages"]"#);
     }
 }
