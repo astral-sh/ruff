@@ -475,6 +475,12 @@ impl File {
         self.path(db).as_str().ends_with("__init__.pyi")
     }
 
+    /// Returns `true` if the file is an `__init__.pyi`
+    pub fn is_package(self, db: &dyn Db) -> bool {
+        let path = self.path(db).as_str();
+        path.ends_with("__init__.pyi") || path.ends_with("__init__.py")
+    }
+
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
         match self.path(db) {
             FilePath::System(path) => path
