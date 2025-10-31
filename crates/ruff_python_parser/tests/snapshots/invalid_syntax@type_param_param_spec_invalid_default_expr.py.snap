@@ -343,7 +343,7 @@ Module(
 2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
 4 | type X[**P = x := int] = int
-  |                ^^ Syntax Error: Expected ',', found ':='
+  |                ^^ Syntax Error: Expected `,`, found `:=`
 5 | type X[**P = *int] = int
   |
 

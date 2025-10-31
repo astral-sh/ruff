@@ -131,7 +131,7 @@ Module(
   |
 1 | assert *x
 2 | assert assert x
-  |        ^^^^^^ Syntax Error: Expected an identifier, but found a keyword 'assert' that cannot be used here
+  |        ^^^^^^ Syntax Error: Expected an identifier, but found a keyword `assert` that cannot be used here
 3 | assert yield x
 4 | assert x := 1
   |

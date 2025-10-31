@@ -326,7 +326,7 @@ Module(
 
   |
 1 | if True: pass elif False: pass else: pass
-  |               ^^^^ Syntax Error: Expected newline, found 'elif'
+  |               ^^^^ Syntax Error: Expected newline, found `elif`
 2 | if True: pass; elif False: pass; else: pass
 3 | for x in iter: break else: pass
   |
@@ -334,7 +334,7 @@ Module(
 
   |
 1 | if True: pass elif False: pass else: pass
-  |                                ^^^^ Syntax Error: Expected newline, found 'else'
+  |                                ^^^^ Syntax Error: Expected newline, found `else`
 2 | if True: pass; elif False: pass; else: pass
 3 | for x in iter: break else: pass
   |
@@ -343,16 +343,7 @@ Module(
   |
 1 | if True: pass elif False: pass else: pass
 2 | if True: pass; elif False: pass; else: pass
-  |                ^^^^ Syntax Error: Expected newline, found 'elif'
-3 | for x in iter: break else: pass
-4 | for x in iter: break; else: pass
-  |
-
-
-  |
-1 | if True: pass elif False: pass else: pass
-2 | if True: pass; elif False: pass; else: pass
-  |                                  ^^^^ Syntax Error: Expected newline, found 'else'
+  |                ^^^^ Syntax Error: Expected newline, found `elif`
 3 | for x in iter: break else: pass
 4 | for x in iter: break; else: pass
   |
@@ -361,8 +352,17 @@ Module(
   |
 1 | if True: pass elif False: pass else: pass
 2 | if True: pass; elif False: pass; else: pass
+  |                                  ^^^^ Syntax Error: Expected newline, found `else`
 3 | for x in iter: break else: pass
-  |                      ^^^^ Syntax Error: Expected newline, found 'else'
+4 | for x in iter: break; else: pass
+  |
+
+
+  |
+1 | if True: pass elif False: pass else: pass
+2 | if True: pass; elif False: pass; else: pass
+3 | for x in iter: break else: pass
+  |                      ^^^^ Syntax Error: Expected newline, found `else`
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
   |
@@ -372,7 +372,7 @@ Module(
 2 | if True: pass; elif False: pass; else: pass
 3 | for x in iter: break else: pass
 4 | for x in iter: break; else: pass
-  |                       ^^^^ Syntax Error: Expected newline, found 'else'
+  |                       ^^^^ Syntax Error: Expected newline, found `else`
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |
@@ -382,7 +382,7 @@ Module(
 3 | for x in iter: break else: pass
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
-  |           ^^^^^^ Syntax Error: Expected newline, found 'except'
+  |           ^^^^^^ Syntax Error: Expected newline, found `except`
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |
 
@@ -391,7 +391,7 @@ Module(
 3 | for x in iter: break else: pass
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
-  |                            ^^^^ Syntax Error: Expected newline, found 'else'
+  |                            ^^^^ Syntax Error: Expected newline, found `else`
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |
 
@@ -400,7 +400,7 @@ Module(
 3 | for x in iter: break else: pass
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
-  |                                       ^^^^^^^ Syntax Error: Expected newline, found 'finally'
+  |                                       ^^^^^^^ Syntax Error: Expected newline, found `finally`
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |
 
@@ -409,7 +409,7 @@ Module(
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
-  |            ^^^^^^ Syntax Error: Expected newline, found 'except'
+  |            ^^^^^^ Syntax Error: Expected newline, found `except`
   |
 
 
@@ -417,7 +417,7 @@ Module(
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
-  |                              ^^^^ Syntax Error: Expected newline, found 'else'
+  |                              ^^^^ Syntax Error: Expected newline, found `else`
   |
 
 
@@ -425,5 +425,5 @@ Module(
 4 | for x in iter: break; else: pass
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
-  |                                          ^^^^^^^ Syntax Error: Expected newline, found 'finally'
+  |                                          ^^^^^^^ Syntax Error: Expected newline, found `finally`
   |
