@@ -427,6 +427,84 @@ reveal_type(ClassA().ID4)  # revealed: int
 reveal_type(ClassB().ID5)  # revealed: int
 ```
 
+## Reassignment to Final in `__init__`
+
+Per PEP 591, there must be exactly one assignment to a Final attribute. This implementation detects
+reassignment to class-level assigned Finals, but has known limitations for detecting multiple
+assignments within `__init__` itself (requires flow-sensitive analysis).
+
+```py
+from typing import Final
+
+# Case 1: Declared in class, assigned once in __init__ - ALLOWED
+class DeclaredAssignedInInit:
+    attr1: Final[int]
+
+    def __init__(self):
+        self.attr1 = 1  # OK: First and only assignment
+
+# Case 2: Declared and assigned in class body - ALLOWED (no __init__ assignment)
+class DeclaredAndAssignedInClass:
+    attr2: Final[int] = 10
+
+# Case 3: Reassignment when already assigned in class body
+# Known limitation: Detecting this requires flow analysis
+class ReassignmentFromClass:
+    attr3: Final[int] = 10
+
+    def __init__(self):
+        # TODO: Should ideally error - already assigned in class body
+        self.attr3 = 20  # Currently allowed
+
+# Case 4: Multiple assignments within __init__ itself
+# Known limitation: Requires flow-sensitive analysis to detect
+class MultipleAssignmentsInInit:
+    attr4: Final[int]
+
+    def __init__(self):
+        self.attr4 = 1  # OK: First assignment
+        # TODO: Should ideally error - requires flow analysis
+        self.attr4 = 2  # Currently allowed
+
+# Case 5: Declaration and assignment in __init__ - ALLOWED
+class DeclareAndAssignInInit:
+    def __init__(self):
+        self.attr5: Final[int] = 1  # OK: Declare and assign in __init__
+
+# Case 6: Assignment outside __init__ should still fail
+class AssignmentOutsideInit:
+    attr6: Final[int]
+
+    def other_method(self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `attr6`"
+        self.attr6 = 1  # Error: Not in __init__
+```
+
+## Conditional assignments in `__init__`
+
+Per Alex's feedback, conditional assignments in different branches should ideally be allowed since
+only one will execute at runtime. However, this requires flow-sensitive analysis to detect mutually
+exclusive branches.
+
+This is a known limitation - the type checker currently sees both assignments and treats the second
+as a reassignment even though they're in mutually exclusive branches.
+
+```py
+import sys
+from typing import Final
+
+class ConditionalAssignment:
+    X: Final[int]
+
+    def __init__(self):
+        if sys.version_info >= (3, 11):
+            self.X = 42
+        else:
+            # Currently allowed due to limitations in flow analysis
+            # TODO: Ideally should be OK since only one branch executes
+            self.X = 56
+```
+
 ## Full diagnostics
 
 <!-- snapshot-diagnostics -->

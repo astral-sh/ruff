@@ -3630,9 +3630,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assignable
             };
 
+        // Check if we're in an __init__ method (where Final attributes can be initialized).
+        let is_in_init = || {
+            self.current_function_definition()
+                .is_some_and(|func| func.name.id == "__init__")
+        };
+
         // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
+        // Per PEP 591, Final instance attributes can be assigned in __init__ methods.
         let invalid_assignment_to_final = |builder: &Self, qualifiers: TypeQualifiers| -> bool {
-            if qualifiers.contains(TypeQualifiers::FINAL) {
+            if qualifiers.contains(TypeQualifiers::FINAL) && !is_in_init() {
                 if emit_diagnostics {
                     if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
                     {
@@ -3884,17 +3891,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
                                 qualifiers,
                             } => {
-                                // Check if this is a Final attribute assignment in __init__
-                                // Issue #1409: Allow Final instance attribute initialization in __init__
-                                let is_init_final_assignment = qualifiers
-                                    .contains(TypeQualifiers::FINAL)
-                                    && self
-                                        .current_function_definition()
-                                        .is_some_and(|func| func.name.id == "__init__");
-
-                                if !is_init_final_assignment
-                                    && invalid_assignment_to_final(self, qualifiers)
-                                {
+                                if invalid_assignment_to_final(self, qualifiers) {
                                     return false;
                                 }
 
@@ -3994,17 +3991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self,
                                         TypeContext::new(Some(instance_attr_ty)),
                                     );
-                                    // Check if this is a Final attribute assignment in __init__
-                                    // Issue #1409: Allow Final instance attribute initialization in __init__
-                                    let is_init_final_assignment = qualifiers
-                                        .contains(TypeQualifiers::FINAL)
-                                        && self
-                                            .current_function_definition()
-                                            .is_some_and(|func| func.name.id == "__init__");
-
-                                    if !is_init_final_assignment
-                                        && invalid_assignment_to_final(self, qualifiers)
-                                    {
+                                    if invalid_assignment_to_final(self, qualifiers) {
                                         return false;
                                     }
 
