@@ -10743,7 +10743,11 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new([Parameter::keyword_only(Name::new_static("inferable"))
                         .type_form()
-                        .with_annotated_type(Type::homogeneous_tuple(db, Type::any()))]),
+                        .with_annotated_type(UnionType::from_elements(
+                            db,
+                            [Type::homogeneous_tuple(db, Type::any()), Type::none(db)],
+                        ))
+                        .with_default_type(Type::none(db))]),
                     Some(KnownClass::Bool.to_instance(db)),
                 )))
             }

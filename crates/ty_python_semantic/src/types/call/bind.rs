@@ -36,9 +36,10 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType,
-    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
+    todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -1178,24 +1179,31 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ) => {
-                        let [Some(inferable)] = overload.parameter_types() else {
-                            continue;
+                        let extract_inferable = |instance: &NominalInstanceType<'db>| {
+                            if instance.has_known_class(db, KnownClass::NoneType) {
+                                // Caller explicitly passed None, so no typevars are inferable.
+                                return Some(FxHashSet::default());
+                            }
+                            instance
+                                .tuple_spec(db)?
+                                .fixed_elements()
+                                .map(|ty| {
+                                    ty.as_typevar()
+                                        .map(|bound_typevar| bound_typevar.identity(db))
+                                })
+                                .collect()
                         };
-                        let Some(tuple) = inferable
-                            .as_nominal_instance()
-                            .and_then(|instance| instance.tuple_spec(db))
-                        else {
-                            continue;
-                        };
-                        let inferable: Option<FxHashSet<_>> = tuple
-                            .fixed_elements()
-                            .map(|ty| {
-                                ty.as_typevar()
-                                    .map(|bound_typevar| bound_typevar.identity(db))
-                            })
-                            .collect();
-                        let Some(inferable) = inferable else {
-                            continue;
+
+                        let inferable = match overload.parameter_types() {
+                            // Caller did not provide argument, so no typevars are inferable.
+                            [None] => FxHashSet::default(),
+                            [Some(Type::NominalInstance(instance))] => {
+                                match extract_inferable(instance) {
+                                    Some(inferable) => inferable,
+                                    None => continue,
+                                }
+                            }
+                            _ => continue,
                         };
 
                         let result = tracked

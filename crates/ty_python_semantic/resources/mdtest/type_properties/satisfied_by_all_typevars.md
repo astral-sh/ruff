@@ -61,30 +61,30 @@ class Unrelated: ...
 
 def unbounded[T]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
 
     static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
 
     # (T = Never) is a valid specialization, which satisfies (T ≤ Unrelated).
     static_assert(ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T ≤ Unrelated).
-    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars())
 
     # (T = Base) is a valid specialization, which satisfies (T ≤ Super).
     static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Unrelated) is a valid specialization, which does not satisfy (T ≤ Super).
-    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
 
     # (T = Base) is a valid specialization, which satisfies (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Unrelated) is a valid specialization, which does not satisfy (T ≤ Base).
-    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
 
     # (T = Sub) is a valid specialization, which satisfies (T ≤ Sub).
     static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Unrelated) is a valid specialization, which does not satisfy (T ≤ Sub).
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
 ```
 
 ## Typevar with an upper bound
@@ -107,38 +107,38 @@ class Unrelated: ...
 
 def bounded[T: Base]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
 
     static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
 
     # (T = Base) is a valid specialization, which satisfies (T ≤ Super).
     static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
     # Every valid specialization satisfies (T ≤ Base). Since (Base ≤ Super), every valid
     # specialization also satisfies (T ≤ Super).
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
 
     # (T = Base) is a valid specialization, which satisfies (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
     # Every valid specialization satisfies (T ≤ Base).
-    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
 
     # (T = Sub) is a valid specialization, which satisfies (T ≤ Sub).
     static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T ≤ Sub).
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
 
     # (T = Never) is a valid specialization, which satisfies (T ≤ Unrelated).
     constraints = ConstraintSet.range(Never, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T ≤ Unrelated).
-    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not constraints.satisfied_by_all_typevars())
 
     # Never is the only type that satisfies both (T ≤ Base) and (T ≤ Unrelated). So there is no
     # valid specialization that satisfies (T ≤ Unrelated ∧ T ≠ Never).
     constraints = constraints & ~ConstraintSet.range(Never, T, Never)
     static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not constraints.satisfied_by_all_typevars())
 ```
 
 ## Constrained typevar
@@ -161,60 +161,60 @@ class Unrelated: ...
 
 def constrained[T: (Base, Unrelated)]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
 
     static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
 
     # (T = Unrelated) is a valid specialization, which satisfies (T ≤ Unrelated).
     static_assert(ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T ≤ Unrelated).
-    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Unrelated).satisfied_by_all_typevars())
 
     # (T = Base) is a valid specialization, which satisfies (T ≤ Super).
     static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Unrelated) is a valid specialization, which does not satisfy (T ≤ Super).
-    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
 
     # (T = Base) is a valid specialization, which satisfies (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Unrelated) is a valid specialization, which does not satisfy (T ≤ Base).
-    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
 
     # Neither (T = Base) nor (T = Unrelated) satisfy (T ≤ Sub).
     static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
 
     # (T = Base) and (T = Unrelated) both satisfy (T ≤ Super ∨ T ≤ Unrelated).
     constraints = ConstraintSet.range(Never, T, Super) | ConstraintSet.range(Never, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(constraints.satisfied_by_all_typevars())
 
     # (T = Base) and (T = Unrelated) both satisfy (T ≤ Base ∨ T ≤ Unrelated).
     constraints = ConstraintSet.range(Never, T, Base) | ConstraintSet.range(Never, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(constraints.satisfied_by_all_typevars())
 
     # (T = Unrelated) is a valid specialization, which satisfies (T ≤ Sub ∨ T ≤ Unrelated).
     constraints = ConstraintSet.range(Never, T, Sub) | ConstraintSet.range(Never, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T ≤ Sub ∨ T ≤ Unrelated).
-    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not constraints.satisfied_by_all_typevars())
 
     # (T = Unrelated) is a valid specialization, which satisfies (T = Super ∨ T = Unrelated).
     constraints = ConstraintSet.range(Super, T, Super) | ConstraintSet.range(Unrelated, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T = Super ∨ T = Unrelated).
-    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not constraints.satisfied_by_all_typevars())
 
     # (T = Base) and (T = Unrelated) both satisfy (T = Base ∨ T = Unrelated).
     constraints = ConstraintSet.range(Base, T, Base) | ConstraintSet.range(Unrelated, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
-    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(constraints.satisfied_by_all_typevars())
 
     # (T = Unrelated) is a valid specialization, which satisfies (T = Sub ∨ T = Unrelated).
     constraints = ConstraintSet.range(Sub, T, Sub) | ConstraintSet.range(Unrelated, T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T = Sub ∨ T = Unrelated).
-    static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[()]))
+    static_assert(not constraints.satisfied_by_all_typevars())
 ```
