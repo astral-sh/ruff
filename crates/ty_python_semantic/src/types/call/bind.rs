@@ -32,14 +32,15 @@ use crate::types::function::{
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
+use crate::types::infer::builder::{MultiInferenceState, TypeInferenceBuilder};
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
-    todo_type,
+    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
+    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support,
+    infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -146,13 +147,116 @@ impl<'db> Bindings<'db> {
     /// We update the bindings to include the return type of the call, the bound types for all
     /// parameters, and any errors resulting from binding the call, all for each union element and
     /// overload (if any).
+    pub(crate) fn infer_and_check_types(
+        mut self,
+        db: &'db dyn Db,
+        ast_arguments: &ast::Arguments,
+        argument_types: &mut CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
+    ) -> Result<Self, CallError<'db>> {
+        // If the type context is a union, attempt to narrow to a specific element.
+        if let Some(Type::Union(union)) = call_expression_tcx.annotation {
+            let old_multi_inference_state =
+                builder.set_multi_inference_state(MultiInferenceState::Overwrite);
+            let was_in_multi_inference = builder.context.set_multi_inference(true);
+
+            'narrow: for narrowed in union.elements(db) {
+                let narrowed_tcx = TypeContext::new(Some(*narrowed));
+
+                self.infer_argument_types(db, ast_arguments, argument_types, narrowed_tcx, builder);
+
+                if self
+                    .check_types_impl(
+                        db,
+                        argument_types,
+                        narrowed_tcx,
+                        builder.dataclass_field_specifiers(),
+                    )
+                    .is_err()
+                {
+                    continue 'narrow;
+                }
+
+                for element in self.elements.iter() {
+                    for (_, overload) in element.matching_overloads() {
+                        // If we inferred a type that is not assignable to the union element we
+                        // want to narrow to, then we didn't successfully narrow to the element
+                        // and inferred a wider type.
+                        //
+                        // TODO: Instead check if it widened, and prefer the one that did not.
+                        //
+                        // TODO: Maybe just do the inference without tcx here instead of
+                        // per-overload? While first preferring tcx that is generic.
+                        if !overload.return_type().is_assignable_to(db, *narrowed) {
+                            // is_subtype_of?
+                            continue 'narrow;
+                        }
+                    }
+                }
+
+                builder.context.set_multi_inference(was_in_multi_inference);
+
+                self.infer_argument_types(db, ast_arguments, argument_types, narrowed_tcx, builder);
+
+                builder.set_multi_inference_state(old_multi_inference_state);
+
+                return Ok(self);
+            }
+
+            builder.set_multi_inference_state(old_multi_inference_state);
+            builder.context.set_multi_inference(was_in_multi_inference);
+        }
+
+        let old_multi_inference_state =
+            builder.set_multi_inference_state(MultiInferenceState::Overwrite);
+
+        self.infer_argument_types(
+            db,
+            ast_arguments,
+            argument_types,
+            call_expression_tcx,
+            builder,
+        );
+
+        builder.set_multi_inference_state(old_multi_inference_state);
+
+        match self.check_types_impl(
+            db,
+            argument_types,
+            call_expression_tcx,
+            builder.dataclass_field_specifiers(),
+        ) {
+            Ok(()) => Ok(self),
+            Err(err) => Err(CallError(err, Box::new(self))),
+        }
+    }
+
     pub(crate) fn check_types(
         mut self,
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: &TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
+        match self.check_types_impl(
+            db,
+            argument_types,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+        ) {
+            Ok(()) => Ok(self),
+            Err(err) => Err(CallError(err, Box::new(self))),
+        }
+    }
+
+    pub(crate) fn check_types_impl(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> Result<(), CallErrorKind> {
         for element in &mut self.elements {
             if let Some(mut updated_argument_forms) =
                 element.check_types(db, argument_types, call_expression_tcx)
@@ -197,16 +301,183 @@ impl<'db> Bindings<'db> {
         }
 
         if all_ok {
-            Ok(self)
+            Ok(())
         } else if any_binding_error {
-            Err(CallError(CallErrorKind::BindingError, Box::new(self)))
+            Err(CallErrorKind::BindingError)
         } else if all_not_callable {
-            Err(CallError(CallErrorKind::NotCallable, Box::new(self)))
+            Err(CallErrorKind::NotCallable)
         } else {
-            Err(CallError(
-                CallErrorKind::PossiblyNotCallable,
-                Box::new(self),
-            ))
+            Err(CallErrorKind::PossiblyNotCallable)
+        }
+    }
+
+    /// Infer the argument types for all bindings.
+    fn infer_argument_types(
+        &mut self,
+        db: &'db dyn Db,
+        ast_arguments: &ast::Arguments,
+        arguments_types: &mut CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
+    ) {
+        debug_assert!(
+            ast_arguments.len() == arguments_types.len()
+                && arguments_types.len() == self.argument_forms().len()
+        );
+
+        let iter = itertools::izip!(
+            0..,
+            arguments_types.iter_mut(),
+            self.argument_forms().iter().copied(),
+            ast_arguments.arguments_source_order()
+        );
+
+        let overloads_with_binding = self
+            .iter()
+            .filter_map(|binding| {
+                match binding.matching_overload_index() {
+                    MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
+                        let overloads = binding
+                            .matching_overloads()
+                            .map(move |(_, overload)| (overload, binding));
+
+                        Some(Either::Right(overloads))
+                    }
+
+                    // If there is a single overload that does not match, we still infer the argument
+                    // types for better diagnostics.
+                    MatchingOverloadIndex::None => match binding.overloads() {
+                        [overload] => Some(Either::Left(std::iter::once((overload, binding)))),
+                        _ => None,
+                    },
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
+            let ast_argument = match ast_argument {
+                // Splatted arguments are inferred before parameter matching to
+                // determine their length.
+                //
+                // TODO: Re-infer splatted arguments with their type context.
+                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
+                | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => continue,
+
+                ast::ArgOrKeyword::Arg(arg) => arg,
+                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
+            };
+
+            // Type-form arguments are inferred without type context, so we can infer the argument type directly.
+            if let Some(ParameterForm::Type) = argument_form {
+                *argument_type = Some(builder.infer_type_expression(ast_argument));
+                continue;
+            }
+
+            // Retrieve the parameter type for the current argument in a given overload and its binding.
+            let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
+                let argument_index = if binding.bound_type.is_some() {
+                    argument_index + 1
+                } else {
+                    argument_index
+                };
+
+                let argument_matches = &overload.argument_matches()[argument_index];
+                let [parameter_index] = argument_matches.parameters.as_slice() else {
+                    return None;
+                };
+
+                let mut parameter_type =
+                    overload.signature.parameters()[*parameter_index].annotated_type()?;
+
+                // If this is a generic call, attempt to specialize the parameter type using the
+                // declared type context, if provided.
+                if let Some(generic_context) = overload.signature.generic_context
+                    && let Some(return_ty) = overload.signature.return_ty
+                    && let Some(declared_return_ty) = call_expression_tcx.annotation
+                {
+                    let mut builder =
+                        SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
+
+                    let _ = builder.infer(return_ty, declared_return_ty);
+                    let specialization = builder.build(generic_context, call_expression_tcx);
+
+                    // Note that we are not necessarily "preferring the declared type" here, as the
+                    // type context will only be preferred during the inference of this expression
+                    // by the same heuristics we use for the inference of the outer generic call.
+                    parameter_type = parameter_type.apply_specialization(db, specialization);
+                }
+
+                // TODO: For now, skip any parameter annotations that still mention any typevars. There
+                // are two issues:
+                //
+                // First, if we include those typevars in the type context that we use to infer the
+                // corresponding argument type, the typevars might end up appearing in the inferred
+                // argument type as well. As part of analyzing this call, we're going to (try to)
+                // infer a specialization of those typevars, and would need to substitute those
+                // typevars in the inferred argument type. We can't do that easily at the moment,
+                // since specialization inference occurs _after_ we've inferred argument types, and
+                // we can't _update_ an expression's inferred type after the fact.
+                //
+                // Second, certain kinds of arguments themselves have typevars that we need to
+                // infer specializations for. (For instance, passing the result of _another_  call
+                // to the argument of _this_ call, where both are calls to generic functions.) In
+                // that case, we want to "tie together" the typevars of the two calls so that we
+                // can infer their specializations at the same time — or at least, for the
+                // specialization of one to influence the specialization of the other. It's not yet
+                // clear how we're going to do that. (We might have to start inferring constraint
+                // sets for each expression, instead of simple types?)
+                //
+                // Regardless, for now, the expedient "solution" is to not perform bidi type
+                // checking for these kinds of parameters.
+                if parameter_type.has_typevar(db) {
+                    return None;
+                }
+
+                Some(parameter_type)
+            };
+
+            // If there is only a single binding and overload, we can infer the argument directly with
+            // the unique parameter type annotation.
+            if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
+                builder.infer_expression(
+                    ast_argument,
+                    TypeContext::new(parameter_type(overload, binding)),
+                );
+            } else {
+                // We perform inference once without any type context, emitting any diagnostics that are unrelated
+                // to bidirectional type inference.
+                builder.infer_expression(ast_argument, TypeContext::default());
+
+                // We then silence any diagnostics emitted during multi-inference, as the type context is only
+                // used as a hint to infer a more assignable argument type, and should not lead to diagnostics
+                // for non-matching overloads.
+                let was_in_multi_inference = builder.context.set_multi_inference(true);
+
+                // Each type is a valid independent inference of the given argument, and we may require different
+                // permutations of argument types to correctly perform argument expansion during overload evaluation,
+                // so we take the intersection of all the types we inferred for each argument.
+                //
+                // Note that this applies to all nested expressions within each argument.
+                let old_multi_inference_state =
+                    builder.set_multi_inference_state(MultiInferenceState::Intersect);
+
+                // Infer the type of each argument once with each distinct parameter type as type context.
+                let parameter_types = overloads_with_binding
+                    .iter()
+                    .filter_map(|(overload, binding)| parameter_type(overload, binding))
+                    .collect::<FxHashSet<_>>();
+
+                for parameter_type in parameter_types {
+                    builder.infer_expression(ast_argument, TypeContext::new(Some(parameter_type)));
+                }
+
+                // Restore the multi-inference state.
+                builder.set_multi_inference_state(old_multi_inference_state);
+                builder.context.set_multi_inference(was_in_multi_inference);
+            }
+
+            *argument_type = builder.try_expression_type(ast_argument);
         }
     }
 
@@ -1466,7 +1737,7 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: &TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -2652,7 +2923,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
-    call_expression_tcx: &'a TypeContext<'db>,
+    call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -2668,7 +2939,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
-        call_expression_tcx: &'a TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
@@ -2718,8 +2989,26 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
+        let return_with_tcx = self
+            .signature
+            .return_ty
+            .zip(self.call_expression_tcx.annotation);
+
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+
+        // Prefer the declared type of generic classes.
+        let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
+            if tcx.class_specialization(self.db).is_none() {
+                return None;
+            };
+
+            let return_ty =
+                return_ty.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
+
+            builder.infer(return_ty, tcx).ok()?;
+            Some(builder.type_mappings().clone())
+        });
 
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
@@ -2733,9 +3022,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                if let Err(error) = builder.infer(
+                let filter = |declared_ty: BoundTypeVarIdentity<'_>, inferred_ty: Type<'_>| {
+                    // Avoid widening the inferred type if it is already assignable to the
+                    // preferred declared type.
+                    preferred_type_mappings
+                        .as_ref()
+                        .and_then(|types| types.get(&declared_ty))
+                        .is_none_or(|preferred_ty| {
+                            !inferred_ty.is_assignable_to(self.db, *preferred_ty)
+                        })
+                };
+
+                if let Err(error) = builder.infer_filter(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
+                    filter,
                 ) {
                     self.errors.push(BindingError::SpecializationError {
                         error,
@@ -2745,15 +3046,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        // Build the specialization first without inferring the type context.
-        let isolated_specialization = builder.build(generic_context, *self.call_expression_tcx);
+        // Build the specialization first without inferring the complete type context.
+        let isolated_specialization = builder.build(generic_context, self.call_expression_tcx);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
 
         let mut try_infer_tcx = || {
-            let return_ty = self.signature.return_ty?;
-            let call_expression_tcx = self.call_expression_tcx.annotation?;
+            let (return_ty, call_expression_tcx) = return_with_tcx?;
 
             // A type variable is not a useful type-context for expression inference, and applying it
             // to the return type can lead to confusing unions in nested generic calls.
@@ -2761,9 +3061,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return None;
             }
 
-            // If the return type is already assignable to the annotated type, we can ignore the
-            // type context and prefer the narrower inferred type.
-            if isolated_return_ty.is_assignable_to(self.db, call_expression_tcx) {
+            // If the return type is a subtype of the annotated type, we ignore the rest of the type
+            // context and prefer the narrower inferred type.
+            if isolated_return_ty.is_subtype_of(self.db, call_expression_tcx) {
                 return None;
             }
 
@@ -2771,8 +3071,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // annotated assignment, to closer match the order of any unions written in the type annotation.
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
-            // Otherwise, build the specialization again after inferring the type context.
-            let specialization = builder.build(generic_context, *self.call_expression_tcx);
+            // Otherwise, build the specialization again after inferring the complete type context.
+            let specialization = builder.build(generic_context, self.call_expression_tcx);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
             Some((Some(specialization), return_ty))
@@ -3130,7 +3430,7 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
-        call_expression_tcx: &TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
     ) {
         let mut checker = ArgumentTypeChecker::new(
             db,

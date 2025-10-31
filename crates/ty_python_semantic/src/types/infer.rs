@@ -57,7 +57,8 @@ use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 
-mod builder;
+pub(crate) mod builder;
+
 #[cfg(test)]
 mod tests;
 

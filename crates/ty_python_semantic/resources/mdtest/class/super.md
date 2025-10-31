@@ -206,8 +206,7 @@ class BuilderMeta2(type):
     ) -> BuilderMeta2:
         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
         s = reveal_type(super())
-        # TODO: should be `BuilderMeta2` (needs https://github.com/astral-sh/ty/issues/501)
-        # revealed:  Unknown
+        # revealed:  BuilderMeta2
         return reveal_type(s.__new__(cls, name, bases, dct))
 
 class Foo[T]:

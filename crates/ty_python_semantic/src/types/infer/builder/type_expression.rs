@@ -20,7 +20,7 @@ use crate::types::{
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
-    pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+    pub(crate) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let mut ty = self.infer_type_expression_no_store(expression);
         let divergent = Type::divergent(Some(self.scope()));
         if ty.has_divergent_type(self.db(), divergent) {

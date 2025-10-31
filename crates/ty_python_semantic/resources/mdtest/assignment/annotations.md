@@ -427,14 +427,13 @@ a = f("a")
 reveal_type(a)  # revealed: list[Literal["a"]]
 
 b: list[int | Literal["a"]] = f("a")
-reveal_type(b)  # revealed: list[Literal["a"] | int]
+reveal_type(b)  # revealed: list[int | Literal["a"]]
 
 c: list[int | str] = f("a")
-reveal_type(c)  # revealed: list[str | int]
+reveal_type(c)  # revealed: list[int | str]
 
 d: list[int | tuple[int, int]] = f((1, 2))
-# TODO: We could avoid reordering the union elements here.
-reveal_type(d)  # revealed: list[tuple[int, int] | int]
+reveal_type(d)  # revealed: list[int | tuple[int, int]]
 
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
@@ -455,7 +454,76 @@ j: int | str = f2(True)
 reveal_type(j)  # revealed: Literal[True]
 ```
 
-Types are not widened unnecessarily:
+The function arguments are also inferred using the type context:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+def f[T](x: list[T]) -> T:
+    return x[0]
+
+a: TD = f([{"x": 0}, {"x": 1}])
+reveal_type(a)  # revealed: TD
+
+b: TD | None = f([{"x": 0}, {"x": 1}])
+reveal_type(b)  # revealed: TD
+
+# error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+# error: [invalid-key] "Invalid key access on TypedDict `TD`: Unknown key "y""
+c: TD | None = f([{"y": 0}, {"x": 1}])
+```
+
+## Prefer the declared type of generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+def f[T](x: T) -> list[T]:
+    return [x]
+
+def f2[T](x: T) -> list[T] | None:
+    return [x]
+
+def f3[T](x: T) -> list[T] | dict[T, T]:
+    return [x]
+
+a = f(1)
+reveal_type(a)  # revealed: list[Literal[1]]
+
+b: list[Any] = f(1)
+reveal_type(b)  # revealed: list[Any]
+
+c: list[Any] = [1]
+reveal_type(c)  # revealed: list[Any]
+
+d: list[Any] | None = f(1)
+reveal_type(d)  # revealed: list[Any]
+
+e: list[Any] | None = [1]
+reveal_type(e)  # revealed: list[Any]
+
+f: list[Any] | None = f2(1)
+reveal_type(f)  # revealed: list[Any] | None
+
+g: list[Any] | dict[Any, Any] = f3(1)
+# TODO: Better constraint solver.
+reveal_type(g)  # revealed: list[Literal[1]] | dict[Literal[1], Literal[1]]
+```
+
+## Prefer the inferred type of non-generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 def id[T](x: T) -> T:
@@ -476,10 +544,8 @@ def _(i: int):
     b: list[int | None] | None = id([i])
     c: list[int | None] | int | None = id([i])
     reveal_type(a)  # revealed: list[int | None]
-    # TODO: these should reveal `list[int | None]`
-    # we currently do not use the call expression annotation as type context for argument inference
-    reveal_type(b)  # revealed: list[Unknown | int]
-    reveal_type(c)  # revealed: list[Unknown | int]
+    reveal_type(b)  # revealed: list[int | None]
+    reveal_type(c)  # revealed: list[int | None]
 
     a: list[int | None] | None = [i]
     b: list[int | None] | None = lst(i)
@@ -494,4 +560,11 @@ def _(i: int):
     reveal_type(a)  # revealed: list[Unknown]
     reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: list[Unknown]
-```
+
+def f[T](x: list[T]) -> T:
+    return x[0]
+
+def _(x: int, y: int | str):
+    z: int | str = f(lst(x))
+    reveal_type(z)  # revealed: int
+  ```

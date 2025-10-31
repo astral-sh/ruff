@@ -8,7 +8,7 @@ use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
 use super::{
@@ -47,7 +47,6 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::subscript::{PyIndex, PySlice};
-use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
 use crate::types::context::{InNoTypeCheck, InferContext};
@@ -96,14 +95,13 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    binding_type, todo_type,
+    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -206,8 +204,9 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 /// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
 /// assignment, type narrowing guard), we use the [`infer_expression_types()`] query to ensure we
 /// don't infer its types more than once.
-pub(super) struct TypeInferenceBuilder<'db, 'ast> {
-    context: InferContext<'db, 'ast>,
+pub(crate) struct TypeInferenceBuilder<'db, 'ast> {
+    pub(crate) context: InferContext<'db, 'ast>,
+
     index: &'db SemanticIndex<'db>,
     region: InferenceRegion<'db>,
 
@@ -301,7 +300,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) const MAX_STRING_LITERAL_SIZE: usize = 4096;
 
     /// Creates a new builder for inferring types in a region.
-    pub(super) fn new(
+    pub(crate) fn new(
         db: &'db dyn Db,
         region: InferenceRegion<'db>,
         index: &'db SemanticIndex<'db>,
@@ -395,6 +394,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
+    pub(crate) fn dataclass_field_specifiers(&self) -> &[Type<'db>] {
+        &self.dataclass_field_specifiers[..]
+    }
+
+    /// Set the multi-inference state, returning the previous value.
+    pub(crate) fn set_multi_inference_state(
+        &mut self,
+        state: MultiInferenceState,
+    ) -> MultiInferenceState {
+        std::mem::replace(&mut self.multi_inference_state, state)
+    }
+
     /// Are we currently inferring types in file with deferred types?
     /// This is true for stub files, for files with `__future__.annotations`, and
     /// by default for all source files in Python 3.14 and later.
@@ -444,7 +455,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.try_expression_type(expr).unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
+    pub(crate) fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
         self.expressions
             .get(&expr.into())
             .copied()
@@ -5671,162 +5682,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer the argument types for multiple potential bindings and overloads.
-    fn infer_all_argument_types<'a>(
-        &mut self,
-        ast_arguments: &ast::Arguments,
-        arguments: &mut CallArguments<'a, 'db>,
-        bindings: &Bindings<'db>,
-    ) {
-        debug_assert!(
-            ast_arguments.len() == arguments.len()
-                && arguments.len() == bindings.argument_forms().len()
-        );
-
-        let iter = itertools::izip!(
-            0..,
-            arguments.iter_mut(),
-            bindings.argument_forms().iter().copied(),
-            ast_arguments.arguments_source_order()
-        );
-
-        let overloads_with_binding = bindings
-            .into_iter()
-            .filter_map(|binding| {
-                match binding.matching_overload_index() {
-                    MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
-                        let overloads = binding
-                            .matching_overloads()
-                            .map(move |(_, overload)| (overload, binding));
-
-                        Some(Either::Right(overloads))
-                    }
-
-                    // If there is a single overload that does not match, we still infer the argument
-                    // types for better diagnostics.
-                    MatchingOverloadIndex::None => match binding.overloads() {
-                        [overload] => Some(Either::Left(std::iter::once((overload, binding)))),
-                        _ => None,
-                    },
-                }
-            })
-            .flatten();
-
-        for (argument_index, (_, argument_type), argument_form, ast_argument) in iter {
-            let ast_argument = match ast_argument {
-                // Splatted arguments are inferred before parameter matching to
-                // determine their length.
-                //
-                // TODO: Re-infer splatted arguments with their type context.
-                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
-                | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => continue,
-
-                ast::ArgOrKeyword::Arg(arg) => arg,
-                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
-            };
-
-            // Type-form arguments are inferred without type context, so we can infer the argument type directly.
-            if let Some(ParameterForm::Type) = argument_form {
-                *argument_type = Some(self.infer_type_expression(ast_argument));
-                continue;
-            }
-
-            // Retrieve the parameter type for the current argument in a given overload and its binding.
-            let db = self.db();
-            let parameter_type = |overload: &Binding<'db>, binding: &CallableBinding<'db>| {
-                let argument_index = if binding.bound_type.is_some() {
-                    argument_index + 1
-                } else {
-                    argument_index
-                };
-
-                let argument_matches = &overload.argument_matches()[argument_index];
-                let [parameter_index] = argument_matches.parameters.as_slice() else {
-                    return None;
-                };
-
-                let parameter_type =
-                    overload.signature.parameters()[*parameter_index].annotated_type()?;
-
-                // TODO: For now, skip any parameter annotations that mention any typevars. There
-                // are two issues:
-                //
-                // First, if we include those typevars in the type context that we use to infer the
-                // corresponding argument type, the typevars might end up appearing in the inferred
-                // argument type as well. As part of analyzing this call, we're going to (try to)
-                // infer a specialization of those typevars, and would need to substitute those
-                // typevars in the inferred argument type. We can't do that easily at the moment,
-                // since specialization inference occurs _after_ we've inferred argument types, and
-                // we can't _update_ an expression's inferred type after the fact.
-                //
-                // Second, certain kinds of arguments themselves have typevars that we need to
-                // infer specializations for. (For instance, passing the result of _another_  call
-                // to the argument of _this_ call, where both are calls to generic functions.) In
-                // that case, we want to "tie together" the typevars of the two calls so that we
-                // can infer their specializations at the same time — or at least, for the
-                // specialization of one to influence the specialization of the other. It's not yet
-                // clear how we're going to do that. (We might have to start inferring constraint
-                // sets for each expression, instead of simple types?)
-                //
-                // Regardless, for now, the expedient "solution" is to not perform bidi type
-                // checking for these kinds of parameters.
-                if parameter_type.has_typevar(db) {
-                    return None;
-                }
-
-                Some(parameter_type)
-            };
-
-            // If there is only a single binding and overload, we can infer the argument directly with
-            // the unique parameter type annotation.
-            if let Ok((overload, binding)) = overloads_with_binding.clone().exactly_one() {
-                self.infer_expression_impl(
-                    ast_argument,
-                    TypeContext::new(parameter_type(overload, binding)),
-                );
-            } else {
-                // Otherwise, each type is a valid independent inference of the given argument, and we may
-                // require different permutations of argument types to correctly perform argument expansion
-                // during overload evaluation, so we take the intersection of all the types we inferred for
-                // each argument.
-                //
-                // Note that this applies to all nested expressions within each argument.
-                let old_multi_inference_state = mem::replace(
-                    &mut self.multi_inference_state,
-                    MultiInferenceState::Intersect,
-                );
-
-                // We perform inference once without any type context, emitting any diagnostics that are unrelated
-                // to bidirectional type inference.
-                self.infer_expression_impl(ast_argument, TypeContext::default());
-
-                // We then silence any diagnostics emitted during multi-inference, as the type context is only
-                // used as a hint to infer a more assignable argument type, and should not lead to diagnostics
-                // for non-matching overloads.
-                let was_in_multi_inference = self.context.set_multi_inference(true);
-
-                // Infer the type of each argument once with each distinct parameter type as type context.
-                let parameter_types = overloads_with_binding
-                    .clone()
-                    .filter_map(|(overload, binding)| parameter_type(overload, binding))
-                    .collect::<FxHashSet<_>>();
-
-                for parameter_type in parameter_types {
-                    self.infer_expression_impl(
-                        ast_argument,
-                        TypeContext::new(Some(parameter_type)),
-                    );
-                }
-
-                // Restore the multi-inference state.
-                self.multi_inference_state = old_multi_inference_state;
-                self.context.set_multi_inference(was_in_multi_inference);
-            }
-
-            *argument_type = self.try_expression_type(ast_argument);
-        }
-    }
-
     fn infer_argument_type(
         &mut self,
         ast_argument: &ast::Expr,
@@ -5857,7 +5712,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[track_caller]
-    fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+    pub(crate) fn infer_expression(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         debug_assert!(
             !self.index.is_standalone_expression(expression),
             "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
@@ -6961,14 +6820,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let db = self.db();
-                let infer_call_arguments = |bindings: Option<Bindings<'db>>| {
-                    if let Some(bindings) = bindings {
-                        let bindings = bindings.match_parameters(self.db(), &call_arguments);
-                        self.infer_all_argument_types(arguments, &mut call_arguments, &bindings);
-                    } else {
-                        let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                        self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
-                    }
+                let infer_call_arguments = |_bindings: Option<Bindings<'db>>| {
+                    // if let Some(bindings) = bindings {
+                    //     let bindings = bindings.match_parameters(self.db(), &call_arguments);
+                    //     self.infer_all_argument_types(
+                    //         arguments,
+                    //         &mut call_arguments,
+                    //         &bindings,
+                    //         tcx,
+                    //     );
+                    // } else {
+                    let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+                    self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
+                    //}
 
                     call_arguments
                 };
@@ -6985,7 +6849,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bindings = callable_type
             .bindings(self.db())
             .match_parameters(self.db(), &call_arguments);
-        self.infer_all_argument_types(arguments, &mut call_arguments, &bindings);
+
+        let bindings_result =
+            bindings.infer_and_check_types(self.db(), arguments, &mut call_arguments, tcx, self);
 
         // Validate `TypedDict` constructor calls after argument type inference
         if let Some(class_literal) = callable_type.as_class_literal() {
@@ -7003,12 +6869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = match bindings.check_types(
-            self.db(),
-            &call_arguments,
-            &tcx,
-            &self.dataclass_field_specifiers[..],
-        ) {
+        let mut bindings = match bindings_result {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
@@ -9557,7 +9418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .check_types(
                 self.db(),
                 &call_argument_types,
-                &TypeContext::default(),
+                TypeContext::default(),
                 &self.dataclass_field_specifiers[..],
             ) {
             Ok(bindings) => bindings,
@@ -10284,7 +10145,7 @@ impl GenericContextError {
 
 /// Dictates the behavior when an expression is inferred multiple times.
 #[derive(Default, Debug, Clone, Copy)]
-enum MultiInferenceState {
+pub(crate) enum MultiInferenceState {
     /// Panic if the expression has already been inferred.
     #[default]
     Panic,
