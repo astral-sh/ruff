@@ -858,15 +858,13 @@ class ChildOfParentDataclass[T](ParentDataclass[T]): ...
 def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
     return ChildOfParentDataclass(x)
 
-# Verify the __init__ signatures
 # TODO: ParentDataclass.__init__ should show generic types, not Unknown
-reveal_type(ParentDataclass.__init__)  # revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
-# TODO: self type should be ChildOfParentDataclass, not ParentDataclass
-reveal_type(
-    ChildOfParentDataclass.__init__
-)  # revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+# revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
+reveal_type(ParentDataclass.__init__)
 
-# Test that the function works correctly
+# revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+reveal_type(ChildOfParentDataclass.__init__)
+
 result_int = uses_dataclass(42)
 reveal_type(result_int)  # revealed: ChildOfParentDataclass[Literal[42]]
 
