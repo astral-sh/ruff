@@ -10827,6 +10827,58 @@ impl<'db> ModuleLiteralType<'db> {
         self._importing_file(db)
     }
 
+    /// Get the submodule attributes we believe to be defined on this module.
+    ///
+    /// Note that `ModuleLiteralType` is per-importing-file, so this analysis
+    /// includes "imports the importing file has performed".
+    ///
+    ///
+    /// # Danger! Powerful Hammer!
+    ///
+    /// These results immediately make the attribute always defined in the importing file,
+    /// shadowing any other attribute in the module with the same name, even if the
+    /// non-submodule-attribute is in fact always the one defined in practice.
+    ///
+    /// Intuitively this means `available_submodule_attributes` "win all tie-breaks",
+    /// with the idea that if we're ever confused about complicated code then usually
+    /// the import is the thing people want in scope.
+    ///
+    /// However this "always defined, always shadows" rule if applied too aggressively
+    /// creates VERY confusing conclusions that break perfectly reasonable code.
+    ///
+    /// For instance, consider a package which has a `myfunc` submodule which defines a
+    /// `myfunc` function (a common idiom). If the package "re-exports" this function
+    /// (`from .myfunc import myfunc`), then at runtime in python
+    /// `from mypackage import myfunc` should import the function and not the submodule.
+    ///
+    /// However, if we were to consider `from mypackage import myfunc` as introducing
+    /// the attribute `mypackage.myfunc` in `available_submodule_attributes`, we would
+    /// fail to ever resolve the function. This is because `available_submodule_attributes`
+    /// is *so early* and *so powerful* in our analysis that **this conclusion would be
+    /// used when actually resolving `from mypackage import myfunc`**!
+    ///
+    /// This currently cannot be fixed by considering the actual symbols defined in `mypackage`,
+    /// because `available_submodule_attributes` is an *input* to that analysis.
+    ///
+    /// We should therefore avoid marking something as an `available_submodule_attribute`
+    /// when the import could be importing a non-submodule (a function, class, or value).
+    ///
+    ///
+    /// # Rules
+    ///
+    /// We have two rules for whether a submodule attribute is defined:
+    ///
+    /// * If the importing file include `import x.y` then `x.y` is defined in the importing file.
+    ///   This is an easy rule to justify because `import` can only ever import a module, and so
+    ///   *should* shadow any non-submodule of the same name.
+    ///
+    /// * If the module is an `__init__.pyi` for `mypackage`, and it contains a `from...import`
+    ///   that normalizes to `from mypackage import submodule`, then `mypackage.submodule` is
+    ///   defined in all files. This supports the `from . import submodule` idiom. Critically,
+    ///   we do *not* allow `from mypackage.nested import submodule` to affect `mypackage`.
+    ///   The idea here is that `from mypackage import submodule` *from mypackage itself* can
+    ///   only ever reasonably be an import of a submodule. It doesn't make any sense to import
+    ///   a function or class from yourself! (You *can* do it but... why? Don't? Please?)
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()

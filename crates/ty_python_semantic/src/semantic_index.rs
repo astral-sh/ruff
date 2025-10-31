@@ -76,15 +76,9 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 
 /// Returns the set of modules that are imported anywhere in `file`.
 ///
-/// This set only considers `import` statements, not `from...import` statements, because:
-///
-///   - In `from foo import bar`, we cannot determine whether `foo.bar` is a submodule (and is
-///     therefore imported) without looking outside the content of this file.  (We could turn this
-///     into a _potentially_ imported modules set, but that would change how it's used in our type
-///     inference logic.)
-///
-///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
-///     knowing the name of the current module, and whether it's a package.
+/// This set only considers `import` statements, not `from...import` statements.
+/// See [`ModuleLiteralType::available_submodule_attributes`] for discussion
+/// of why this analysis is intentionally limited.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()
@@ -95,10 +89,12 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 ///
 /// This set only considers `from...import` statements (but it could also include `import`).
 /// It also only returns a non-empty result for `__init__.pyi` files.
+/// See [`ModuleLiteralType::available_submodule_attributes`] for discussion
+/// of why this analysis is intentionally limited.
 ///
 /// This function specifically implements the rule that if an `__init__.pyi` file
-/// contains a `from...import` that imports a relative submodule of the package,
-/// that relative submodule should be available as an attribute of the package.
+/// contains a `from...import` that imports a direct submodule of the package,
+/// that submodule should be available as an attribute of the package.
 ///
 /// While we endeavour to accurately model import side-effects for `.py` files, we intentionally
 /// limit them for `.pyi` files to encourage more intentional API design. The standard escape
@@ -137,7 +133,9 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
                 return None;
             }
             submodule.extend(&ModuleName::new(import.submodule.as_str())?);
-            // Throw out the result if this doesn't resolve to an actual module
+            // Throw out the result if this doesn't resolve to an actual module.
+            // This is quite expensive, but we've gone through a lot of hoops to
+            // get here so it won't happen too much.
             resolve_module(db, &submodule)?;
             // Return only the relative part
             submodule.relative_to(importing_module_name)
@@ -286,7 +284,7 @@ pub(crate) struct SemanticIndex<'db> {
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FxHashSet<ModuleName>>,
 
-    /// The set of modules that are imported anywhere within this file.
+    /// `from...import` statements within this file that might import a submodule.
     maybe_imported_modules: Arc<FxHashSet<MaybeModuleImport>>,
 
     /// Flags about the global scope (code usage impacting inference)

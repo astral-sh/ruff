@@ -27,8 +27,8 @@ here have several competing concerns:
 
 To that end we define the following extension:
 
-> If an `__init__.pyi` for `mypackage` contains a `from...import` targetting a submodule, then that
-> submodule should be available as an attribute of `mypackage`.
+> If an `__init__.pyi` for `mypackage` contains a `from...import` targetting a direct submodule of
+> `mypackage`, then that submodule should be available as an attribute of `mypackage`.
 
 ## Relative `from` Import of Direct Submodule in `__init__`
 
@@ -178,6 +178,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this is probably safe to allow, as it's an unambiguous import of a submodule
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
@@ -201,6 +202,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this is probably safe to allow, as it's an unambiguous import of a submodule
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
@@ -232,6 +234,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to allow
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -264,6 +267,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -299,6 +303,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -331,6 +336,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -366,6 +372,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support, and is probably safe to do as it's unambiguous
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -398,6 +405,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support, and is probably safe to do as it's unambiguous
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -452,6 +460,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support, as it works at runtime
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 reveal_type(mypackage.imported_m.X)  # revealed: int
@@ -527,6 +536,7 @@ X: int = 42
 ```py
 from mypackage import *
 
+# TODO: this would be nice to support (available_submodule_attributes isn't visible to `*` imports)
 # error: "`imported` used when not defined"
 reveal_type(imported.X)  # revealed: Unknown
 reveal_type(Z)  # revealed: int
@@ -602,6 +612,7 @@ X: int = 42
 ```py
 import mypackage
 
+# TODO: this would be nice to support, as it works at runtime
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
@@ -628,6 +639,7 @@ X: int = 42
 import mypackage
 from mypackage import imported
 
+# TODO: this would be nice to support, but it's dangerous with available_submodule_attributes
 reveal_type(imported.X)  # revealed: int
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
@@ -652,6 +664,7 @@ X: int = 42
 import mypackage
 from mypackage import imported
 
+# TODO: this would be nice to support, as it works at runtime
 reveal_type(imported.X)  # revealed: int
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
@@ -737,6 +750,10 @@ This precise configuration of:
 Can easily result in the typechecker getting "confused" and thinking imports of the name from the
 top-level package are referring to the subpackage and not the function/class. This issue can be
 found with the `lobpcg` function in `scipy.sparse.linalg`.
+
+This kind of failure mode is why the rule is restricted to *direct* submodule imports, as anything
+more powerful than that in the current implementation strategy quickly gets the functions and
+submodules mixed up.
 
 `mypackage/__init__.pyi`:
 
