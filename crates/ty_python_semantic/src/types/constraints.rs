@@ -65,7 +65,10 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeRelation, UnionType};
+use crate::types::{
+    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
+    UnionType,
+};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -254,6 +257,28 @@ impl<'db> ConstraintSet<'db> {
         Self {
             node: self.node.when_subtype_of_given(db, lhs, rhs, inferable),
         }
+    }
+
+    /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
+    ///
+    /// Each typevar has a set of _valid specializations_, which is defined by any upper bound or
+    /// constraints that the typevar has.
+    ///
+    /// Each typevar is also either _inferable_ or _non-inferable_. (You provide a list of the
+    /// `inferable` typevars; all others are considered non-inferable.) For an inferable typevar,
+    /// then there must be _some_ valid specialization that satisfies the constraint set. For a
+    /// non-inferable typevar, then _all_ valid specializations must satisfy it.
+    ///
+    /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
+    /// since the constraint set cannot be affected by any typevars that it does not mention. That
+    /// means that those additional typevars trivially satisfy the constraint set, regardless of
+    /// whether they are inferable or not.
+    pub(crate) fn satisfied_by_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        self.node.satisfied_by_all_typevars(db, inferable)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -746,6 +771,13 @@ impl<'db> Node<'db> {
             .or(db, self.negate(db).and(db, else_node))
     }
 
+    fn satisfies(self, db: &'db dyn Db, other: Self) -> Self {
+        let simplified_self = self.simplify(db);
+        let implication = simplified_self.implies(db, other);
+        let (simplified, domain) = implication.simplify_and_domain(db);
+        simplified.and(db, domain)
+    }
+
     fn when_subtype_of_given(
         self,
         db: &'db dyn Db,
@@ -767,10 +799,48 @@ impl<'db> Node<'db> {
             _ => return lhs.when_subtype_of(db, rhs, inferable).node,
         };
 
-        let simplified_self = self.simplify(db);
-        let implication = simplified_self.implies(db, constraint);
-        let (simplified, domain) = implication.simplify_and_domain(db);
-        simplified.and(db, domain)
+        self.satisfies(db, constraint)
+    }
+
+    fn satisfied_by_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        match self {
+            Node::AlwaysTrue => return true,
+            Node::AlwaysFalse => return false,
+            Node::Interior(_) => {}
+        }
+
+        let mut typevars = FxHashSet::default();
+        self.for_each_constraint(db, &mut |constraint| {
+            typevars.insert(constraint.typevar(db));
+        });
+
+        for typevar in typevars {
+            // Determine which valid specializations of this typevar satisfy the constraint set.
+            let valid_specializations = typevar.valid_specializations(db).node;
+            let when_satisfied = valid_specializations
+                .satisfies(db, self)
+                .and(db, valid_specializations);
+            let satisfied = if typevar.is_inferable(db, inferable) {
+                // If the typevar is inferable, then we only need one valid specialization to
+                // satisfy the constraint set.
+                !when_satisfied.is_never_satisfied()
+            } else {
+                // If the typevar is non-inferable, then we need _all_ valid specializations to
+                // satisfy the constraint set.
+                when_satisfied
+                    .iff(db, valid_specializations)
+                    .is_always_satisfied(db)
+            };
+            if !satisfied {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
@@ -1858,6 +1928,33 @@ impl<'db> SatisfiedClauses<'db> {
             .collect();
         clauses.sort();
         clauses.join(" ∨ ")
+    }
+}
+
+/// Returns a constraint set describing the valid specializations of a typevar.
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => ConstraintSet::from(true),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
+                db,
+                self,
+                Type::Never,
+                bound,
+                TypeRelation::Assignability,
+            ),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().when_any(db, |constraint| {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        self,
+                        *constraint,
+                        *constraint,
+                        TypeRelation::Assignability,
+                    )
+                })
+            }
+        }
     }
 }
 
