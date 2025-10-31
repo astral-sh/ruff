@@ -19,7 +19,7 @@ use crate::types::{
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
@@ -884,6 +884,37 @@ pub struct CallSignatureDetails<'db> {
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
 }
 
+impl CallSignatureDetails<'_> {
+    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
+        let definition = self.signature.definition()?;
+        let file = definition.file(db);
+        let module_ref = parsed_module(db, file).load(db);
+        let offsets = definition_parameter_offsets(definition.kind(db), &module_ref)?;
+
+        offsets
+            .into_iter()
+            .find(|(param_name, _)| param_name == name)
+            .map(|(_, text_range)| FileRange::new(file, text_range))
+    }
+}
+
+fn definition_parameter_offsets(
+    definition_kind: &DefinitionKind,
+    module_ref: &ParsedModuleRef,
+) -> Option<HashMap<String, TextRange>> {
+    match definition_kind {
+        DefinitionKind::Function(node) => Some(
+            node.node(module_ref)
+                .parameters
+                .iter()
+                .map(|param| (param.name().to_string(), param.name().range()))
+                .collect(),
+        ),
+        // TODO: lambda functions
+        _ => None,
+    }
+}
+
 /// Extract signature details from a function call expression.
 /// This function analyzes the callable being invoked and returns zero or more
 /// `CallSignatureDetails` objects, each representing one possible signature
@@ -1079,15 +1110,16 @@ pub fn find_active_signature_from_details(
 }
 
 #[derive(Default)]
-pub struct InlayHintFunctionArgumentDetails {
-    pub argument_names: HashMap<usize, String>,
+pub struct InlayHintCallArgumentDetails {
+    /// The position of the arguments mapped to their name and the range of the argument definition in the signature.
+    pub argument_names: HashMap<usize, (String, Option<FileRange>)>,
 }
 
-pub fn inlay_hint_function_argument_details<'db>(
+pub fn inlay_hint_call_argument_details<'db>(
     db: &'db dyn Db,
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
-) -> Option<InlayHintFunctionArgumentDetails> {
+) -> Option<InlayHintCallArgumentDetails> {
     let signature_details = call_signature_details(db, model, call_expr);
 
     if signature_details.is_empty() {
@@ -1099,6 +1131,7 @@ pub fn inlay_hint_function_argument_details<'db>(
     let call_signature_details = signature_details.get(active_signature_index)?;
 
     let parameters = call_signature_details.signature.parameters();
+
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
@@ -1121,16 +1154,19 @@ pub fn inlay_hint_function_argument_details<'db>(
             continue;
         };
 
+        let parameter_label_offset =
+            call_signature_details.get_definition_parameter_range(db, param.name()?.as_ref());
+
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
             let Some(name) = param.name() else {
                 continue;
             };
-            argument_names.insert(arg_index, name.to_string());
+            argument_names.insert(arg_index, (name.to_string(), parameter_label_offset));
         }
     }
 
-    Some(InlayHintFunctionArgumentDetails { argument_names })
+    Some(InlayHintCallArgumentDetails { argument_names })
 }
 
 /// Find the text range of a specific parameter in function parameters by name.
