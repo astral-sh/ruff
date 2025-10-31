@@ -190,10 +190,8 @@ impl Files {
         let roots = self.inner.roots.read().unwrap();
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        // We need to resolve away symlinks here to avoid getting confused about subdirectories.
-        let canonicalized = db.system().canonicalize_path(&absolute).unwrap_or(absolute);
 
-        roots.at(&canonicalized)
+        roots.at(&absolute)
     }
 
     /// The same as [`Self::root`] but panics if no root is found.
