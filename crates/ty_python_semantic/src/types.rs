@@ -1270,7 +1270,11 @@ impl<'db> Type<'db> {
     ///
     /// It also avoids literal promotion if a literal type annotation was provided as type context.
     pub(crate) fn promote_literals(self, db: &'db dyn Db, tcx: TypeContext<'db>) -> Type<'db> {
-        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals, tcx)
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::PromoteLiterals(PromoteLiteralsMode::On),
+            tcx,
+        )
     }
 
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
@@ -6765,7 +6769,7 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::PromoteLiterals
+                TypeMapping::PromoteLiterals(_)
                     | TypeMapping::ReplaceParameterDefaults
                     | TypeMapping::BindLegacyTypevars(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
@@ -6779,7 +6783,7 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
-                TypeMapping::PromoteLiterals |
+                TypeMapping::PromoteLiterals(_) |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
@@ -6790,7 +6794,7 @@ impl<'db> Type<'db> {
                 let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
 
                 match type_mapping {
-                    TypeMapping::PromoteLiterals => function.promote_literals_impl(db, tcx),
+                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => function.promote_literals_impl(db, tcx),
                     _ => function
                 }
             }
@@ -6867,13 +6871,9 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-                let flipped_mapping = match type_mapping {
-                    TypeMapping::Materialize(materialization_kind) => &TypeMapping::Materialize(materialization_kind.flip()),
-                    _ => type_mapping,
-                };
                 for negative in intersection.negative(db) {
                     builder =
-                        builder.add_negative(negative.apply_type_mapping_impl(db, flipped_mapping, tcx, visitor));
+                        builder.add_negative(negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor));
                 }
                 builder.build()
             }
@@ -6902,8 +6902,9 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults => self,
-                TypeMapping::PromoteLiterals => self.promote_literals_impl(db, tcx)
+                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6912,7 +6913,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::PromoteLiterals |
+                TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -7456,6 +7457,21 @@ fn apply_specialization_cycle_initial<'db>(
     Type::Never
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub enum PromoteLiteralsMode {
+    On,
+    Off,
+}
+
+impl PromoteLiteralsMode {
+    const fn flip(self) -> Self {
+        match self {
+            PromoteLiteralsMode::On => PromoteLiteralsMode::Off,
+            PromoteLiteralsMode::Off => PromoteLiteralsMode::On,
+        }
+    }
+}
+
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
 /// the components of complex types.
 ///
@@ -7470,7 +7486,7 @@ pub enum TypeMapping<'a, 'db> {
     PartialSpecialization(PartialSpecialization<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    PromoteLiterals,
+    PromoteLiterals(PromoteLiteralsMode),
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -7495,7 +7511,7 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
-            | TypeMapping::PromoteLiterals
+            | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults => context,
@@ -7519,6 +7535,22 @@ impl<'db> TypeMapping<'_, 'db> {
                     }
                 }),
             ),
+        }
+    }
+
+    /// Returns a new `TypeMapping` that should be applied in contravariant positions.
+    pub(crate) fn flip(&self) -> Self {
+        match self {
+            TypeMapping::Materialize(materialization_kind) => {
+                TypeMapping::Materialize(materialization_kind.flip())
+            }
+            TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
+            TypeMapping::Specialization(_)
+            | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::BindSelf(_)
+            | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceParameterDefaults => self.clone(),
         }
     }
 }
