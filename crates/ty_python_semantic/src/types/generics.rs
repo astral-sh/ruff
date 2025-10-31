@@ -18,9 +18,10 @@ use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomi
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    UnionType, declaration_type, walk_bound_type_var_type,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet};
 
@@ -210,6 +211,7 @@ impl<'db> GenericContextTypeVar<'db> {
 pub struct GenericContext<'db> {
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
+    cycle_recovery: Option<Type<'db>>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -226,6 +228,10 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
 impl get_size2::GetSize for GenericContext<'_> {}
 
 impl<'db> GenericContext<'db> {
+    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+        Self::new_internal(db, FxOrderMap::default(), Some(Type::divergent(id)))
+    }
+
     fn from_variables(
         db: &'db dyn Db,
         variables: impl IntoIterator<Item = GenericContextTypeVar<'db>>,
@@ -236,6 +242,7 @@ impl<'db> GenericContext<'db> {
                 .into_iter()
                 .map(|variable| (variable.bound_typevar.identity(db), variable))
                 .collect::<FxOrderMap<_, _>>(),
+            None,
         )
     }
 
@@ -618,10 +625,27 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances(db, variables)
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let variables = self
+            .variables(db)
+            .map(|bound_typevar| bound_typevar.recursive_type_normalized_impl(db, visitor));
+
+        Self::from_typevar_instances(db, variables)
+    }
+
     fn heap_size(
-        (variables,): &(FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,),
+        (variables, cycle_recovery): &(
+            FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
+            Option<Type<'db>>,
+        ),
     ) -> usize {
-        ruff_memory_usage::order_map_heap_size(variables)
+        use get_size2::GetSize;
+
+        ruff_memory_usage::order_map_heap_size(variables) + cycle_recovery.get_heap_size()
     }
 }
 
@@ -1047,6 +1071,31 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .iter()
+            .map(|ty| ty.recursive_type_normalized_impl(db, visitor))
+            .collect();
+        let tuple_inner = self
+            .tuple_inner(db)
+            .map(|tuple| tuple.recursive_type_normalized(db, visitor));
+        let context = self
+            .generic_context(db)
+            .recursive_type_normalized(db, visitor);
+        Self::new(
+            db,
+            context,
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        )
+    }
+
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,
@@ -1254,25 +1303,6 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
-    }
-
-    /// Returns a copy of this specialization with the type at a given index replaced.
-    pub(crate) fn with_replaced_type(
-        self,
-        db: &'db dyn Db,
-        index: usize,
-        new_type: Type<'db>,
-    ) -> Self {
-        let mut new_types: Box<[_]> = self.types(db).to_vec().into_boxed_slice();
-        new_types[index] = new_type;
-
-        Self::new(
-            db,
-            self.generic_context(db),
-            new_types,
-            self.materialization_kind(db),
-            self.tuple_inner(db),
-        )
     }
 }
 

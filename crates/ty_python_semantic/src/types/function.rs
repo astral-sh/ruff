@@ -82,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, NormalizedVisitor,
-    SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation, UnionBuilder,
-    binding_type, todo_type, walk_signature,
+    RecursiveTypeNormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping,
+    TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -576,7 +576,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=overloads_and_implementation_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -659,6 +659,14 @@ impl<'db> FunctionLiteral<'db> {
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition(db).raw_signature(db)
     }
+}
+
+fn overloads_and_implementation_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _function: FunctionLiteral<'db>,
+) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    (Box::new([]), None)
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
@@ -1043,6 +1051,26 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         )
     }
+
+    pub(crate) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let literal = self.literal(db);
+        let updated_signature = self
+            .updated_signature(db)
+            .map(|signature| signature.recursive_type_normalized(db, visitor));
+        let updated_last_definition_signature = self
+            .updated_last_definition_signature(db)
+            .map(|signature| signature.recursive_type_normalized(db, visitor));
+        Self::new(
+            db,
+            literal,
+            updated_signature,
+            updated_last_definition_signature,
+        )
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
@@ -1203,18 +1231,18 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
 
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom())
+    CallableSignature::single(Signature::divergent(id))
 }
 
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
-    Signature::bottom()
+    Signature::divergent(id)
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might

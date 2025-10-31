@@ -14,8 +14,8 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -72,10 +72,7 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements
-                .into_iter()
-                .map(Into::into)
-                .map(|element| element.fallback_to_divergent(db)),
+            elements.into_iter().map(Into::into),
         ))
     }
 
@@ -350,6 +347,22 @@ impl<'db> NominalInstanceType<'db> {
                 NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
             )),
             NominalInstanceInner::Object => Type::object(),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Self(NominalInstanceInner::ExactTuple(
+                tuple.recursive_type_normalized(db, visitor),
+            )),
+            NominalInstanceInner::NonTuple(class) => Self(NominalInstanceInner::NonTuple(
+                class.recursive_type_normalized(db, visitor),
+            )),
+            NominalInstanceInner::Object => Self(NominalInstanceInner::Object),
         }
     }
 
@@ -702,6 +715,14 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        _db: &'db dyn Db,
+        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        self
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.

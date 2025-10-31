@@ -12,7 +12,7 @@ use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map
 use crate::types::{
     ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, Truthiness, Type,
     TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
-    todo_type,
+    join_with_previous_cycle_place, todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -697,16 +697,35 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 
 fn place_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
     _considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::Never).into()
+    Place::bound(Type::divergent(id)).into()
 }
 
-#[salsa::tracked(cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[allow(clippy::too_many_arguments)]
+fn place_cycle_recover<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    previous_place: &PlaceAndQualifiers<'db>,
+    place: &PlaceAndQualifiers<'db>,
+    _count: u32,
+    _scope: ScopeId<'db>,
+    _place_id: ScopedPlaceId,
+    _requires_explicit_reexport: RequiresExplicitReExport,
+    _considered_definitions: ConsideredDefinitions,
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+    let div = Type::divergent(id);
+    salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
+        place: join_with_previous_cycle_place(db, &previous_place.place, &place.place, div),
+        qualifiers: place.qualifiers,
+    })
+}
+
+#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,

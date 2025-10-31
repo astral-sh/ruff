@@ -180,10 +180,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     pub(crate) fn finish(mut self) -> UnpackResult<'db> {
         self.targets.shrink_to_fit();
+
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: self.targets,
-            cycle_fallback_type: None,
+            cycle_recovery: None,
         }
     }
 }
@@ -196,10 +197,22 @@ pub(crate) struct UnpackResult<'db> {
     /// The fallback type for missing expressions.
     ///
     /// This is used only when constructing a cycle-recovery `UnpackResult`.
-    cycle_fallback_type: Option<Type<'db>>,
+    cycle_recovery: Option<Type<'db>>,
 }
 
 impl<'db> UnpackResult<'db> {
+    pub(crate) fn new(
+        targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+        diagnostics: TypeCheckDiagnostics,
+        cycle_recovery: Option<Type<'db>>,
+    ) -> Self {
+        Self {
+            targets,
+            diagnostics,
+            cycle_recovery,
+        }
+    }
+
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
@@ -222,7 +235,11 @@ impl<'db> UnpackResult<'db> {
         self.targets
             .get(&expr.into())
             .copied()
-            .or(self.cycle_fallback_type)
+            .or(self.cycle_recovery)
+    }
+
+    pub(crate) fn targets(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
+        &self.targets
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -230,11 +247,15 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_initial(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_recovery(&self) -> Option<Type<'db>> {
+        self.cycle_recovery
+    }
+
+    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
-            cycle_fallback_type: Some(cycle_fallback_type),
+            cycle_recovery: Some(cycle_recovery),
         }
     }
 }
