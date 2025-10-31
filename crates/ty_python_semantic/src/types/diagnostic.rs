@@ -572,10 +572,14 @@ declare_lint! {
 // Added in #19763.
 declare_lint! {
     /// ## What it does
-    /// Checks for subscript accesses with invalid keys.
+    /// Checks for subscript accesses with invalid keys and `TypedDict` construction with an
+    /// unknown key.
     ///
     /// ## Why is this bad?
-    /// Using an invalid key will raise a `KeyError` at runtime.
+    /// Subscripting with an invalid key will raise a `KeyError` at runtime.
+    ///
+    /// Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is
+    /// `closed=true` it also violates the expectations of the type.
     ///
     /// ## Examples
     /// ```python
@@ -587,9 +591,13 @@ declare_lint! {
     ///
     /// alice = Person(name="Alice", age=30)
     /// alice["height"]  # KeyError: 'height'
+    ///
+    /// bob: Person = { "name": "Bob", "age": 30 }  # typo!
+    ///
+    /// carol = Person(name="Carol", age=25)  # typo!
     /// ```
     pub(crate) static INVALID_KEY = {
-        summary: "detects invalid subscript accesses",
+        summary: "detects invalid subscript accesses or TypedDict literal keys",
         status: LintStatus::stable("0.0.1-alpha.17"),
         default_level: Level::Error,
     }
@@ -2966,7 +2974,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid key access on TypedDict `{typed_dict_name}`",
+                    "Invalid key for TypedDict `{typed_dict_name}`",
                 ));
 
                 diagnostic.annotate(
@@ -2989,7 +2997,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 diagnostic
             }
             _ => builder.into_diagnostic(format_args!(
-                "TypedDict `{}` cannot be indexed with a key of type `{}`",
+                "Invalid key for TypedDict `{}` of type `{}`",
                 typed_dict_ty.display(db),
                 key_ty.display(db),
             )),
