@@ -8186,6 +8186,17 @@ impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
     }
+
+    pub(crate) fn map_type(
+        &self,
+        f: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> TypeAndQualifiers<'db> {
+        TypeAndQualifiers {
+            inner: f(self.inner),
+            origin: self.origin,
+            qualifiers: self.qualifiers,
+        }
+    }
 }
 
 /// Error struct providing information on type(s) that were deemed to be invalid

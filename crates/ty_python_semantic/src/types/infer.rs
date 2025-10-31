@@ -215,26 +215,13 @@ fn definition_cycle_recover_inner<'db>(
             .iter()
             .find(|(previous_declaration, _)| previous_declaration == declaration)
         {
-            *declaration_ty = TypeAndQualifiers {
-                inner: UnionType::from_elements(
-                    db,
-                    [
-                        declaration_ty.inner_type(),
-                        previous_declaration.inner_type(),
-                    ],
-                )
-                .recursive_type_normalized(db, &visitor),
-                origin: declaration_ty.origin(),
-                qualifiers: declaration_ty.qualifiers(),
-            };
+            *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                UnionType::from_elements(db, [decl_ty, previous_declaration.inner_type()])
+                    .recursive_type_normalized(db, &visitor)
+            });
         } else {
-            *declaration_ty = TypeAndQualifiers {
-                inner: declaration_ty
-                    .inner_type()
-                    .recursive_type_normalized(db, &visitor),
-                origin: declaration_ty.origin(),
-                qualifiers: declaration_ty.qualifiers(),
-            };
+            *declaration_ty =
+                declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, &visitor));
         }
     }
 
