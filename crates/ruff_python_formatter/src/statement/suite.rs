@@ -236,7 +236,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     )?;
                 } else {
                     // Preserve empty lines after a stub implementation but don't insert a new one if there isn't any present in the source.
-                    // This is useful when having multiple function overloads that should be grouped to getter by omitting new lines between them.
+                    // This is useful when having multiple function overloads that should be grouped together by omitting new lines between them.
                     let is_preceding_stub_function_without_empty_line = following
                         .is_function_def_stmt()
                         && preceding
