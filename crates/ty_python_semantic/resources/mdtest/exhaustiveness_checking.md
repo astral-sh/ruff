@@ -417,3 +417,55 @@ class Answer(Enum):
             case Answer.NO:
                 return False
 ```
+
+## Exhaustiveness checking for type variables with bounds or constraints
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never, Literal
+
+def f[T: bool](x: T) -> T:
+    match x:
+        case True:
+            return x
+        case False:
+            return x
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+
+def g[T: Literal["foo", "bar"]](x: T) -> T:
+    match x:
+        case "foo":
+            return x
+        case "bar":
+            return x
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+
+def h[T: int | str](x: T) -> T:
+    if isinstance(x, int):
+        return x
+    elif isinstance(x, str):
+        return x
+    else:
+        reveal_type(x)  # revealed: Never
+        assert_never(x)
+
+def i[T: (int, str)](x: T) -> T:
+    match x:
+        case int():
+            pass
+        case str():
+            pass
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+
+    return x
+```

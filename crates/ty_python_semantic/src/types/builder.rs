@@ -781,37 +781,6 @@ impl<'db> IntersectionBuilder<'db> {
                     seen_aliases,
                 )
             }
-            Type::EnumLiteral(enum_literal) => {
-                let enum_class = enum_literal.enum_class(self.db);
-                let metadata =
-                    enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
-
-                let enum_members_in_negative_part = self
-                    .intersections
-                    .iter()
-                    .flat_map(|intersection| &intersection.negative)
-                    .filter_map(|ty| ty.as_enum_literal())
-                    .filter(|lit| lit.enum_class(self.db) == enum_class)
-                    .map(|lit| lit.name(self.db))
-                    .chain(std::iter::once(enum_literal.name(self.db)))
-                    .collect::<FxHashSet<_>>();
-
-                let all_members_are_in_negative_part = metadata
-                    .members
-                    .keys()
-                    .all(|name| enum_members_in_negative_part.contains(name));
-
-                if all_members_are_in_negative_part {
-                    for inner in &mut self.intersections {
-                        inner.add_negative(self.db, enum_literal.enum_class_instance(self.db));
-                    }
-                } else {
-                    for inner in &mut self.intersections {
-                        inner.add_negative(self.db, ty);
-                    }
-                }
-                self
-            }
             _ => {
                 for inner in &mut self.intersections {
                     inner.add_negative(self.db, ty);
@@ -1177,6 +1146,39 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_constrained_typevars(db);
+
+        // If any typevars are in `self.positive`, speculatively solve all bounded type variables
+        // to their upper bound and all constrained type variables to the union of their constraints.
+        // If that speculative intersection simplifies to `Never`, this intersection must also simplify
+        // to `Never`.
+        if self.positive.iter().any(|ty| ty.is_type_var()) {
+            let mut speculative = IntersectionBuilder::new(db);
+            for pos in &self.positive {
+                match pos {
+                    Type::TypeVar(type_var) => {
+                        match type_var.typevar(db).bound_or_constraints(db) {
+                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                speculative = speculative.add_positive(bound);
+                            }
+                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                speculative = speculative.add_positive(Type::Union(constraints));
+                            }
+                            // TypeVars without a bound or constraint implicitly have `object` as their
+                            // upper bound, and it is always a no-op to add `object` to an intersection.
+                            None => {}
+                        }
+                    }
+                    _ => speculative = speculative.add_positive(*pos),
+                }
+            }
+            for neg in &self.negative {
+                speculative = speculative.add_negative(*neg);
+            }
+            if speculative.build().is_never() {
+                return Type::Never;
+            }
+        }
+
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::object(),
             (1, 0) => self.positive[0],
