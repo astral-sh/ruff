@@ -35,30 +35,23 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 },
         } = params;
 
-        let key = match session.key_from_url(uri) {
-            Ok(key) => key,
-            Err(uri) => {
-                tracing::debug!("Failed to create document key from URI: {}", uri);
-                return Ok(());
-            }
-        };
+        let document = session.open_text_document(
+            TextDocument::new(uri, text, version).with_language_id(&language_id),
+        );
 
-        let document = TextDocument::new(text, version).with_language_id(&language_id);
-        session.open_text_document(key.path(), document);
-
-        let path = key.path();
+        let path = document.to_file_path();
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
         // `try_system` call will return `None` which doesn't mean that the file is new, it's just
         // that the server didn't need the file yet.
         let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
-            let db = session.project_db(path);
+            let db = session.project_db(&path);
             db.files()
                 .try_system(db, system_path)
                 .is_none_or(|file| !file.exists(db))
         });
 
-        match path {
+        match &*path {
             AnySystemPath::System(system_path) => {
                 let event = if is_maybe_new_system_file {
                     ChangeEvent::Created {
@@ -68,22 +61,22 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 } else {
                     ChangeEvent::Opened(system_path.clone())
                 };
-                session.apply_changes(path, vec![event]);
+                session.apply_changes(&path, vec![event]);
 
-                let db = session.project_db_mut(path);
+                let db = session.project_db_mut(&path);
                 match system_path_to_file(db, system_path) {
                     Ok(file) => db.project().open_file(db, file),
                     Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.project_db_mut(path);
+                let db = session.project_db_mut(&path);
                 let virtual_file = db.files().virtual_file(db, virtual_path);
                 db.project().open_file(db, virtual_file.file());
             }
         }
 
-        publish_diagnostics(session, &key, client);
+        publish_diagnostics(session, document.url(), client);
 
         Ok(())
     }

@@ -28,19 +28,16 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let key = match session.key_from_url(uri) {
-            Ok(key) => key,
-            Err(uri) => {
-                tracing::debug!("Failed to create document key from URI: {}", uri);
-                return Ok(());
-            }
-        };
-
-        session
-            .update_text_document(&key, content_changes, version)
+        let document = session
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let changes = match key.path() {
+        document
+            .update_text_document(session, content_changes, version)
+            .with_failure_code(ErrorCode::InternalError)?;
+
+        let path = document.to_file_path();
+        let changes = match &*path {
             AnySystemPath::System(system_path) => {
                 vec![ChangeEvent::file_content_changed(system_path.clone())]
             }
@@ -49,9 +46,9 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         };
 
-        session.apply_changes(key.path(), changes);
+        session.apply_changes(&path, changes);
 
-        publish_diagnostics(session, &key, client);
+        publish_diagnostics(session, document.url(), client);
 
         Ok(())
     }

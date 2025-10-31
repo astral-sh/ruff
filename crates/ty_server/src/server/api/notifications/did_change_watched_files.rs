@@ -1,3 +1,4 @@
+use crate::document::DocumentKey;
 use crate::server::Result;
 use crate::server::api::diagnostics::{publish_diagnostics, publish_settings_diagnostics};
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -25,16 +26,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
-            let path = match AnySystemPath::try_from_url(&change.uri) {
-                Ok(path) => path,
-                Err(err) => {
-                    tracing::warn!(
-                        "Failed to convert URI '{}` to system path: {err:?}",
-                        change.uri
-                    );
-                    continue;
-                }
-            };
+            let key = DocumentKey::from_url(&change.uri);
+            let path = key.to_file_path();
 
             let system_path = match path {
                 AnySystemPath::System(system) => system,
@@ -99,8 +92,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 |_, ()| {},
             );
         } else {
-            for key in session.text_document_keys() {
-                publish_diagnostics(session, &key, client);
+            for key in session.text_document_handles() {
+                publish_diagnostics(session, key.url(), client);
             }
         }
         // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
