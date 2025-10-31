@@ -200,7 +200,7 @@ def f() -> list[Literal[1]]:
     return [1]
 ```
 
-## Instance attribute
+## Instance attributes
 
 ```toml
 [environment]
@@ -233,6 +233,24 @@ def _(flag: bool):
     def _(c: C):
         c.x = lst(1)
         C.x = lst(1)
+```
+
+For union targets, each element of the union is considered as a separate type context:
+
+```py
+from typing import Literal
+
+class X:
+    x: list[int | str]
+
+class Y:
+    x: list[int | None]
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def _(xy: X | Y):
+    xy.x = lst(1)
 ```
 
 ## Class constructor parameters
