@@ -27,7 +27,7 @@ impl super::SyncNotificationHandler for DidClose {
             );
             return Ok(());
         };
-        clear_diagnostics_for_document(session, snapshot.query(), client)?;
+        clear_diagnostics_for_document(snapshot.query(), client)?;
 
         session
             .close_document(&key)
