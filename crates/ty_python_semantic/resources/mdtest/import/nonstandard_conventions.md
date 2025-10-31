@@ -570,7 +570,8 @@ reveal_type(Z)  # revealed: int
 ## `from` Import of Non-Submodule
 
 A from import that terminates in a non-submodule should not expose the intermediate submodules as
-attributes.
+attributes. This is an arbitrary decision but on balance probably safe and correct, as otherwise it
+would be hard for a stub author to be intentional about the submodules being exposed as attributes.
 
 `mypackage/__init__.pyi`:
 

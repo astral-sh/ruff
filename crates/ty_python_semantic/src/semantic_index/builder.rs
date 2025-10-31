@@ -1266,6 +1266,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
+        self.maybe_imported_modules.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1278,7 +1279,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
-            maybe_imported_modules: Arc::new(self.maybe_imported_modules),
+            maybe_imported_modules: self.maybe_imported_modules,
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),

@@ -285,7 +285,7 @@ pub(crate) struct SemanticIndex<'db> {
     imported_modules: Arc<FxHashSet<ModuleName>>,
 
     /// `from...import` statements within this file that might import a submodule.
-    maybe_imported_modules: Arc<FxHashSet<MaybeModuleImport>>,
+    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
