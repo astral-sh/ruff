@@ -1261,11 +1261,11 @@ pub(crate) fn check_docstring(
                         && !is_staticmethod(&function_def.decorator_list, semantic),
                 )) {
                     if !(checker.settings().pydocstyle.ignore_var_parameters()
-                        && signature_param.is_variadic)
-                        && !signature_param.name.starts_with('_')
-                        && !parameters_section.parameters.iter().any(|param| {
-                            &param.name == &signature_param.name && param.has_definition
-                        })
+                        && signature_param.is_variadic
+                        || signature_param.name.starts_with('_')
+                        || parameters_section.parameters.iter().any(|param| {
+                            param.name == signature_param.name && param.has_definition
+                        }))
                     {
                         missing_parameters.push(signature_param.name.to_string());
                     }
@@ -1386,7 +1386,7 @@ pub(crate) fn check_docstring(
                 for docstring_param in &docstring_params.parameters {
                     if !signature_parameters
                         .iter()
-                        .any(|param| &param.name == &docstring_param.name)
+                        .any(|param| param.name == docstring_param.name)
                     {
                         checker.report_diagnostic(
                             DocstringExtraneousParameter {
