@@ -243,6 +243,10 @@ pub(crate) type TryBoolVisitor<'db> =
     CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
 pub(crate) struct TryBool;
 
+/// A [`CycleDetector`] that is used in `visit_specialization` methods.
+pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
+pub(crate) struct VisitSpecialization;
+
 /// A [`TypeTransformer`] that is used in `normalized` methods.
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 
@@ -3373,6 +3377,79 @@ impl<'db> Type<'db> {
                     relation_visitor,
                 )
             }
+        }
+    }
+
+    /// Recursively visit the specialization of a generic class instance.
+    ///
+    /// The provided closure will be called with each assignment of a type variable present in this
+    /// type, along with the variance of the outermost type with respect to the type variable.
+    ///
+    /// If a `TypeContext` is provided, it will be narrowed as nested types are visited, if the
+    /// type is a specialized instance of the same class.
+    pub(crate) fn visit_specialization<F>(self, db: &'db dyn Db, tcx: TypeContext<'db>, mut f: F)
+    where
+        F: FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
+    {
+        self.visit_specialization_impl(
+            db,
+            tcx,
+            TypeVarVariance::Covariant,
+            &mut f,
+            &SpecializationVisitor::default(),
+        );
+    }
+
+    fn visit_specialization_impl(
+        self,
+        db: &'db dyn Db,
+        tcx: TypeContext<'db>,
+        polarity: TypeVarVariance,
+        f: &mut dyn FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
+        visitor: &SpecializationVisitor<'db>,
+    ) {
+        let Type::NominalInstance(instance) = self else {
+            match self {
+                Type::Union(union) => {
+                    for element in union.elements(db) {
+                        element.visit_specialization(db, tcx, &mut *f);
+                    }
+                }
+                Type::Intersection(intersection) => {
+                    for element in intersection.positive(db) {
+                        element.visit_specialization(db, tcx, &mut *f);
+                    }
+                }
+                Type::TypeAlias(alias) => visitor.visit(self, || {
+                    alias.value_type(db).visit_specialization(db, tcx, f);
+                }),
+                _ => {}
+            }
+
+            return;
+        };
+
+        let (class_literal, Some(specialization)) = instance.class(db).class_literal(db) else {
+            return;
+        };
+
+        let tcx_specialization = tcx
+            .annotation
+            .and_then(|tcx| tcx.specialization_of(db, class_literal));
+
+        for (typevar, ty) in specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+        {
+            let variance = typevar.variance_with_polarity(db, polarity);
+            let tcx = TypeContext::new(tcx_specialization.and_then(|spec| spec.get(db, typevar)));
+
+            f(typevar, *ty, variance, tcx);
+
+            visitor.visit(*ty, || {
+                ty.visit_specialization_impl(db, tcx, variance, f, visitor);
+            });
         }
     }
 
