@@ -1,6 +1,6 @@
 use crate::{TestServer, TestServerBuilder};
 use insta::assert_debug_snapshot;
-use lsp_types::{CompletionTriggerKind, NotebookCellKind, Position, Range};
+use lsp_types::{CompletionResponse, CompletionTriggerKind, NotebookCellKind, Position, Range};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -209,26 +209,7 @@ b: Litera
 
     server.ignore_notifications::<lsp_types::notification::PublishDiagnostics>(2)?;
 
-    let completions_id =
-        server.send_request::<lsp_types::request::Completion>(lsp_types::CompletionParams {
-            text_document_position: lsp_types::TextDocumentPositionParams {
-                text_document: lsp_types::TextDocumentIdentifier {
-                    uri: second_cell.clone(),
-                },
-                position: Position::new(1, 9),
-            },
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-            context: Some(lsp_types::CompletionContext {
-                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
-                trigger_character: None,
-            }),
-        });
-
-    // There are a ton of imports we don't care about in here...
-    // The import bit is that an edit is always restricted to the current cell. That means,
-    // we can't add `Literal` to the `from typing import TYPE_CHECKING` import in cell 1
-    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id)?;
+    let completions = literal_completions(&mut server, &second_cell)?;
 
     assert_debug_snapshot!(completions);
 
@@ -264,26 +245,7 @@ b: Litera
 
     server.ignore_notifications::<lsp_types::notification::PublishDiagnostics>(2)?;
 
-    let completions_id =
-        server.send_request::<lsp_types::request::Completion>(lsp_types::CompletionParams {
-            text_document_position: lsp_types::TextDocumentPositionParams {
-                text_document: lsp_types::TextDocumentIdentifier {
-                    uri: second_cell.clone(),
-                },
-                position: Position::new(1, 9),
-            },
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-            context: Some(lsp_types::CompletionContext {
-                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
-                trigger_character: None,
-            }),
-        });
-
-    // There are a ton of imports we don't care about in here...
-    // The import bit is that an edit is always restricted to the current cell. That means,
-    // we can't add `Literal` to the `from typing import TYPE_CHECKING` import in cell 1
-    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id)?;
+    let completions = literal_completions(&mut server, &second_cell)?;
 
     assert_debug_snapshot!(completions);
 
@@ -372,4 +334,36 @@ impl NotebookBuilder {
 
         self.notebook_url.clone()
     }
+}
+
+fn literal_completions(server: &mut TestServer, cell: &lsp_types::Url) -> crate::Result<Vec<lsp_types::CompletionItem>> {
+    let completions_id =
+        server.send_request::<lsp_types::request::Completion>(lsp_types::CompletionParams {
+            text_document_position: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: cell.clone(),
+                },
+                position: Position::new(1, 9),
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+            context: Some(lsp_types::CompletionContext {
+                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
+                trigger_character: None,
+            }),
+        });
+
+    // There are a ton of imports we don't care about in here...
+    // The import bit is that an edit is always restricted to the current cell. That means,
+    // we can't add `Literal` to the `from typing import TYPE_CHECKING` import in cell 1
+    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id)?;
+    let mut items = match completions {
+        Some(CompletionResponse::Array(array)) => array,
+        Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
+        None => return Ok(vec![]),
+    };
+
+    items.retain(|item| item.label.starts_with("Litera"));
+
+    Ok(items)
 }
