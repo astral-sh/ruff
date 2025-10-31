@@ -34,7 +34,14 @@ reveal_type(p.y)  # revealed: Unknown | int
 
 ## Self-referential bare type alias
 
+```toml
+[environment]
+python-version = "3.12"  # typing.TypeAliasType
+```
+
 ```py
+from typing import Union, TypeAliasType, Sequence, Mapping
+
 A = list["A" | None]
 
 def f(x: A):
@@ -42,9 +49,12 @@ def f(x: A):
     reveal_type(x)  # revealed: list[Divergent]
     # TODO: should be `A | None`?
     reveal_type(x[0])  # revealed: Divergent
+
+JSONPrimitive = Union[str, int, float, bool, None]
+JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 ```
 
-## Self-referential type variables
+## Self-referential legacy type variables
 
 ```py
 from typing import Generic, TypeVar
@@ -52,6 +62,22 @@ from typing import Generic, TypeVar
 B = TypeVar("B", bound="Base")
 
 class Base(Generic[B]):
+    pass
+
+T = TypeVar("T", bound="Foo[int]")
+
+class Foo(Generic[T]): ...
+```
+
+## Self-referential PEP-695 type variables
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Node[T: "Node[int]"]:
     pass
 ```
 
