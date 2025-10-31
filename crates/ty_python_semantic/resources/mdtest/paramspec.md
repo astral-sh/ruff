@@ -85,12 +85,21 @@ P4 = ParamSpec("P4", contravariant=True)
 python-version = "3.13"
 ```
 
+The default value for a `ParamSpec` can be either a list of types, `...`, or another `ParamSpec`.
+
 ```py
 from typing import ParamSpec
 
 P1 = ParamSpec("P1", default=[int, str])
 P2 = ParamSpec("P2", default=...)
 P3 = ParamSpec("P3", default=P2)
+```
+
+Other values are invalid.
+
+```py
+# error: [invalid-paramspec]
+P4 = ParamSpec("P4", default=int)
 ```
 
 ### PEP 695
@@ -108,6 +117,8 @@ def foo1[**P]() -> None:
 
 def foo2[**P = ...]() -> None:
     reveal_type(P)  # revealed: typing.ParamSpec
+
+def foo2[**P = [int, str]]() -> None: ...
 ```
 
 #### Invalid
@@ -115,7 +126,7 @@ def foo2[**P = ...]() -> None:
 ParamSpec, when defined using the new syntax, does not allow defining bounds or constraints.
 
 This results in a lot of syntax errors mainly because the AST doesn't accept them in this position.
-We could do a better job in recovering from these errors.
+The parser could do a better job in recovering from these errors.
 
 <!-- blacken-docs:off -->
 
@@ -133,3 +144,11 @@ def foo[**P: int]() -> None:
 ```
 
 <!-- blacken-docs:on -->
+
+#### Invalid default
+
+```py
+# error: [invalid-paramspec]
+def foo[**P = int]() -> None:
+    pass
+```
