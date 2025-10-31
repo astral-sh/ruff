@@ -7761,9 +7761,6 @@ pub enum DynamicType<'db> {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
-    /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
-    /// case the handling of these types in `Callable` annotations.
-    TodoPEP695ParamSpec,
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
@@ -7791,13 +7788,6 @@ impl std::fmt::Display for DynamicType<'_> {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::TodoPEP695ParamSpec => {
-                if cfg!(debug_assertions) {
-                    f.write_str("@Todo(ParamSpec)")
-                } else {
-                    f.write_str("@Todo")
-                }
-            }
             DynamicType::TodoUnpack => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(typing.Unpack)")

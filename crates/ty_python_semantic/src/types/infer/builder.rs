@@ -8316,10 +8316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (
                 todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoTypeAlias,
+                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
                 ),
                 _,
                 _,
@@ -8327,10 +8324,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | (
                 _,
                 todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoTypeAlias,
+                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
                 ),
                 _,
             ) => Some(todo),
