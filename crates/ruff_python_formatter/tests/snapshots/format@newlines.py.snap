@@ -386,6 +386,11 @@ def preserved7():
     return 0
 
 
+def preserved8():  # this also prevents collapsing the stub
+
+    ...
+
+
 # But we still discard these newlines:
 def removed1():
 
@@ -861,6 +866,10 @@ def preserved7():
     return 0
 
 
+def preserved8():  # this also prevents collapsing the stub
+    ...
+
+
 # But we still discard these newlines:
 def removed1():
     "Docstring"
@@ -1011,7 +1020,15 @@ def untouched3():
      # comment
      # another line
      # and a third
-@@ -441,6 +457,7 @@
+@@ -427,6 +443,7 @@
+ 
+ 
+ def preserved8():  # this also prevents collapsing the stub
++
+     ...
+ 
+ 
+@@ -445,6 +462,7 @@
  
  # And we discard empty lines after the first:
  def partially_preserved1():

@@ -172,12 +172,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             )
         } else {
             // Allow an empty line after a function header in preview, if the function has no
-            // docstring and no initial comment and doesn't consist of a single ellipsis.
+            // docstring and no initial comment.
             let allow_newline_after_block_open =
                 is_allow_newline_after_block_open_enabled(f.context())
                     && matches!(self.kind, SuiteKind::Function)
-                    && matches!(first, SuiteChildStatement::Other(_))
-                    && !contains_only_an_ellipsis(statements, f.context().comments());
+                    && matches!(first, SuiteChildStatement::Other(_));
 
             let start = comments
                 .leading(first)
@@ -747,17 +746,21 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
 pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
-    match body {
-        [Stmt::Expr(ast::StmtExpr { value, .. })] => {
-            let [node] = body else {
-                return false;
-            };
-            value.is_ellipsis_literal_expr()
-                && !comments.has_leading(node)
-                && !comments.has_trailing_own_line(node)
-        }
-        _ => false,
+    as_only_an_ellipsis(body, comments).is_some()
+}
+
+/// Returns `Some(Stmt::Ellipsis)` if a function or class body contains only an ellipsis with no
+/// comments.
+pub(crate) fn as_only_an_ellipsis<'a>(body: &'a [Stmt], comments: &Comments) -> Option<&'a Stmt> {
+    if let [node @ Stmt::Expr(ast::StmtExpr { value, .. })] = body
+        && value.is_ellipsis_literal_expr()
+        && !comments.has_leading(node)
+        && !comments.has_trailing_own_line(node)
+    {
+        return Some(node);
     }
+
+    None
 }
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.

@@ -380,6 +380,11 @@ def preserved7():
     return 0
 
 
+def preserved8():  # this also prevents collapsing the stub
+
+    ...
+
+
 # But we still discard these newlines:
 def removed1():
 
