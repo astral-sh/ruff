@@ -205,6 +205,207 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
+## Relative `from` Import of Nested Submodule in `__init__`
+
+`from .submodule import nested` in an `__init__.pyi` is currently not supported as a way to expose
+`mypackage.submodule` or `mypackage.submodule.nested` but it could be.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .submodule import nested
+```
+
+`mypackage/submodule/__init__.pyi`:
+
+```pyi
+```
+
+`mypackage/submodule/nested.pyi`:
+
+```pyi
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+```
+
+## Relative `from` Import of Nested Submodule in `__init__` (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from .submodule import nested
+```
+
+`mypackage/submodule/__init__.py`:
+
+```py
+```
+
+`mypackage/submodule/nested.py`:
+
+```py
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+```
+
+## Absolute `from` Import of Nested Submodule in `__init__`
+
+`from mypackage.submodule import nested` in an `__init__.pyi` is currently not supported as a way to
+expose `mypackage.submodule` or `mypackage.submodule.nested` but it could be.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from mypackage.submodule import nested
+```
+
+`mypackage/submodule/__init__.pyi`:
+
+```pyi
+```
+
+`mypackage/submodule/nested.pyi`:
+
+```pyi
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+```
+
+## Absolute `from` Import of Nested Submodule in `__init__` (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from mypackage.submodule import nested
+```
+
+`mypackage/submodule/__init__.py`:
+
+```py
+```
+
+`mypackage/submodule/nested.py`:
+
+```py
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+```
+
+## Import of Nested Submodule in `__init__`
+
+`import mypackage.submodule.nested` in an `__init__.pyi` is currently not supported as a way to
+expose `mypackage.submodule` or `mypackage.submodule.nested` but it could be.
+
+`mypackage/__init__.pyi`:
+
+```pyi
+import mypackage.submodule.nested
+```
+
+`mypackage/submodule/__init__.pyi`:
+
+```pyi
+```
+
+`mypackage/submodule/nested.pyi`:
+
+```pyi
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+```
+
+## Import of Nested Submodule in `__init__` (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+import mypackage.submodule.nested
+```
+
+`mypackage/submodule/__init__.py`:
+
+```py
+```
+
+`mypackage/submodule/nested.py`:
+
+```py
+X: int = 42
+```
+
+`main.py`:
+
+```py
+import mypackage
+
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested)  # revealed: Unknown
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+```
+
 ## Relative `from` Import of Direct Submodule in `__init__`, Mismatched Alias
 
 Renaming the submodule to something else disables the `__init__.pyi` idiom.
@@ -533,9 +734,9 @@ This precise configuration of:
 - that in turn defines a function/class with its own name
 - and re-exporting that name through every layer using `from` imports and `__all__`
 
-Causes the typechecker to eventually get "confused" and think imports of the name from the top-level
-package are referring to the subpackage and not the function/class. This is an issue that as of this
-writing effects the `lobpcg` function in `scipy.sparse.linalg`.
+Can easily result in the typechecker getting "confused" and thinking imports of the name from the
+top-level package are referring to the subpackage and not the function/class. This issue can be
+found with the `lobpcg` function in `scipy.sparse.linalg`.
 
 `mypackage/__init__.pyi`:
 
@@ -566,8 +767,6 @@ def funcmod(x: int) -> int: ...
 ```py
 from mypackage import funcmod
 
-# TODO: this isn't a desirable result
-# error: "Object of type `<module 'mypackage.funcmod'>` is not callable"
 x = funcmod(1)
 ```
 

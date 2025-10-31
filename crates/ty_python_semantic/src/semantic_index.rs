@@ -130,11 +130,17 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
                 import.level,
             )
             .ok()?;
+            // We only actually care if this is a direct submodule of the package
+            // so this part should actually be exactly the importing module.
+            let importing_module_name = importing_module.name(db);
+            if importing_module_name != &submodule {
+                return None;
+            }
             submodule.extend(&ModuleName::new(import.submodule.as_str())?);
             // Throw out the result if this doesn't resolve to an actual module
             resolve_module(db, &submodule)?;
             // Return only the relative part
-            submodule.relative_to(importing_module.name(db))
+            submodule.relative_to(importing_module_name)
         })
         .collect()
 }
