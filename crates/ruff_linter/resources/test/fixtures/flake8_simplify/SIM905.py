@@ -171,3 +171,10 @@ print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
 " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
 "a  b".split(maxsplit=1)  # ["a", "b"]
+
+# https://github.com/astral-sh/ruff/issues/19610
+r"1" "\n".split("1")  # [r"", "\n"]
+r"" "\"".split("1")  # ['"']
+r"1" """
+""".split("1")  # [r"", "\n"]
+r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
