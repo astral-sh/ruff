@@ -4207,7 +4207,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn infer_target_impl(
         &mut self,
         target: &ast::Expr,
@@ -10299,7 +10299,7 @@ enum MultiInferenceState {
 }
 
 impl MultiInferenceState {
-    fn is_panic(self) -> bool {
+    const fn is_panic(self) -> bool {
         matches!(self, MultiInferenceState::Panic)
     }
 }
