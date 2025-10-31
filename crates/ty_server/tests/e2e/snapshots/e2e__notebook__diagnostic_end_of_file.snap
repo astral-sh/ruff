@@ -119,7 +119,7 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
                 source: Some(
                     "ty",
                 ),
-                message: "Expected ',', found name",
+                message: "Expected `,`, found name",
                 related_information: Some(
                     [],
                 ),
@@ -199,7 +199,7 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
                 source: Some(
                     "ty",
                 ),
-                message: "Expected ',', found string",
+                message: "Expected `,`, found string",
                 related_information: Some(
                     [],
                 ),
@@ -344,7 +344,7 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
                 source: Some(
                     "ty",
                 ),
-                message: "Expected ',', found name",
+                message: "Expected `,`, found name",
                 related_information: Some(
                     [],
                 ),
@@ -537,7 +537,7 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
                 source: Some(
                     "ty",
                 ),
-                message: "Expected ',', found name",
+                message: "Expected `,`, found name",
                 related_information: Some(
                     [],
                 ),
