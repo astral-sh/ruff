@@ -389,7 +389,7 @@ fn validate_from_keywords<'db, 'ast>(
     provided_keys
 }
 
-/// Validates a `TypedDict` dictionary literal assignment,
+/// Validates a `TypedDict` dictionary literal assignment, emitting any needed diagnostics.
 /// e.g. `person: Person = {"name": "Alice", "age": 30}`
 pub(super) fn validate_typed_dict_dict_literal<'db>(
     context: &InferContext<'db, '_>,
@@ -397,8 +397,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     dict_expr: &ast::ExprDict,
     error_node: AnyNodeRef,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
-) -> Result<OrderSet<&'db str>, OrderSet<&'db str>> {
-    let mut valid = true;
+) {
     let mut provided_keys = OrderSet::new();
 
     // Validate each key-value pair in the dictionary literal
@@ -411,7 +410,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
 
             let value_type = expression_type_fn(&item.value);
 
-            valid &= validate_typed_dict_key_assignment(
+            validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
                 key_str,
@@ -424,11 +423,5 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
         }
     }
 
-    valid &= validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
-
-    if valid {
-        Ok(provided_keys)
-    } else {
-        Err(provided_keys)
-    }
+    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 }
