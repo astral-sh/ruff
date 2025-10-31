@@ -637,12 +637,17 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.is_subclass_of(db, other);
+            return self
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == other.class_literal(db).0);
         }
         if other.is_final(db) {
-            return other.is_subclass_of(db, self);
+            return other
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == self.class_literal(db).0);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
