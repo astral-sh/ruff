@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/match.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -620,6 +619,31 @@ match guard_comments:
     ):
         pass
 
+
+# regression tests from https://github.com/astral-sh/ruff/issues/17796
+match class_pattern:
+    case Class(xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as capture:
+        pass
+
+match sequence_pattern_brackets:
+    case [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] as capture:
+        pass
+    case [
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ] as capture:
+        pass
+    case [
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ] as capture:
+        pass
 ```
 
 ## Output
@@ -1284,5 +1308,31 @@ match guard_comments:
         aaaaaaaaa == 1
         # trailing own line comment
     ):
+        pass
+
+
+# regression tests from https://github.com/astral-sh/ruff/issues/17796
+match class_pattern:
+    case Class(xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as capture:
+        pass
+
+match sequence_pattern_brackets:
+    case [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] as capture:
+        pass
+    case [
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ] as capture:
+        pass
+    case [
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ] as capture:
         pass
 ```
