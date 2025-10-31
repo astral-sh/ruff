@@ -1273,10 +1273,11 @@ pub(crate) fn check_docstring(
 
                 if !missing_parameters.is_empty() {
                     if let Some(definition) = docstring.definition.name() {
+                        let names = missing_parameters.into_iter().sorted().collect();
                         checker.report_diagnostic(
                             UndocumentedParam {
                                 definition: definition.to_string(),
-                                names: missing_parameters,
+                                names,
                             },
                             function_def.identifier(),
                         );
