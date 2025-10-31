@@ -163,7 +163,7 @@ Module(
 
   |
 1 | def foo[T1, *T2(a, b):
-  |                ^ Syntax Error: Expected ']', found '('
+  |                ^ Syntax Error: Expected `]`, found `(`
 2 |     return a + b
 3 | x = 10
   |

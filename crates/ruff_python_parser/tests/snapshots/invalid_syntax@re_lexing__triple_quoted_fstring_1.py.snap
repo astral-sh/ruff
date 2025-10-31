@@ -83,7 +83,7 @@ Module(
   |
 5 | f"""hello {x # comment    
 6 | y = 1
-  | ^ Syntax Error: f-string: expecting '}'
+  | ^ Syntax Error: f-string: expecting `}`
   |
 
 

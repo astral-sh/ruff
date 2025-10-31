@@ -4,4 +4,4 @@ expression: content
 ---
 syntax_errors.py:
   1:15 invalid-syntax: Expected one or more symbol names after import
-  3:12 invalid-syntax: Expected ')', found newline
+  3:12 invalid-syntax: Expected `)`, found newline
