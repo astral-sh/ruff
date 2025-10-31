@@ -626,6 +626,10 @@ match class_pattern:
         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ) as capture:
         pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as really_really_really_really_really_really_really_really_really_really_really_really_long_capture:
+        pass
 
 match sequence_pattern_brackets:
     case [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] as capture:
