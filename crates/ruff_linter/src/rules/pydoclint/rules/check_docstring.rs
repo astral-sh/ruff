@@ -1178,7 +1178,8 @@ fn is_generator_function_annotated_as_returning_none(
 #[derive(Debug)]
 struct SignatureParameter<'a> {
     name: &'a str,
-    is_variadic: bool,
+    is_vararg: bool,
+    is_kwarg: bool,
 }
 
 fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<SignatureParameter<'a>> {
@@ -1186,10 +1187,26 @@ fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<SignatureParam
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
-    for param in &function.parameters {
+    for param in function.parameters.iter_non_variadic_params() {
         parameters.push(SignatureParameter {
             name: param.name(),
-            is_variadic: param.is_variadic(),
+            is_vararg: false,
+            is_kwarg: false,
+        });
+    }
+
+    if let Some(param) = function.parameters.vararg.as_ref() {
+        parameters.push(SignatureParameter {
+            name: param.name(),
+            is_vararg: true,
+            is_kwarg: false,
+        });
+    }
+    if let Some(param) = function.parameters.kwarg.as_ref() {
+        parameters.push(SignatureParameter {
+            name: param.name(),
+            is_vararg: false,
+            is_kwarg: true,
         });
     }
 
@@ -1261,13 +1278,20 @@ pub(crate) fn check_docstring(
                         && !is_staticmethod(&function_def.decorator_list, semantic),
                 )) {
                     if !(checker.settings().pydocstyle.ignore_var_parameters()
-                        && signature_param.is_variadic
+                        && (signature_param.is_vararg || signature_param.is_kwarg)
                         || signature_param.name.starts_with('_')
                         || parameters_section.parameters.iter().any(|param| {
                             param.name == signature_param.name && param.has_definition
                         }))
                     {
-                        missing_parameters.push(signature_param.name.to_string());
+                        let name = signature_param.name;
+                        if signature_param.is_vararg {
+                            missing_parameters.push(format!("*{name}"));
+                        } else if signature_param.is_kwarg {
+                            missing_parameters.push(format!("**{name}"));
+                        } else {
+                            missing_parameters.push(name.to_string());
+                        }
                     }
                 }
 
