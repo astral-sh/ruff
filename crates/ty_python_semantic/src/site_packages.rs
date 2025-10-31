@@ -46,7 +46,7 @@ type StdlibDiscoveryResult<T> = Result<T, StdlibDiscoveryError>;
 /// were the case, the system environment's `site-packages` directory
 /// *might* be added to the `SitePackagesPaths` twice, but we wouldn't
 /// want duplicates to appear in this set.
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(PartialEq, Eq, Default)]
 pub struct SitePackagesPaths(IndexSet<SystemPathBuf>);
 
 impl SitePackagesPaths {
@@ -108,6 +108,12 @@ impl SitePackagesPaths {
 
     pub fn into_vec(self) -> Vec<SystemPathBuf> {
         self.0.into_iter().collect()
+    }
+}
+
+impl fmt::Debug for SitePackagesPaths {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
