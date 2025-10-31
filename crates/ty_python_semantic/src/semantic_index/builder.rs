@@ -1454,6 +1454,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .record_node_reachability(NodeKey::from_node(node));
 
                 let mut found_star = false;
+                let shadowing_is_even_vaguely_possible = node
+                    .names
+                    .iter()
+                    .filter_map(|alias| {
+                        let path = node.module.as_ref()?;
+                        let module = ModuleName::new(path.as_str())?;
+                        module
+                            .components()
+                            .find(|name| *name == alias.name.as_str())?;
+                        Some(true)
+                    })
+                    .any(|_| true);
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
                         // The following line maintains the invariant that every AST node that
@@ -1565,7 +1577,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     };
 
                     // If there's no alias or a redundant alias, record this as a potential import of a submodule
-                    if alias.asname.is_none() || is_reexported {
+                    if !shadowing_is_even_vaguely_possible
+                        && (alias.asname.is_none() || is_reexported)
+                    {
                         self.maybe_imported_modules.insert(MaybeModuleImport {
                             level: node.level,
                             from_module: node.module.clone().map(Into::into),
