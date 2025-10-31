@@ -950,7 +950,8 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn cycle_normalized(self, db: &'db dyn Db, previous: Self, div: Self) -> Self {
-        UnionType::from_elements(db, [self, previous]).recursive_type_normalized(db, div)
+        UnionType::from_elements_cycle_recovery(db, [self, previous])
+            .recursive_type_normalized(db, div)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -11756,6 +11757,20 @@ impl<'db> UnionType<'db> {
             .into_iter()
             .fold(
                 UnionBuilder::new(db).unpack_aliases(false),
+                |builder, element| builder.add(element.into()),
+            )
+            .build()
+    }
+
+    fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        elements
+            .into_iter()
+            .fold(
+                UnionBuilder::new(db).cycle_recovery(true),
                 |builder, element| builder.add(element.into()),
             )
             .build()
