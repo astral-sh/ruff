@@ -3,11 +3,11 @@ from . import views
 
 # Errors - leading slash
 urlpatterns = [
-    path("/help/", views.help_view),  # DJ015
-    path("/about/", views.about_view),  # DJ015
-    path("/contact/", views.contact_view),  # DJ015
-    path("/api/users/", views.users_view),  # DJ015
-    path("/blog/posts/", views.posts_view),  # DJ015
+    path("/help/", views.help_view),  # DJ101
+    path("/about/", views.about_view),  # DJ101
+    path("/contact/", views.contact_view),  # DJ101
+    path("/api/users/", views.users_view),  # DJ101
+    path("/blog/posts/", views.posts_view),  # DJ101
 ]
 
 # OK - no leading slash
@@ -34,21 +34,21 @@ urlpatterns_params = [
 # Mixed cases
 urlpatterns_mixed = [
     path("good/", views.good_view),
-    path("/bad/", views.bad_view),  # DJ015
+    path("/bad/", views.bad_view),  # DJ101
     path("also-good/", views.also_good_view),
-    path("/also-bad/", views.also_bad_view),  # DJ015
+    path("/also-bad/", views.also_bad_view),  # DJ101
 ]
 
 # Edge cases with different quote styles
 urlpatterns_quotes = [
-    path('/single-quote/', views.single_quote_view),  # DJ015
-    path("/double-quote/", views.double_quote_view),  # DJ015
-    path('''/triple-single/''', views.triple_single_view),  # DJ015
-    path("""/triple-double/""", views.triple_double_view),  # DJ015
+    path('/single-quote/', views.single_quote_view),  # DJ101
+    path("/double-quote/", views.double_quote_view),  # DJ101
+    path('''/triple-single/''', views.triple_single_view),  # DJ101
+    path("""/triple-double/""", views.triple_double_view),  # DJ101
 ]
 
 # Error - leading trail slash and argument should stay in message
 urlpatterns_params_bad = [
-    path("/bad/<slug:slug>/", views.bad_view),  # DJ015
-    path("/<slug:slug>", views.bad_view),  # DJ015
+    path("/bad/<slug:slug>/", views.bad_view),  # DJ101
+    path("/<slug:slug>", views.bad_view),  # DJ101
 ]
