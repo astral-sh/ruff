@@ -75,7 +75,6 @@ use crate::types::diagnostic::{
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars};
 use crate::types::ide_support::all_members;
-use crate::types::infer::infer_scope_types;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -87,47 +86,6 @@ use crate::types::{
     TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
-
-// Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
-// For example, consider the following recursive function:
-// ```py
-// def div(n: int):
-//     if n == 0:
-//         return None
-//     else:
-//         return (div(n-1),)
-// ```
-// If we try to infer the return type of this function naively, we will get `tuple[tuple[tuple[...] | None] | None] | None`, which never converges.
-// So, when we detect a cycle, we set the cycle initial type to `Divergent`. Then the type obtained in the first cycle is `tuple[Divergent] | None`.
-// Let's call such a type containing `Divergent` a "recursive type".
-// Next, if there is a type containing a recursive type (let's call this a nested recursive type), we replace the inner recursive type with the `Divergent` type.
-// All recursive types are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
-// 0th: Divergent
-// 1st: tuple[Divergent] | None
-// 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
-fn return_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    previous_return_type: &Type<'db>,
-    return_type: &Type<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    let div = Type::divergent(id);
-    salsa::CycleRecoveryAction::Fallback(return_type.cycle_normalized(
-        db,
-        *previous_return_type,
-        div,
-    ))
-}
-
-fn return_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -1112,14 +1070,6 @@ impl<'db> FunctionType<'db> {
             updated_signature,
             updated_last_definition_signature,
         )
-    }
-
-    /// Infers this function scope's types and returns the inferred return type.
-    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
-    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self.literal(db).last_definition(db).body_scope(db);
-        let inference = infer_scope_types(db, scope);
-        inference.infer_return_type(db, Type::FunctionLiteral(self))
     }
 }
 

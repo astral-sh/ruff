@@ -144,25 +144,20 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A | B
 ```
 
-## No special narrowing for custom `type` callable
+## No narrowing for custom `type` callable
 
 ```py
-def type(x: object):
-    return int
-
 class A: ...
 class B: ...
 
+def type(x):
+    return int
+
 def _(x: A | B):
-    # The custom `type` function always returns `int`,
-    # so any branch other than `type(...) is int` is unreachable.
     if type(x) is A:
-        reveal_type(x)  # revealed: Never
-    # And the condition here is always `True` and has no effect on the narrowing of `x`.
-    elif type(x) is int:
         reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: A | B
 ```
 
 ## No narrowing for multiple arguments

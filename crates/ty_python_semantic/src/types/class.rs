@@ -170,14 +170,6 @@ fn try_metaclass_cycle_initial<'db>(
     })
 }
 
-fn into_callable_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    _self: ClassType<'db>,
-) -> Type<'db> {
-    Type::Callable(CallableType::divergent(db, id))
-}
-
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
@@ -1268,6 +1260,14 @@ impl<'db> ClassType<'db> {
     }
 }
 
+fn into_callable_cycle_initial<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    _self: ClassType<'db>,
+) -> Type<'db> {
+    Type::Callable(CallableType::divergent(db, id))
+}
+
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
     fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
         ClassType::Generic(generic)
@@ -1294,7 +1294,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
 
 /// A filter that describes which methods are considered when looking for implicit attribute assignments
 /// in [`ClassLiteral::implicit_attribute`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum MethodDecorator {
     None,
     ClassMethod,

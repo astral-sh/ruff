@@ -166,7 +166,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    3300,
+    3000,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -197,8 +197,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    // TODO: With better decorator support, `__slots__` support, etc., it should be possible to reduce the number of errors considerably.
-    70000,
+    13000,
 );
 
 static TANJUN: Benchmark = Benchmark::new(

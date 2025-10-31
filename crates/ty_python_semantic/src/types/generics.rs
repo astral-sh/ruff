@@ -17,8 +17,8 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    CycleRecoveryType, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
     RecursiveTypeNormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionType, declaration_type, walk_bound_type_var_type,
@@ -211,7 +211,7 @@ impl<'db> GenericContextTypeVar<'db> {
 pub struct GenericContext<'db> {
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
-    cycle_recovery: Option<CycleRecoveryType<'db>>,
+    cycle_recovery: Option<Type<'db>>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -640,7 +640,7 @@ impl<'db> GenericContext<'db> {
     fn heap_size(
         (variables, cycle_recovery): &(
             FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
-            Option<CycleRecoveryType<'db>>,
+            Option<Type<'db>>,
         ),
     ) -> usize {
         use get_size2::GetSize;

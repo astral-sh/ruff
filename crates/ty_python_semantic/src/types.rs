@@ -24,10 +24,10 @@ pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL};
 pub(crate) use self::infer::{
-    TypeContext, infer_deferred_types, infer_expression_type, infer_isolated_expression,
-    infer_scope_expression_type, static_expression_truthiness,
+    TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
+    infer_expression_types, infer_isolated_expression, infer_scope_types,
+    static_expression_truthiness,
 };
-use self::infer::{infer_definition_types, infer_expression_types, infer_scope_types};
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
@@ -112,30 +112,6 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-fn return_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    previous_return_type: &Type<'db>,
-    return_type: &Type<'db>,
-    _count: u32,
-    _method: BoundMethodType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    let div = Type::divergent(id);
-    salsa::CycleRecoveryAction::Fallback(return_type.cycle_normalized(
-        db,
-        *previous_return_type,
-        div,
-    ))
-}
-
-fn return_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _method: BoundMethodType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
     tracing::debug!("Checking file '{path}'", path = file.path(db));
@@ -188,14 +164,6 @@ pub(crate) fn declaration_type<'db>(
     inference.declaration_type(definition)
 }
 
-pub(crate) fn undecorated_type<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-) -> Option<Type<'db>> {
-    let inference = infer_definition_types(db, definition);
-    inference.undecorated_type()
-}
-
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
@@ -221,7 +189,7 @@ fn definition_expression_type<'db>(
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_expression_type(db, scope, expression)
+        infer_scope_types(db, scope).expression_type(expression)
     }
 }
 
@@ -273,6 +241,7 @@ pub(crate) type TryBoolVisitor<'db> =
     CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
 pub(crate) struct TryBool;
 
+/// A [`TypeTransformer`] that is used in `normalized` methods.
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 
 #[derive(Debug)]
@@ -368,7 +337,7 @@ enum InstanceFallbackShadowsNonDataDescriptor {
 }
 
 bitflags! {
-    #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
     pub(crate) struct MemberLookupPolicy: u8 {
         /// Dunder methods are looked up on the meta-type of a type without potentially falling
         /// back on attributes on the type itself. For example, when implicitly invoked on an
@@ -431,9 +400,6 @@ impl Default for MemberLookupPolicy {
     }
 }
 
-impl get_size2::GetSize for MemberLookupPolicy {}
-
-#[allow(clippy::needless_pass_by_value)]
 fn member_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -444,7 +410,7 @@ fn member_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
@@ -463,7 +429,6 @@ fn member_lookup_cycle_recover<'db>(
     })
 }
 
-#[allow(clippy::needless_pass_by_value)]
 fn class_lookup_cycle_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -495,7 +460,7 @@ pub(crate) fn join_with_previous_cycle_place<'db>(
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
@@ -4425,20 +4390,20 @@ impl<'db> Type<'db> {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
                             Type::FunctionLiteral(bound_method.function(db))
-                                .member_lookup_with_policy(db, name.clone(), policy)
+                                .member_lookup_with_policy(db, name, policy)
                         })
                 }
             },
             Type::KnownBoundMethod(method) => method
                 .class()
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.clone(), policy),
+                .member_lookup_with_policy(db, name, policy),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.clone(), policy),
+                .member_lookup_with_policy(db, name, policy),
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.clone(), policy),
+                .member_lookup_with_policy(db, name, policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                 Place::bound(self).into()
@@ -4446,10 +4411,10 @@ impl<'db> Type<'db> {
 
             Type::Callable(callable) if callable.is_function_like(db) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.clone(), policy),
+                .member_lookup_with_policy(db, name, policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) => {
-                Type::object().member_lookup_with_policy(db, name.clone(), policy)
+                Type::object().member_lookup_with_policy(db, name, policy)
             }
 
             Type::NominalInstance(instance)
@@ -4507,11 +4472,9 @@ impl<'db> Type<'db> {
                 policy,
             ),
 
-            Type::TypeAlias(alias) => {
-                alias
-                    .value_type(db)
-                    .member_lookup_with_policy(db, name.clone(), policy)
-            }
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .member_lookup_with_policy(db, name, policy),
 
             Type::EnumLiteral(enum_literal)
                 if matches!(name_str, "name" | "_name_")
@@ -5733,19 +5696,6 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
-        }
-    }
-
-    /// Returns the inferred return type of `self` if it is a function literal / bound method.
-    fn infer_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self {
-            Type::FunctionLiteral(function_type) if !function_type.file(db).is_stub(db) => {
-                Some(function_type.infer_return_type(db))
-            }
-            Type::BoundMethod(method_type) if !method_type.function(db).file(db).is_stub(db) => {
-                Some(method_type.infer_return_type(db))
-            }
-            _ => None,
         }
     }
 
@@ -8004,8 +7954,6 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 }
-
-pub(crate) type CycleRecoveryType<'db> = Type<'db>;
 
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
@@ -10434,75 +10382,11 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    /// Infers this method scope's types and returns the inferred return type.
-    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
-    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self
-            .function(db)
-            .literal(db)
-            .last_definition(db)
-            .body_scope(db);
-        let inference = infer_scope_types(db, scope);
-        inference.infer_return_type(db, Type::BoundMethod(self))
-    }
-
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let definition_scope = self.function(db).definition(db).scope(db);
         let index = semantic_index(db, definition_scope.file(db));
         Some(index.expect_single_definition(definition_scope.node(db).as_class()?))
-    }
-
-    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
-        if self
-            .function(db)
-            .has_known_decorator(db, FunctionDecorators::FINAL)
-        {
-            return true;
-        }
-        let Some(class_ty) = self
-            .class_definition(db)
-            .and_then(|class| binding_type(db, class).as_class_literal())
-        else {
-            return false;
-        };
-        class_ty
-            .known_function_decorators(db)
-            .any(|deco| deco == KnownFunction::Final)
-    }
-
-    pub(super) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
-        let name = self.function(db).name(db);
-
-        let base = class
-            .iter_mro(db)
-            .nth(1)
-            .and_then(class_base::ClassBase::into_class)?;
-        let base_member = base.class_member(db, name, MemberLookupPolicy::default());
-        if let Place::Defined(Type::FunctionLiteral(base_func), _, _) = base_member.place {
-            if let [signature] = base_func.signature(db).overloads.as_slice() {
-                let unspecialized_return_ty = signature.return_ty.unwrap_or_else(|| {
-                    let base_method_ty =
-                        base_func.into_bound_method_type(db, Type::instance(db, class));
-                    base_method_ty.infer_return_type(db)
-                });
-                if let Some(generic_context) = signature.generic_context.as_ref() {
-                    // If the return type of the base method contains a type variable, replace it with `Unknown` to avoid dangling type variables.
-                    Some(
-                        unspecialized_return_ty
-                            .apply_specialization(db, generic_context.unknown_specialization(db)),
-                    )
-                } else {
-                    Some(unspecialized_return_ty)
-                }
-            } else {
-                // TODO: Handle overloaded base methods.
-                None
-            }
-        } else {
-            None
-        }
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {

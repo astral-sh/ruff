@@ -481,7 +481,6 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::object(), Some(Type::Never))
     }
 
-    /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn divergent(id: salsa::Id) -> Self {
         Self::new(Parameters::object(), Some(Type::divergent(id)))
     }

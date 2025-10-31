@@ -467,6 +467,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "str | None");
         db.take_salsa_events()
     };
+
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
@@ -561,6 +562,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "str | None");
         db.take_salsa_events()
     };
+
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
@@ -660,6 +662,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "str");
         db.take_salsa_events()
     };
+
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
