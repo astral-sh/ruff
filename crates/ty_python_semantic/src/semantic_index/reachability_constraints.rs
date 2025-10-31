@@ -771,8 +771,9 @@ impl ReachabilityConstraints {
                 truthiness
             }
             PatternPredicateKind::Class(class_expr, kind) => {
-                let class_ty =
-                    infer_expression_type(db, *class_expr, TypeContext::default()).to_instance(db);
+                let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+                    .as_class_literal()
+                    .map(|class| Type::instance(db, class.top_materialization(db)));
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {
@@ -802,10 +803,27 @@ impl ReachabilityConstraints {
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
         let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
-        let narrowed_subject_ty = IntersectionBuilder::new(db)
+        let narrowed_subject = IntersectionBuilder::new(db)
             .add_positive(subject_ty)
-            .add_negative(type_excluded_by_previous_patterns(db, predicate))
+            .add_negative(type_excluded_by_previous_patterns(db, predicate));
+
+        let narrowed_subject_ty = narrowed_subject.clone().build();
+
+        // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
+        // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
+        // subject type is `Self & ~Literal[NO]`. This type is *not* equivalent to `Literal[YES]`,
+        // because `Self` could also specialize to `Literal[NO]` or `Never`, making the intersection
+        // empty. However, if the current pattern matches on `YES`, the *next* narrowed subject type
+        // will be `Self & ~Literal[NO] & ~Literal[YES]`, which *is* always equivalent to `Never`. This
+        // means that subsequent patterns can never match. And we know that if we reach this point,
+        // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
+        // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
+        let next_narrowed_subject_ty = narrowed_subject
+            .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
             .build();
+        if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
+            return Truthiness::AlwaysTrue;
+        }
 
         let truthiness = Self::analyze_single_pattern_predicate_kind(
             db,

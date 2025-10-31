@@ -182,12 +182,20 @@ def match_non_exhaustive(x: Color):
 
 ## `isinstance` checks
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import assert_never
 
 class A: ...
 class B: ...
 class C: ...
+
+class GenericClass[T]:
+    x: T
 
 def if_else_exhaustive(x: A | B | C):
     if isinstance(x, A):
@@ -253,6 +261,17 @@ def match_non_exhaustive(x: A | B | C):
 
             # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
             assert_never(x)  # error: [type-assertion-failure]
+
+# Note: no invalid-return-type diagnostic; the `match` is exhaustive
+def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
+    match obj:
+        case GenericClass(x=42):
+            reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
+            return obj
+        case GenericClass(x=x):
+            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
+            return obj
 ```
 
 ## `isinstance` checks with generics
@@ -378,4 +397,23 @@ def as_pattern_non_exhaustive(subject: int | str):
 
             # this diagnostic is correct: the inferred type of `subject` is `str`
             assert_never(subject)  # error: [type-assertion-failure]
+```
+
+## Exhaustiveness checking for methods of enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = "yes"
+    NO = "no"
+
+    def is_yes(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes
+
+        match self:
+            case Answer.YES:
+                return True
+            case Answer.NO:
+                return False
 ```

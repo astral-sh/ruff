@@ -637,12 +637,17 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.is_subclass_of(db, other);
+            return self
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == other.class_literal(db).0);
         }
         if other.is_final(db) {
-            return other.is_subclass_of(db, self);
+            return other
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == self.class_literal(db).0);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1051,16 +1056,10 @@ impl<'db> ClassType<'db> {
             return Type::Callable(metaclass_dunder_call_function.into_callable_type(db));
         }
 
-        let dunder_new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            )
-            .place;
+        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
 
         let dunder_new_signature = dunder_new_function_symbol
-            .ignore_possibly_undefined()
+            .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
             .and_then(|ty| match ty {
                 Type::FunctionLiteral(function) => Some(function.signature(db)),
                 Type::Callable(callable) => Some(callable.signatures(db)),
@@ -2182,7 +2181,8 @@ impl<'db> ClassLiteral<'db> {
         });
 
         if member.is_undefined() {
-            if let Some(synthesized_member) = self.own_synthesized_member(db, specialization, name)
+            if let Some(synthesized_member) =
+                self.own_synthesized_member(db, specialization, inherited_generic_context, name)
             {
                 return Member::definitely_declared(synthesized_member);
             }
@@ -2198,6 +2198,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
@@ -2326,7 +2327,7 @@ impl<'db> ClassLiteral<'db> {
 
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
-                    self.inherited_generic_context(db),
+                    inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
                     Parameters::new(parameters),
                     return_ty,
                 ),
@@ -2708,7 +2709,7 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Some(member) = self.own_synthesized_member(db, specialization, name) {
+        if let Some(member) = self.own_synthesized_member(db, specialization, None, name) {
             Place::bound(member).into()
         } else {
             KnownClass::TypedDictFallback

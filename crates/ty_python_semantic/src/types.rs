@@ -39,7 +39,9 @@ use crate::place::{
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
+use crate::semantic_index::{
+    imported_modules, imported_relative_submodules_of_stub_package, place_table, semantic_index,
+};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -1268,7 +1270,11 @@ impl<'db> Type<'db> {
     ///
     /// It also avoids literal promotion if a literal type annotation was provided as type context.
     pub(crate) fn promote_literals(self, db: &'db dyn Db, tcx: TypeContext<'db>) -> Type<'db> {
-        self.apply_type_mapping(db, &TypeMapping::PromoteLiterals, tcx)
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::PromoteLiterals(PromoteLiteralsMode::On),
+            tcx,
+        )
     }
 
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
@@ -3584,16 +3590,21 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    #[allow(unused_variables)]
-    // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
-    fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
-        self.find_name_in_mro_with_policy(
-            db,
-            "__new__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-        )
+    fn lookup_dunder_new(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        fn lookup_dunder_new_inner<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            _: (),
+        ) -> Option<PlaceAndQualifiers<'db>> {
+            let mut flags = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
+            if !ty.is_subtype_of(db, KnownClass::Type.to_instance(db)) {
+                flags |= MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
+            }
+            ty.find_name_in_mro_with_policy(db, "__new__", flags)
+        }
+
+        lookup_dunder_new_inner(db, self, ())
     }
 
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
@@ -4151,6 +4162,14 @@ impl<'db> Type<'db> {
             {
                 Place::bound(Type::KnownBoundMethod(
                     KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "satisfied_by_all_typevars" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                 ))
                 .into()
             }
@@ -6089,7 +6108,7 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_method = self_type.lookup_dunder_new(db, ());
+        let new_method = self_type.lookup_dunder_new(db);
 
         // Construct an instance type that we can use to look up the `__init__` instance method.
         // This performs the same logic as `Type::to_instance`, except for generic class literals.
@@ -6750,7 +6769,7 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::PromoteLiterals
+                TypeMapping::PromoteLiterals(_)
                     | TypeMapping::ReplaceParameterDefaults
                     | TypeMapping::BindLegacyTypevars(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
@@ -6764,7 +6783,7 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
-                TypeMapping::PromoteLiterals |
+                TypeMapping::PromoteLiterals(_) |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
@@ -6775,7 +6794,7 @@ impl<'db> Type<'db> {
                 let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
 
                 match type_mapping {
-                    TypeMapping::PromoteLiterals => function.promote_literals_impl(db, tcx),
+                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => function.promote_literals_impl(db, tcx),
                     _ => function
                 }
             }
@@ -6852,13 +6871,9 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-                let flipped_mapping = match type_mapping {
-                    TypeMapping::Materialize(materialization_kind) => &TypeMapping::Materialize(materialization_kind.flip()),
-                    _ => type_mapping,
-                };
                 for negative in intersection.negative(db) {
                     builder =
-                        builder.add_negative(negative.apply_type_mapping_impl(db, flipped_mapping, tcx, visitor));
+                        builder.add_negative(negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor));
                 }
                 builder.build()
             }
@@ -6887,8 +6902,9 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults => self,
-                TypeMapping::PromoteLiterals => self.promote_literals_impl(db, tcx)
+                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6897,7 +6913,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::PromoteLiterals |
+                TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -6916,6 +6932,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -7067,7 +7084,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -7439,6 +7457,21 @@ fn apply_specialization_cycle_initial<'db>(
     Type::Never
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub enum PromoteLiteralsMode {
+    On,
+    Off,
+}
+
+impl PromoteLiteralsMode {
+    const fn flip(self) -> Self {
+        match self {
+            PromoteLiteralsMode::On => PromoteLiteralsMode::Off,
+            PromoteLiteralsMode::Off => PromoteLiteralsMode::On,
+        }
+    }
+}
+
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
 /// the components of complex types.
 ///
@@ -7453,7 +7486,7 @@ pub enum TypeMapping<'a, 'db> {
     PartialSpecialization(PartialSpecialization<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    PromoteLiterals,
+    PromoteLiterals(PromoteLiteralsMode),
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -7478,7 +7511,7 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
-            | TypeMapping::PromoteLiterals
+            | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults => context,
@@ -7502,6 +7535,22 @@ impl<'db> TypeMapping<'_, 'db> {
                     }
                 }),
             ),
+        }
+    }
+
+    /// Returns a new `TypeMapping` that should be applied in contravariant positions.
+    pub(crate) fn flip(&self) -> Self {
+        match self {
+            TypeMapping::Materialize(materialization_kind) => {
+                TypeMapping::Materialize(materialization_kind.flip())
+            }
+            TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
+            TypeMapping::Specialization(_)
+            | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::BindSelf(_)
+            | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceParameterDefaults => self.clone(),
         }
     }
 }
@@ -10348,6 +10397,7 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetAlways,
     ConstraintSetNever,
     ConstraintSetImpliesSubtypeOf(TrackedConstraintSet<'db>),
+    ConstraintSetSatisfiedByAllTypeVars(TrackedConstraintSet<'db>),
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10375,7 +10425,8 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetRange
         | KnownBoundMethodType::ConstraintSetAlways
         | KnownBoundMethodType::ConstraintSetNever
-        | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {}
+        | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {}
     }
 }
 
@@ -10443,6 +10494,10 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from(true),
 
             (
@@ -10455,7 +10510,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -10465,7 +10521,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from(false),
         }
     }
@@ -10518,6 +10575,10 @@ impl<'db> KnownBoundMethodType<'db> {
             (
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(left_constraints),
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(right_constraints),
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(left_constraints),
+                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(right_constraints),
             ) => left_constraints
                 .constraints(db)
                 .iff(db, right_constraints.constraints(db)),
@@ -10532,7 +10593,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -10542,7 +10604,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from(false),
         }
     }
@@ -10566,7 +10629,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
-            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => self,
+            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => self,
         }
     }
 
@@ -10582,7 +10646,10 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
-            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => KnownClass::ConstraintSet,
+            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
+                KnownClass::ConstraintSet
+            }
         }
     }
 
@@ -10721,6 +10788,19 @@ impl<'db> KnownBoundMethodType<'db> {
                     Some(KnownClass::ConstraintSet.to_instance(db)),
                 )))
             }
+
+            KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([Parameter::keyword_only(Name::new_static("inferable"))
+                        .type_form()
+                        .with_annotated_type(UnionType::from_elements(
+                            db,
+                            [Type::homogeneous_tuple(db, Type::any()), Type::none(db)],
+                        ))
+                        .with_default_type(Type::none(db))]),
+                    Some(KnownClass::Bool.to_instance(db)),
+                )))
+            }
         }
     }
 }
@@ -10841,11 +10921,68 @@ impl<'db> ModuleLiteralType<'db> {
         self._importing_file(db)
     }
 
+    /// Get the submodule attributes we believe to be defined on this module.
+    ///
+    /// Note that `ModuleLiteralType` is per-importing-file, so this analysis
+    /// includes "imports the importing file has performed".
+    ///
+    ///
+    /// # Danger! Powerful Hammer!
+    ///
+    /// These results immediately make the attribute always defined in the importing file,
+    /// shadowing any other attribute in the module with the same name, even if the
+    /// non-submodule-attribute is in fact always the one defined in practice.
+    ///
+    /// Intuitively this means `available_submodule_attributes` "win all tie-breaks",
+    /// with the idea that if we're ever confused about complicated code then usually
+    /// the import is the thing people want in scope.
+    ///
+    /// However this "always defined, always shadows" rule if applied too aggressively
+    /// creates VERY confusing conclusions that break perfectly reasonable code.
+    ///
+    /// For instance, consider a package which has a `myfunc` submodule which defines a
+    /// `myfunc` function (a common idiom). If the package "re-exports" this function
+    /// (`from .myfunc import myfunc`), then at runtime in python
+    /// `from mypackage import myfunc` should import the function and not the submodule.
+    ///
+    /// However, if we were to consider `from mypackage import myfunc` as introducing
+    /// the attribute `mypackage.myfunc` in `available_submodule_attributes`, we would
+    /// fail to ever resolve the function. This is because `available_submodule_attributes`
+    /// is *so early* and *so powerful* in our analysis that **this conclusion would be
+    /// used when actually resolving `from mypackage import myfunc`**!
+    ///
+    /// This currently cannot be fixed by considering the actual symbols defined in `mypackage`,
+    /// because `available_submodule_attributes` is an *input* to that analysis.
+    ///
+    /// We should therefore avoid marking something as an `available_submodule_attribute`
+    /// when the import could be importing a non-submodule (a function, class, or value).
+    ///
+    ///
+    /// # Rules
+    ///
+    /// We have two rules for whether a submodule attribute is defined:
+    ///
+    /// * If the importing file include `import x.y` then `x.y` is defined in the importing file.
+    ///   This is an easy rule to justify because `import` can only ever import a module, and so
+    ///   *should* shadow any non-submodule of the same name.
+    ///
+    /// * If the module is an `__init__.pyi` for `mypackage`, and it contains a `from...import`
+    ///   that normalizes to `from mypackage import submodule`, then `mypackage.submodule` is
+    ///   defined in all files. This supports the `from . import submodule` idiom. Critically,
+    ///   we do *not* allow `from mypackage.nested import submodule` to affect `mypackage`.
+    ///   The idea here is that `from mypackage import submodule` *from mypackage itself* can
+    ///   only ever reasonably be an import of a submodule. It doesn't make any sense to import
+    ///   a function or class from yourself! (You *can* do it but... why? Don't? Please?)
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
+            .chain(
+                imported_relative_submodules_of_stub_package(db, self.module(db))
+                    .iter()
+                    .cloned(),
+            )
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 

@@ -29,7 +29,7 @@ alice: Person = {"name": "Alice", "age": 30}
 reveal_type(alice["name"])  # revealed: str
 reveal_type(alice["age"])  # revealed: int | None
 
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
 reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
@@ -41,7 +41,7 @@ bob = Person(name="Bob", age=25)
 reveal_type(bob["name"])  # revealed: str
 reveal_type(bob["age"])  # revealed: int | None
 
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
@@ -69,7 +69,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
+# error: [invalid-key] "Invalid key for TypedDict `Person` of type `str`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -81,7 +81,7 @@ def _():
 
 CAPITALIZED_NAME = "Name"
 
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "Name" - did you mean "name"?"
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "Name" - did you mean "name"?"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
 
@@ -99,15 +99,24 @@ eve1a: Person = {"name": b"Eve", "age": None}
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
+reveal_type(eve1a)  # revealed: Person
+reveal_type(eve1b)  # revealed: Person
+
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2a: Person = {"age": 22}
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+reveal_type(eve2a)  # revealed: Person
+reveal_type(eve2b)  # revealed: Person
+
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
+
+reveal_type(eve3a)  # revealed: Person
+reveal_type(eve3b)  # revealed: Person
 ```
 
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
@@ -157,10 +166,10 @@ bob["name"] = None
 Assignments to non-existing keys are disallowed:
 
 ```py
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 alice["extra"] = True
 
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 bob["extra"] = True
 ```
 
@@ -185,10 +194,10 @@ alice: Person = {"inner": {"name": "Alice", "age": 30}}
 reveal_type(alice["inner"]["name"])  # revealed: str
 reveal_type(alice["inner"]["age"])  # revealed: int | None
 
-# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "non_existing""
+# error: [invalid-key] "Invalid key for TypedDict `Inner`: Unknown key "non_existing""
 reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
 
-# error: [invalid-key] "Invalid key access on TypedDict `Inner`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Inner`: Unknown key "extra""
 alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
 ```
 
@@ -267,22 +276,22 @@ a_person = {"name": None, "age": 30}
 All of these have an extra field that is not defined in the `TypedDict`:
 
 ```py
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 alice4: Person = {"name": "Alice", "age": 30, "extra": True}
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 Person(name="Alice", age=30, extra=True)
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 Person({"name": "Alice", "age": 30, "extra": True})
 
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 # TODO: this should be an error
 house.owner = {"name": "Alice", "age": 30, "extra": True}
 
 a_person: Person
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 a_person = {"name": "Alice", "age": 30, "extra": True}
-# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
@@ -323,7 +332,7 @@ user2 = User({"name": "Bob"})
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `User`: value of type `None`"
 user3 = User({"name": None, "age": 25})
 
-# error: [invalid-key] "Invalid key access on TypedDict `User`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `User`: Unknown key "extra""
 user4 = User({"name": "Charlie", "age": 30, "extra": True})
 ```
 
@@ -360,7 +369,7 @@ invalid = OptionalPerson(name=123)
 Extra fields are still not allowed, even with `total=False`:
 
 ```py
-# error: [invalid-key] "Invalid key access on TypedDict `OptionalPerson`: Unknown key "extra""
+# error: [invalid-key] "Invalid key for TypedDict `OptionalPerson`: Unknown key "extra""
 invalid_extra = OptionalPerson(name="George", extra=True)
 ```
 
@@ -503,10 +512,10 @@ def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age",
 
     reveal_type(person[union_of_keys])  # revealed: int | None | str
 
-    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
+    # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
+    # error: [invalid-key] "Invalid key for TypedDict `Person` of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:
@@ -530,7 +539,7 @@ def _(person: Person):
     person["name"] = "Alice"
     person["age"] = 30
 
-    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "naem" - did you mean "name"?"
+    # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "naem" - did you mean "name"?"
     person["naem"] = "Alice"
 
 def _(person: Person):
@@ -646,7 +655,7 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("name", "Alice"))  # revealed: str
     reveal_type(p.setdefault("extra", "default"))  # revealed: str
 
-    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
+    # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
@@ -1015,6 +1024,10 @@ def write_to_non_existing_key(person: Person):
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
+
+def create_with_invalid_string_key():
+    alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}  # error: [invalid-key]
+    bob = Person(name="Bob", age=25, unknown="Bar")  # error: [invalid-key]
 ```
 
 Assignment to `ReadOnly` keys:

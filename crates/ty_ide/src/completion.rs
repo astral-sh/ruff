@@ -212,7 +212,10 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
-    if is_in_comment(&parsed, offset) || is_in_string(&parsed, offset) {
+
+    let tokens = tokens_start_before(parsed.tokens(), offset);
+
+    if is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, tokens, file) {
         return vec![];
     }
 
@@ -829,8 +832,7 @@ fn find_typed_text(
 
 /// Whether the given offset within the parsed module is within
 /// a comment or not.
-fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = tokens_start_before(parsed.tokens(), offset);
+fn is_in_comment(tokens: &[Token]) -> bool {
     tokens.last().is_some_and(|t| t.kind().is_comment())
 }
 
@@ -839,14 +841,38 @@ fn is_in_comment(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
 ///
 /// Note that this will return `false` when positioned within an
 /// interpolation block in an f-string or a t-string.
-fn is_in_string(parsed: &ParsedModuleRef, offset: TextSize) -> bool {
-    let tokens = tokens_start_before(parsed.tokens(), offset);
+fn is_in_string(tokens: &[Token]) -> bool {
     tokens.last().is_some_and(|t| {
         matches!(
             t.kind(),
             TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle
         )
     })
+}
+
+/// If the tokens end with `class f` or `def f` we return true.
+/// If the tokens end with `class` or `def`, we return false.
+/// This is fine because we don't provide completions anyway.
+fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
+    let is_definition_keyword = |token: &Token| {
+        if matches!(
+            token.kind(),
+            TokenKind::Def | TokenKind::Class | TokenKind::Type
+        ) {
+            true
+        } else if token.kind() == TokenKind::Name {
+            let source = source_text(db, file);
+            &source[token.range()] == "type"
+        } else {
+            false
+        }
+    };
+
+    tokens
+        .len()
+        .checked_sub(2)
+        .and_then(|i| tokens.get(i))
+        .is_some_and(is_definition_keyword)
 }
 
 /// Order completions according to the following rules:
@@ -1791,7 +1817,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Quux
+        __new__ :: def __new__(cls) -> Self@__new__
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -4056,6 +4082,86 @@ def f[T](x: T):
 ",
         );
         test.build().contains("__repr__");
+    }
+
+    #[test]
+    fn no_completions_in_function_def_name() {
+        let builder = completion_test_builder(
+            "\
+def f<CURSOR>
+    ",
+        );
+
+        assert!(builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn completions_in_function_def_empty_name() {
+        let builder = completion_test_builder(
+            "\
+def <CURSOR>
+        ",
+        );
+
+        // This is okay because the ide will not request completions when the cursor is in this position.
+        assert!(!builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn no_completions_in_class_def_name() {
+        let builder = completion_test_builder(
+            "\
+class f<CURSOR>
+    ",
+        );
+
+        assert!(builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn completions_in_class_def_empty_name() {
+        let builder = completion_test_builder(
+            "\
+class <CURSOR>
+        ",
+        );
+
+        // This is okay because the ide will not request completions when the cursor is in this position.
+        assert!(!builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn no_completions_in_type_def_name() {
+        let builder = completion_test_builder(
+            "\
+type f<CURSOR> = int
+    ",
+        );
+
+        assert!(builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn no_completions_in_maybe_type_def_name() {
+        let builder = completion_test_builder(
+            "\
+type f<CURSOR>
+       ",
+        );
+
+        assert!(builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn completions_in_type_def_empty_name() {
+        let builder = completion_test_builder(
+            "\
+type <CURSOR>
+        ",
+        );
+
+        // This is okay because the ide will not request completions when the cursor is in this position.
+        assert!(!builder.auto_import().build().completions().is_empty());
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test

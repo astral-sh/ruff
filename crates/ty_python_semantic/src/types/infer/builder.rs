@@ -6377,9 +6377,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(typed_dict) = tcx
                 .filter_union(self.db(), Type::is_typed_dict)
                 .as_typed_dict()
-            && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict)
         {
-            return ty;
+            self.infer_typed_dict_expression(dict, typed_dict);
+            return Type::TypedDict(typed_dict);
         }
 
         // Avoid false positives for the functional `TypedDict` form, which is currently
@@ -6404,7 +6404,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         dict: &ast::ExprDict,
         typed_dict: TypedDictType<'db>,
-    ) -> Option<Type<'db>> {
+    ) {
         let ast::ExprDict {
             range: _,
             node_index: _,
@@ -6427,9 +6427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
             self.expression_type(expr)
-        })
-        .ok()
-        .map(|_| Type::TypedDict(typed_dict))
+        });
     }
 
     // Infer the type of a collection literal expression.

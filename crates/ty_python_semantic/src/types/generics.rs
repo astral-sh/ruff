@@ -1483,6 +1483,14 @@ impl<'db> SpecializationBuilder<'db> {
                         self.add_type_mapping(bound_typevar, ty);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // Prefer an exact match first.
+                        for constraint in constraints.elements(self.db) {
+                            if ty == *constraint {
+                                self.add_type_mapping(bound_typevar, ty);
+                                return Ok(());
+                            }
+                        }
+
                         for constraint in constraints.elements(self.db) {
                             if ty
                                 .when_assignable_to(self.db, *constraint, self.inferable)

@@ -44,6 +44,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -422,9 +423,9 @@ impl<'db> UnionBuilder<'db> {
                     .iter()
                     .filter_map(UnionElement::to_type_element)
                     .filter_map(Type::as_enum_literal)
-                    .map(|literal| literal.name(self.db).clone())
-                    .chain(std::iter::once(enum_member_to_add.name(self.db).clone()))
-                    .collect::<FxOrderSet<_>>();
+                    .map(|literal| literal.name(self.db))
+                    .chain(std::iter::once(enum_member_to_add.name(self.db)))
+                    .collect::<FxHashSet<_>>();
 
                 let all_members_are_in_union = metadata
                     .members
@@ -779,6 +780,37 @@ impl<'db> IntersectionBuilder<'db> {
                     ),
                     seen_aliases,
                 )
+            }
+            Type::EnumLiteral(enum_literal) => {
+                let enum_class = enum_literal.enum_class(self.db);
+                let metadata =
+                    enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
+
+                let enum_members_in_negative_part = self
+                    .intersections
+                    .iter()
+                    .flat_map(|intersection| &intersection.negative)
+                    .filter_map(|ty| ty.as_enum_literal())
+                    .filter(|lit| lit.enum_class(self.db) == enum_class)
+                    .map(|lit| lit.name(self.db))
+                    .chain(std::iter::once(enum_literal.name(self.db)))
+                    .collect::<FxHashSet<_>>();
+
+                let all_members_are_in_negative_part = metadata
+                    .members
+                    .keys()
+                    .all(|name| enum_members_in_negative_part.contains(name));
+
+                if all_members_are_in_negative_part {
+                    for inner in &mut self.intersections {
+                        inner.add_negative(self.db, enum_literal.enum_class_instance(self.db));
+                    }
+                } else {
+                    for inner in &mut self.intersections {
+                        inner.add_negative(self.db, ty);
+                    }
+                }
+                self
             }
             _ => {
                 for inner in &mut self.intersections {
