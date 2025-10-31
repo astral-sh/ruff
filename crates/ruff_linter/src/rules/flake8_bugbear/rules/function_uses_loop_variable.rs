@@ -64,7 +64,7 @@ struct LoadedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        // Don't visit nested function definitions
+        // Skip nested function definitions - they are handled separately by `SuspiciousVariablesVisitor`
         if stmt.is_function_def_stmt() {
             return;
         }
@@ -87,7 +87,8 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
 struct SuspiciousVariablesVisitor<'a> {
     names: Vec<&'a ast::ExprName>,
     safe_functions: Vec<&'a Expr>,
-    apply_calls: Vec<&'a Expr>,
+    pandas_imported: bool,
+    outer_parameters: Vec<&'a ast::Parameters>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in
@@ -109,11 +110,26 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
+                        // Check if variable is bound in current function parameters
                         if parameters.includes(&loaded.id) {
+                            return false;
+                        }
+
+                        // Check if variable is bound in outer function parameters
+                        if self
+                            .outer_parameters
+                            .iter()
+                            .any(|params| params.includes(&loaded.id))
+                        {
                             return false;
                         }
                         true
                     }));
+
+                // Recursively visit nested functions with updated parameter stack
+                self.outer_parameters.push(parameters);
+                visitor::walk_body(self, body);
+                self.outer_parameters.pop();
 
                 return;
             }
@@ -162,10 +178,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 }
                             }
                         } else if attr == "apply" {
-                            // Collect apply calls to check later if pandas is imported
-                            for arg in &*arguments.args {
-                                if arg.is_lambda_expr() {
-                                    self.apply_calls.push(arg);
+                            // If pandas is imported, apply is safe like map
+                            if self.pandas_imported {
+                                for arg in &*arguments.args {
+                                    if arg.is_lambda_expr() {
+                                        self.safe_functions.push(arg);
+                                    }
                                 }
                             }
                         }
@@ -303,30 +321,12 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
-    let (_suspicious_variables, mut safe_functions, apply_calls) = {
-        let mut visitor = SuspiciousVariablesVisitor {
-            names: Vec::new(),
-            safe_functions: Vec::new(),
-            apply_calls: Vec::new(),
-        };
-        match node {
-            Node::Stmt(stmt) => visitor.visit_stmt(stmt),
-            Node::Expr(expr) => visitor.visit_expr(expr),
-        }
-        (visitor.names, visitor.safe_functions, visitor.apply_calls)
-    };
-
-    // If pandas is imported, add apply calls to safe functions
-    if checker.semantic().seen_module(Modules::PANDAS) {
-        safe_functions.extend(apply_calls);
-    }
-
-    // Collect suspicious variables
     let suspicious_variables = {
         let mut visitor = SuspiciousVariablesVisitor {
             names: Vec::new(),
-            safe_functions: safe_functions.clone(),
-            apply_calls: Vec::new(),
+            safe_functions: Vec::new(),
+            pandas_imported: checker.semantic().seen_module(Modules::PANDAS),
+            outer_parameters: Vec::new(),
         };
         match node {
             Node::Stmt(stmt) => visitor.visit_stmt(stmt),

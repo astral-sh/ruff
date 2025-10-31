@@ -221,3 +221,15 @@ for _ in range(2):
     for value in range(5):
         result = add_one()(value)
         print(result)
+
+
+# nested function that captures loop variable (SHOULD trigger B023)
+lst = []
+for value in range(2):
+    def add_one():
+        def _add_one_inner():
+            return value + 1  # Should trigger B023 - value is loop variable, not bound
+
+        return _add_one_inner
+
+    lst.append(add_one())
