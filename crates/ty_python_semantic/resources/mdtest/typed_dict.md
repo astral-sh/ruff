@@ -99,15 +99,24 @@ eve1a: Person = {"name": b"Eve", "age": None}
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
+reveal_type(eve1a)  # revealed: Person
+reveal_type(eve1b)  # revealed: Person
+
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2a: Person = {"age": 22}
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
+reveal_type(eve2a)  # revealed: Person
+reveal_type(eve2b)  # revealed: Person
+
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
+
+reveal_type(eve3a)  # revealed: Person
+reveal_type(eve3b)  # revealed: Person
 ```
 
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
