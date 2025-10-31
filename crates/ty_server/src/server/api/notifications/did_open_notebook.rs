@@ -29,11 +29,12 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             version,
             cells,
             metadata,
+            uri: notebook_uri,
             ..
         } = params.notebook_document;
 
         let notebook = NotebookDocument::new(
-            params.notebook_document.uri,
+            notebook_uri,
             version,
             cells,
             metadata.unwrap_or_default(),

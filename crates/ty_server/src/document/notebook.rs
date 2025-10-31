@@ -1,10 +1,10 @@
-use crate::{PositionEncoding, TextDocument};
 use anyhow::Ok;
 use lsp_types::NotebookCellKind;
 use ruff_notebook::CellMetadata;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use super::DocumentVersion;
+use crate::{PositionEncoding, TextDocument};
 
 pub(super) type CellId = usize;
 
