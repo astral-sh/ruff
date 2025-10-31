@@ -85,6 +85,13 @@ impl TypeVarVariance {
             TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
         }
     }
+
+    pub(crate) const fn is_covariant(self) -> bool {
+        matches!(
+            self,
+            TypeVarVariance::Covariant | TypeVarVariance::Bivariant
+        )
+    }
 }
 
 impl std::iter::FromIterator<Self> for TypeVarVariance {

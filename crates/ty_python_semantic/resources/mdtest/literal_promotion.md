@@ -1,5 +1,10 @@
 # Literal promotion
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 There are certain places where we promote literals to their common supertype:
 
 ```py
@@ -29,4 +34,35 @@ def double_negation(callback: Callable[[Callable[[Literal[1]], None]], None]):
     reveal_type(callback)  # revealed: ((Literal[1], /) -> None, /) -> None
 
     reveal_type([callback])  # revealed: list[Unknown | (((int, /) -> None, /) -> None)]
+```
+
+Literal promotion should also not apply recursively to type arguments in contravariant/invariant
+position:
+
+```py
+class Bivariant[T]:
+    pass
+
+class Covariant[T]:
+    def pop(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def push(self, value: T) -> None:
+        pass
+
+class Invariant[T]:
+    x: T
+
+def _(
+    bivariant: Bivariant[Literal[1]],
+    covariant: Covariant[Literal[1]],
+    contravariant: Contravariant[Literal[1]],
+    invariant: Invariant[Literal[1]],
+):
+    reveal_type([bivariant])  # revealed: list[Unknown | Bivariant[int]]
+    reveal_type([covariant])  # revealed: list[Unknown | Covariant[int]]
+
+    reveal_type([contravariant])  # revealed: list[Unknown | Contravariant[Literal[1]]]
+    reveal_type([invariant])  # revealed: list[Unknown | Invariant[Literal[1]]]
 ```
