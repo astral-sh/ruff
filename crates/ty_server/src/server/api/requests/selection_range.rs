@@ -43,7 +43,8 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
         let mut results = Vec::new();
 
         for position in params.positions {
-            let offset = position.to_text_size(db, file, snapshot.encoding());
+            let offset =
+                position.to_text_size(db, file, snapshot.document().url(), snapshot.encoding());
 
             let ranges = selection_range(db, file, offset);
             if !ranges.is_empty() {

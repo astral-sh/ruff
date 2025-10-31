@@ -3,10 +3,8 @@ use super::notebook;
 use crate::Db;
 use crate::system::file_to_url;
 
-use crate::session::index::Document;
 use lsp_types as types;
 use lsp_types::{Location, Position, Url};
-
 use ruff_db::files::{File, FileRange};
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::LineIndex;
@@ -68,48 +66,48 @@ impl<'db> LspRange<'db> {
         Some(Location { uri: uri?, range })
     }
 
-    fn to_uri_and_range(&self) -> (Option<Url>, lsp_types::Range) {
+    pub(crate) fn to_uri_and_range(&self) -> (Option<Url>, lsp_types::Range) {
         let source = source_text(self.db, self.file);
         let index = line_index(self.db, self.file);
-        if let Some(notebook) = source.as_notebook() {
-            if let Some(Document::Notebook(notebook_document)) = self.db.document(self.file) {
-                let notebook_index = notebook.index();
 
-                let start = index.source_location(
-                    self.range.start(),
-                    source.as_str(),
-                    self.encoding.into(),
-                );
-                let mut end =
-                    index.source_location(self.range.end(), source.as_str(), self.encoding.into());
-                let starting_cell = notebook_index.cell(start.line);
+        if let Some(notebook) = source.as_notebook()
+            && let Some(notebook_document) = self.db.notebook_document(self.file)
+        {
+            let notebook_index = notebook.index();
 
-                // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
-                // we need to move it one character back (which should place it at the end of the last line).
-                // we test this by checking if the ending offset is in a different (or nonexistent) cell compared to the cell of the starting offset.
-                if notebook_index.cell(end.line) != starting_cell {
-                    end.line = end.line.saturating_sub(1);
-                    let offset = self.range.end().checked_sub(1.into()).unwrap_or_default();
-                    end.character_offset = index
-                        .source_location(offset, source.as_str(), self.encoding.into())
-                        .character_offset;
-                }
+            let start_in_concatenated =
+                index.source_location(self.range.start(), &source, self.encoding.into());
+            let cell_index = notebook_index.cell(start_in_concatenated.line);
 
-                let start =
-                    source_location_to_position(&notebook_index.translate_source_location(&start));
-                let end =
-                    source_location_to_position(&notebook_index.translate_source_location(&end));
+            let cell_range = notebook
+                .cell_range(cell_index.unwrap().to_zero_indexed())
+                .unwrap();
 
-                let cell = starting_cell
-                    .map(OneIndexed::to_zero_indexed)
-                    .unwrap_or_default();
+            // Clamp the end offset to the end of the cell.
+            let end_offset = self.range.end().min(cell_range.end());
 
-                let cell_uri = notebook_document.cell_uri_by_index(cell);
+            let end_in_concatenated =
+                index.source_location(end_offset, &source, self.encoding.into());
 
-                if let Some(cell_uri) = cell_uri {
-                    return (Some(cell_uri.clone()), lsp_types::Range::new(start, end));
-                }
-            }
+            let start_in_cell = source_location_to_position(
+                &notebook_index.translate_source_location(&start_in_concatenated),
+            );
+            let end_in_cell = source_location_to_position(
+                &notebook_index.translate_source_location(&end_in_concatenated),
+            );
+
+            let cell = cell_index
+                .map(OneIndexed::to_zero_indexed)
+                .unwrap_or_default();
+
+            let cell_uri = notebook_document
+                .cell_uri_by_index(cell)
+                .expect("Index to contain an URI for every cell");
+
+            return (
+                Some(cell_uri.clone()),
+                lsp_types::Range::new(start_in_cell, end_in_cell),
+            );
         }
 
         let uri = file_to_url(self.db, self.file);
@@ -164,24 +162,22 @@ impl<'db> LspPosition<'db> {
         let source = source_text(self.db, self.file);
         let index = line_index(self.db, self.file);
 
-        if let Some(notebook) = source.as_notebook() {
-            if let Some(Document::Notebook(notebook_document)) = self.db.document(self.file) {
-                let start =
-                    index.source_location(self.position, source.as_str(), self.encoding.into());
-                let cell = notebook
-                    .index()
-                    .cell(start.line)
-                    .map(OneIndexed::to_zero_indexed)
-                    .unwrap_or_default();
+        if let Some(notebook) = source.as_notebook()
+            && let Some(notebook_document) = self.db.notebook_document(self.file)
+        {
+            let start = index.source_location(self.position, source.as_str(), self.encoding.into());
+            let cell = notebook
+                .index()
+                .cell(start.line)
+                .map(OneIndexed::to_zero_indexed)
+                .unwrap_or_default();
 
-                let start = source_location_to_position(
-                    &notebook.index().translate_source_location(&start),
-                );
+            let start =
+                source_location_to_position(&notebook.index().translate_source_location(&start));
 
-                let cell_uri = notebook_document.cell_uri_by_index(cell);
+            let cell_uri = notebook_document.cell_uri_by_index(cell);
 
-                return (cell_uri.cloned(), start);
-            }
+            return (cell_uri.cloned(), start);
         }
 
         let uri = file_to_url(self.db, self.file);
@@ -196,13 +192,25 @@ pub(crate) trait RangeExt {
     ///
     /// For notebook support, the caller should have the URI to determine which cell
     /// the range refers to, and pass the corresponding file.
-    fn to_text_range(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextRange;
+    fn to_text_range(
+        &self,
+        db: &dyn Db,
+        file: File,
+        url: &lsp_types::Url,
+        encoding: PositionEncoding,
+    ) -> TextRange;
 }
 
 impl RangeExt for lsp_types::Range {
-    fn to_text_range(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextRange {
-        let start = self.start.to_text_size(db, file, encoding);
-        let end = self.end.to_text_size(db, file, encoding);
+    fn to_text_range(
+        &self,
+        db: &dyn Db,
+        file: File,
+        url: &lsp_types::Url,
+        encoding: PositionEncoding,
+    ) -> TextRange {
+        let start = self.start.to_text_size(db, file, url, encoding);
+        let end = self.end.to_text_size(db, file, url, encoding);
 
         TextRange::new(start, end)
     }
@@ -215,21 +223,32 @@ pub(crate) trait PositionExt {
     /// - Determine if the file is a notebook
     /// - Map cell-relative position to absolute position in the notebook file
     /// - Note: The caller also needs access to the URI to determine which cell
-    fn to_text_size(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextSize;
+    fn to_text_size(
+        &self,
+        db: &dyn Db,
+        file: File,
+        url: &lsp_types::Url,
+        encoding: PositionEncoding,
+    ) -> TextSize;
 }
 
 impl PositionExt for lsp_types::Position {
-    fn to_text_size(&self, db: &dyn Db, file: File, encoding: PositionEncoding) -> TextSize {
+    fn to_text_size(
+        &self,
+        db: &dyn Db,
+        file: File,
+        url: &lsp_types::Url,
+        encoding: PositionEncoding,
+    ) -> TextSize {
         let source = source_text(db, file);
         let index = line_index(db, file);
 
-        if let Some(notebook) = source.as_notebook() {
+        if let Some(notebook) = source.as_notebook()
+            && let Some(notebook_document) = db.notebook_document(file)
+            && let Some(cell_index) = notebook_document.cell_index_by_uri(url)
+        {
+            let start_offset = notebook.cell_offset(cell_index).unwrap_or_default();
             let line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
-            let start_offset = notebook
-                .index()
-                .cell(line)
-                .and_then(|cell| notebook.cell_offset(cell))
-                .unwrap_or_default();
 
             let cell_start_location =
                 index.source_location(start_offset, source.as_str(), encoding.into());

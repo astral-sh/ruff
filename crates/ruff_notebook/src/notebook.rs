@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
@@ -349,6 +349,16 @@ impl Notebook {
             row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 
+        // Add an entry for the row just past the end of the document.
+        // This row doesn't really exist but `line_index(EOF)` can return that index
+        if let Some(last_cell) = row_to_cell.last().copied() {
+            row_to_cell.push(last_cell)
+        }
+
+        if let Some(last_row) = row_to_row_in_cell.last().copied() {
+            row_to_row_in_cell.push(last_row.saturating_add(1));
+        }
+
         NotebookIndex {
             row_to_cell,
             row_to_row_in_cell,
@@ -386,8 +396,19 @@ impl Notebook {
         &self.cell_offsets
     }
 
-    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
-        self.cell_offsets.get(cell.to_zero_indexed()).copied()
+    /// Returns the start offset of the cell at index `cell` in the concatenated
+    /// text document.
+    pub fn cell_offset(&self, cell: usize) -> Option<TextSize> {
+        self.cell_offsets.get(cell).copied()
+    }
+
+    /// Returns the text range in the concatenated document of the cell
+    /// with index `cell`.
+    pub fn cell_range(&self, cell: usize) -> Option<TextRange> {
+        let start = self.cell_offsets.get(cell).copied()?;
+        let end = self.cell_offsets.get(cell + 1).copied()?;
+
+        Some(TextRange::new(start, end))
     }
 
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.

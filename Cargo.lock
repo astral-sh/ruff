@@ -3177,6 +3177,7 @@ dependencies = [
  "serde_with",
  "test-case",
  "thiserror 2.0.16",
+ "tracing",
  "uuid",
 ]
 

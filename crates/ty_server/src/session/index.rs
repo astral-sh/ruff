@@ -124,11 +124,11 @@ impl Index {
             };
 
             if updated_cell.changes.is_empty() {
-                document.update_version(new_version);
+                document.update_version(updated_cell.document.version);
                 return Ok(());
             }
 
-            document.apply_changes(updated_cell.changes, new_version, encoding);
+            document.apply_changes(updated_cell.changes, updated_cell.document.version, encoding);
         }
 
         // Notebook cells URIs aren't removed from the index here, instead we'll wait for
@@ -150,21 +150,6 @@ impl Index {
         };
 
         Ok(document)
-    }
-
-    pub(crate) fn notebook_arc(
-        &self,
-        key: &DocumentKey,
-    ) -> Result<Arc<NotebookDocument>, DocumentError> {
-        let Some(document) = self.documents.get(key) else {
-            return Err(DocumentError::NotFound(key.clone()));
-        };
-
-        if let Document::Notebook(notebook) = document {
-            Ok(notebook.clone())
-        } else {
-            Err(DocumentError::NotFound(key.clone()))
-        }
     }
 
     pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {

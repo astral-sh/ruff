@@ -811,22 +811,10 @@ impl Session {
         Some(DidChangeWatchedFilesRegistrationOptions { watchers })
     }
 
-    pub(crate) fn document(&self, url: &Url) -> Result<&Document, DocumentError> {
-        self.index().document(&DocumentKey::from_url(url))
-    }
-
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn snapshot_document(&self, url: &Url) -> Result<DocumentSnapshot, DocumentError> {
         let index = self.index();
         let document_handle = index.document_handle(url)?;
-
-        let notebook = if let Some(notebook_path) = document_handle.notebook_path() {
-            index
-                .notebook_arc(&DocumentKey::from(notebook_path.clone()))
-                .ok()
-        } else {
-            None
-        };
 
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
@@ -838,7 +826,6 @@ impl Session {
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
-            notebook_document: notebook,
         })
     }
 
@@ -997,7 +984,6 @@ pub(crate) struct DocumentSnapshot {
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document: DocumentHandle,
-    notebook_document: Option<Arc<NotebookDocument>>,
 }
 
 impl DocumentSnapshot {
@@ -1024,10 +1010,6 @@ impl DocumentSnapshot {
     /// Returns the result of the document query for this snapshot.
     pub(crate) fn document(&self) -> &DocumentHandle {
         &self.document
-    }
-
-    pub(crate) fn notebook_document(&self) -> Option<&NotebookDocument> {
-        self.notebook_document.as_deref()
     }
 
     pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
@@ -1430,6 +1412,14 @@ impl DocumentHandle {
                 .try_virtual_file(virtual_path)
                 .map(|virtual_file| virtual_file.file()),
         }
+    }
+
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell { .. })
+    }
+
+    pub(crate) fn is_cell_or_notebook(&self) -> bool {
+        matches!(self, Self::Cell { .. } | Self::Notebook { .. })
     }
 
     pub(crate) fn update_text_document(

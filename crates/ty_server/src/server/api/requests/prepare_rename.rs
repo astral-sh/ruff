@@ -40,7 +40,10 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let offset = params.position.to_text_size(db, file, snapshot.encoding());
+        let offset =
+            params
+                .position
+                .to_text_size(db, file, snapshot.document().url(), snapshot.encoding());
 
         let Some(range) = can_rename(db, file, offset) else {
             return Ok(None);

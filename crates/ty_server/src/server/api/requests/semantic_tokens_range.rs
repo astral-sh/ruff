@@ -40,7 +40,15 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         };
 
         // Convert LSP range to text offsets
-        let requested_range = params.range.to_text_range(db, file, snapshot.encoding());
+        let requested_range =
+            params
+                .range
+                .to_text_range(db, file, snapshot.document().url(), snapshot.encoding());
+        tracing::debug!(
+            "requested_range: {:?}, original range: {:?}",
+            requested_range,
+            params.range
+        );
 
         let lsp_tokens = generate_semantic_tokens(
             db,

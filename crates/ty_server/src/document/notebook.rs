@@ -16,6 +16,8 @@ pub struct NotebookDocument {
     cells: Vec<NotebookCell>,
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
+    /// Map from Cell URL to their index in `cells`
+    cell_index: FxHashMap<lsp_types::Url, usize>,
 }
 
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
@@ -41,8 +43,14 @@ impl NotebookDocument {
         metadata: serde_json::Map<String, serde_json::Value>,
     ) -> crate::Result<Self> {
         let cells: Vec<_> = cells.into_iter().map(NotebookCell::new).collect();
+        let index = cells
+            .iter()
+            .enumerate()
+            .map(|(index, cell)| (cell.url.clone(), index))
+            .collect();
 
         Ok(Self {
+            cell_index: index,
             url,
             version: notebook_version,
             cells,
@@ -110,6 +118,11 @@ impl NotebookDocument {
 
         let start = array.start as usize;
         let delete = array.delete_count as usize;
+        let added = array
+            .cells
+            .as_ref()
+            .map(|cells| cells.len())
+            .unwrap_or_default();
 
         self.cells.drain(start..start + delete);
 
@@ -119,20 +132,20 @@ impl NotebookDocument {
         self.cells
             .extend(array.cells.into_iter().flatten().map(NotebookCell::new));
 
-        if !cells.is_empty() {
-            // Metadata updates should be relatively rare. That's why we don't store the index on
-            // the document itself (helps with memory usage). But what's important is that
-            // the update is O(n) and not O(n^2).
-            let index_by_uri: FxHashMap<_, _> = self
-                .cells
-                .iter()
-                .enumerate()
-                .map(|(i, cell)| (cell.url.to_string(), i))
-                .collect();
+        // Re-build the cell-index if new cells were added, deleted or removed
+        if start > 0 || delete > 0 || added > 0 {
+            self.cell_index.clear();
+            self.cell_index.extend(
+                self.cells
+                    .iter()
+                    .enumerate()
+                    .map(|(i, cell)| (cell.url.clone(), i)),
+            );
+        }
 
+        if !cells.is_empty() {
             for cell in cells {
-                if let Some(existing_cell_index) = index_by_uri.get(cell.document.as_str()).copied()
-                {
+                if let Some(existing_cell_index) = self.cell_index.get(&cell.document).copied() {
                     self.cells[existing_cell_index].kind = cell.kind;
                 }
             }
@@ -158,6 +171,10 @@ impl NotebookDocument {
     /// Returns a list of cell URIs in the order they appear in the array.
     pub(crate) fn cell_urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
         self.cells.iter().map(|cell| &cell.url)
+    }
+
+    pub(crate) fn cell_index_by_uri(&self, cell_url: &lsp_types::Url) -> Option<CellId> {
+        self.cell_index.get(cell_url).copied()
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::NotebookDocument;
 use crate::session::index::Document;
 use crate::system::LSPSystem;
 use ruff_db::Db as _;
@@ -8,6 +9,11 @@ use ty_python_semantic::Db as SemanticDb;
 #[salsa::db]
 pub(crate) trait Db: SemanticDb {
     fn document(&self, file: File) -> Option<&Document>;
+
+    fn notebook_document(&self, file: File) -> Option<&NotebookDocument> {
+        let document = self.document(file)?;
+        document.as_notebook()
+    }
 }
 
 #[salsa::db]

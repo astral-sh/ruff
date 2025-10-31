@@ -220,6 +220,7 @@ pub fn completion<'db>(
     }
 
     let typed = find_typed_text(db, file, &parsed, offset);
+
     let typed_query = typed
         .as_deref()
         .map(QueryPattern::new)

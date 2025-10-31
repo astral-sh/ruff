@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::PositionEncoding;
-use crate::document::ToRangeExt;
+use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -11,6 +11,7 @@ use crate::session::client::Client;
 use crate::session::index::Index;
 use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
 use crate::system::file_to_url;
+
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -22,6 +23,7 @@ use lsp_types::{
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -360,11 +362,16 @@ impl<'a> ResponseWriter<'a> {
     }
 
     fn write_diagnostics_for_file(&mut self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
-        // TODO: This needs to send one report for each notebook cell.
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
+
+        if source_text(db, file).is_notebook() {
+            // Notebooks only support publish diagnostics.
+            return;
+        }
+
         let key = DocumentKey::from_url(&url);
         let version = self
             .index
@@ -391,19 +398,7 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| {
-                        let range = diagnostic
-                            .primary_span()
-                            .and_then(|span| {
-                                Some(
-                                    span.range()?
-                                        .as_lsp_range(db, file, self.position_encoding)
-                                        .to_local_range(),
-                                )
-                            })
-                            .unwrap_or_default();
-                        to_lsp_diagnostic(db, diagnostic, range, self.position_encoding)
-                    })
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding).1)
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {

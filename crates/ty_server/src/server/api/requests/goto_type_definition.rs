@@ -43,6 +43,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
         let offset = params.text_document_position_params.position.to_text_size(
             db,
             file,
+            snapshot.document().url(),
             snapshot.encoding(),
         );
 
