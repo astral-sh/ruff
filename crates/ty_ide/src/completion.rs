@@ -854,23 +854,25 @@ fn is_in_string(tokens: &[Token]) -> bool {
 /// If the tokens end with `class` or `def`, we return false.
 /// This is fine because we don't provide completions anyway.
 fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
+    let is_definition_keyword = |token: &Token| {
+        if matches!(
+            token.kind(),
+            TokenKind::Def | TokenKind::Class | TokenKind::Type
+        ) {
+            true
+        } else if token.kind() == TokenKind::Name {
+            let source = source_text(db, file);
+            &source[token.range()] == "type"
+        } else {
+            false
+        }
+    };
+
     tokens
         .len()
         .checked_sub(2)
         .and_then(|i| tokens.get(i))
-        .is_some_and(|t| {
-            if matches!(
-                t.kind(),
-                TokenKind::Def | TokenKind::Class | TokenKind::Type
-            ) {
-                true
-            } else if t.kind() == TokenKind::Name {
-                let source = source_text(db, file);
-                &source[t.range()] == "type"
-            } else {
-                false
-            }
-        })
+        .is_some_and(is_definition_keyword)
 }
 
 /// Order completions according to the following rules:
@@ -4090,18 +4092,19 @@ def f<CURSOR>
     ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        assert!(builder.auto_import().build().completions().is_empty());
     }
 
     #[test]
-    fn no_completions_in_function_def_empty_name() {
+    fn completions_in_function_def_empty_name() {
         let builder = completion_test_builder(
             "\
 def <CURSOR>
         ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        // This is okay because the ide will not request completions when the cursor is in this position.
+        assert!(!builder.auto_import().build().completions().is_empty());
     }
 
     #[test]
@@ -4112,18 +4115,19 @@ class f<CURSOR>
     ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        assert!(builder.auto_import().build().completions().is_empty());
     }
 
     #[test]
-    fn no_completions_in_class_def_empty_name() {
+    fn completions_in_class_def_empty_name() {
         let builder = completion_test_builder(
             "\
 class <CURSOR>
         ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        // This is okay because the ide will not request completions when the cursor is in this position.
+        assert!(!builder.auto_import().build().completions().is_empty());
     }
 
     #[test]
@@ -4134,7 +4138,7 @@ type f<CURSOR> = int
     ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        assert!(builder.auto_import().build().completions().is_empty());
     }
 
     #[test]
@@ -4145,18 +4149,19 @@ type f<CURSOR>
        ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        assert!(builder.auto_import().build().completions().is_empty());
     }
 
     #[test]
-    fn no_completions_in_type_def_empty_name() {
+    fn completions_in_type_def_empty_name() {
         let builder = completion_test_builder(
             "\
 type <CURSOR>
         ",
         );
 
-        builder.auto_import().build().not_contains("fabs");
+        // This is okay because the ide will not request completions when the cursor is in this position.
+        assert!(!builder.auto_import().build().completions().is_empty());
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
