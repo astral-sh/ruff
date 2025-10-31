@@ -3631,10 +3631,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
         // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
-        // Per PEP 591, Final instance attributes can be assigned in __init__ methods.
-        //
-        // Known limitation (requires flow-sensitive analysis):
-        // - Allows multiple assignments within __init__ (e.g., self.x = 1; self.x = 2)
+        // Per PEP 591 and the typing conformance suite, Final instance attributes can be assigned
+        // in __init__ methods. Multiple assignments within __init__ are allowed (matching mypy
+        // and pyright behavior), as long as the attribute doesn't have a class-level value.
         let invalid_assignment_to_final = |builder: &Self, qualifiers: TypeQualifiers| -> bool {
             // Check if it's a Final attribute
             if !qualifiers.contains(TypeQualifiers::FINAL) {

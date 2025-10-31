@@ -429,9 +429,9 @@ reveal_type(ClassB().ID5)  # revealed: int
 
 ## Reassignment to Final in `__init__`
 
-Per PEP 591, there must be exactly one assignment to a Final attribute. This implementation detects
-reassignment to class-level assigned Finals, but has known limitations for detecting multiple
-assignments within `__init__` itself (requires flow-sensitive analysis).
+Per PEP 591 and the typing conformance suite, Final attributes can be assigned in `__init__`.
+Multiple assignments within `__init__` are allowed (matching mypy and pyright behavior). However,
+assignment in `__init__` is not allowed if the attribute already has a value at class level.
 
 ```py
 from typing import Final
@@ -456,14 +456,13 @@ class ReassignmentFromClass:
         self.attr3 = 20  # Error: already assigned in class body
 
 # Case 4: Multiple assignments within __init__ itself
-# Known limitation: Requires flow-sensitive analysis to detect
+# Per conformance suite and PEP 591, all assignments in __init__ are allowed
 class MultipleAssignmentsInInit:
     attr4: Final[int]
 
     def __init__(self):
-        self.attr4 = 1  # OK: First assignment
-        # TODO: Should ideally error - requires flow analysis
-        self.attr4 = 2  # Currently allowed
+        self.attr4 = 1  # OK: Assignment in __init__
+        self.attr4 = 2  # OK: Multiple assignments in __init__ are allowed
 
 # Case 5: Declaration and assignment in __init__ - ALLOWED
 class DeclareAndAssignInInit:
@@ -481,12 +480,9 @@ class AssignmentOutsideInit:
 
 ## Conditional assignments in `__init__`
 
-Per Alex's feedback, conditional assignments in different branches should ideally be allowed since
-only one will execute at runtime. However, this requires flow-sensitive analysis to detect mutually
-exclusive branches.
-
-This is a known limitation - the type checker currently sees both assignments and treats the second
-as a reassignment even though they're in mutually exclusive branches.
+Per the typing conformance suite and feedback from Carl, conditional assignments in different
+branches are allowed in `__init__`. Both mypy and pyright allow multiple assignments in `__init__`,
+and the conformance suite requires this behavior.
 
 ```py
 import sys
@@ -495,13 +491,11 @@ from typing import Final
 class ConditionalAssignment:
     X: Final[int]
 
-    def __init__(self):
-        if sys.version_info >= (3, 11):
-            self.X = 42
+    def __init__(self, cond: bool):
+        if cond:
+            self.X = 42  # OK: Assignment in __init__
         else:
-            # Currently allowed due to limitations in flow analysis
-            # TODO: Ideally should be OK since only one branch executes
-            self.X = 56
+            self.X = 56  # OK: Multiple conditional assignments in __init__ are allowed
 ```
 
 ## Full diagnostics
