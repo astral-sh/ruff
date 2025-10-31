@@ -509,20 +509,17 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let flipped_mapping = match type_mapping {
-            TypeMapping::Materialize(materialization_kind) => {
-                &TypeMapping::Materialize(materialization_kind.flip())
-            }
-            _ => type_mapping,
-        };
         Self {
             generic_context: self
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
-            parameters: self
-                .parameters
-                .apply_type_mapping_impl(db, flipped_mapping, tcx, visitor),
+            parameters: self.parameters.apply_type_mapping_impl(
+                db,
+                &type_mapping.flip(),
+                tcx,
+                visitor,
+            ),
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
