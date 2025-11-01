@@ -50,8 +50,6 @@ def _(l: list[int] | None = None):
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 
-# TODO: no error
-# error: [invalid-assignment] "Object of type `Literal[1] | list[Literal[1]]` is not assignable to `int | list[int]`"
 l5: int | list[int] = f(1, True)
 ```
 

@@ -258,7 +258,7 @@ impl<'db> GenericAlias<'db> {
     ) -> Self {
         let tcx = tcx
             .annotation
-            .and_then(|ty| ty.specialization_of(db, Some(self.origin(db))))
+            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
