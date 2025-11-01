@@ -3652,3 +3652,33 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     ");
     Ok(())
 }
+
+// Regression test for https://github.com/astral-sh/ruff/issues/20891
+#[test]
+fn required_import_skips_pyi025() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .arg("--isolated")
+            .arg("check")
+            .args(["--select", "F401,I002,PYI025"])
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports=["from collections.abc import Set"]"#)
+            .arg("-")
+            .arg("--unsafe-fixes")
+            .arg("--no-cache")
+            .pass_stdin("1"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    I002 [*] Missing required import: `from collections.abc import Set`
+    --> -:1:1
+    help: Insert required import: `from collections.abc import Set`
+
+    Found 1 error.
+    [*] 1 fixable with the --fix option.
+
+    ----- stderr -----
+    "
+    );
+}
