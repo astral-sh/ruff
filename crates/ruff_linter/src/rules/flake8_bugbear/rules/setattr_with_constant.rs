@@ -90,13 +90,11 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     }
 
-    // Ignore non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
+    // Mark fixes as unsafe for non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
     // attribute syntax (e.g., `obj.attr = value`) would normalize the name and potentially change
     // program behavior.
     let attr_name = name.to_str();
-    if attr_name.nfkc().collect::<String>() != attr_name {
-        return;
-    }
+    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name;
 
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
@@ -109,10 +107,16 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     {
         if expr == child.as_ref() {
             let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            let edit = Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
-            )));
+            );
+            let fix = if is_unsafe {
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            };
+            diagnostic.set_fix(fix);
         }
     }
 }

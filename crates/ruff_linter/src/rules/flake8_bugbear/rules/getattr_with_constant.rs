@@ -70,16 +70,14 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     }
 
-    // Ignore non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
+    // Mark fixes as unsafe for non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
     // attribute syntax (e.g., `obj.attr`) would normalize the name and potentially change
     // program behavior.
     let attr_name = value.to_str();
-    if attr_name.nfkc().collect::<String>() != attr_name {
-        return;
-    }
+    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name;
 
     let mut diagnostic = checker.report_diagnostic(GetAttrWithConstant, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    let edit = Edit::range_replacement(
         pad(
             if matches!(
                 obj,
@@ -97,5 +95,11 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
             checker.locator(),
         ),
         expr.range(),
-    )));
+    );
+    let fix = if is_unsafe {
+        Fix::unsafe_edit(edit)
+    } else {
+        Fix::safe_edit(edit)
+    };
+    diagnostic.set_fix(fix);
 }
