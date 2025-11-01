@@ -3,6 +3,7 @@ use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Stmt};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -63,6 +64,14 @@ struct LoadedNamesVisitor<'a> {
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        // Skip nested function definitions - they are handled separately by `SuspiciousVariablesVisitor`
+        if stmt.is_function_def_stmt() {
+            return;
+        }
+        visitor::walk_stmt(self, stmt);
+    }
+
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(name) => match &name.ctx {
@@ -70,15 +79,17 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
                 ExprContext::Store => self.stored.push(name),
                 _ => {}
             },
+            Expr::Lambda(ast::ExprLambda { parameters: _, .. }) => {}
             _ => visitor::walk_expr(self, expr),
         }
     }
 }
 
-#[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
     names: Vec<&'a ast::ExprName>,
     safe_functions: Vec<&'a Expr>,
+    pandas_imported: bool,
+    outer_parameters: Vec<&'a ast::Parameters>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in
@@ -89,7 +100,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters, body, ..
             }) => {
-                // Collect all loaded variable names.
+                // Collect all loaded variable names and lambda parameters.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
 
@@ -100,12 +111,26 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
+                        // Check if variable is bound in current function parameters
                         if parameters.includes(&loaded.id) {
                             return false;
                         }
 
+                        // Check if variable is bound in outer function parameters
+                        if self
+                            .outer_parameters
+                            .iter()
+                            .any(|params| params.includes(&loaded.id))
+                        {
+                            return false;
+                        }
                         true
                     }));
+
+                // Recursively visit nested functions with updated parameter stack
+                self.outer_parameters.push(parameters);
+                visitor::walk_body(self, body);
+                self.outer_parameters.pop();
 
                 return;
             }
@@ -153,6 +178,15 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                     }
                                 }
                             }
+                        } else if attr == "apply" {
+                            // If pandas is imported, apply is safe like map
+                            if self.pandas_imported {
+                                for arg in &*arguments.args {
+                                    if arg.is_lambda_expr() {
+                                        self.safe_functions.push(arg);
+                                    }
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -173,9 +207,15 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 node_index: _,
             }) => {
                 if !self.safe_functions.contains(&expr) {
-                    // Collect all loaded variable names.
+                    // Collect all loaded variable names from the lambda body.
                     let mut visitor = LoadedNamesVisitor::default();
                     visitor.visit_expr(body);
+
+                    // Collect lambda parameter names
+                    let lambda_param_names: Vec<&str> = parameters
+                        .as_ref()
+                        .map(|params| params.iter().map(|param| param.name().as_str()).collect())
+                        .unwrap_or_default();
 
                     // Treat any non-arguments as "suspicious".
                     self.names
@@ -184,10 +224,8 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 return false;
                             }
 
-                            if parameters
-                                .as_ref()
-                                .is_some_and(|parameters| parameters.includes(&loaded.id))
-                            {
+                            // Check if the variable is a lambda parameter
+                            if lambda_param_names.contains(&loaded.id.as_str()) {
                                 return false;
                             }
 
@@ -285,7 +323,12 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
-        let mut visitor = SuspiciousVariablesVisitor::default();
+        let mut visitor = SuspiciousVariablesVisitor {
+            names: Vec::new(),
+            safe_functions: Vec::new(),
+            pandas_imported: checker.semantic().seen_module(Modules::PANDAS),
+            outer_parameters: Vec::new(),
+        };
         match node {
             Node::Stmt(stmt) => visitor.visit_stmt(stmt),
             Node::Expr(expr) => visitor.visit_expr(expr),
