@@ -7,10 +7,10 @@
 ## About
 
 Typeshed contains external type annotations for the Python standard library
-and Python builtins, as well as third party packages as contributed by
+and Python builtins, as well as third-party packages that are contributed by
 people external to those projects.
 
-This data can e.g. be used for static analysis, type checking, type inference,
+This data can, e.g., be used for static analysis, type checking, type inference,
 and autocompletion.
 
 For information on how to use typeshed, read below.  Information for
@@ -29,8 +29,8 @@ If you're just using a type checker (e.g. [mypy](https://github.com/python/mypy/
 [pyright](https://github.com/microsoft/pyright), or PyCharm's built-in type
 checker), as opposed to
 developing it, you don't need to interact with the typeshed repo at
-all: a copy of standard library part of typeshed is bundled with type checkers.
-And type stubs for third party packages and modules you are using can
+all: a copy of the standard library part of typeshed is bundled with type checkers.
+And type stubs for third-party packages and modules you are using can
 be installed from PyPI. For example, if you are using `html5lib` and `requests`,
 you can install the type stubs using
 
@@ -70,7 +70,7 @@ package you're using, each with its own tradeoffs:
    type checking due to changes in the stubs.
 
    Another risk of this strategy is that stubs often lag behind
-   the package being stubbed. You might want to force the package being stubbed
+   the package that is being stubbed. You might want to force the package being stubbed
    to a certain minimum version because it fixes a critical bug, but if
    correspondingly updated stubs have not been released, your type
    checking results may not be fully accurate.
@@ -119,6 +119,6 @@ a review of your type annotations or stubs outside of typeshed, head over to
 [our discussion forum](https://github.com/python/typing/discussions).
 For less formal discussion, try the typing chat room on
 [gitter.im](https://gitter.im/python/typing).  Some typeshed maintainers
-are almost always present; feel free to find us there and we're happy
+are almost always present; feel free to find us there, and we're happy
 to chat.  Substantive technical discussion will be directed to the
 issue tracker.
