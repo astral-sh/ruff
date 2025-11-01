@@ -1,6 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
+use ruff_python_ast::{
+    self as ast,
+    visitor::{Visitor, walk_expr, walk_stmt},
+};
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -77,12 +80,8 @@ pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRai
 
 /// Returns true if we're inside a function that contains any `yield`/`yield from`.
 fn in_generator_context(checker: &Checker) -> bool {
-    for scope in checker.semantic().current_scopes() {
-        if let ruff_python_semantic::ScopeKind::Function(function_def) = scope.kind {
-            if contains_yield_statement(&function_def.body) {
-                return true;
-            }
-        }
+    if let ScopeKind::Function(function_def) = checker.semantic().current_scope().kind {
+        return contains_yield_statement(&function_def.body);
     }
     false
 }
@@ -94,6 +93,13 @@ fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
     }
 
     impl Visitor<'_> for YieldFinder {
+        fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+            match stmt {
+                ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) => {}
+                _ => walk_stmt(self, stmt),
+            }
+        }
+
         fn visit_expr(&mut self, expr: &ast::Expr) {
             if matches!(expr, ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
                 self.found = true;
@@ -105,7 +111,7 @@ fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
 
     let mut finder = YieldFinder { found: false };
     for stmt in body {
-        walk_stmt(&mut finder, stmt);
+        finder.visit_stmt(stmt);
         if finder.found {
             return true;
         }
