@@ -1006,7 +1006,7 @@ impl<Context> std::fmt::Debug for Align<'_, Context> {
 /// Block indents indent a block of code, such as in a function body, and therefore insert a line
 /// break before and after the content.
 ///
-/// Doesn't create an indentation if the passed in content is [`FormatElement.is_empty`].
+/// Doesn't create an indentation if the passed in content is empty.
 ///
 /// # Examples
 ///
