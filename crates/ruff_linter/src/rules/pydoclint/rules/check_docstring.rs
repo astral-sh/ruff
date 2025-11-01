@@ -4,6 +4,7 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
+use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -18,6 +19,71 @@ use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
+
+/// ## What it does
+/// Checks for function docstrings that do not include documentation for all
+/// parameters.
+///
+/// ## Why is this bad?
+/// If a function accepts a parameter without documenting it in its docstring,
+/// it can be misleading to users and/or a sign of incomplete documentation or
+/// refactors.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent travelling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.14.3")]
+pub(crate) struct DocstringMissingParameter {
+    ids: Vec<String>,
+}
+
+impl Violation for DocstringMissingParameter {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocstringMissingParameter { ids } = self;
+
+        if let [id] = ids.as_slice() {
+            format!("Parameter `{id}` missing from the docstring")
+        } else {
+            format!(
+                "These parameters are missing from the docstring: {}",
+                ids.iter().map(|id| format!("`{id}`")).join(", ")
+            )
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringMissingParameter { ids } = self;
+        let s = if ids.len() == 1 { "" } else { "s" };
+        Some(format!("Add the missing parameter{s} to the docstring"))
+    }
+}
 
 /// ## What it does
 /// Checks for function docstrings that include parameters which are not
@@ -1195,6 +1261,45 @@ pub(crate) fn check_docstring(
     };
 
     let signature_parameters = parameters_from_signature(docstring);
+
+    // DOC101
+    if checker.is_rule_enabled(Rule::DocstringMissingParameter) {
+        let mut missing_parameters = Vec::new();
+
+        // Here we check if the function is a method (and not a staticmethod)
+        // in which case we skip the first argument which should be `self` or
+        // `cls`, and does not need to be documented.
+        for signature_param in signature_parameters.iter().skip(usize::from(
+            docstring.definition.is_method()
+                && !is_staticmethod(&function_def.decorator_list, semantic),
+        )) {
+            if !docstring_sections
+                .parameters
+                .as_ref()
+                .is_some_and(|section| {
+                    section
+                        .parameters
+                        .iter()
+                        .any(|param| &param.name == signature_param)
+                })
+            {
+                missing_parameters.push((*signature_param).to_string());
+            }
+        }
+        if !missing_parameters.is_empty() {
+            let range = if let Some(ref docstring_params) = docstring_sections.parameters {
+                docstring_params.range()
+            } else {
+                docstring.range()
+            };
+            checker.report_diagnostic(
+                DocstringMissingParameter {
+                    ids: missing_parameters,
+                },
+                range,
+            );
+        }
+    }
 
     // DOC201
     if checker.is_rule_enabled(Rule::DocstringMissingReturns) {

@@ -991,6 +991,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (FastApi, "003") => rules::fastapi::rules::FastApiUnusedPathParameter,
 
         // pydoclint
+        (Pydoclint, "101") => rules::pydoclint::rules::DocstringMissingParameter,
         (Pydoclint, "102") => rules::pydoclint::rules::DocstringExtraneousParameter,
         (Pydoclint, "201") => rules::pydoclint::rules::DocstringMissingReturns,
         (Pydoclint, "202") => rules::pydoclint::rules::DocstringExtraneousReturns,
