@@ -43,9 +43,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
             }
-            if checker.is_rule_enabled(Rule::NonlocalWithoutBinding) {
-                pylint::rules::nonlocal_without_binding(checker, nonlocal);
-            }
             if checker.is_rule_enabled(Rule::NonlocalAndGlobal) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
             }
