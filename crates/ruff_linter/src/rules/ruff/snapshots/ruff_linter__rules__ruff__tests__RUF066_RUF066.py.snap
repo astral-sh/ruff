@@ -1,0 +1,178 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF066 `Annotated[]` type must not be nested within another type
+ --> RUF066.py:4:4
+  |
+3 | # Errors
+4 | a: Union[Annotated[int, "An integer"], None] = 5
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
+6 | c: Optional[Annotated[float, "A float"]] = 2.71
+  |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+ --> RUF066.py:5:4
+  |
+3 | # Errors
+4 | a: Union[Annotated[int, "An integer"], None] = 5
+5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | c: Optional[Annotated[float, "A float"]] = 2.71
+7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
+  |
+
+RUF066 `Annotated[]` type must not be nested within another type
+ --> RUF066.py:6:4
+  |
+4 | a: Union[Annotated[int, "An integer"], None] = 5
+5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
+6 | c: Optional[Annotated[float, "A float"]] = 2.71
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
+  |
+
+RUF066 `Annotated[]` type must not be nested within another type
+ --> RUF066.py:7:4
+  |
+5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
+6 | c: Optional[Annotated[float, "A float"]] = 2.71
+7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | def f1(x: Union[Annotated[int, "An integer"], None]) -> None:
+  |
+
+RUF066 `Annotated[]` type must not be nested within another type
+ --> RUF066.py:7:4
+  |
+5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
+6 | c: Optional[Annotated[float, "A float"]] = 2.71
+7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | def f1(x: Union[Annotated[int, "An integer"], None]) -> None:
+  |
+
+RUF066 `Annotated[]` type must not be nested within another type
+  --> RUF066.py:9:11
+   |
+ 7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
+ 8 |
+ 9 | def f1(x: Union[Annotated[int, "An integer"], None]) -> None:
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |     pass
+   |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+  --> RUF066.py:12:11
+   |
+10 |     pass
+11 |
+12 | def f2(y: Annotated[Union[int, str], "An integer or string"] | None) -> None:
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |     pass
+   |
+
+RUF066 `Annotated[]` type must not be nested within another type
+  --> RUF066.py:15:11
+   |
+13 |     pass
+14 |
+15 | def f3(z: Optional[Annotated[float, "A float"]]) -> None:
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     pass
+   |
+
+RUF066 `Annotated[]` type must not be nested within another type
+  --> RUF066.py:18:4
+   |
+16 |     pass
+17 |
+18 | e: Annotated[Annotated[int, "An integer"], "Another annotation"]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 |
+20 | l: TypeAlias = Annotated[int, "An integer"] | None
+   |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+  --> RUF066.py:20:16
+   |
+18 | e: Annotated[Annotated[int, "An integer"], "Another annotation"]
+19 |
+20 | l: TypeAlias = Annotated[int, "An integer"] | None
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 | m: TypeAlias = Union[Annotated[int, "An integer"], str]
+22 | n: TypeAlias = Optional[Annotated[float, "A float"]]
+   |
+
+RUF066 `Annotated[]` type must not be nested within another type
+  --> RUF066.py:21:16
+   |
+20 | l: TypeAlias = Annotated[int, "An integer"] | None
+21 | m: TypeAlias = Union[Annotated[int, "An integer"], str]
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 | n: TypeAlias = Optional[Annotated[float, "A float"]]
+23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
+   |
+
+RUF066 `Annotated[]` type must not be nested within another type
+  --> RUF066.py:22:16
+   |
+20 | l: TypeAlias = Annotated[int, "An integer"] | None
+21 | m: TypeAlias = Union[Annotated[int, "An integer"], str]
+22 | n: TypeAlias = Optional[Annotated[float, "A float"]]
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
+   |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+  --> RUF066.py:23:17
+   |
+21 | m: TypeAlias = Union[Annotated[int, "An integer"], str]
+22 | n: TypeAlias = Optional[Annotated[float, "A float"]]
+23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 |
+25 | p: None | Annotated[int, "An integer"]
+   |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+  --> RUF066.py:25:4
+   |
+23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
+24 |
+25 | p: None | Annotated[int, "An integer"]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 |
+27 | q = Annotated[int | str, "An integer or string"] | None
+   |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+  --> RUF066.py:27:5
+   |
+25 | p: None | Annotated[int, "An integer"]
+26 |
+27 | q = Annotated[int | str, "An integer or string"] | None
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | r = Optional[Annotated[float | None, "A float or None"]]
+   |
+
+RUF066 `Annotated[]` type must not be nested within another type
+  --> RUF066.py:28:5
+   |
+27 | q = Annotated[int | str, "An integer or string"] | None
+28 | r = Optional[Annotated[float | None, "A float or None"]]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 |
+30 | @some_decorator()
+   |
+
+RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+  --> RUF066.py:31:13
+   |
+30 | @some_decorator()
+31 | def func(x: Annotated[str, "A string"] | None) -> None:
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 |     pass
+   |
