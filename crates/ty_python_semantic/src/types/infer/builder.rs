@@ -4778,12 +4778,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         match self.infer_type_expression(&arguments.args[1]) {
             Type::NominalInstance(_) | Type::NewTypeInstance(_) => {}
-            _ => {
+            other_type => {
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
                 {
                     let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
+                    diag.set_primary_message(format!("type `{}`", other_type.display(self.db())));
                     diag.info("The base of a `NewType` must be a class type or another `NewType`.");
                 }
             }
