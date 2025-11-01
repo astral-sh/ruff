@@ -131,9 +131,7 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
-                        ValueSource::PythonVSCodeExtension => {
-                            PythonVersionSource::PythonVSCodeExtension
-                        }
+                        ValueSource::Editor => PythonVersionSource::Editor,
                     },
                 });
 
@@ -153,7 +151,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
-                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
+                ValueSource::Editor => SysPrefixPathOrigin::Editor,
             };
 
             Some(PythonEnvironment::new(
@@ -819,8 +817,8 @@ impl Rules {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
 
-                        ValueSource::PythonVSCodeExtension => {
-                            unreachable!("Can't configure rules from the Python VSCode extension")
+                        ValueSource::Editor => {
+                            unreachable!("Can't configure rules from the user's editor")
                         }
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
@@ -957,7 +955,7 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
+                        ValueSource::Editor => unreachable!("Can't configure includes from the user's editor"),
                     }
                 })?;
         }
@@ -1040,8 +1038,8 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!(
-                            "Can't configure excludes from the Python VSCode extension"
+                        ValueSource::Editor => unreachable!(
+                            "Can't configure excludes from the user's editor"
                         )
                     }
                 })?;

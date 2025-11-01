@@ -28,8 +28,8 @@ pub enum ValueSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from an LSP client configuration.
-    PythonVSCodeExtension,
+    /// The value comes from an user's editor settings.
+    Editor,
 }
 
 impl ValueSource {
@@ -37,7 +37,7 @@ impl ValueSource {
         match self {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
-            ValueSource::PythonVSCodeExtension => None,
+            ValueSource::Editor => None,
         }
     }
 
@@ -137,11 +137,7 @@ impl<T> RangedValue<T> {
     }
 
     pub fn python_extension(value: T) -> Self {
-        Self::with_range(
-            value,
-            ValueSource::PythonVSCodeExtension,
-            TextRange::default(),
-        )
+        Self::with_range(value, ValueSource::Editor, TextRange::default())
     }
 
     pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
@@ -368,7 +364,7 @@ impl RelativePathBuf {
     }
 
     pub fn python_extension(path: impl AsRef<SystemPath>) -> Self {
-        Self::new(path, ValueSource::PythonVSCodeExtension)
+        Self::new(path, ValueSource::Editor)
     }
 
     /// Returns the relative path as specified by the user.
@@ -398,7 +394,7 @@ impl RelativePathBuf {
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
         SystemPath::absolute(&self.0, relative_to)
@@ -454,7 +450,7 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;
