@@ -1,7 +1,7 @@
 import MonacoEditor from "@monaco-editor/react";
 import { AstralButton, Theme } from "shared";
 import { ReadonlyFiles } from "../Playground";
-import { Suspense, use, useState } from "react";
+import { Suspense, use, useMemo, useState } from "react";
 import { loadPyodide, PyodideInterface } from "pyodide";
 import classNames from "classnames";
 
@@ -103,12 +103,8 @@ function Content({
   }
 }
 
-let pyodidePromise: Promise<PyodideInterface> | null = null;
-
 function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
-  if (pyodidePromise == null) {
-    pyodidePromise = loadPyodide();
-  }
+  const pyodidePromise = useMemo(() => loadPyodide(), []);
 
   return (
     <Suspense
@@ -151,7 +147,12 @@ function RunWithPyiodide({
 
       let fileName = "main.py";
       for (const file of files.index) {
-        pyodide.FS.writeFile(file.name, files.contents[file.id]);
+        let last_separator = file.name.lastIndexOf("/");
+        if (last_separator !== -1) {
+          const directory = "/home/pyodide/" + file.name.slice(0, last_separator);
+          pyodide.FS.mkdirTree(directory);
+        }
+        pyodide.FS.writeFile("/home/pyodide/" + file.name, files.contents[file.id]);
 
         if (file.id === files.selected) {
           fileName = file.name;
@@ -162,7 +163,7 @@ function RunWithPyiodide({
       const globals = dict();
 
       try {
-        // Patch up reveal types
+        // Patch reveal_type to print runtime values
         pyodide.runPython(`
         import builtins
 
