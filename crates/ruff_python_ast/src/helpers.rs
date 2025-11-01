@@ -1357,7 +1357,9 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::ListComp(_) => true,
             Expr::SetComp(_) => true,
             Expr::DictComp(_) => true,
-            Expr::Compare(_) => true,
+            // Compare can return any value, even empty string
+            // https://docs.python.org/3/reference/datamodel.html#object.__ge__
+            Expr::Compare(_) => false,
             Expr::NumberLiteral(_) => true,
             Expr::BooleanLiteral(_) => true,
             Expr::NoneLiteral(_) => true,
@@ -1399,12 +1401,16 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
     expr.value.iter().any(|part| match part {
         ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
-            f_string.elements.iter().all(|element| match element {
-                InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => {
-                    f_string.debug_text.is_some() || inner(&f_string.expression)
-                }
-            })
+            !f_string.elements.is_empty()
+                && f_string.elements.iter().all(|element| match element {
+                    InterpolatedStringElement::Literal(string_literal) => {
+                        !string_literal.is_empty()
+                    }
+                    InterpolatedStringElement::Interpolation(f_string) => {
+                        f_string.format_spec.is_none()
+                            && (f_string.debug_text.is_some() || inner(&f_string.expression))
+                    }
+                })
         }
     })
 }
