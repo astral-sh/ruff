@@ -1,5 +1,7 @@
 use insta::assert_json_snapshot;
-use lsp_types::{NotebookCellKind, Position, Range};
+use lsp_types::{CompletionResponse, CompletionTriggerKind, NotebookCellKind, Position, Range};
+use ruff_db::system::SystemPath;
+use ty_server::ClientOptions;
 
 use crate::{TestServer, TestServerBuilder};
 
@@ -276,6 +278,142 @@ fn swap_cells() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn auto_import() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions::default().with_experimental_auto_import(true)),
+        )?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    builder.add_python_cell(
+        r#"from typing import TYPE_CHECKING
+"#,
+    );
+
+    let second_cell = builder.add_python_cell(
+        r#"# leading comment
+b: Litera
+"#,
+    );
+
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostics(2)?;
+
+    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
+
+    assert_json_snapshot!(completions);
+
+    Ok(())
+}
+
+#[test]
+fn auto_import_same_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions::default().with_experimental_auto_import(true)),
+        )?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    let first_cell = builder.add_python_cell(
+        r#"from typing import TYPE_CHECKING
+b: Litera
+"#,
+    );
+
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostics(1)?;
+
+    let completions = literal_completions(&mut server, &first_cell, Position::new(1, 9))?;
+
+    assert_json_snapshot!(completions);
+
+    Ok(())
+}
+
+#[test]
+fn auto_import_from_future() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions::default().with_experimental_auto_import(true)),
+        )?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    builder.add_python_cell(r#"from typing import TYPE_CHECKING"#);
+
+    let second_cell = builder.add_python_cell(
+        r#"from __future__ import annotations
+b: Litera
+"#,
+    );
+
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostics(2)?;
+
+    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
+
+    assert_json_snapshot!(completions);
+
+    Ok(())
+}
+
+#[test]
+fn auto_import_docstring() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions::default().with_experimental_auto_import(true)),
+        )?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    builder.add_python_cell(
+        r#"from typing import TYPE_CHECKING
+"#,
+    );
+
+    let second_cell = builder.add_python_cell(
+        r#""""A cell level docstring"""
+b: Litera
+"#,
+    );
+
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostics(2)?;
+
+    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
+
+    assert_json_snapshot!(completions);
+
+    Ok(())
+}
+
 fn semantic_tokens_full_for_cell(
     server: &mut TestServer,
     cell_uri: &lsp_types::Url,
@@ -358,4 +496,38 @@ impl NotebookBuilder {
 
         self.notebook_url
     }
+}
+
+fn literal_completions(
+    server: &mut TestServer,
+    cell: &lsp_types::Url,
+    position: Position,
+) -> crate::Result<Vec<lsp_types::CompletionItem>> {
+    let completions_id =
+        server.send_request::<lsp_types::request::Completion>(lsp_types::CompletionParams {
+            text_document_position: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier { uri: cell.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+            context: Some(lsp_types::CompletionContext {
+                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
+                trigger_character: None,
+            }),
+        });
+
+    // There are a ton of imports we don't care about in here...
+    // The import bit is that an edit is always restricted to the current cell. That means,
+    // we can't add `Literal` to the `from typing import TYPE_CHECKING` import in cell 1
+    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id)?;
+    let mut items = match completions {
+        Some(CompletionResponse::Array(array)) => array,
+        Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
+        None => return Ok(vec![]),
+    };
+
+    items.retain(|item| item.label.starts_with("Litera"));
+
+    Ok(items)
 }
