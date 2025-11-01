@@ -95,6 +95,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return `true` if `self` is a nominal instance of the given known class.
+    pub(crate) fn is_instance_of(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+        match self {
+            Type::NominalInstance(instance) => instance.class(db).is_known(db, known_class),
+            _ => false,
+        }
+    }
+
     /// Synthesize a protocol instance type with a given set of read-only property members.
     pub(super) fn protocol_with_readonly_members<'a, M>(db: &'db dyn Db, members: M) -> Self
     where

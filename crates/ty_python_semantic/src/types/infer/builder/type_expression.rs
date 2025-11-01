@@ -811,6 +811,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(slice);
                     todo_type!("Generic manual PEP-695 type alias")
                 }
+                KnownInstanceType::UnionType(_) => {
+                    self.infer_type_expression(slice);
+                    todo_type!("Generic specialization of types.UnionType")
+                }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
                 self.infer_type_expression(slice);

@@ -170,7 +170,8 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
-                | KnownInstanceType::ConstraintSet(_) => None,
+                | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::UnionType(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {
