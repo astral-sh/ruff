@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use crate::document::DocumentKey;
+use crate::document::{DocumentKey, LanguageId};
 use crate::session::index::{Document, Index};
 use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
@@ -118,6 +118,24 @@ impl LSPSystem {
         index.document(&DocumentKey::from(path)).ok()
     }
 
+    fn source_type_from_document(
+        &self,
+        document: &Document,
+        extension: Option<&str>,
+    ) -> Option<PySourceType> {
+        match document {
+            Document::Text(text) => match text.language_id()? {
+                LanguageId::Python => Some(
+                    extension
+                        .and_then(|extension| PySourceType::try_from_extension(extension))
+                        .unwrap_or(PySourceType::Python),
+                ),
+                LanguageId::Other => None,
+            },
+            Document::Notebook(_) => Some(PySourceType::Ipynb),
+        }
+    }
+
     pub(crate) fn system_path_to_document(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
         self.document(any_path)
@@ -155,17 +173,14 @@ impl System for LSPSystem {
         self.native_system.path_exists_case_sensitive(path, prefix)
     }
 
-    fn source_type(&self, path: &FilePath) -> Option<PySourceType> {
-        let document = match path {
-            FilePath::System(path) => self.system_path_to_document(path),
-            FilePath::SystemVirtual(path) => self.system_virtual_path_to_document(path),
-            FilePath::Vendored(_) => None,
-        }?;
+    fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
+        let document = self.system_path_to_document(path)?;
+        self.source_type_from_document(&document, path.extension())
+    }
 
-        Some(match document {
-            Document::Text(_) => PySourceType::try_from_extension(path.extension()?)?,
-            Document::Notebook(_) => PySourceType::Ipynb,
-        })
+    fn virtual_path_source_type(&self, path: &SystemVirtualPath) -> Option<PySourceType> {
+        let document = self.system_virtual_path_to_document(path)?;
+        self.source_type_from_document(&document, path.extension())
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {

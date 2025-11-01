@@ -12,8 +12,8 @@ use crate::system::AnySystemPath;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
 use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
-pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
+pub(crate) use text_document::{DocumentVersion, LanguageId};
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.

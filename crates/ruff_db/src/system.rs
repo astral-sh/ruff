@@ -22,7 +22,6 @@ pub use self::path::{
     SystemVirtualPathBuf, deduplicate_nested_paths,
 };
 use crate::file_revision::FileRevision;
-use crate::files::FilePath;
 
 mod memory_fs;
 #[cfg(feature = "os")]
@@ -67,7 +66,11 @@ pub trait System: Debug + Sync + Send {
     /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
-    fn source_type(&self, _path: &FilePath) -> Option<PySourceType> {
+    fn source_type(&self, _path: &SystemPath) -> Option<PySourceType> {
+        None
+    }
+
+    fn virtual_path_source_type(&self, _path: &SystemVirtualPath) -> Option<PySourceType> {
         None
     }
 
