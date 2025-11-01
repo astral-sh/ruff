@@ -35,18 +35,18 @@ reveal_type(filtered)                                # Test 10: QuerySet chainin
 
 ## Results Comparison
 
-| Test | Mypy + django-stubs | Pyright + django-types | ty (Current) |
-|------|---------------------|------------------------|--------------|
+| Test | Mypy + django-stubs | Pyright + django-types | ty + django-stubs |
+|------|---------------------|------------------------|-------------------|
 | **1. Model class type** | `def (*args: Any, **kwargs: Any) -> User` | `type[User]` | `<class 'User'>` ✅ |
-| **2. Manager type** | `Manager[User]` | `BaseManager[User]` | Import error |
-| **3. QuerySet type** | `QuerySet[User, User]` | `BaseManager[User]` | Import error |
-| **4. Model instance** | `User` | `User` | Import error |
-| **5. CharField access** | `str` ✅ | `str` ✅ | Import error |
-| **6. EmailField access** | `str` ✅ | `str` ✅ | Import error |
-| **7. IntegerField access** | `int` ✅ | `int` ✅ | Import error |
-| **8. Invalid attribute** | Error: "User" has no attribute | Error: Cannot access attribute | Import error |
-| **9. Invalid method** | Error: "Manager[User]" has no attribute | Error: Cannot access attribute | Import error |
-| **10. QuerySet chaining** | `QuerySet[User, User]` | `BaseManager[User]` | Import error |
+| **2. Manager type** | `Manager[User]` | `BaseManager[User]` | `Unknown \| Manager[User]` ⚠️ |
+| **3. QuerySet type** | `QuerySet[User, User]` | `BaseManager[User]` | `Unknown \| QuerySet[User, User]` ✅ |
+| **4. Model instance** | `User` | `User` | `Unknown \| User` ⚠️ |
+| **5. CharField access** | `str` ✅ | `str` ✅ | `Unknown` ❌ |
+| **6. EmailField access** | `str` ✅ | `str` ✅ | `Unknown` ❌ |
+| **7. IntegerField access** | `int` ✅ | `int` ✅ | `Unknown` ❌ |
+| **8. Invalid attribute** | Error: "User" has no attribute | Error: Cannot access attribute | Warning: may be missing ⚠️ |
+| **9. Invalid method** | Error: "Manager[User]" has no attribute | Error: Cannot access attribute | Warning: may be missing ⚠️ |
+| **10. QuerySet chaining** | `QuerySet[User, User]` | `BaseManager[User]` | `Unknown \| QuerySet[User, User]` ✅ |
 
 ## Key Findings
 
@@ -86,42 +86,80 @@ pip install django-types
 
 **Verdict:** Good Django support with simpler type model (BaseManager instead of QuerySet)
 
-### ty (Current State)
+### ty + django-stubs (Real Stubs)
 
-**Current Behavior:**
-- ❌ Cannot resolve Django imports without stubs
-- ✅ Basic Model class detection works with stubs
-- ❌ No `.objects` auto-synthesis
-- ❌ No field type inference
-- ❌ No QuerySet/Manager generic support
+**Setup:**
+```bash
+# Option 1: Use uv to create a venv
+uv venv
+uv pip install django django-stubs
 
-**With Our Test Stubs:**
-- ✅ Model class type detection
-- ✅ Basic methods (save, delete) accessible
-- ⏳ Generic support requires manual annotations
-- ⏳ Field access not type-safe (returns Any)
+# Option 2: Use uvx (temporary environment)
+uvx --with django-stubs --with django python -c "import django"
+```
+
+**Configuration (`ty.toml`):**
+```toml
+[environment]
+python = ".venv/bin/python"  # Point to your venv
+```
+
+**Strengths:**
+- ✅ Can read and use real django-stubs from Python environment
+- ✅ Correctly infers `QuerySet[User, User]` (matches mypy!)
+- ✅ Generic Manager/QuerySet types work
+- ✅ Method chaining preserves type information
+- ✅ Warns on possibly-missing attributes (not hard errors)
+
+**Weaknesses:**
+- ⚠️ Returns `Unknown | T` unions instead of just `T`
+  - This suggests ty is uncertain about some type paths
+  - Results in less precise types than mypy/pyright
+- ❌ Field access returns `Unknown` instead of `str`/`int`
+  - This is the biggest gap vs mypy/pyright
+  - Likely needs descriptor protocol implementation
+- ⚠️ Warnings instead of errors for invalid attributes
+  - Less strict than mypy/pyright
 
 ## Implementation Gap Analysis
 
-To match mypy + django-stubs, ty needs:
+### What Works Today (with django-stubs)
+✅ ty can read and use django-stubs from Python environment
+✅ Generic `Manager[T]` and `QuerySet[T, T]` types are recognized
+✅ Method chaining works correctly
+✅ QuerySet types match mypy exactly
 
-### Phase 2 (Critical):
-1. **Auto-synthesize `.objects` manager** on Model classes
-   - Both mypy and pyright require manual `objects = Manager["User"]()` annotation
-   - **ty could do better** by auto-synthesizing this!
-2. **Auto-synthesize exception classes** (`.DoesNotExist`, `.MultipleObjectsReturned`)
-3. **Auto-add `id` field** when not explicitly defined
+### Critical Gaps to Fix
 
-### Phase 3 (Field Descriptors):
-4. **Implement descriptor protocol** for Django Fields
-   - `CharField` should make attribute access return `str`
-   - `IntegerField` → `int`, `BooleanField` → `bool`, etc.
-   - This is what makes `user.name` return `str` instead of `Any`
+**1. Unknown Unions (Highest Priority)**
+- ty returns `Unknown | Manager[User]` instead of `Manager[User]`
+- ty returns `Unknown | User` instead of `User`
+- **Impact**: Less precise types, harder to catch errors
+- **Root cause**: ty is uncertain about some type resolution paths
+- **Fix needed**: Improve type narrowing/resolution logic
 
-### Phase 4 (Advanced):
-5. **Generic Manager/QuerySet support**
-   - `Manager[User]` and `QuerySet[User]` types
-   - Method chaining type preservation
+**2. Field Descriptor Protocol (High Priority)**
+- Field access returns `Unknown` instead of actual types
+- `user.name` should return `str`, not `Unknown`
+- `user.age` should return `int`, not `Unknown`
+- **Impact**: Major usability gap vs mypy/pyright
+- **Fix needed**: Implement descriptor protocol support
+  - Recognize `Field[T]` pattern
+  - Return `T` when accessing field on model instance
+
+**3. Stricter Error Reporting (Medium Priority)**
+- Invalid attributes show warnings instead of errors
+- Less strict than mypy/pyright
+- **Impact**: May miss some bugs
+- **Fix needed**: Make `possibly-missing-attribute` more strict for known types
+
+### Future Enhancements (Lower Priority)
+
+**Auto-synthesis (ty competitive advantage)**
+- Auto-synthesize `.objects` manager (better than mypy!)
+- Auto-synthesize `.DoesNotExist` exception
+- Auto-add `id` field
+- **Impact**: Better UX than mypy/pyright (no manual annotations needed)
 
 ## Competitive Advantage Opportunity
 

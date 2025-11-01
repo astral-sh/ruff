@@ -1,0 +1,264 @@
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:26:1
+   |
+25 | # Test 1: Model class type
+26 | reveal_type(User)
+   | ^^^^^^^^^^^
+27 |
+28 | # Test 2: .objects manager
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:26:13
+   |
+25 | # Test 1: Model class type
+26 | reveal_type(User)
+   |             ^^^^ `<class 'User'>`
+27 |
+28 | # Test 2: .objects manager
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:29:1
+   |
+28 | # Test 2: .objects manager
+29 | reveal_type(User.objects)
+   | ^^^^^^^^^^^
+30 |
+31 | # Test 3: Manager methods return QuerySet
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:29:13
+   |
+28 | # Test 2: .objects manager
+29 | reveal_type(User.objects)
+   |             ^^^^^^^^^^^^ `Unknown | Manager[User]`
+30 |
+31 | # Test 3: Manager methods return QuerySet
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:33:1
+   |
+31 | # Test 3: Manager methods return QuerySet
+32 | all_users = User.objects.all()
+33 | reveal_type(all_users)
+   | ^^^^^^^^^^^
+34 |
+35 | # Test 4: QuerySet.get() returns model instance
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:33:13
+   |
+31 | # Test 3: Manager methods return QuerySet
+32 | all_users = User.objects.all()
+33 | reveal_type(all_users)
+   |             ^^^^^^^^^ `Unknown | QuerySet[User]`
+34 |
+35 | # Test 4: QuerySet.get() returns model instance
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:37:1
+   |
+35 | # Test 4: QuerySet.get() returns model instance
+36 | user = User.objects.get(id=1)
+37 | reveal_type(user)
+   | ^^^^^^^^^^^
+38 |
+39 | # Test 5: Field access on instance
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:37:13
+   |
+35 | # Test 4: QuerySet.get() returns model instance
+36 | user = User.objects.get(id=1)
+37 | reveal_type(user)
+   |             ^^^^ `Unknown | User`
+38 |
+39 | # Test 5: Field access on instance
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:40:1
+   |
+39 | # Test 5: Field access on instance
+40 | reveal_type(user.name)
+   | ^^^^^^^^^^^
+41 | reveal_type(user.email)
+42 | reveal_type(user.age)
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:40:13
+   |
+39 | # Test 5: Field access on instance
+40 | reveal_type(user.name)
+   |             ^^^^^^^^^ `Unknown | CharField`
+41 | reveal_type(user.email)
+42 | reveal_type(user.age)
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:41:1
+   |
+39 | # Test 5: Field access on instance
+40 | reveal_type(user.name)
+41 | reveal_type(user.email)
+   | ^^^^^^^^^^^
+42 | reveal_type(user.age)
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:41:13
+   |
+39 | # Test 5: Field access on instance
+40 | reveal_type(user.name)
+41 | reveal_type(user.email)
+   |             ^^^^^^^^^^ `Unknown | EmailField`
+42 | reveal_type(user.age)
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:42:1
+   |
+40 | reveal_type(user.name)
+41 | reveal_type(user.email)
+42 | reveal_type(user.age)
+   | ^^^^^^^^^^^
+43 |
+44 | # Test 6: Invalid field access
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:42:13
+   |
+40 | reveal_type(user.name)
+41 | reveal_type(user.email)
+42 | reveal_type(user.age)
+   |             ^^^^^^^^ `Unknown | IntegerField`
+43 |
+44 | # Test 6: Invalid field access
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:45:1
+   |
+44 | # Test 6: Invalid field access
+45 | reveal_type(user.nonexistent)  # Should error
+   | ^^^^^^^^^^^
+46 |
+47 | # Test 7: ForeignKey access
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+warning[possibly-missing-attribute]: Attribute `nonexistent` may be missing on object of type `Unknown | User`
+  --> django_comparison_test.py:45:13
+   |
+44 | # Test 6: Invalid field access
+45 | reveal_type(user.nonexistent)  # Should error
+   |             ^^^^^^^^^^^^^^^^
+46 |
+47 | # Test 7: ForeignKey access
+   |
+info: rule `possibly-missing-attribute` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:45:13
+   |
+44 | # Test 6: Invalid field access
+45 | reveal_type(user.nonexistent)  # Should error
+   |             ^^^^^^^^^^^^^^^^ `Unknown`
+46 |
+47 | # Test 7: ForeignKey access
+   |
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:49:1
+   |
+47 | # Test 7: ForeignKey access
+48 | post = Post.objects.get(id=1)
+49 | reveal_type(post.author)
+   | ^^^^^^^^^^^
+50 |
+51 | # Test 8: Invalid manager method
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:49:13
+   |
+47 | # Test 7: ForeignKey access
+48 | post = Post.objects.get(id=1)
+49 | reveal_type(post.author)
+   |             ^^^^^^^^^^^ `Unknown | ForeignKey[Unknown]`
+50 |
+51 | # Test 8: Invalid manager method
+   |
+
+warning[possibly-missing-attribute]: Attribute `nonexistent_method` may be missing on object of type `Unknown | Manager[User]`
+  --> django_comparison_test.py:52:1
+   |
+51 | # Test 8: Invalid manager method
+52 | User.objects.nonexistent_method()  # Should error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |
+54 | # Test 9: QuerySet chaining
+   |
+info: rule `possibly-missing-attribute` is enabled by default
+
+warning[undefined-reveal]: `reveal_type` used without importing it
+  --> django_comparison_test.py:56:1
+   |
+54 | # Test 9: QuerySet chaining
+55 | filtered = User.objects.filter(age=25).exclude(name="test")
+56 | reveal_type(filtered)
+   | ^^^^^^^^^^^
+57 |
+58 | # Test 10: DoesNotExist exception
+   |
+info: This is allowed for debugging convenience but will fail at runtime
+info: rule `undefined-reveal` is enabled by default
+
+info[revealed-type]: Revealed type
+  --> django_comparison_test.py:56:13
+   |
+54 | # Test 9: QuerySet chaining
+55 | filtered = User.objects.filter(age=25).exclude(name="test")
+56 | reveal_type(filtered)
+   |             ^^^^^^^^ `Unknown | QuerySet[User]`
+57 |
+58 | # Test 10: DoesNotExist exception
+   |
+
+error[unresolved-attribute]: Class `User` has no attribute `DoesNotExist`
+  --> django_comparison_test.py:61:8
+   |
+59 | try:
+60 |     User.objects.get(id=999)
+61 | except User.DoesNotExist:
+   |        ^^^^^^^^^^^^^^^^^
+62 |     pass
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+Found 23 diagnostics
