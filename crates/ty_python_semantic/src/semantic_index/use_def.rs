@@ -233,7 +233,7 @@
 //! have two live bindings of `x`: `x = 3` and `x = 4`.
 //!
 //! Another piece of information that the `UseDefMap` needs to provide are reachability constraints.
-//! See [`reachability_constraints.rs`] for more details, in particular how they apply to bindings.
+//! See `reachability_constraints.rs` for more details, in particular how they apply to bindings.
 //!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
