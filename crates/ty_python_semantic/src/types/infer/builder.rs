@@ -1379,16 +1379,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 KnownClass::OrderedDict,
             ];
 
-            SAFE_MUTABLE_CLASSES
-                .iter()
-                .map(|class| class.to_instance(db))
-                .any(|safe_mutable_class| {
-                    ty.is_equivalent_to(db, safe_mutable_class)
-                        || ty
-                            .generic_origin(db)
-                            .zip(safe_mutable_class.generic_origin(db))
-                            .is_some_and(|(l, r)| l == r)
-                })
+            ty.as_nominal_instance().is_some_and(|instance| {
+                SAFE_MUTABLE_CLASSES
+                    .iter()
+                    .any(|known_class| instance.has_known_class(db, *known_class))
+            })
         }
 
         debug_assert!(
