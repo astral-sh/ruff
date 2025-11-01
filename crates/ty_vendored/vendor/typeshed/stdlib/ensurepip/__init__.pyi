@@ -2,8 +2,9 @@ __all__ = ["version", "bootstrap"]
 
 def version() -> str:
     """
-Returns a string specifying the bundled version of pip.
-"""
+    Returns a string specifying the bundled version of pip.
+    """
+
 def bootstrap(
     *,
     root: str | None = None,
@@ -14,8 +15,8 @@ def bootstrap(
     verbosity: int = 0,
 ) -> None:
     """
-Bootstrap pip into the current Python installation (or the given root
-directory).
+    Bootstrap pip into the current Python installation (or the given root
+    directory).
 
-Note that calling this function will alter both sys.path and os.environ.
-"""
+    Note that calling this function will alter both sys.path and os.environ.
+    """
