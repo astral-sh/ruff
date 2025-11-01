@@ -100,26 +100,26 @@ while (
 
 while True:
     pass
-else:
-    # comment
-    pass
-
-while True:
-    pass
-else:
-    # comment
-    pass
-
-while True:
-    pass
-    # comment
+# comment
 else:
     pass
 
 while True:
     pass
+# comment
 else:
+    pass
+
+while True:
+    pass
     # comment
+else:
+    pass
+
+while True:
+    pass
+# comment
+else:
     pass
 
 
