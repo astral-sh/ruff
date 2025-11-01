@@ -260,20 +260,21 @@ pub fn completion<'db>(
     if scoped.is_some() {
         add_keyword_value_completions(db, &typed_query, &mut completions);
     }
+
+    sort_completions(&mut completions);
+
     if settings.auto_import {
         if let Some(scoped) = scoped {
-            add_unimported_completions(
+            completions.extend(unimported_completions(
                 db,
                 file,
                 &parsed,
                 scoped,
                 typed.as_deref(),
-                &mut completions,
-            );
+            ));
         }
     }
-    completions.sort_by(compare_suggestions);
-    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+
     completions
 }
 
@@ -316,16 +317,16 @@ fn add_keyword_value_completions<'db>(
 ///
 /// The completions returned will auto-insert import statements
 /// when selected into `File`.
-fn add_unimported_completions<'db>(
+fn unimported_completions<'db>(
     db: &'db dyn Db,
     file: File,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
     typed: Option<&str>,
-    completions: &mut Vec<Completion<'db>>,
-) {
+) -> Vec<Completion<'db>> {
+    let mut completions = Vec::new();
     let Some(typed) = typed else {
-        return;
+        return completions;
     };
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
@@ -357,6 +358,15 @@ fn add_unimported_completions<'db>(
             documentation: None,
         });
     }
+
+    sort_completions(&mut completions);
+
+    completions
+}
+
+fn sort_completions(completions: &mut Vec<Completion>) {
+    completions.sort_by(compare_suggestions);
+    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
 }
 
 /// The kind of tokens identified under the cursor.
@@ -3444,8 +3454,8 @@ from os.<CURSOR>
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @r"
-        AbraKadabra :: Unavailable :: package
         Kadabra :: Literal[1] :: Current module
+        AbraKadabra :: Unavailable :: package
         ");
     }
 
@@ -4162,6 +4172,27 @@ type <CURSOR>
 
         // This is okay because the ide will not request completions when the cursor is in this position.
         assert!(!builder.auto_import().build().completions().is_empty());
+    }
+
+    #[test]
+    fn favour_symbols_currently_imported() {
+        let snapshot = CursorTest::builder()
+            .source("main.py", "long_nameb = 1\nlong_name<CURSOR>")
+            .source("foo.py", "def long_namea(): ...")
+            .completion_test_builder()
+            .type_signatures()
+            .auto_import()
+            .module_names()
+            .filter(|c| c.name.contains("bar"))
+            .build()
+            .snapshot();
+
+        // Even though long_namea is alphabetically before long_nameb,
+        // long_nameb is currently imported and should be preferred.
+        assert_snapshot!(snapshot, @r"
+        long_nameb :: Literal[1] :: Current module
+        long_namea :: Unavailable :: foo
+        ");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
