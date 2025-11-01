@@ -5,11 +5,12 @@ import json
 import logging
 import tempfile
 import typing
+import subprocess
 from pathlib import Path
 
 from benchmark import Hyperfine
 from benchmark.cases import Benchmark, Mypy, Pyright, Tool, Ty, Venv
-from benchmark.projects import ALL as all_projects
+from benchmark.projects import ALL as all_projects, Project
 from benchmark.projects import DEFAULT as default_projects
 
 if typing.TYPE_CHECKING:
@@ -142,6 +143,14 @@ def main() -> None:
 
                 print(f"{project.name} ({benchmark.value})")
 
+                if args.ty:
+                    _ = count_errors_produced_by_ty(
+                        benchmark=benchmark,
+                        project=project,
+                        venv=venv,
+                        cwd=cwd,
+                    )
+
                 hyperfine = Hyperfine(
                     name=f"{project.name}-{benchmark.value}",
                     commands=commands,
@@ -151,3 +160,18 @@ def main() -> None:
                     json=False,
                 )
                 hyperfine.run(cwd=cwd)
+
+
+def count_errors_produced_by_ty(
+    benchmark: Benchmark, project: Project, venv: Venv, cwd: Path | None = None
+) -> int:
+    ty = Ty()
+    command = ty.command(benchmark, project, venv)
+    output = subprocess.run(
+        command.command + ["--output-format=concise"],
+        cwd=cwd,
+        capture_output=True,
+    )
+    decoded_output = output.stdout.decode("utf-8")
+    error_count = len(decoded_output.splitlines())
+    return error_count
