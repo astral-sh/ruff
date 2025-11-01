@@ -156,61 +156,104 @@ impl<'db> Bindings<'db> {
         builder: &mut TypeInferenceBuilder<'db, '_>,
     ) -> Result<Self, CallError<'db>> {
         // If the type context is a union, attempt to narrow to a specific element.
-        if let Some(Type::Union(union)) = call_expression_tcx.annotation {
-            let old_multi_inference_state =
-                builder.set_multi_inference_state(MultiInferenceState::Overwrite);
-            let was_in_multi_inference = builder.context.set_multi_inference(true);
+        let narrow_targets = match call_expression_tcx.annotation {
+            Some(Type::Union(union)) => union.elements(db),
+            Some(ty) => &[ty],
+            None => &[],
+        };
 
-            'narrow: for narrowed in union.elements(db) {
-                let narrowed_tcx = TypeContext::new(Some(*narrowed));
-
-                self.infer_argument_types(db, ast_arguments, argument_types, narrowed_tcx, builder);
-
-                if self
-                    .check_types_impl(
-                        db,
-                        argument_types,
-                        narrowed_tcx,
-                        builder.dataclass_field_specifiers(),
-                    )
-                    .is_err()
-                {
-                    continue 'narrow;
-                }
-
-                for element in self.elements.iter() {
-                    for (_, overload) in element.matching_overloads() {
-                        // If we inferred a type that is not assignable to the union element we
-                        // want to narrow to, then we didn't successfully narrow to the element
-                        // and inferred a wider type.
-                        //
-                        // TODO: Instead check if it widened, and prefer the one that did not.
-                        //
-                        // TODO: Maybe just do the inference without tcx here instead of
-                        // per-overload? While first preferring tcx that is generic.
-                        if !overload.return_type().is_assignable_to(db, *narrowed) {
-                            // is_subtype_of?
-                            continue 'narrow;
-                        }
-                    }
-                }
-
-                builder.context.set_multi_inference(was_in_multi_inference);
-
-                self.infer_argument_types(db, ast_arguments, argument_types, narrowed_tcx, builder);
-
-                builder.set_multi_inference_state(old_multi_inference_state);
-
-                return Ok(self);
-            }
-
-            builder.set_multi_inference_state(old_multi_inference_state);
-            builder.context.set_multi_inference(was_in_multi_inference);
-        }
-
+        // We silence diagnostics until we successfully narrow to a specific type.
         let old_multi_inference_state =
             builder.set_multi_inference_state(MultiInferenceState::Overwrite);
+        let was_in_multi_inference = builder.context.set_multi_inference(true);
 
+        let mut try_narrow = |narrowed_ty| {
+            let narrowed_tcx = TypeContext::new(narrowed_ty);
+            eprintln!("narrowing to {:?}", narrowed_ty);
+
+            // Attempt to infer the argument types using the narrowed type context.
+            self.infer_argument_types(db, ast_arguments, argument_types, narrowed_tcx, builder);
+
+            // Ensure the argument types match their annotated types.
+            if self
+                .check_types_impl(
+                    db,
+                    argument_types,
+                    narrowed_tcx,
+                    builder.dataclass_field_specifiers(),
+                    true,
+                )
+                .is_err()
+            {
+                eprintln!("binding error");
+                return false;
+            }
+
+            // Ensure the inferred return type is assignable to the declared type.
+            for element in self.elements.iter() {
+                for (_, overload) in element.matching_overloads() {
+                    if call_expression_tcx
+                        .annotation
+                        .is_some_and(|call_expression_tcx| {
+                            !overload
+                                .return_type()
+                                .is_assignable_to(db, call_expression_tcx)
+                        })
+                    {
+                        eprintln!("unassignable {}", overload.return_type().display(db));
+                        return false;
+                    }
+                }
+            }
+
+            // Successfully narrowed to an element of the union.
+            //
+            // Re-enable diagnostics and infer the argument types again with the narrowed type context.
+            builder.context.set_multi_inference(was_in_multi_inference);
+
+            eprintln!("narrowed!");
+            self.infer_argument_types(db, ast_arguments, argument_types, narrowed_tcx, builder);
+            let _ = self.check_types_impl(
+                db,
+                argument_types,
+                narrowed_tcx,
+                builder.dataclass_field_specifiers(),
+                false,
+            );
+
+            // Restore the multi-inference state.
+            builder.set_multi_inference_state(old_multi_inference_state);
+
+            true
+        };
+
+        // Prefer the declared type of generic classes.
+        for narrowed_ty in narrow_targets
+            .iter()
+            .filter(|ty| ty.class_specialization(db).is_some())
+        {
+            if try_narrow(Some(*narrowed_ty)) {
+                return Ok(self);
+            }
+        }
+
+        // Prefer a narrower inferred type, ignoring the type context.
+        if try_narrow(None) {
+            return Ok(self);
+        }
+
+        // Try the remaining elements of the union.
+        for narrowed_ty in narrow_targets
+            .iter()
+            .filter(|ty| ty.class_specialization(db).is_none())
+        {
+            if try_narrow(Some(*narrowed_ty)) {
+                return Ok(self);
+            }
+        }
+
+        // Otherwise, if we failed to narrow to any element, we infer against the entire union.
+        builder.context.set_multi_inference(was_in_multi_inference);
         self.infer_argument_types(
             db,
             ast_arguments,
@@ -219,6 +262,7 @@ impl<'db> Bindings<'db> {
             builder,
         );
 
+        // Restore the multi-inference state.
         builder.set_multi_inference_state(old_multi_inference_state);
 
         match self.check_types_impl(
@@ -226,6 +270,7 @@ impl<'db> Bindings<'db> {
             argument_types,
             call_expression_tcx,
             builder.dataclass_field_specifiers(),
+            false,
         ) {
             Ok(()) => Ok(self),
             Err(err) => Err(CallError(err, Box::new(self))),
@@ -244,6 +289,7 @@ impl<'db> Bindings<'db> {
             argument_types,
             call_expression_tcx,
             dataclass_field_specifiers,
+            false,
         ) {
             Ok(()) => Ok(self),
             Err(err) => Err(CallError(err, Box::new(self))),
@@ -256,10 +302,11 @@ impl<'db> Bindings<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
+        silence_errors: bool,
     ) -> Result<(), CallErrorKind> {
         for element in &mut self.elements {
             if let Some(mut updated_argument_forms) =
-                element.check_types(db, argument_types, call_expression_tcx)
+                element.check_types(db, argument_types, call_expression_tcx, silence_errors)
             {
                 // If this element returned a new set of argument forms (indicating successful
                 // argument type expansion), update the `Bindings` with these forms.
@@ -1738,6 +1785,7 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        silence_errors: bool,
     ) -> Option<ArgumentForms> {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -1750,7 +1798,12 @@ impl<'db> CallableBinding<'db> {
                 // still perform type checking for non-overloaded function to provide better user
                 // experience.
                 if let [overload] = self.overloads.as_mut_slice() {
-                    overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
+                    overload.check_types(
+                        db,
+                        argument_types.as_ref(),
+                        call_expression_tcx,
+                        silence_errors,
+                    );
                 }
                 return None;
             }
@@ -1758,7 +1811,12 @@ impl<'db> CallableBinding<'db> {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
                 self.matching_overload_index = Some(index);
-                self.overloads[index].check_types(db, argument_types.as_ref(), call_expression_tcx);
+                self.overloads[index].check_types(
+                    db,
+                    argument_types.as_ref(),
+                    call_expression_tcx,
+                    silence_errors,
+                );
                 return None;
             }
             MatchingOverloadIndex::Multiple(indexes) => {
@@ -1770,7 +1828,12 @@ impl<'db> CallableBinding<'db> {
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
+            overload.check_types(
+                db,
+                argument_types.as_ref(),
+                call_expression_tcx,
+                silence_errors,
+            );
         }
 
         match self.matching_overload_index() {
@@ -1910,7 +1973,12 @@ impl<'db> CallableBinding<'db> {
                 merged_argument_forms.merge(&argument_forms);
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, expanded_arguments, call_expression_tcx);
+                    overload.check_types(
+                        db,
+                        expanded_arguments,
+                        call_expression_tcx,
+                        silence_errors,
+                    );
                 }
 
                 let return_type = match self.matching_overload_index() {
@@ -3001,10 +3069,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
             if tcx.class_specialization(self.db).is_none() {
                 return None;
-            };
-
-            let return_ty =
-                return_ty.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
+            }
 
             builder.infer(return_ty, tcx).ok()?;
             Some(builder.type_mappings().clone())
@@ -3062,7 +3127,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             // If the return type is a subtype of the annotated type, we ignore the rest of the type
-            // context and prefer the narrower inferred type.
+            // context and prefer the narrower inferred type, for a given overload.
             if isolated_return_ty.is_subtype_of(self.db, call_expression_tcx) {
                 return None;
             }
@@ -3431,7 +3496,9 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        silence_errors: bool,
     ) {
+        let errors_snapshot = self.errors.len();
         let mut checker = ArgumentTypeChecker::new(
             db,
             &self.signature,
@@ -3449,6 +3516,10 @@ impl<'db> Binding<'db> {
         checker.check_argument_types();
 
         (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+
+        if silence_errors {
+            self.errors.truncate(errors_snapshot);
+        }
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {

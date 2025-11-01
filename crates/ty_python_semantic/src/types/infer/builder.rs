@@ -6820,7 +6820,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let db = self.db();
-                let infer_call_arguments = |_bindings: Option<Bindings<'db>>| {
+                let infer_call_arguments = |bindings: Option<Bindings<'db>>| {
                     // if let Some(bindings) = bindings {
                     //     let bindings = bindings.match_parameters(self.db(), &call_arguments);
                     //     self.infer_all_argument_types(

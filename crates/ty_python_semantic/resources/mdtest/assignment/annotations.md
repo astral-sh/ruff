@@ -469,10 +469,14 @@ a: TD = f([{"x": 0}, {"x": 1}])
 reveal_type(a)  # revealed: TD
 
 b: TD | None = f([{"x": 0}, {"x": 1}])
-reveal_type(b)  # revealed: TD
+# TODO: This should reveal `TD` after typed dict assignability is implemented.
+reveal_type(b)  # revealed: Unknown | dict[Unknown | str, Unknown | int]
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-# error: [invalid-key] "Invalid key access on TypedDict `TD`: Unknown key "y""
+# error: [invalid-key] "Invalid key for TypedDict `TD`: Unknown key "y""
+c: TD = f([{"y": 0}, {"x": 1}])
+
+# TODO: This should error like above once typed dict assignability is implemented.
 c: TD | None = f([{"y": 0}, {"x": 1}])
 ```
 
@@ -514,8 +518,7 @@ f: list[Any] | None = f2(1)
 reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
-# TODO: Better constraint solver.
-reveal_type(g)  # revealed: list[Literal[1]] | dict[Literal[1], Literal[1]]
+reveal_type(g)  # revealed: list[Any] | dict[Any, Any]
 ```
 
 ## Prefer the inferred type of non-generic classes
