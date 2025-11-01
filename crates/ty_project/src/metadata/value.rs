@@ -28,7 +28,7 @@ pub enum ValueSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from an user's editor settings.
+    /// The value comes from the user's editor settings.
     Editor,
 }
 
