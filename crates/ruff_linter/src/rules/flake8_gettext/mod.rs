@@ -5,6 +5,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 
