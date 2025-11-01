@@ -6,7 +6,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `Annotated[]` types nested within other subscript types or union types.
+/// Checks for `Annotated[]` types within a `Union` or `Optional` type.
 ///
 /// ## Why is this bad?
 /// Consumers of `Annotated` types often only check the top-level type for annotations,
@@ -27,28 +27,46 @@ use crate::checkers::ast::Checker;
 /// # {'a': typing.Annotated[str | None, 'test data']}
 /// ```
 ///
+/// ## Example
+/// ```python
+/// from typing import Annotated, Optional
+/// from fastapi import FastAPI, Query
+///
+/// app = FastAPI()
+///
+/// @app.get('/route')
+/// def route(param: Annotated[str, Query()] | None = None):
+///    ...
+/// ```
+/// This fails to parse `param` as a query parameter. Use instead:
+/// ```python
+/// @app.get('/route')
+/// def route(param: Annotated[str | None, Query()] = None):
+///   ...
+/// ```
+///
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.3")]
-pub(crate) struct NestedAnnotatedType {
+#[violation_metadata(preview_since = "0.14.4")]
+pub(crate) struct UnionWithAnnotatedType {
     parent_type: ParentType,
 }
 
-impl Violation for NestedAnnotatedType {
+impl Violation for UnionWithAnnotatedType {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.parent_type {
             ParentType::Subscript => {
-                "`Annotated[]` type must not be nested within another type".to_string()
+                "`Annotated[]` type must not be part of a Union or Optional type".to_string()
             }
             ParentType::BinOp => {
-                "`Annotated[]` type must not be nested within a PEP604 type union (|)".to_string()
+                "`Annotated[]` type must not be part of a PEP604 type union (|)".to_string()
             }
         }
     }
 }
 
 /// RUF066
-pub(crate) fn nested_annotated_type(checker: &Checker, subscript: &ExprSubscript) {
+pub(crate) fn union_with_annotated_type(checker: &Checker, subscript: &ExprSubscript) {
     let semantic = checker.semantic();
 
     if !semantic.match_typing_expr(&subscript.value, "Annotated") {
@@ -66,7 +84,7 @@ pub(crate) fn nested_annotated_type(checker: &Checker, subscript: &ExprSubscript
         .last();
 
     if let Some((parent, parent_type)) = result {
-        checker.report_diagnostic(NestedAnnotatedType { parent_type }, parent.range());
+        checker.report_diagnostic(UnionWithAnnotatedType { parent_type }, parent.range());
     }
 }
 

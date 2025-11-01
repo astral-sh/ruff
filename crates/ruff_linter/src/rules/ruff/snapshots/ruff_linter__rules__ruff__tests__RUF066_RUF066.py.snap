@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
  --> RUF066.py:4:4
   |
 3 | # Errors
@@ -11,7 +11,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 6 | c: Optional[Annotated[float, "A float"]] = 2.71
   |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
  --> RUF066.py:5:4
   |
 3 | # Errors
@@ -22,7 +22,7 @@ RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
 7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
   |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
  --> RUF066.py:6:4
   |
 4 | a: Union[Annotated[int, "An integer"], None] = 5
@@ -32,7 +32,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
   |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
  --> RUF066.py:7:4
   |
 5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
@@ -43,7 +43,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 9 | def f1(x: Union[Annotated[int, "An integer"], None]) -> None:
   |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
  --> RUF066.py:7:4
   |
 5 | b: Annotated[Union[int, str], "An integer or string"] | None = "World"
@@ -54,7 +54,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 9 | def f1(x: Union[Annotated[int, "An integer"], None]) -> None:
   |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
   --> RUF066.py:9:11
    |
  7 | d: Union[Annotated[int, "An integer"], Annotated[str, "A string"]]
@@ -64,7 +64,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 10 |     pass
    |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
   --> RUF066.py:12:11
    |
 10 |     pass
@@ -74,7 +74,7 @@ RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
 13 |     pass
    |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
   --> RUF066.py:15:11
    |
 13 |     pass
@@ -84,7 +84,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 16 |     pass
    |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
   --> RUF066.py:18:4
    |
 16 |     pass
@@ -95,7 +95,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 20 | l: TypeAlias = Annotated[int, "An integer"] | None
    |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
   --> RUF066.py:20:16
    |
 18 | e: Annotated[Annotated[int, "An integer"], "Another annotation"]
@@ -106,7 +106,7 @@ RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
 22 | n: TypeAlias = Optional[Annotated[float, "A float"]]
    |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
   --> RUF066.py:21:16
    |
 20 | l: TypeAlias = Annotated[int, "An integer"] | None
@@ -116,7 +116,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
    |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
   --> RUF066.py:22:16
    |
 20 | l: TypeAlias = Annotated[int, "An integer"] | None
@@ -126,7 +126,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
    |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
   --> RUF066.py:23:17
    |
 21 | m: TypeAlias = Union[Annotated[int, "An integer"], str]
@@ -137,7 +137,7 @@ RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
 25 | p: None | Annotated[int, "An integer"]
    |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
   --> RUF066.py:25:4
    |
 23 | o: TypeAlias = "Annotated[str, 'A string'] | None"
@@ -148,7 +148,7 @@ RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
 27 | q = Annotated[int | str, "An integer or string"] | None
    |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
   --> RUF066.py:27:5
    |
 25 | p: None | Annotated[int, "An integer"]
@@ -158,7 +158,7 @@ RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
 28 | r = Optional[Annotated[float | None, "A float or None"]]
    |
 
-RUF066 `Annotated[]` type must not be nested within another type
+RUF066 `Annotated[]` type must not be part of a Union or Optional type
   --> RUF066.py:28:5
    |
 27 | q = Annotated[int | str, "An integer or string"] | None
@@ -168,7 +168,7 @@ RUF066 `Annotated[]` type must not be nested within another type
 30 | @some_decorator()
    |
 
-RUF066 `Annotated[]` type must not be nested within a PEP604 type union (|)
+RUF066 `Annotated[]` type must not be part of a PEP604 type union (|)
   --> RUF066.py:31:13
    |
 30 | @some_decorator()
