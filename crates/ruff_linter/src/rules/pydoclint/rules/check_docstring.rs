@@ -618,7 +618,11 @@ fn parse_parameters(
 fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
     let mut entries: Vec<ParameterEntry> = Vec::new();
     // Find first entry to determine indentation
-    let Some(first_arg) = content.lines().next() else {
+    let Some((_, first_arg)) = content
+        .lines()
+        .enumerate()
+        .find(|(_, line)| !line.trim().is_empty())
+    else {
         return entries;
     };
     let indentation = &first_arg[..first_arg.len() - first_arg.trim_start().len()];
