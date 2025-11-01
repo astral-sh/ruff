@@ -262,9 +262,6 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
 
-        (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
-        (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
-
         (DynamicType::TodoUnpack, _) => Ordering::Less,
         (_, DynamicType::TodoUnpack) => Ordering::Greater,
 

@@ -1633,11 +1633,12 @@ def ab(a: int, *, c: int):
             "#,
         );
 
+        // TODO: This should be `P@Alias (<variance>)`
         assert_snapshot!(test.hover(), @r"
-        @Todo
+        typing.ParamSpec
         ---------------------------------------------
         ```python
-        @Todo
+        typing.ParamSpec
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

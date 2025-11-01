@@ -21,8 +21,9 @@ def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
 
 def g() -> TypeGuard[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
-    reveal_type(args)  # revealed: tuple[@Todo(Support for `typing.ParamSpec`), ...]
-    reveal_type(kwargs)  # revealed: dict[str, @Todo(Support for `typing.ParamSpec`)]
+    # TODO: Should reveal a type representing `P.args` and `P.kwargs`
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
+    reveal_type(kwargs)  # revealed: dict[str, Unknown]
     return callback(42, *args, **kwargs)
 
 class Foo:

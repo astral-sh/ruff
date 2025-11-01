@@ -26,9 +26,12 @@ reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `ParamSpec`/`TypeVarTuple` properly (these should not reveal `None`)
-reveal_type(generic_context(SingleParamSpec))  # revealed: None
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: None
+# revealed: tuple[P@SingleParamSpec]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: tuple[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+
+# TODO: support `TypeVarTuple` properly (these should not reveal `None`)
 reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
 reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
 ```
