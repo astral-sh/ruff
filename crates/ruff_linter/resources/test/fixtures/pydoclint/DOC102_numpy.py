@@ -444,3 +444,21 @@ def baz(x: int) -> int:
     int
     """
     return x
+
+
+# OK - comma-separated parameters without type annotations
+def add_numbers(a, b):
+    """
+    Adds two numbers and returns the result.
+
+    Parameters
+    ----------
+    a, b
+        The numbers to add.
+
+    Returns
+    -------
+    int
+        The sum of the two numbers.
+    """
+    return a + b
