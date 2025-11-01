@@ -4525,6 +4525,10 @@ class BaseException:
     def __setstate__(self, state: dict[str, Any] | None, /) -> None: ...
     def with_traceback(self, tb: TracebackType | None, /) -> Self:
         """Set self.__traceback__ to tb and return self."""
+    # Necessary for security-focused static analyzers (e.g, pysa)
+    # See https://github.com/python/typeshed/pull/14900
+    def __str__(self) -> str: ...  # noqa: Y029
+    def __repr__(self) -> str: ...  # noqa: Y029
     if sys.version_info >= (3, 11):
         # only present after add_note() is called
         __notes__: list[str]
