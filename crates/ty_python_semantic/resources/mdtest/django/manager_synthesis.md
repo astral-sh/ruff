@@ -69,37 +69,42 @@ class User(models.Model):
 
 # Manager type inference
 reveal_type(User.objects)  # revealed: Unknown
-# Current ty output: Unknown  ❌ Self not accepted as generic argument!
-# Target (mypy): Manager[User]
-# Target (pyright): BaseManager[User]
-# TODO: [Phase 2] Fix Self type resolution in class body
+# 1. Current ty (no changes): Unknown (Self not accepted as generic argument)
+# 2. Future ty (after fix): Manager[User]
+# 3. mypy + django-stubs: Manager[User]
+# 4. pyright + django-types: BaseManager[User]
+# TODO: [Phase 2] Implement PEP 673 Self type support
 
 # QuerySet from Manager.all()
 all_users = User.objects.all()
 reveal_type(all_users)  # revealed: Unknown
-# Current ty output: Unknown  ❌ Propagates from Manager[Self] error
-# Target (mypy): QuerySet[User, User]
-# Target (pyright): BaseManager[User]
+# 1. Current ty (no changes): Unknown (propagates from Manager[Self] error)
+# 2. Future ty (after fix): QuerySet[User]
+# 3. mypy + django-stubs: QuerySet[User, User]
+# 4. pyright + django-types: QuerySet[User, User]
 
 # Model instance from QuerySet.get()
 user = User.objects.get(id=1)
 reveal_type(user)  # revealed: Unknown
-# Current ty output: Unknown  ❌ Propagates from Manager[Self] error
-# Target (mypy): User
-# Target (pyright): User
+# 1. Current ty (no changes): Unknown (propagates from Manager[Self] error)
+# 2. Future ty (after fix): User
+# 3. mypy + django-stubs: User
+# 4. pyright + django-types: User
 
 # Optional from QuerySet.first()
 maybe_user = User.objects.first()
 reveal_type(maybe_user)  # revealed: Unknown
-# Current ty output: Unknown  ❌ Propagates from Manager[Self] error
-# Target (mypy): User | None
-# Target (pyright): User | None
+# 1. Current ty (no changes): Unknown (propagates from Manager[Self] error)
+# 2. Future ty (after fix): User | None
+# 3. mypy + django-stubs: User | None
+# 4. pyright + django-types: User | None
 
-# TODO: Count method not found due to Manager[Unknown]
+# TODO: Count method not found due to Manager[Self] error
 # count = User.objects.count()
-# reveal_type(count)  # Should be: int
-# Current ty output: error[unresolved-attribute]
-# This breaks because Self resolves to Unknown
+# 1. Current ty (no changes): error[unresolved-attribute]
+# 2. Future ty (after fix): int
+# 3. mypy + django-stubs: int
+# 4. pyright + django-types: int
 
 # TODO: [Phase 2] Auto-synthesize .objects so manual annotation not needed
 # class AutoUser(models.Model):

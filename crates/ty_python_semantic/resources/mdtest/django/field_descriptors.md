@@ -78,40 +78,46 @@ article = Article()
 
 # CharField descriptor should return str
 reveal_type(article.title)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️ Should not have Unknown union
-# Target (mypy): str
-# Target (pyright): str
-# TODO: Remove Unknown from union - descriptor protocol works but type narrowing needs improvement
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
+# TODO: Remove Unknown from union - descriptor protocol works but needs type narrowing
 
 # TextField descriptor should return str
 reveal_type(article.content)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️
-# Target (mypy): str
-# Target (pyright): str
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
 
 # EmailField descriptor should return str
 reveal_type(article.author_email)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️
-# Target (mypy): str
-# Target (pyright): str
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
 
 # IntegerField descriptor should return int
 reveal_type(article.view_count)  # revealed: Unknown | int
-# Current ty output: Unknown | int  ⚠️
-# Target (mypy): int
-# Target (pyright): int
+# 1. Current ty (no changes): Unknown | int
+# 2. Future ty (after fix): int
+# 3. mypy + django-stubs: int
+# 4. pyright + django-types: int
 
 # BooleanField descriptor should return bool
 reveal_type(article.is_published)  # revealed: Unknown | bool
-# Current ty output: Unknown | bool  ⚠️
-# Target (mypy): bool
-# Target (pyright): bool
+# 1. Current ty (no changes): Unknown | bool
+# 2. Future ty (after fix): bool
+# 3. mypy + django-stubs: bool
+# 4. pyright + django-types: bool
 
 # FloatField descriptor should return float
 reveal_type(article.rating)  # revealed: Unknown | int | float
-# Current ty output: Unknown | int | float  ⚠️
-# Target (mypy): float
-# Target (pyright): float
+# 1. Current ty (no changes): Unknown | int | float
+# 2. Future ty (after fix): float
+# 3. mypy + django-stubs: float
+# 4. pyright + django-types: float
 
 # Field assignment should accept the correct type
 article.title = "New Title"  # OK: str
@@ -190,20 +196,23 @@ product = Product()
 
 # Non-nullable field
 reveal_type(product.name)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️ Should not have Unknown union
-# Target (mypy): str
-# Target (pyright): str
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
 
 # TODO: [Phase 3] Nullable fields should return Optional types
-# reveal_type(product.description)  # Should be: str | None
-# Current ty output: Unknown
-# Target (mypy): str | None
-# Target (pyright): str | None
+# reveal_type(product.description)
+# 1. Current ty (no changes): Unknown (field not recognized due to missing null support)
+# 2. Future ty (after fix): str | None
+# 3. mypy + django-stubs: str | None
+# 4. pyright + django-types: str | None
 
-# reveal_type(product.stock)  # Should be: int | None
-# Current ty output: Unknown
-# Target (mypy): int | None
-# Target (pyright): int | None
+# reveal_type(product.stock)
+# 1. Current ty (no changes): Unknown (field not recognized due to missing null support)
+# 2. Future ty (after fix): int | None
+# 3. mypy + django-stubs: int | None
+# 4. pyright + django-types: int | None
 ```
 
 ## Field with default value
@@ -268,19 +277,22 @@ settings = Settings()
 
 # Fields with defaults are still non-nullable
 reveal_type(settings.theme)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️ Should not have Unknown union
-# Target (mypy): str
-# Target (pyright): str
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
 
 reveal_type(settings.notifications_enabled)  # revealed: Unknown | bool
-# Current ty output: Unknown | bool  ⚠️ Should not have Unknown union
-# Target (mypy): bool
-# Target (pyright): bool
+# 1. Current ty (no changes): Unknown | bool
+# 2. Future ty (after fix): bool
+# 3. mypy + django-stubs: bool
+# 4. pyright + django-types: bool
 
 reveal_type(settings.max_items)  # revealed: Unknown | int
-# Current ty output: Unknown | int  ⚠️ Should not have Unknown union
-# Target (mypy): int
-# Target (pyright): int
+# 1. Current ty (no changes): Unknown | int
+# 2. Future ty (after fix): int
+# 3. mypy + django-stubs: int
+# 4. pyright + django-types: int
 ```
 
 ## Field access on class vs instance
@@ -339,16 +351,18 @@ class Book(models.Model):
 
 # Accessing field on class returns the Field descriptor
 reveal_type(Book.title)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️
-# Target (mypy): CharField (the descriptor itself)
-# Target (pyright): CharField
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): CharField (the descriptor itself)
+# 3. mypy + django-stubs: CharField
+# 4. pyright + django-types: CharField
 
 # Accessing field on instance returns the value type
 book = Book()
 reveal_type(book.title)  # revealed: Unknown | str
-# Current ty output: Unknown | str  ⚠️ Should not have Unknown union
-# Target (mypy): str
-# Target (pyright): str
+# 1. Current ty (no changes): Unknown | str
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
 
 # TODO: [Phase 3] Class access should return Field, instance access should return T
 # ty needs to understand the descriptor protocol more completely
