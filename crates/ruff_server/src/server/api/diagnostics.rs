@@ -1,4 +1,5 @@
 use crate::{
+    Session,
     lint::DiagnosticsMap,
     session::{Client, DocumentQuery, DocumentSnapshot},
 };
@@ -38,9 +39,13 @@ pub(super) fn publish_diagnostics_for_document(
 }
 
 pub(super) fn clear_diagnostics_for_document(
+    session: &Session,
     query: &DocumentQuery,
     client: &Client,
 ) -> crate::server::Result<()> {
+    if session.resolved_client_capabilities().pull_diagnostics {
+        return Ok(());
+    }
     client
         .send_notification::<lsp_types::notification::PublishDiagnostics>(
             lsp_types::PublishDiagnosticsParams {
