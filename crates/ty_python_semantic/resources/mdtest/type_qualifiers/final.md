@@ -88,9 +88,7 @@ class C:
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
-        # TODO: Should not be an error
-        # error: [invalid-assignment] "Cannot assign to final attribute `FINAL_E` on type `Self@__init__`"
-        self.FINAL_E = 1
+        self.FINAL_E = 1  # OK: Final can be initialized in __init__
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -186,8 +184,7 @@ class C(metaclass=Meta):
         self.INSTANCE_FINAL_A: Final[int] = 1
         self.INSTANCE_FINAL_B: Final = 1
         self.INSTANCE_FINAL_C: Final[int]
-        # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `Self@__init__`"
-        self.INSTANCE_FINAL_C = 1
+        self.INSTANCE_FINAL_C = 1  # OK: First assignment to Final in __init__
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
 C.META_FINAL_A = 2
@@ -282,9 +279,7 @@ class C:
     def __init__(self):
         self.LEGAL_H: Final[int] = 1
         self.LEGAL_I: Final[int]
-        # TODO: Should not be an error
-        # error: [invalid-assignment]
-        self.LEGAL_I = 1
+        self.LEGAL_I = 1  # OK: Final can be initialized in __init__
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
 def f(ILLEGAL: Final[int]) -> None:
@@ -396,9 +391,120 @@ class C:
     DEFINED_IN_INIT: Final[int]
 
     def __init__(self):
-        # TODO: should not be an error
+        self.DEFINED_IN_INIT = 1  # OK: Final can be initialized in __init__
+```
+
+## Final attributes with Self annotation in `__init__`
+
+Issue #1409: Final instance attributes should be assignable in `__init__` even when using `Self`
+type annotation.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Final, Self
+
+class ClassA:
+    ID4: Final[int]  # OK because initialized in __init__
+
+    def __init__(self: Self):
+        self.ID4 = 1  # Should be OK
+
+    def other_method(self: Self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `ID4` on type `Self@other_method`"
+        self.ID4 = 2  # Should still error outside __init__
+
+class ClassB:
+    ID5: Final[int]
+
+    def __init__(self):  # Without Self annotation
+        self.ID5 = 1  # Should also be OK
+
+reveal_type(ClassA().ID4)  # revealed: int
+reveal_type(ClassB().ID5)  # revealed: int
+```
+
+## Reassignment to Final in `__init__`
+
+Per PEP 591 and the typing conformance suite, Final attributes can be assigned in `__init__`.
+Multiple assignments within `__init__` are allowed (matching mypy and pyright behavior). However,
+assignment in `__init__` is not allowed if the attribute already has a value at class level.
+
+```py
+from typing import Final
+
+# Case 1: Declared in class, assigned once in __init__ - ALLOWED
+class DeclaredAssignedInInit:
+    attr1: Final[int]
+
+    def __init__(self):
+        self.attr1 = 1  # OK: First and only assignment
+
+# Case 2: Declared and assigned in class body - ALLOWED (no __init__ assignment)
+class DeclaredAndAssignedInClass:
+    attr2: Final[int] = 10
+
+# Case 3: Reassignment when already assigned in class body
+class ReassignmentFromClass:
+    attr3: Final[int] = 10
+
+    def __init__(self):
         # error: [invalid-assignment]
-        self.DEFINED_IN_INIT = 1
+        self.attr3 = 20  # Error: already assigned in class body
+
+# Case 4: Multiple assignments within __init__ itself
+# Per conformance suite and PEP 591, all assignments in __init__ are allowed
+class MultipleAssignmentsInInit:
+    attr4: Final[int]
+
+    def __init__(self):
+        self.attr4 = 1  # OK: Assignment in __init__
+        self.attr4 = 2  # OK: Multiple assignments in __init__ are allowed
+
+# Case 5: Declaration and assignment in __init__ - ALLOWED
+class DeclareAndAssignInInit:
+    def __init__(self):
+        self.attr5: Final[int] = 1  # OK: Declare and assign in __init__
+
+# Case 6: Assignment outside __init__ should still fail
+class AssignmentOutsideInit:
+    attr6: Final[int]
+
+    def other_method(self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `attr6`"
+        self.attr6 = 1  # Error: Not in __init__
+```
+
+## Conditional assignments in `__init__`
+
+Per the typing conformance suite and feedback from Carl, conditional assignments in different
+branches are allowed in `__init__`. Both mypy and pyright allow multiple assignments in `__init__`,
+and the conformance suite requires this behavior.
+
+```py
+import sys
+from typing import Final
+
+class ConditionalAssignmentTyped:
+    X: Final[int]
+
+    def __init__(self, cond: bool):
+        if cond:
+            self.X = 42  # OK: Assignment in __init__
+        else:
+            self.X = 56  # OK: Multiple conditional assignments in __init__ are allowed
+
+class ConditionalAssignmentUntyped:
+    Y: Final[int]
+
+    def __init__(self, cond):
+        if cond:
+            self.Y = 1  # OK: Assignment in __init__
+        else:
+            self.Y = 2  # OK: Multiple conditional assignments in __init__ are allowed
 ```
 
 ## Full diagnostics
