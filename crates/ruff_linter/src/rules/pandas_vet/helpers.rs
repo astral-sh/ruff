@@ -18,6 +18,7 @@ pub(super) enum Resolution {
 /// Test an [`Expr`] for relevance to Pandas-related operations.
 pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resolution {
     match expr {
+        // Literals in the expression itself are definitely not pandas-related
         Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
@@ -43,6 +44,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                             if matches!(name.id.as_str(), "self" | "cls") {
                                 Resolution::IrrelevantBinding
                             } else {
+                                // Function arguments are treated as relevant unless proven otherwise
                                 Resolution::RelevantLocal
                             }
                         }
@@ -52,72 +54,62 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         | BindingKind::LoopVar
                         | BindingKind::Global(_)
                         | BindingKind::Nonlocal(_, _) => {
-                            // Check if this binding comes from pandas or another relevant source
+                            // Check if this binding comes from a definitively non-pandas source
                             if let Some(assigned_value) = find_binding_value(binding, semantic) {
-                                // Check if the assigned value comes from pandas
-                                if is_pandas_related_value(assigned_value, semantic) {
-                                    Resolution::RelevantLocal
-                                } else {
-                                    // This is a non-pandas binding (e.g., literal, numpy, etc.)
-                                    Resolution::IrrelevantBinding
+                                // Recurse to check the assigned value
+                                match test_expression(assigned_value, semantic) {
+                                    // If the assigned value is definitively not pandas (literals, etc.)
+                                    Resolution::IrrelevantExpression => {
+                                        Resolution::IrrelevantBinding
+                                    }
+                                    // If it's clearly pandas-related, treat as relevant
+                                    Resolution::RelevantLocal | Resolution::PandasModule => {
+                                        Resolution::RelevantLocal
+                                    }
+                                    // If we got IrrelevantBinding, it means we traced it back to a
+                                    // non-pandas source (e.g., numpy import), so keep it as irrelevant
+                                    Resolution::IrrelevantBinding => Resolution::IrrelevantBinding,
                                 }
                             } else {
-                                // If we can't determine the source, be conservative and treat as relevant
+                                // If we can't determine the source, be liberal and treat as relevant
+                                // to avoid false negatives (e.g., function parameters with annotations)
                                 Resolution::RelevantLocal
                             }
                         }
-                        BindingKind::Import(import)
-                            if matches!(import.qualified_name().segments(), ["pandas"]) =>
-                        {
-                            Resolution::PandasModule
+                        BindingKind::Import(import) => {
+                            let segments = import.qualified_name().segments();
+                            if matches!(segments, ["pandas"]) {
+                                Resolution::PandasModule
+                            } else if matches!(segments, ["numpy"]) {
+                                // Explicitly exclude numpy imports
+                                Resolution::IrrelevantBinding
+                            } else {
+                                Resolution::IrrelevantBinding
+                            }
                         }
                         _ => Resolution::IrrelevantBinding,
                     }
                 })
         }
-        _ => Resolution::RelevantLocal,
-    }
-}
-
-/// Check if an expression value is related to pandas (e.g., comes from pandas module or operations).
-fn is_pandas_related_value(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        // Literals are definitely not pandas-related
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Tuple(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_) => false,
-
-        // Direct pandas module access
-        Expr::Name(name) => {
-            if let Some(binding_id) = semantic.resolve_name(name) {
-                let binding = semantic.binding(binding_id);
-                if let BindingKind::Import(import) = &binding.kind {
-                    return matches!(import.qualified_name().segments(), ["pandas"]);
+        // Recurse for attribute access (e.g., df.values -> check df)
+        Expr::Attribute(attr) => test_expression(attr.value.as_ref(), semantic),
+        // Recurse for call expressions (e.g., pd.DataFrame() -> check pd)
+        Expr::Call(call) => {
+            // Check if this is a pandas function call
+            if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
+                let segments = qualified_name.segments();
+                if segments.starts_with(&["pandas"]) {
+                    return Resolution::RelevantLocal;
+                }
+                // Explicitly exclude numpy function calls
+                if segments.starts_with(&["numpy"]) || segments.starts_with(&["np"]) {
+                    return Resolution::IrrelevantBinding;
                 }
             }
-            false
+            // For other calls, recurse on the function expression
+            test_expression(&call.func, semantic)
         }
-        // Method calls on pandas objects
-        Expr::Attribute(attr) => {
-            // Check if the object being accessed is pandas-related
-            is_pandas_related_value(attr.value.as_ref(), semantic)
-        }
-        // Function calls - check if they're pandas functions
-        Expr::Call(call) => {
-            if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
-                return qualified_name.segments().starts_with(&["pandas"]);
-            }
-            false
-        }
-        // For other expressions, we can't easily determine if they're pandas-related
-        // so we return false to be conservative (treat as non-pandas)
-        _ => false,
+        // For other expressions, default to relevant to avoid false negatives
+        _ => Resolution::RelevantLocal,
     }
 }

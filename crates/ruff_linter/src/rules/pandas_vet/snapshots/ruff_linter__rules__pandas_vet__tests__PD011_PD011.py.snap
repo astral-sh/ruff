@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+---
+PD011 Use `.to_numpy()` instead of `.values`
+  --> PD011.py:37:14
+   |
+35 |     import pandas as pd
+36 |     x = pd.DataFrame()
+37 |     result = x.values
+   |              ^^^^^^^^
+   |
