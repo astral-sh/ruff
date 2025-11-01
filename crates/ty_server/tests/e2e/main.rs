@@ -30,6 +30,7 @@
 mod commands;
 mod initialize;
 mod inlay_hints;
+mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 
@@ -431,6 +432,15 @@ impl TestServer {
             "Failed to receive `{}` notification after {RETRY_COUNT} retries",
             N::METHOD
         ))
+    }
+
+    /// Awaits the given number of notifications.
+    pub(crate) fn ignore_notifications<N: Notification>(&mut self, times: usize) -> Result<()> {
+        for _ in 0..times {
+            self.await_notification::<N>()?;
+        }
+
+        Ok(())
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and

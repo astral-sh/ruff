@@ -1,3 +1,4 @@
+use crate::Db;
 use crate::PositionEncoding;
 use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
@@ -10,6 +11,7 @@ use crate::session::client::Client;
 use crate::session::index::Index;
 use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
 use crate::system::file_to_url;
+
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -21,12 +23,13 @@ use lsp_types::{
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use ty_project::{Db, ProgressReporter};
+use ty_project::{ProgressReporter, ProjectDatabase};
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
 ///
@@ -230,7 +233,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         state.report_progress(&self.work_done);
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
@@ -260,7 +263,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         state.response.maybe_flush();
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         let mut by_file: BTreeMap<File, Vec<Diagnostic>> = BTreeMap::new();
 
         for diagnostic in diagnostics {
@@ -363,6 +366,12 @@ impl<'a> ResponseWriter<'a> {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
+
+        if source_text(db, file).is_notebook() {
+            // Notebooks only support publish diagnostics.
+            return;
+        }
+
         let key = DocumentKey::from_url(&url);
         let version = self
             .index
@@ -389,7 +398,7 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding).1)
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {

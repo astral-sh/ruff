@@ -8,7 +8,7 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
-use ruff_db::source::{line_index, source_text};
+
 use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
 use ty_project::ProjectDatabase;
 
@@ -36,16 +36,14 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let index = line_index(db, file);
-        let source = source_text(db, file);
-
-        let range = params
-            .range
-            .to_text_range(&source, &index, snapshot.encoding());
+        let range =
+            params
+                .range
+                .to_text_range(db, file, snapshot.document().url(), snapshot.encoding());
 
         let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
@@ -54,7 +52,8 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             .map(|hint| lsp_types::InlayHint {
                 position: hint
                     .position
-                    .to_position(&source, &index, snapshot.encoding()),
+                    .to_lsp_position(db, file, snapshot.encoding())
+                    .to_local_position(),
                 label: inlay_hint_label(&hint.label),
                 kind: Some(inlay_hint_kind(&hint.kind)),
                 tooltip: None,

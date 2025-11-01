@@ -20,6 +20,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -76,6 +77,7 @@ impl<'a> Importer<'a> {
         parsed: &'a ParsedModuleRef,
     ) -> Self {
         let imports = TopLevelImports::find(parsed);
+
         Self {
             db,
             file,
@@ -145,10 +147,15 @@ impl<'a> Importer<'a> {
         let request = request.avoid_conflicts(self.db, self.file, members);
         let mut symbol_text: Box<str> = request.member.into();
         let Some(response) = self.find(&request, members.at) else {
-            let insertion = if let Some(future) = self.find_last_future_import() {
+            let insertion = if let Some(future) = self.find_last_future_import(members.at) {
                 Insertion::end_of_statement(future.stmt, self.source, self.stylist)
             } else {
-                Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist)
+                // What we want here: Given an offset, return the range of that cell. I guess that's what containing range is
+                let range = source_text(self.db, self.file)
+                    .as_notebook()
+                    .and_then(|notebook| notebook.cell_offsets().containing_range(members.at));
+
+                Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist, range)
             };
             let import = insertion.into_edit(&request.to_string());
             if matches!(request.style, ImportStyle::Import) {
@@ -209,6 +216,7 @@ impl<'a> Importer<'a> {
         available_at: TextSize,
     ) -> Option<ImportResponse<'importer, 'a>> {
         let mut choice = None;
+
         for import in &self.imports {
             // If the import statement comes after the spot where we
             // need the symbol, then we conservatively assume that
@@ -226,6 +234,18 @@ impl<'a> Importer<'a> {
             if import.stmt.start() >= available_at {
                 return choice;
             }
+
+            if let Some(notebook) = source_text(self.db, self.file).as_notebook() {
+                // The edits in completions are restricted to the same Cell for notebooks.
+                // If this import is from another cell, then we can't make changes to it.
+                if notebook
+                    .cell_offsets()
+                    .has_cell_boundary(TextRange::new(import.stmt.start(), available_at))
+                {
+                    continue;
+                }
+            }
+
             if let Some(response) = import.satisfies(self.db, self.file, request) {
                 if choice
                     .as_ref()
@@ -247,7 +267,10 @@ impl<'a> Importer<'a> {
     }
 
     /// Find the last `from __future__` import statement in the AST.
-    fn find_last_future_import(&self) -> Option<&'a AstImport> {
+    fn find_last_future_import(&self, at: TextSize) -> Option<&'a AstImport> {
+        let source = source_text(self.db, self.file);
+        let notebook = source.as_notebook();
+
         self.imports
             .iter()
             .take_while(|import| {
@@ -255,6 +278,14 @@ impl<'a> Importer<'a> {
                     .stmt
                     .as_import_from_stmt()
                     .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+                    && import.stmt.start() >= at
+            })
+            .filter(|import| {
+                notebook.is_none_or(|notebook| {
+                    !notebook
+                        .cell_offsets()
+                        .has_cell_boundary(TextRange::new(import.stmt.start(), at))
+                })
             })
             .last()
     }

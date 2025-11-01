@@ -226,7 +226,12 @@ impl<'db> SemanticTokenVisitor<'db> {
         let range = ranged.range();
         // Only emit tokens that intersect with the range filter, if one is specified
         if let Some(range_filter) = self.range_filter {
-            if range.intersect(range_filter).is_none() {
+            // Only include ranges that intersect. Ranges that only touch (are empty)
+            // should be excluded.
+            if range
+                .intersect(range_filter)
+                .is_none_or(ruff_text_size::TextRange::is_empty)
+            {
                 return;
             }
         }

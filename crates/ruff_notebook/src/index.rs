@@ -9,19 +9,18 @@ use ruff_source_file::{LineColumn, OneIndexed, SourceLocation};
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NotebookIndex {
     /// Enter a row (1-based), get back the cell (1-based)
+    ///
+    /// Given a row number in the concatenated source text, returns the
+    /// cell index to which the row belongs.
     pub(super) row_to_cell: Vec<OneIndexed>,
     /// Enter a row (1-based), get back the row in cell (1-based)
+    ///
+    /// Given a row index in the concatenated source text,
+    /// returns the row number relative to the start of the cell.
     pub(super) row_to_row_in_cell: Vec<OneIndexed>,
 }
 
 impl NotebookIndex {
-    pub fn new(row_to_cell: Vec<OneIndexed>, row_to_row_in_cell: Vec<OneIndexed>) -> Self {
-        Self {
-            row_to_cell,
-            row_to_row_in_cell,
-        }
-    }
-
     /// Returns the cell number (1-based) for the given row (1-based).
     pub fn cell(&self, row: OneIndexed) -> Option<OneIndexed> {
         self.row_to_cell.get(row.to_zero_indexed()).copied()
@@ -44,11 +43,12 @@ impl NotebookIndex {
     /// Translates the given [`LineColumn`] based on the indexing table.
     ///
     /// This will translate the row/column in the concatenated source code
-    /// to the row/column in the Jupyter Notebook.
+    /// to the row/column in the Jupyter Notebook cell.
     pub fn translate_line_column(&self, source_location: &LineColumn) -> LineColumn {
         LineColumn {
             line: self
                 .cell_row(source_location.line)
+                .or_else(|| self.row_to_row_in_cell.last().copied())
                 .unwrap_or(OneIndexed::MIN),
             column: source_location.column,
         }
@@ -57,11 +57,12 @@ impl NotebookIndex {
     /// Translates the given [`SourceLocation`] based on the indexing table.
     ///
     /// This will translate the line/character in the concatenated source code
-    /// to the line/character in the Jupyter Notebook.
+    /// to the line/character in the Jupyter Notebook cell.
     pub fn translate_source_location(&self, source_location: &SourceLocation) -> SourceLocation {
         SourceLocation {
             line: self
                 .cell_row(source_location.line)
+                .or_else(|| self.row_to_row_in_cell.last().copied())
                 .unwrap_or(OneIndexed::MIN),
             character_offset: source_location.character_offset,
         }

@@ -27,6 +27,24 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         Cow::Borrowed(&params.text_document.uri)
     }
 
+    // Hardest part is how to map the ranges back to notebook documents
+    // The issue is that we can't fetch the notebook index of an arbitrary notebook
+    // But then again, we **know** it's a notebook.
+    // One option would be to stuff the URI into `ruff_notebook` as an extra
+    // field on `cell`. Doesn't seem like the WORST ever?
+    // But then there's also the issue that ty and the LSP might disagree
+    // what's considered a notebook, resulting in ty returning a regular document for
+    // a document that's supposed to be a notebook. Resulting in a mismatch between
+    // So how can we channel through the entire notebook? But also make this work
+    // If we kept the cells within notebook, would it then be easier?
+    // Maybe, we could snapshot the entire notebook and call ruff notebook on it.
+    // But that only works for the current notebook and not for **any** notebook.
+    // In the end, we need a way to retrieve the metadata from any notebook.
+    // A method on lsp system doesn't sound that horrible?
+    // what happens if we don't report the diagnostics on the cell?
+    // The issue with that is that a notebook has no rows?
+    // We can't import other notebooks, so related should only be limited to the current file.
+
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,

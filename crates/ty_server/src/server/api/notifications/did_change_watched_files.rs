@@ -96,7 +96,6 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 publish_diagnostics(session, key.url(), client);
             }
         }
-        // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
 
         if client_capabilities.supports_inlay_hint_refresh() {
             client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});

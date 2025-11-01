@@ -1,0 +1,242 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
+---
+[
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "vscode-notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: Some(
+                Domain(
+                    "test.ipynb",
+                ),
+            ),
+            port: None,
+            path: "",
+            query: None,
+            fragment: Some(
+                "1",
+            ),
+        },
+        diagnostics: [
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 49,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 52,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-return-type",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "invalid-return-type",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Function can implicitly return `None`, which is not assignable to return type `str`",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+        ],
+        version: Some(
+            0,
+        ),
+    },
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "vscode-notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: Some(
+                Domain(
+                    "test.ipynb",
+                ),
+            ),
+            port: None,
+            path: "",
+            query: None,
+            fragment: Some(
+                "2",
+            ),
+        },
+        diagnostics: [
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 66,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 78,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-argument-type",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "invalid-argument-type",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/"underlined/"]`",
+                related_information: Some(
+                    [
+                        DiagnosticRelatedInformation {
+                            location: Location {
+                                uri: Url {
+                                    scheme: "vscode-notebook-cell",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "test.ipynb",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "",
+                                    query: None,
+                                    fragment: Some(
+                                        "1",
+                                    ),
+                                },
+                                range: Range {
+                                    start: Position {
+                                        line: 0,
+                                        character: 4,
+                                    },
+                                    end: Position {
+                                        line: 0,
+                                        character: 14,
+                                    },
+                                },
+                            },
+                            message: "Function defined here",
+                        },
+                        DiagnosticRelatedInformation {
+                            location: Location {
+                                uri: Url {
+                                    scheme: "vscode-notebook-cell",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "test.ipynb",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "",
+                                    query: None,
+                                    fragment: Some(
+                                        "1",
+                                    ),
+                                },
+                                range: Range {
+                                    start: Position {
+                                        line: 0,
+                                        character: 32,
+                                    },
+                                    end: Position {
+                                        line: 0,
+                                        character: 44,
+                                    },
+                                },
+                            },
+                            message: "Parameter declared here",
+                        },
+                    ],
+                ),
+                tags: None,
+                data: None,
+            },
+        ],
+        version: Some(
+            0,
+        ),
+    },
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "vscode-notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: Some(
+                Domain(
+                    "test.ipynb",
+                ),
+            ),
+            port: None,
+            path: "",
+            query: None,
+            fragment: Some(
+                "0",
+            ),
+        },
+        diagnostics: [],
+        version: Some(
+            0,
+        ),
+    },
+]

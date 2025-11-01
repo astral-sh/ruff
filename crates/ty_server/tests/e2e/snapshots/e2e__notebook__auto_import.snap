@@ -1,0 +1,174 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: completions
+---
+[
+    CompletionItem {
+        label: "Literal (import typing)",
+        label_details: None,
+        kind: Some(
+            Variable,
+        ),
+        detail: None,
+        documentation: None,
+        deprecated: None,
+        preselect: None,
+        sort_text: Some(
+            " 43",
+        ),
+        filter_text: None,
+        insert_text: Some(
+            "Literal",
+        ),
+        insert_text_format: None,
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: Some(
+            [
+                TextEdit {
+                    range: Range {
+                        start: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                        end: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                    },
+                    new_text: "from typing import Literal\n",
+                },
+            ],
+        ),
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    },
+    CompletionItem {
+        label: "Literal (import typing_extensions)",
+        label_details: None,
+        kind: Some(
+            Variable,
+        ),
+        detail: None,
+        documentation: None,
+        deprecated: None,
+        preselect: None,
+        sort_text: Some(
+            " 44",
+        ),
+        filter_text: None,
+        insert_text: Some(
+            "Literal",
+        ),
+        insert_text_format: None,
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: Some(
+            [
+                TextEdit {
+                    range: Range {
+                        start: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                        end: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                    },
+                    new_text: "from typing_extensions import Literal\n",
+                },
+            ],
+        ),
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    },
+    CompletionItem {
+        label: "LiteralString (import typing)",
+        label_details: None,
+        kind: Some(
+            Variable,
+        ),
+        detail: None,
+        documentation: None,
+        deprecated: None,
+        preselect: None,
+        sort_text: Some(
+            " 45",
+        ),
+        filter_text: None,
+        insert_text: Some(
+            "LiteralString",
+        ),
+        insert_text_format: None,
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: Some(
+            [
+                TextEdit {
+                    range: Range {
+                        start: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                        end: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                    },
+                    new_text: "from typing import LiteralString\n",
+                },
+            ],
+        ),
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    },
+    CompletionItem {
+        label: "LiteralString (import typing_extensions)",
+        label_details: None,
+        kind: Some(
+            Variable,
+        ),
+        detail: None,
+        documentation: None,
+        deprecated: None,
+        preselect: None,
+        sort_text: Some(
+            " 46",
+        ),
+        filter_text: None,
+        insert_text: Some(
+            "LiteralString",
+        ),
+        insert_text_format: None,
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: Some(
+            [
+                TextEdit {
+                    range: Range {
+                        start: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                        end: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                    },
+                    new_text: "from typing_extensions import LiteralString\n",
+                },
+            ],
+        ),
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    },
+]

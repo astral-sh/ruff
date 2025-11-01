@@ -1,0 +1,605 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
+---
+[
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "vscode-notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: Some(
+                Domain(
+                    "test.ipynb",
+                ),
+            ),
+            port: None,
+            path: "",
+            query: None,
+            fragment: Some(
+                "1",
+            ),
+        },
+        diagnostics: [
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 49,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 52,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-return-type",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "invalid-return-type",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Function can implicitly return `None`, which is not assignable to return type `str`",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+        ],
+        version: Some(
+            0,
+        ),
+    },
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "vscode-notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: Some(
+                Domain(
+                    "test.ipynb",
+                ),
+            ),
+            port: None,
+            path: "",
+            query: None,
+            fragment: Some(
+                "2",
+            ),
+        },
+        diagnostics: [
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 19,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 23,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-syntax",
+                    ),
+                ),
+                code_description: None,
+                source: Some(
+                    "ty",
+                ),
+                message: "Expected `,`, found name",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 19,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 23,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "unresolved-reference",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "unresolved-reference",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Name `word` used when not defined",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 23,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 27,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-syntax",
+                    ),
+                ),
+                code_description: None,
+                source: Some(
+                    "ty",
+                ),
+                message: "Expected `,`, found string",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 23,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 27,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-argument-type",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "invalid-argument-type",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`",
+                related_information: Some(
+                    [
+                        DiagnosticRelatedInformation {
+                            location: Location {
+                                uri: Url {
+                                    scheme: "vscode-notebook-cell",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "test.ipynb",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "",
+                                    query: None,
+                                    fragment: Some(
+                                        "1",
+                                    ),
+                                },
+                                range: Range {
+                                    start: Position {
+                                        line: 0,
+                                        character: 4,
+                                    },
+                                    end: Position {
+                                        line: 0,
+                                        character: 14,
+                                    },
+                                },
+                            },
+                            message: "Function defined here",
+                        },
+                        DiagnosticRelatedInformation {
+                            location: Location {
+                                uri: Url {
+                                    scheme: "vscode-notebook-cell",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "test.ipynb",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "",
+                                    query: None,
+                                    fragment: Some(
+                                        "1",
+                                    ),
+                                },
+                                range: Range {
+                                    start: Position {
+                                        line: 0,
+                                        character: 32,
+                                    },
+                                    end: Position {
+                                        line: 0,
+                                        character: 44,
+                                    },
+                                },
+                            },
+                            message: "Parameter declared here",
+                        },
+                    ],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 27,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 36,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-syntax",
+                    ),
+                ),
+                code_description: None,
+                source: Some(
+                    "ty",
+                ),
+                message: "Expected `,`, found name",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 27,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 36,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "unresolved-reference",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "unresolved-reference",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Name `underline` used when not defined",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 27,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 36,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "too-many-positional-arguments",
+                    ),
+                ),
+                code_description: Some(
+                    CodeDescription {
+                        href: Url {
+                            scheme: "https",
+                            cannot_be_a_base: false,
+                            username: "",
+                            password: None,
+                            host: Some(
+                                Domain(
+                                    "ty.dev",
+                                ),
+                            ),
+                            port: None,
+                            path: "/rules",
+                            query: None,
+                            fragment: Some(
+                                "too-many-positional-arguments",
+                            ),
+                        },
+                    },
+                ),
+                source: Some(
+                    "ty",
+                ),
+                message: "Too many positional arguments to function `with_style`: expected 3, got 6",
+                related_information: Some(
+                    [
+                        DiagnosticRelatedInformation {
+                            location: Location {
+                                uri: Url {
+                                    scheme: "vscode-notebook-cell",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "test.ipynb",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "",
+                                    query: None,
+                                    fragment: Some(
+                                        "1",
+                                    ),
+                                },
+                                range: Range {
+                                    start: Position {
+                                        line: 0,
+                                        character: 4,
+                                    },
+                                    end: Position {
+                                        line: 0,
+                                        character: 52,
+                                    },
+                                },
+                            },
+                            message: "Function signature here",
+                        },
+                    ],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 36,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 38,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-syntax",
+                    ),
+                ),
+                code_description: None,
+                source: Some(
+                    "ty",
+                ),
+                message: "missing closing quote in string literal",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 2,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 2,
+                        character: 7,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-syntax",
+                    ),
+                ),
+                code_description: None,
+                source: Some(
+                    "ty",
+                ),
+                message: "Expected `,`, found name",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+            Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 3,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 3,
+                        character: 0,
+                    },
+                },
+                severity: Some(
+                    Error,
+                ),
+                code: Some(
+                    String(
+                        "invalid-syntax",
+                    ),
+                ),
+                code_description: None,
+                source: Some(
+                    "ty",
+                ),
+                message: "unexpected EOF while parsing",
+                related_information: Some(
+                    [],
+                ),
+                tags: None,
+                data: None,
+            },
+        ],
+        version: Some(
+            0,
+        ),
+    },
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "vscode-notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: Some(
+                Domain(
+                    "test.ipynb",
+                ),
+            ),
+            port: None,
+            path: "",
+            query: None,
+            fragment: Some(
+                "0",
+            ),
+        },
+        diagnostics: [],
+        version: Some(
+            0,
+        ),
+    },
+]

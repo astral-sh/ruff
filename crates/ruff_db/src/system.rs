@@ -9,6 +9,7 @@ pub use os::OsSystem;
 
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
@@ -16,12 +17,11 @@ use std::{fmt, io};
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
-use crate::file_revision::FileRevision;
-
 pub use self::path::{
     DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
     SystemVirtualPathBuf, deduplicate_nested_paths,
 };
+use crate::file_revision::FileRevision;
 
 mod memory_fs;
 #[cfg(feature = "os")]
@@ -65,6 +65,14 @@ pub trait System: Debug + Sync + Send {
     /// Unlike `std::fs::canonicalize`, this function does remove UNC prefixes if possible.
     /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
+
+    fn source_type(&self, _path: &SystemPath) -> Option<PySourceType> {
+        None
+    }
+
+    fn virtual_path_source_type(&self, _path: &SystemVirtualPath) -> Option<PySourceType> {
+        None
+    }
 
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
