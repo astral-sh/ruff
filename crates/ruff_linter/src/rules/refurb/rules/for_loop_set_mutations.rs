@@ -111,13 +111,24 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
                 parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
             )
         }
-        (for_target, arg) => format!(
-            "{}.{batch_method_name}({} for {} in {})",
-            set.id,
-            locator.slice(arg),
-            locator.slice(for_target),
-            parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
-        ),
+        (for_target, arg) => {
+            // Parenthesize an unparenthesized generator expression argument to preserve semantics,
+            // e.g. `s.add(c for c in x)` -> `s.update((c for c in x) for x in ...)`.
+            let arg_text = match arg {
+                Expr::Generator(generator) if !generator.parenthesized => {
+                    format!("({})", locator.slice(arg))
+                }
+                _ => locator.slice(arg).to_string(),
+            };
+
+            format!(
+                "{}.{batch_method_name}({} for {} in {})",
+                set.id,
+                arg_text,
+                locator.slice(for_target),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
+            )
+        }
     };
 
     let applicability = if checker.comment_ranges().intersects(for_stmt.range) {
