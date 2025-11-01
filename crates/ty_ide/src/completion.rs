@@ -4183,7 +4183,7 @@ type <CURSOR>
             .type_signatures()
             .auto_import()
             .module_names()
-            .filter(|c| c.name.contains("bar"))
+            .filter(|c| c.name.contains("long_name"))
             .build()
             .snapshot();
 
