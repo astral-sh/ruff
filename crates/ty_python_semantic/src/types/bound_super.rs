@@ -404,6 +404,9 @@ impl<'db> BoundSuperType<'db> {
                         .to_specialized_instance(db, [key_builder.build(), value_builder.build()]),
                 );
             }
+            Type::NewTypeInstance(newtype) => {
+                return delegate_to(Type::instance(db, newtype.base_class_type(db)));
+            }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
             }

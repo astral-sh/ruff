@@ -156,7 +156,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::Dynamic(_) => TypeKind::Atomic,
+            | Type::Dynamic(_)
+            // REVIEWERS: is this correct?
+            | Type::NewTypeInstance(_) => TypeKind::Atomic,
 
             // Non-atomic types
             Type::FunctionLiteral(function) => {

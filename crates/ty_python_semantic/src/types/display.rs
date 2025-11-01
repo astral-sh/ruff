@@ -615,6 +615,7 @@ impl Display for DisplayRepresentation<'_> {
                         .fmt(f),
                 }
             }
+            Type::NewTypeInstance(newtype) => f.write_str(newtype.name(self.db)),
         }
     }
 }
