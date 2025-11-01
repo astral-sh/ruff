@@ -53,10 +53,41 @@ g(Bar(Foo(42)))
 h(42)  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Literal[42]`"
 h(Foo(42))  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Foo`"
 h(Bar(Foo(42)))
+```
 
-# Method lookup works.
-def _(x: Bar):
-    reveal_type(x.bit_length())  # revealed: int
+## Member and method lookup work
+
+```py
+from typing_extensions import NewType
+
+class Foo:
+    foo_member: str = "hello"
+    def foo_method(self) -> int:
+        return 42
+
+Bar = NewType("Bar", Foo)
+Baz = NewType("Baz", Bar)
+baz = Baz(Bar(Foo()))
+reveal_type(baz.foo_member)  # revealed: str
+reveal_type(baz.foo_method())  # revealed: int
+```
+
+## `NewType` wrapper functions are `Callable`
+
+```py
+from collections.abc import Callable
+from typing_extensions import NewType
+
+Foo = NewType("Foo", int)
+
+def f(_: Callable[[int], Foo]): ...
+
+f(Foo)
+map(Foo, [1, 2, 3])
+
+def g(_: Callable[[str], Foo]): ...
+
+g(Foo)  # error: [invalid-argument-type]
 ```
 
 ## The name must be a string literal

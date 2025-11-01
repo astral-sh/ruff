@@ -1523,6 +1523,15 @@ impl<'db> Type<'db> {
                 false,
             ))),
 
+            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Some(CallableType::single(
+                db,
+                Signature::new(
+                    Parameters::new([Parameter::positional_only(None)
+                        .with_annotated_type(newtype.base(db).instance_type(db))]),
+                    Some(Type::NewTypeInstance(newtype)),
+                ),
+            )),
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
