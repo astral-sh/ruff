@@ -7,7 +7,9 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
-use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::analyze::typing::{
+    find_binding_value, is_immutable_annotation, is_mutable_expr,
+};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -142,6 +144,23 @@ fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
             elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
         }
         Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
+        Expr::Name(name) => {
+            // Resolve module-level constants that are bound to mutable objects
+            let Some(binding_id) = semantic.only_binding(name) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            // Only check assignments (not imports, function parameters, etc.)
+            if !binding.kind.is_assignment() {
+                return false;
+            }
+            // Get the assigned value and check if it's mutable
+            if let Some(value) = find_binding_value(binding, semantic) {
+                is_guaranteed_mutable_expr(value, semantic)
+            } else {
+                false
+            }
+        }
         _ => is_mutable_expr(expr, semantic),
     }
 }

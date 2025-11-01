@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_10.py:11:26
+   |
+10 | # Triggering B006 (correct)
+11 | def func_B(s: set[str] = {"ABC", "DEF"}):
+   |                          ^^^^^^^^^^^^^^
+12 |     return s
+   |
+help: Replace with `None`; initialize within function
+8  |     return s
+9  | 
+10 | # Triggering B006 (correct)
+   - def func_B(s: set[str] = {"ABC", "DEF"}):
+11 + def func_B(s: set[str] = None):
+12 +     if s is None:
+13 +         s = {"ABC", "DEF"}
+14 |     return s
+15 | 
+16 | # Should trigger B006
+note: This is an unsafe fix and may change runtime behavior
