@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use lsp_types::request::Rename;
 use lsp_types::{RenameParams, TextEdit, Url, WorkspaceEdit};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::rename;
 use ty_project::ProjectDatabase;
 
@@ -42,11 +41,10 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
         let offset = params.text_document_position.position.to_text_size(
-            &source,
-            &line_index,
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
         );
 

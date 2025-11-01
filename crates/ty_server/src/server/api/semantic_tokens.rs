@@ -1,5 +1,5 @@
 use lsp_types::SemanticToken;
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::source_text;
 use ruff_text_size::{Ranged, TextRange};
 use ty_ide::semantic_tokens;
 use ty_project::ProjectDatabase;
@@ -16,7 +16,6 @@ pub(crate) fn generate_semantic_tokens(
     multiline_token_support: bool,
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
-    let line_index = line_index(db, file);
     let semantic_token_data = semantic_tokens(db, file, range);
 
     // Convert semantic tokens to LSP format
@@ -25,7 +24,10 @@ pub(crate) fn generate_semantic_tokens(
     let mut prev_start = 0u32;
 
     for token in &*semantic_token_data {
-        let lsp_range = token.range().to_lsp_range(&source, &line_index, encoding);
+        let lsp_range = token
+            .range()
+            .as_lsp_range(db, file, encoding)
+            .to_local_range();
         let line = lsp_range.start.line;
         let character = lsp_range.start.character;
 
