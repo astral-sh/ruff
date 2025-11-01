@@ -62,7 +62,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
         generate_set(
             output,
             Set::Named {
-                name: set_name.to_string(),
+                name: set_name.clone(),
                 set: *sub_set,
             },
             parents,

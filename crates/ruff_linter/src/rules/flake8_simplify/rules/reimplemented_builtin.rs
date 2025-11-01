@@ -116,7 +116,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -212,7 +212,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
