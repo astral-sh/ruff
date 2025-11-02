@@ -118,7 +118,7 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
     // let is_stub = file.is_package_stub(db);
     let importing_module_name = importing_module.name(db);
 
-    let sub_imports = semantic_index(db, file)
+    let imports = semantic_index(db, file)
         .maybe_imported_modules
         .iter()
         .filter_map(|import| {
@@ -138,17 +138,9 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
                 .iter()
                 .map(|module| (module.clone(), vec![])),
         )
-        .filter_map(|(module, names)| {
-            let relative = if importing_module_name == &module {
-                None
-            } else {
-                Some(module.relative_to(importing_module_name)?)
-            };
-            Some((relative, names))
-        })
         .collect::<Vec<_>>();
 
-    let created_names = sub_imports
+    let created_names = imports
         .iter()
         .flat_map(|(_, names)| {
             names
@@ -157,10 +149,21 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
         })
         .collect::<FxHashSet<_>>();
 
-    sub_imports
+    imports
         .iter()
-        .filter_map(|(rel, names)| {
-            if let Some(rel) = rel {
+        .filter_map(|(module, names)| {
+            let relative = if importing_module_name == module {
+                None
+            } else {
+                Some(module.relative_to(importing_module_name)?)
+            };
+
+            // Don't mess with star imports
+            if names.iter().any(|(name, _)| name.as_str() == "*") {
+                return None;
+            }
+
+            if let Some(rel) = relative {
                 // The module we're importing from is a submodule of ourself!
                 // In this case the only submodule attribute we're introducing in ourself
                 // is the direct submodule, but we don't want to do that if another from import
@@ -174,6 +177,8 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
                 // The module we're importing from is ourselves!
                 // In this case all imports are presumably of modules, as it "doesn't"
                 // make sense to write `from . import an_actual_function`
+
+                // FOR NOW NOT ALLOWED
                 let submodules = names.iter().filter_map(|(name, alias)| {
                     if alias.is_some() && alias.as_ref() != Some(name) {
                         return None;
