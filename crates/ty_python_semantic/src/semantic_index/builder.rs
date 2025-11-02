@@ -2776,6 +2776,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         )
     }
 
+    fn nonlocal(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
+
     fn in_notebook(&self) -> bool {
         self.source_text().is_notebook()
     }

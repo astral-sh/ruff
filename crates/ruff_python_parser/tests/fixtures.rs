@@ -527,7 +527,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         None
     }
 
-    fn nonlocal(&self, name: &str) -> Option<TextRange> {
+    fn nonlocal(&self, _name: &str) -> Option<TextRange> {
         None
     }
 
