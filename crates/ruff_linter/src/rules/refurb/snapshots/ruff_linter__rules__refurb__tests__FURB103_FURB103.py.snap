@@ -136,12 +136,78 @@ FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(fo
 help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 
 FURB103 `open` and `write` should be replaced by `Path("test.json")....`
-   --> FURB103.py:154:6
+   --> FURB103.py:155:6
     |
-152 | data = {"price": 100}
-153 |
-154 | with open("test.json", "wb") as f:
+153 | data = {"price": 100}
+154 |
+155 | with open("test.json", "wb") as f:
     |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-155 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
+156 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
     |
 help: Replace with `Path("test.json")....`
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103.py:158:6
+    |
+156 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
+157 |
+158 | with Path("file.txt").open("w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+159 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test")`
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
+   --> FURB103.py:161:6
+    |
+159 |     f.write("test")
+160 |
+161 | with Path("file.txt").open("wb") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+162 |     f.write(b"test")
+    |
+help: Replace with `Path("file.txt").write_bytes(b"test")`
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103.py:164:6
+    |
+162 |     f.write(b"test")
+163 |
+164 | with Path("file.txt").open(mode="w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+165 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test")`
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
+   --> FURB103.py:167:6
+    |
+165 |     f.write("test")
+166 |
+167 | with Path("file.txt").open("w", encoding="utf8") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+168 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test", encoding="utf8")`
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
+   --> FURB103.py:170:6
+    |
+168 |     f.write("test")
+169 |
+170 | with Path("file.txt").open("w", errors="ignore") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+171 |     f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test", errors="ignore")`
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
+   --> FURB103.py:173:6
+    |
+171 |     f.write("test")
+172 |
+173 | with Path(foo()).open("w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+174 |     f.write("test")
+    |
+help: Replace with `Path(foo()).write_text("test")`
