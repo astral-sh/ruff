@@ -263,7 +263,7 @@ pub fn completion<'db>(
 
     if settings.auto_import {
         if let Some(scoped) = scoped {
-            unimported_completions(
+            add_unimported_completions(
                 db,
                 file,
                 &parsed,
@@ -319,7 +319,7 @@ fn add_keyword_value_completions<'db>(
 ///
 /// The completions returned will auto-insert import statements
 /// when selected into `File`.
-fn unimported_completions<'db>(
+fn add_unimported_completions<'db>(
     db: &'db dyn Db,
     file: File,
     parsed: &ParsedModuleRef,
