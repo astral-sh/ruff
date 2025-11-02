@@ -115,14 +115,14 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
     if !file.is_package(db) {
         return Box::default();
     }
-    let is_stub = file.is_package_stub(db);
+    // let is_stub = file.is_package_stub(db);
     let importing_module_name = importing_module.name(db);
 
     let sub_imports = semantic_index(db, file)
         .maybe_imported_modules
         .iter()
         .filter_map(|import| {
-            let mut submodule = ModuleName::from_identifier_parts(
+            let submodule = ModuleName::from_identifier_parts(
                 db,
                 file,
                 import.from_module.as_deref(),
@@ -150,7 +150,7 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
 
     let created_names = sub_imports
         .iter()
-        .flat_map(|(rel, names)| {
+        .flat_map(|(_, names)| {
             names
                 .iter()
                 .map(|(name, alias)| alias.as_ref().unwrap_or(name))
