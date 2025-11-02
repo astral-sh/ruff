@@ -260,7 +260,6 @@ pub fn completion<'db>(
     if scoped.is_some() {
         add_keyword_value_completions(db, &typed_query, &mut completions);
     }
-
     if settings.auto_import {
         if let Some(scoped) = scoped {
             add_unimported_completions(
@@ -273,10 +272,8 @@ pub fn completion<'db>(
             );
         }
     }
-
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-
     completions
 }
 
@@ -890,9 +887,9 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    fn key<'a>(completion: &'a Completion) -> (Option<&'a ModuleName>, NameKind, bool, &'a Name) {
+    fn key<'a>(completion: &'a Completion) -> (bool, NameKind, bool, &'a Name) {
         (
-            completion.module_name,
+            completion.module_name.is_some(),
             NameKind::classify(&completion.name),
             completion.is_type_check_only,
             &completion.name,
