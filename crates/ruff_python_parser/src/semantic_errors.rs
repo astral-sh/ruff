@@ -223,6 +223,10 @@ impl SemanticSyntaxChecker {
                 // test_err nonlocal_declaration_at_module_level
                 // nonlocal x
                 // nonlocal x, y
+
+                // test_ok nonlocal_declaration_at_module_level
+                // def _():
+                //     nonlocal x
                 if ctx.in_module_scope() {
                     Self::add_error(
                         ctx,
