@@ -132,6 +132,10 @@ impl NavigationTarget {
     pub fn full_range(&self) -> TextRange {
         self.full_range
     }
+
+    pub fn full_file_range(&self) -> FileRange {
+        FileRange::new(self.file, self.full_range)
+    }
 }
 
 /// Specifies the kind of reference operation.
