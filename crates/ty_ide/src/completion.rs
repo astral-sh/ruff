@@ -261,20 +261,20 @@ pub fn completion<'db>(
         add_keyword_value_completions(db, &typed_query, &mut completions);
     }
 
-    completions.sort_by(compare_suggestions);
-
     if settings.auto_import {
         if let Some(scoped) = scoped {
-            completions.extend(unimported_completions(
+            unimported_completions(
                 db,
                 file,
                 &parsed,
                 scoped,
                 typed.as_deref(),
-            ));
+                &mut completions,
+            );
         }
     }
 
+    completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
 
     completions
@@ -325,10 +325,10 @@ fn unimported_completions<'db>(
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
     typed: Option<&str>,
-) -> Vec<Completion<'db>> {
-    let mut completions = Vec::new();
+    completions: &mut Vec<Completion<'db>>,
+) {
     let Some(typed) = typed else {
-        return completions;
+        return;
     };
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
@@ -360,10 +360,6 @@ fn unimported_completions<'db>(
             documentation: None,
         });
     }
-
-    completions.sort_by(compare_suggestions);
-
-    completions
 }
 
 /// The kind of tokens identified under the cursor.
@@ -894,9 +890,16 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    let (kind1, kind2) = (NameKind::classify(&c1.name), NameKind::classify(&c2.name));
+    fn key<'a>(completion: &'a Completion) -> (Option<&'a ModuleName>, NameKind, bool, &'a Name) {
+        (
+            completion.module_name,
+            NameKind::classify(&completion.name),
+            completion.is_type_check_only,
+            &completion.name,
+        )
+    }
 
-    (kind1, c1.is_type_check_only, &c1.name).cmp(&(kind2, c2.is_type_check_only, &c2.name))
+    key(c1).cmp(&key(c2))
 }
 
 #[cfg(test)]
