@@ -4124,6 +4124,19 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .map_with_boundness_and_qualifiers(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
+                })
+                .or_fall_back_to(db, || {
+                    if intersection
+                        .positive(db)
+                        .iter()
+                        .any(|element| element.is_type_var())
+                    {
+                        intersection
+                            .with_positive_typevars_solved_to_bounds_or_constraints(db)
+                            .member_lookup_with_policy(db, name, policy)
+                    } else {
+                        Place::Undefined.into()
+                    }
                 }),
 
             Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
