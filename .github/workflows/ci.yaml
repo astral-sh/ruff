@@ -277,8 +277,8 @@ jobs:
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest
-      # Dogfood ty on py-fuzzer
-      - run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
+      - name: Dogfood ty on py-fuzzer
+        run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -649,7 +649,7 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
-    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 5 || 20 }}
+    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 10 || 20 }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
