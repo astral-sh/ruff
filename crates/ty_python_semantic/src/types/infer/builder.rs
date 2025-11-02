@@ -2423,15 +2423,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// The declared type is the annotated type, if any, or `Unknown`.
     ///
-    /// The inferred type is the annotated type, unioned with the type of the default value, if
-    /// any. If both types are fully static, this union is a no-op (it should simplify to just the
-    /// annotated type.) But in a case like `f(x=None)` with no annotated type, we want to infer
-    /// the type `Unknown | None` for `x`, not just `Unknown`, so that we can error on usage of `x`
-    /// that would not be valid for `None`.
-    ///
-    /// If the default-value type is not assignable to the declared (annotated) type, we ignore the
-    /// default-value type and just infer the annotated type; this is the same way we handle
-    /// assignments, and allows an explicit annotation to override a bad inference.
+    /// The inferred type is the annotated type, if any. If there is no annotation, it is the union
+    /// of `Unknown` and the type of the default value, if any.
     ///
     /// Parameter definitions are odd in that they define a symbol in the function-body scope, so
     /// the Definition belongs to the function body scope, but the expressions (annotation and
@@ -2460,23 +2453,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|default| self.file_expression_type(default));
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
-            let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
-                if default_ty.is_assignable_to(self.db(), declared_ty) {
-                    DeclaredAndInferredType::MightBeDifferent {
-                        declared_ty: TypeAndQualifiers::declared(declared_ty),
-                        inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
-                    }
-                } else if (self.in_stub()
-                    || self.in_function_overload_or_abstractmethod()
-                    || self
-                        .class_context_of_current_method()
-                        .is_some_and(|class| class.is_protocol(self.db())))
-                    && default
-                        .as_ref()
-                        .is_some_and(|d| d.is_ellipsis_literal_expr())
+            if let Some(default_ty) = default_ty {
+                if !default_ty.is_assignable_to(self.db(), declared_ty)
+                    && !((self.in_stub()
+                        || self.in_function_overload_or_abstractmethod()
+                        || self
+                            .class_context_of_current_method()
+                            .is_some_and(|class| class.is_protocol(self.db())))
+                        && default
+                            .as_ref()
+                            .is_some_and(|d| d.is_ellipsis_literal_expr()))
                 {
-                    DeclaredAndInferredType::are_the_same_type(declared_ty)
-                } else {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_PARAMETER_DEFAULT, parameter_with_default)
@@ -2488,15 +2475,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             declared_ty.display(self.db())
                         ));
                     }
-                    DeclaredAndInferredType::are_the_same_type(declared_ty)
                 }
-            } else {
-                DeclaredAndInferredType::are_the_same_type(declared_ty)
-            };
+            }
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
-                &declared_and_inferred_ty,
+                &DeclaredAndInferredType::are_the_same_type(declared_ty),
             );
         } else {
             let ty = if let Some(default_ty) = default_ty {

@@ -1,12 +1,9 @@
 # Function parameter types
 
 Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
-not annotated). The initial inferred type is the union of the declared type with the type of the
-default value expression (if any). If both are fully static types, this union should simplify to the
-annotated type (since the default value type must be assignable to the annotated type, and for fully
-static types this means subtype-of, which simplifies in unions). But if the annotated type is
-Unknown or another non-fully-static type, the default value type may still be relevant as lower
-bound.
+not annotated). The initial inferred type is the annotated type of the parameter, if any. If there
+is no annotation, it is the union of `Unknown` with the type of the default value expression (if
+any).
 
 The variadic parameter is a variadic tuple of its annotated type; the variadic-keywords parameter is
 a dictionary from strings to its annotated type.
@@ -41,13 +38,13 @@ def g(*args, **kwargs):
 
 ## Annotation is present but not a fully static type
 
-The default value type should be a lower bound on the inferred type.
+If there is an annotation, we respect it fully and don't union in the default value type.
 
 ```py
 from typing import Any
 
 def f(x: Any = 1):
-    reveal_type(x)  # revealed: Any | Literal[1]
+    reveal_type(x)  # revealed: Any
 ```
 
 ## Default value type must be assignable to annotated type
@@ -64,7 +61,7 @@ def f(x: int = "foo"):
 from typing import Any
 
 def g(x: Any = "foo"):
-    reveal_type(x)  # revealed: Any | Literal["foo"]
+    reveal_type(x)  # revealed: Any
 ```
 
 ## Stub functions
