@@ -11,7 +11,7 @@ use ruff_python_ast::{
     AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt, StringLiteral,
     TypeParam,
 };
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_semantic::{
     HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
@@ -226,7 +226,12 @@ impl<'db> SemanticTokenVisitor<'db> {
         let range = ranged.range();
         // Only emit tokens that intersect with the range filter, if one is specified
         if let Some(range_filter) = self.range_filter {
-            if range.intersect(range_filter).is_none() {
+            // Only include ranges that have a non-empty overlap. Adjacent ranges
+            // should be excluded.
+            if range
+                .intersect(range_filter)
+                .is_none_or(TextRange::is_empty)
+            {
                 return;
             }
         }
@@ -446,11 +451,11 @@ impl<'db> SemanticTokenVisitor<'db> {
         let name_start = name.start();
 
         // Split the dotted name and calculate positions for each part
-        let mut current_offset = ruff_text_size::TextSize::default();
+        let mut current_offset = TextSize::default();
         for part in name_str.split('.') {
             if !part.is_empty() {
                 self.add_token(
-                    ruff_text_size::TextRange::at(name_start + current_offset, part.text_len()),
+                    TextRange::at(name_start + current_offset, part.text_len()),
                     token_type,
                     SemanticTokenModifier::empty(),
                 );
@@ -926,6 +931,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 mod tests {
     use super::*;
     use crate::tests::cursor_test;
+
     use insta::assert_snapshot;
 
     /// Helper function to get semantic tokens for full file (for testing)
@@ -1231,10 +1237,7 @@ def function2():
 
         // Get the range that covers only the second function
         // Hardcoded offsets: function2 starts at position 42, source ends at position 108
-        let range = ruff_text_size::TextRange::new(
-            ruff_text_size::TextSize::from(42u32),
-            ruff_text_size::TextSize::from(108u32),
-        );
+        let range = TextRange::new(TextSize::from(42u32), TextSize::from(108u32));
 
         let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
 
@@ -1276,6 +1279,31 @@ def function2():
                 range
             );
         }
+    }
+
+    /// When a token starts right at where the requested range ends,
+    /// don't include it in the semantic tokens.
+    #[test]
+    fn test_semantic_tokens_range_excludes_boundary_tokens() {
+        let test = cursor_test(
+            "
+x = 1
+y = 2
+z = 3<CURSOR>
+",
+        );
+
+        // Range [6..13) starts where "1" ends and ends where "z" starts.
+        // Expected: only "y" @ 7..8 and "2" @ 11..12 (non-empty overlap with target range).
+        // Not included: "1" @ 5..6 and "z" @ 13..14 (adjacent, but not overlapping at offsets 6 and 13).
+        let range = TextRange::new(TextSize::from(6), TextSize::from(13));
+
+        let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &range_tokens), @r#"
+        "y" @ 7..8: Variable
+        "2" @ 11..12: Number
+        "#);
     }
 
     #[test]
