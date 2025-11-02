@@ -8,3 +8,7 @@ benchmark = "bench -p ruff_benchmark --bench linter --bench formatter --"
 # See: https://github.com/astral-sh/ruff/issues/11503
 [target.'cfg(all(target_env="msvc", target_os = "windows"))']
 rustflags = ["-C", "target-feature=+crt-static"]
+
+# Use system jemalloc (which may or may not be compiled for 64K pages).
+[target.'cfg(all(target_env = "musl", target_os = "linux"))'.jemalloc]
+rustc-link-lib = ["jemalloc"]
