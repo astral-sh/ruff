@@ -1899,8 +1899,10 @@ impl<'db> Type<'db> {
                     })
                 }),
 
-            (Type::Intersection(intersection), _) => {
-                intersection.positive(db).iter().when_any(db, |&elem_ty| {
+            (Type::Intersection(intersection), _) => intersection
+                .positive(db)
+                .iter()
+                .when_any(db, |&elem_ty| {
                     elem_ty.has_relation_to_impl(
                         db,
                         target,
@@ -1910,7 +1912,26 @@ impl<'db> Type<'db> {
                         disjointness_visitor,
                     )
                 })
-            }
+                .or(db, || {
+                    if intersection
+                        .positive(db)
+                        .iter()
+                        .any(|element| element.is_type_var())
+                    {
+                        intersection
+                            .with_positive_typevars_solved_to_bounds_or_constraints(db)
+                            .has_relation_to_impl(
+                                db,
+                                target,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                    } else {
+                        ConstraintSet::from(false)
+                    }
+                }),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
@@ -11802,6 +11823,22 @@ impl<'db> IntersectionType<'db> {
 
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {
         (self.positive(db).len() + self.negative(db).len()) == 1
+    }
+
+    pub(crate) fn with_positive_typevars_solved_to_bounds_or_constraints(
+        self,
+        db: &'db dyn Db,
+    ) -> Type<'db> {
+        self.map_positive(db, |ty| match ty {
+            Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    Type::Union(constraints)
+                }
+                None => Type::object(),
+            },
+            _ => *ty,
+        })
     }
 
     fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {

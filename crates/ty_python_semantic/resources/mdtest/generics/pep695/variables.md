@@ -1008,10 +1008,10 @@ def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
         reveal_type(x)  # revealed: T@constrained & Base
 
     def _(x: Intersection[T, Unrelated]) -> None:
-        reveal_type(x)  # revealed: Unrelated
+        reveal_type(x)  # revealed: T@constrained & Unrelated
 
     def _(x: Intersection[T, Sub]) -> None:
-        reveal_type(x)  # revealed: Sub
+        reveal_type(x)  # revealed: T@constrained & Sub
 
     def _(x: Intersection[T, None]) -> None:
         reveal_type(x)  # revealed: Never
@@ -1028,7 +1028,7 @@ from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: T@remove_constraint & ~int
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]
@@ -1082,38 +1082,38 @@ class R: ...
 
 def f[T: (P, Q)](t: T) -> None:
     if isinstance(t, P):
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@f & P
         p: P = t
     else:
-        reveal_type(t)  # revealed: Q & ~P
+        reveal_type(t)  # revealed: T@f & ~P
         q: Q = t
 
     if isinstance(t, Q):
-        reveal_type(t)  # revealed: Q
+        reveal_type(t)  # revealed: T@f & Q
         q: Q = t
     else:
-        reveal_type(t)  # revealed: P & ~Q
+        reveal_type(t)  # revealed: T@f & ~Q
         p: P = t
 
 def g[T: (P, Q, R)](t: T) -> None:
     if isinstance(t, P):
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@g & P
         p: P = t
     elif isinstance(t, Q):
-        reveal_type(t)  # revealed: Q & ~P
+        reveal_type(t)  # revealed: T@g & Q & ~P
         q: Q = t
     else:
-        reveal_type(t)  # revealed: R & ~P & ~Q
+        reveal_type(t)  # revealed: T@g & ~P & ~Q
         r: R = t
 
     if isinstance(t, P):
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@g & P
         p: P = t
     elif isinstance(t, Q):
-        reveal_type(t)  # revealed: Q & ~P
+        reveal_type(t)  # revealed: T@g & Q & ~P
         q: Q = t
     elif isinstance(t, R):
-        reveal_type(t)  # revealed: R & ~P & ~Q
+        reveal_type(t)  # revealed: T@g & R & ~P & ~Q
         r: R = t
     else:
         reveal_type(t)  # revealed: Never
@@ -1124,10 +1124,10 @@ If the constraints are disjoint, simplification does eliminate the redundant neg
 ```py
 def h[T: (P, None)](t: T) -> None:
     if t is None:
-        reveal_type(t)  # revealed: None
+        reveal_type(t)  # revealed: T@h & None
         p: None = t
     else:
-        reveal_type(t)  # revealed: P
+        reveal_type(t)  # revealed: T@h & ~None
         p: P = t
 ```
 
