@@ -110,6 +110,10 @@ impl RangeExt for lsp_types::Range {
 pub(crate) trait PositionExt {
     /// Convert an LSP Position to internal `TextSize`.
     ///
+    /// For notebook support, this uses the URI to determine which cell the position
+    /// refers to, and maps the cell-relative position to the absolute position in the
+    /// concatenated notebook file.
+    ///
     /// Returns `None` if `file` is a notebook and the
     /// cell identified by `url` can't be looked up or if the notebook
     /// isn't open in the editor.
@@ -127,11 +131,31 @@ impl PositionExt for lsp_types::Position {
         &self,
         db: &dyn Db,
         file: File,
-        _url: &lsp_types::Url,
+        url: &lsp_types::Url,
         encoding: PositionEncoding,
     ) -> Option<TextSize> {
         let source = source_text(db, file);
         let index = line_index(db, file);
+
+        if let Some(notebook) = source.as_notebook() {
+            let notebook_document = db.notebook_document(file)?;
+            let cell_index = notebook_document.cell_index_by_uri(url)?;
+
+            let cell_start_offset = notebook.cell_offset(cell_index).unwrap_or_default();
+            let cell_relative_line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
+
+            let cell_start_location =
+                index.source_location(cell_start_offset, source.as_str(), encoding.into());
+            assert_eq!(cell_start_location.character_offset, OneIndexed::MIN);
+
+            let absolute_start = SourceLocation {
+                line: cell_start_location
+                    .line
+                    .saturating_add(cell_relative_line.to_zero_indexed()),
+                character_offset: OneIndexed::from_zero_indexed(u32_index_to_usize(self.character)),
+            };
+            return Some(index.offset(absolute_start, &source, encoding.into()));
+        }
 
         Some(lsp_position_to_text_size(*self, &source, &index, encoding))
     }
@@ -164,6 +188,19 @@ impl TextSizeExt for TextSize {
     ) -> Option<LspPosition> {
         let source = source_text(db, file);
         let index = line_index(db, file);
+
+        if let Some(notebook) = source.as_notebook() {
+            let notebook_document = db.notebook_document(file)?;
+            let start = index.source_location(*self, source.as_str(), encoding.into());
+            let cell = notebook.index().cell(start.line)?;
+
+            let cell_relative_start = notebook.index().translate_source_location(&start);
+
+            return Some(LspPosition {
+                uri: Some(notebook_document.cell_uri_by_index(cell)?.clone()),
+                position: source_location_to_position(&cell_relative_start),
+            });
+        }
 
         let uri = file_to_url(db, file);
         let position = text_size_to_lsp_position(*self, &source, &index, encoding);
@@ -252,6 +289,38 @@ impl ToRangeExt for TextRange {
     ) -> Option<LspRange> {
         let source = source_text(db, file);
         let index = line_index(db, file);
+
+        if let Some(notebook) = source.as_notebook() {
+            let notebook_index = notebook.index();
+            let notebook_document = db.notebook_document(file)?;
+
+            let start_in_concatenated =
+                index.source_location(self.start(), &source, encoding.into());
+            let cell_index = notebook_index.cell(start_in_concatenated.line)?;
+            let cell_range = notebook.cell_range(cell_index)?;
+
+            // Clamp the end offset to the end of the cell.
+            let end_offset = self.end().min(cell_range.end());
+
+            let end_in_concatenated = index.source_location(end_offset, &source, encoding.into());
+
+            let start_in_cell = source_location_to_position(
+                &notebook_index.translate_source_location(&start_in_concatenated),
+            );
+            let end_in_cell = source_location_to_position(
+                &notebook_index.translate_source_location(&end_in_concatenated),
+            );
+
+            let cell_uri = notebook_document
+                .cell_uri_by_index(cell_index)
+                .expect("Index to contain an URI for every cell");
+
+            return Some(LspRange {
+                uri: Some(cell_uri.clone()),
+                range: lsp_types::Range::new(start_in_cell, end_in_cell),
+            });
+        }
+
         let range = text_range_to_lsp_range(*self, &source, &index, encoding);
 
         let uri = file_to_url(db, file);

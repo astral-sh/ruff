@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
@@ -294,7 +294,7 @@ impl Notebook {
         }
     }
 
-    /// Build and return the [`JupyterIndex`].
+    /// Build and return the [`NotebookIndex`].
     ///
     /// ## Notes
     ///
@@ -386,6 +386,21 @@ impl Notebook {
     /// the Jupyter notebook.
     pub fn cell_offsets(&self) -> &CellOffsets {
         &self.cell_offsets
+    }
+
+    /// Returns the start offset of the cell at index `cell` in the concatenated
+    /// text document.
+    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
+        self.cell_offsets.get(cell.to_zero_indexed()).copied()
+    }
+
+    /// Returns the text range in the concatenated document of the cell
+    /// with index `cell`.
+    pub fn cell_range(&self, cell: OneIndexed) -> Option<TextRange> {
+        let start = self.cell_offsets.get(cell.to_zero_indexed()).copied()?;
+        let end = self.cell_offsets.get(cell.to_zero_indexed() + 1).copied()?;
+
+        Some(TextRange::new(start, end))
     }
 
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.

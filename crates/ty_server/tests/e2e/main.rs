@@ -30,11 +30,12 @@
 mod commands;
 mod initialize;
 mod inlay_hints;
+mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, OnceLock};
 use std::thread::JoinHandle;
@@ -433,6 +434,33 @@ impl TestServer {
         ))
     }
 
+    /// Collects `N` publish diagnostics into a map, indexed by the document url.
+    ///
+    /// ## Panics
+    /// If there are multiple publish diagnostics notifications for the same document.
+    pub(crate) fn collect_publish_diagnostics(
+        &mut self,
+        count: usize,
+    ) -> Result<BTreeMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>> {
+        let mut results = BTreeMap::default();
+
+        for _ in 0..count {
+            let notification =
+                self.await_notification::<lsp_types::notification::PublishDiagnostics>()?;
+
+            if let Some(existing) =
+                results.insert(notification.uri.clone(), notification.diagnostics)
+            {
+                panic!(
+                    "Received multiple publish diagnostic notifications for {url}: ({existing:#?})",
+                    url = &notification.uri
+                );
+            }
+        }
+
+        Ok(results)
+    }
+
     /// Wait for a request of the specified type from the server and return the request ID and
     /// parameters.
     ///
@@ -774,6 +802,7 @@ impl Drop for TestServer {
             match self.await_response::<Shutdown>(&shutdown_id) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
+
                     None
                 }
                 Err(err) => Some(format!("Failed to get shutdown response: {err:?}")),
@@ -782,9 +811,32 @@ impl Drop for TestServer {
             None
         };
 
-        if let Some(_client_connection) = self.client_connection.take() {
-            // Drop the client connection before joining the server thread to avoid any hangs
-            // in case the server didn't respond to the shutdown request.
+        // Drop the client connection before joining the server thread to avoid any hangs
+        // in case the server didn't respond to the shutdown request.
+        if let Some(client_connection) = self.client_connection.take() {
+            if !std::thread::panicking() {
+                // Wait for the client sender to drop (confirmation that it processed the exit notification).
+
+                match client_connection
+                    .receiver
+                    .recv_timeout(Duration::from_secs(20))
+                {
+                    Err(RecvTimeoutError::Disconnected) => {
+                        // Good, the server terminated
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        tracing::warn!(
+                            "The server didn't exit within 20ms after receiving the EXIT notification"
+                        );
+                    }
+                    Ok(message) => {
+                        // Ignore any errors: A duplicate pending message
+                        // won't matter that much because `assert_no_pending_messages` will
+                        // panic anyway.
+                        let _ = self.handle_message(message);
+                    }
+                }
+            }
         }
 
         if std::thread::panicking() {

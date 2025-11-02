@@ -5,7 +5,7 @@ use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
 use crate::Db;
-use crate::document::DocumentKey;
+use crate::document::{DocumentKey, LanguageId};
 use crate::session::index::{Document, Index};
 use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
@@ -16,6 +16,7 @@ use ruff_db::system::{
     SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use ty_ide::cached_vendored_path;
 
 /// Returns a [`Url`] for the given [`File`].
@@ -117,6 +118,23 @@ impl LSPSystem {
         index.document(&DocumentKey::from(path)).ok()
     }
 
+    fn source_type_from_document(
+        document: &Document,
+        extension: Option<&str>,
+    ) -> Option<PySourceType> {
+        match document {
+            Document::Text(text) => match text.language_id()? {
+                LanguageId::Python => Some(
+                    extension
+                        .and_then(PySourceType::try_from_extension)
+                        .unwrap_or(PySourceType::Python),
+                ),
+                LanguageId::Other => None,
+            },
+            Document::Notebook(_) => Some(PySourceType::Ipynb),
+        }
+    }
+
     pub(crate) fn system_path_to_document(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
         self.document(any_path)
@@ -154,6 +172,16 @@ impl System for LSPSystem {
         self.native_system.path_exists_case_sensitive(path, prefix)
     }
 
+    fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
+        let document = self.system_path_to_document(path)?;
+        Self::source_type_from_document(document, path.extension())
+    }
+
+    fn virtual_path_source_type(&self, path: &SystemVirtualPath) -> Option<PySourceType> {
+        let document = self.system_virtual_path_to_document(path)?;
+        Self::source_type_from_document(document, path.extension())
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         let document = self.system_path_to_document(path);
 
@@ -168,7 +196,7 @@ impl System for LSPSystem {
 
         match document {
             Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
-            Some(Document::Notebook(notebook)) => Ok(notebook.make_ruff_notebook()),
+            Some(Document::Notebook(notebook)) => Ok(notebook.to_ruff_notebook(self.index())),
             None => self.native_system.read_to_notebook(path),
         }
     }
@@ -195,7 +223,7 @@ impl System for LSPSystem {
 
         match document {
             Document::Text(document) => Notebook::from_source_code(document.contents()),
-            Document::Notebook(notebook) => Ok(notebook.make_ruff_notebook()),
+            Document::Notebook(notebook) => Ok(notebook.to_ruff_notebook(self.index())),
         }
     }
 

@@ -47,7 +47,7 @@ impl NotebookIndex {
     /// Translates the given [`LineColumn`] based on the indexing table.
     ///
     /// This will translate the row/column in the concatenated source code
-    /// to the row/column in the Jupyter Notebook.
+    /// to the row/column in the Jupyter Notebook cell.
     pub fn translate_line_column(&self, source_location: &LineColumn) -> LineColumn {
         LineColumn {
             line: self
@@ -60,7 +60,7 @@ impl NotebookIndex {
     /// Translates the given [`SourceLocation`] based on the indexing table.
     ///
     /// This will translate the line/character in the concatenated source code
-    /// to the line/character in the Jupyter Notebook.
+    /// to the line/character in the Jupyter Notebook cell.
     pub fn translate_source_location(&self, source_location: &SourceLocation) -> SourceLocation {
         SourceLocation {
             line: self

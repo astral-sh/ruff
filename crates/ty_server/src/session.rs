@@ -1,7 +1,11 @@
 //! Data model, state management, and configuration resolution.
 
+use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
 use anyhow::{Context, anyhow};
-use index::DocumentError;
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
@@ -13,19 +17,16 @@ use lsp_types::{
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
-use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use std::borrow::Cow;
-use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
+
+use index::DocumentError;
+use options::GlobalOptions;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
@@ -36,6 +37,7 @@ use crate::capabilities::{
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
+use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
@@ -816,25 +818,16 @@ impl Session {
         let index = self.index();
         let document_handle = index.document_handle(url)?;
 
-        let notebook = if let Some(notebook_path) = &document_handle.notebook_path {
-            index
-                .notebook_arc(&DocumentKey::from(notebook_path.clone()))
-                .ok()
-        } else {
-            None
-        };
-
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
             workspace_settings: document_handle
-                .to_file_path()
+                .notebook_or_file_path()
                 .as_system()
                 .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
-            notebook,
         })
     }
 
@@ -860,13 +853,7 @@ impl Session {
     pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
         self.index()
             .text_documents()
-            .map(|(key, document)| DocumentHandle {
-                key: key.clone(),
-                url: document.url().clone(),
-                version: document.version(),
-                // TODO: Set notebook path if text document is part of a notebook
-                notebook_path: None,
-            })
+            .map(|(_, document)| DocumentHandle::from_text_document(document))
     }
 
     /// Returns a handle to the document specified by its URL.
@@ -999,7 +986,6 @@ pub(crate) struct DocumentSnapshot {
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document: DocumentHandle,
-    notebook: Option<Arc<NotebookDocument>>,
 }
 
 impl DocumentSnapshot {
@@ -1028,17 +1014,12 @@ impl DocumentSnapshot {
         &self.document
     }
 
-    /// Returns the URL of the document.
     pub(crate) fn url(&self) -> &lsp_types::Url {
         self.document.url()
     }
 
-    pub(crate) fn notebook(&self) -> Option<&NotebookDocument> {
-        self.notebook.as_deref()
-    }
-
-    pub(crate) fn to_file(&self, db: &dyn Db) -> Option<File> {
-        let file = self.document.to_file(db);
+    pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
+        let file = self.document.notebook_or_file(db);
         if file.is_none() {
             tracing::debug!(
                 "Failed to resolve file: file not found for `{}`",
@@ -1048,8 +1029,8 @@ impl DocumentSnapshot {
         file
     }
 
-    pub(crate) fn to_file_path(&self) -> Cow<'_, AnySystemPath> {
-        self.document.to_file_path()
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        self.document.notebook_or_file_path()
     }
 }
 
@@ -1330,34 +1311,99 @@ impl SuspendedWorkspaceDiagnosticRequest {
 ///
 /// It also exposes methods to get the file-path of the corresponding ty-file.
 #[derive(Clone, Debug)]
-pub(crate) struct DocumentHandle {
-    /// The key that uniquely identifies this document in the index.
-    key: DocumentKey,
-    url: lsp_types::Url,
-    /// The path to the enclosing notebook file if this document is a notebook or a notebook cell.
-    notebook_path: Option<AnySystemPath>,
-    version: DocumentVersion,
+pub(crate) enum DocumentHandle {
+    Text {
+        url: lsp_types::Url,
+        path: AnySystemPath,
+        version: DocumentVersion,
+    },
+    Notebook {
+        url: lsp_types::Url,
+        path: AnySystemPath,
+        version: DocumentVersion,
+    },
+    Cell {
+        url: lsp_types::Url,
+        version: DocumentVersion,
+        notebook_path: AnySystemPath,
+    },
 }
 
 impl DocumentHandle {
+    fn from_text_document(document: &TextDocument) -> Self {
+        match document.notebook() {
+            None => Self::Text {
+                version: document.version(),
+                url: document.url().clone(),
+                path: DocumentKey::from_url(document.url()).into_file_path(),
+            },
+            Some(notebook) => Self::Cell {
+                notebook_path: notebook.clone(),
+                version: document.version(),
+                url: document.url().clone(),
+            },
+        }
+    }
+
+    fn from_notebook_document(document: &NotebookDocument) -> Self {
+        Self::Notebook {
+            path: DocumentKey::from_url(document.url()).into_file_path(),
+            url: document.url().clone(),
+            version: document.version(),
+        }
+    }
+
+    fn from_document(document: &Document) -> Self {
+        match document {
+            Document::Text(text) => Self::from_text_document(text),
+            Document::Notebook(notebook) => Self::from_notebook_document(notebook),
+        }
+    }
+
+    fn key(&self) -> DocumentKey {
+        DocumentKey::from_url(self.url())
+    }
+
     pub(crate) const fn version(&self) -> DocumentVersion {
-        self.version
+        match self {
+            Self::Text { version, .. }
+            | Self::Notebook { version, .. }
+            | Self::Cell { version, .. } => *version,
+        }
     }
 
     /// The URL as used by the client to reference this document.
     pub(crate) fn url(&self) -> &lsp_types::Url {
-        &self.url
+        match self {
+            Self::Text { url, .. } | Self::Notebook { url, .. } | Self::Cell { url, .. } => url,
+        }
     }
 
     /// The path to the enclosing file for this document.
     ///
     /// This is the path corresponding to the URL, except for notebook cells where the
     /// path corresponds to the notebook file.
-    pub(crate) fn to_file_path(&self) -> Cow<'_, AnySystemPath> {
-        if let Some(path) = self.notebook_path.as_ref() {
-            Cow::Borrowed(path)
-        } else {
-            Cow::Owned(self.key.to_file_path())
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        match self {
+            Self::Text { path, .. } | Self::Notebook { path, .. } => path,
+            Self::Cell { notebook_path, .. } => notebook_path,
+        }
+    }
+
+    #[expect(unused)]
+    pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
+        match self {
+            Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
+            Self::Cell { .. } => None,
+        }
+    }
+
+    #[expect(unused)]
+    pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
+        match self {
+            DocumentHandle::Notebook { path, .. } => Some(path),
+            DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
+            DocumentHandle::Text { .. } => None,
         }
     }
 
@@ -1366,14 +1412,22 @@ impl DocumentHandle {
     /// It returns [`None`] for the following cases:
     /// - For virtual file, if it's not yet opened
     /// - For regular file, if it does not exists or is a directory
-    pub(crate) fn to_file(&self, db: &dyn Db) -> Option<File> {
-        match &*self.to_file_path() {
+    pub(crate) fn notebook_or_file(&self, db: &dyn Db) -> Option<File> {
+        match &self.notebook_or_file_path() {
             AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
             AnySystemPath::SystemVirtual(virtual_path) => db
                 .files()
                 .try_virtual_file(virtual_path)
                 .map(|virtual_file| virtual_file.file()),
         }
+    }
+
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell { .. })
+    }
+
+    pub(crate) fn is_cell_or_notebook(&self) -> bool {
+        matches!(self, Self::Cell { .. } | Self::Notebook { .. })
     }
 
     pub(crate) fn update_text_document(
@@ -1385,7 +1439,7 @@ impl DocumentHandle {
         let position_encoding = session.position_encoding();
         let mut index = session.index_mut();
 
-        let document_mut = index.document_mut(&self.key)?;
+        let document_mut = index.document_mut(&self.key())?;
 
         let Some(document) = document_mut.as_text_mut() else {
             anyhow::bail!("Text document path does not point to a text document");
@@ -1401,10 +1455,23 @@ impl DocumentHandle {
         Ok(())
     }
 
+    pub(crate) fn update_notebook_document(
+        &self,
+        session: &mut Session,
+        cells: Option<lsp_types::NotebookDocumentCellChange>,
+        metadata: Option<lsp_types::LSPObject>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        let mut index = session.index_mut();
+
+        index.update_notebook_document(&self.key(), cells, metadata, new_version, position_encoding)
+    }
+
     /// De-registers a document, specified by its key.
     /// Calling this multiple times for the same document is a logic error.
     pub(crate) fn close(self, session: &mut Session) -> crate::Result<()> {
-        session.index_mut().close_document(&self.key)?;
+        session.index_mut().close_document(&self.key())?;
         session.bump_revision();
         Ok(())
     }

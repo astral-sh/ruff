@@ -1,10 +1,10 @@
 use lsp_types::{
     ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
     DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
-    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    InlayHintServerCapabilities, MarkupKind, NotebookCellSelector, NotebookSelector, OneOf,
+    RenameOptions, SelectionRangeProviderCapability, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 
@@ -422,6 +422,16 @@ pub(crate) fn server_capabilities(
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
+        notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
+            save: Some(false),
+            notebook_selector: [NotebookSelector::ByCells {
+                notebook: None,
+                cells: vec![NotebookCellSelector {
+                    language: "python".to_string(),
+                }],
+            }]
+            .to_vec(),
+        })),
         ..Default::default()
     }
 }
