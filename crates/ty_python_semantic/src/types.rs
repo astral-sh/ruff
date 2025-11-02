@@ -1153,6 +1153,23 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
+    /// Detects types which are valid to appear inside a `Literal[…]` type annotation.
+    pub(crate) fn is_literal_or_union_of_literals(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_literal_or_union_of_literals(db)),
+            Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::EnumLiteral(_) => true,
+            Type::NominalInstance(_) => self.is_none(db) || self.is_bool(db) || self.is_enum(db),
+            _ => false,
+        }
+    }
+
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
         self.as_union().is_some_and(|union| {
             union.elements(db).iter().all(|ty| {
