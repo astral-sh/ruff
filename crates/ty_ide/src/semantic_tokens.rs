@@ -226,7 +226,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         let range = ranged.range();
         // Only emit tokens that intersect with the range filter, if one is specified
         if let Some(range_filter) = self.range_filter {
-            // Only include ranges that intersect. Ranges that only touch (are empty)
+            // Only include ranges that have a non-empty overlap. Adjacent ranges
             // should be excluded.
             if range
                 .intersect(range_filter)
@@ -1294,8 +1294,8 @@ z = 3<CURSOR>
         );
 
         // Range [6..13) starts where "1" ends and ends where "z" starts.
-        // Expected: only "y" @ 7..8 and "2" @ 11..12 (non-empty intersections).
-        // Not included: "1" @ 5..6 and "z" @ 13..14 (touch at single points 6 and 13).
+        // Expected: only "y" @ 7..8 and "2" @ 11..12 (non-empty overlap with target range).
+        // Not included: "1" @ 5..6 and "z" @ 13..14 (adjacent, but not overlapping at offsets 6 and 13).
         let range = TextRange::new(TextSize::from(6), TextSize::from(13));
 
         let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
