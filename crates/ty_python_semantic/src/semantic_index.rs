@@ -116,7 +116,9 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
         return Box::default();
     }
     let is_stub = file.is_package_stub(db);
-    semantic_index(db, file)
+    let importing_module_name = importing_module.name(db);
+
+    let sub_imports = semantic_index(db, file)
         .maybe_imported_modules
         .iter()
         .filter_map(|import| {
@@ -128,34 +130,65 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
             )
             .ok()?;
 
-            if is_stub {
-                // We only actually care if this is a direct submodule of the package
-                // so this part should actually be exactly the importing module.
-                let importing_module_name = importing_module.name(db);
-                if importing_module_name != &submodule {
+            Some((submodule, import.names.clone()))
+        })
+        .chain(
+            semantic_index(db, file)
+                .imported_modules
+                .iter()
+                .map(|module| (module.clone(), vec![])),
+        )
+        .filter_map(|(module, names)| {
+            let relative = if importing_module_name == &module {
+                None
+            } else {
+                Some(module.relative_to(importing_module_name)?)
+            };
+            Some((relative, names))
+        })
+        .collect::<Vec<_>>();
+
+    let created_names = sub_imports
+        .iter()
+        .flat_map(|(rel, names)| {
+            names
+                .iter()
+                .map(|(name, alias)| alias.as_ref().unwrap_or(name))
+        })
+        .collect::<FxHashSet<_>>();
+
+    sub_imports
+        .iter()
+        .filter_map(|(rel, names)| {
+            if let Some(rel) = rel {
+                // The module we're importing from is a submodule of ourself!
+                // In this case the only submodule attribute we're introducing in ourself
+                // is the direct submodule, but we don't want to do that if another from import
+                // explicitly shadows it
+                let direct_submodule = Name::from(rel.components().next()?.to_owned());
+                if created_names.contains(&direct_submodule) {
                     return None;
                 }
-                submodule.extend(&ModuleName::new(import.submodule.as_str())?);
-                // Throw out the result if this doesn't resolve to an actual module.
-                // This is quite expensive, but we've gone through a lot of hoops to
-                // get here so it won't happen too much.
-                resolve_module(db, &submodule)?;
-                // Return only the relative part
-                submodule.relative_to(importing_module_name)
+                Some(vec![ModuleName::new(direct_submodule.as_str())?])
             } else {
-                // NO
-                let importing_module_name = importing_module.name(db);
-                let relative = submodule.relative_to(importing_module_name);
-                if let Some(final_part) = ModuleName::new(import.submodule.as_str())
-                    && let Some(relative) = &relative
-                {
-                    if relative.components().next() == Some(&final_part) {
+                // The module we're importing from is ourselves!
+                // In this case all imports are presumably of modules, as it "doesn't"
+                // make sense to write `from . import an_actual_function`
+                let submodules = names.iter().filter_map(|(name, alias)| {
+                    if alias.is_some() && alias.as_ref() != Some(name) {
                         return None;
                     }
-                }
-                relative
+                    let subname = ModuleName::new(name)?;
+                    let mut submodule = importing_module_name.clone();
+                    submodule.extend(&subname);
+                    resolve_module(db, &submodule)?;
+                    Some(subname)
+                });
+
+                Some(submodules.collect())
             }
         })
+        .flatten()
         .collect()
 }
 
@@ -323,7 +356,7 @@ pub(crate) struct SemanticIndex<'db> {
 pub(crate) struct MaybeModuleImport {
     level: u32,
     from_module: Option<Name>,
-    submodule: Name,
+    names: Vec<(Name, Option<Name>)>,
 }
 
 impl<'db> SemanticIndex<'db> {

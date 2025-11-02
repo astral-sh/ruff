@@ -178,9 +178,7 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this is probably safe to allow, as it's an unambiguous import of a submodule
-# error: "has no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
 ## Import of Direct Submodule in `__init__` (Non-Stub Check)
@@ -202,9 +200,7 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this is probably safe to allow, as it's an unambiguous import of a submodule
-# error: "has no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
 ## Relative `from` Import of Nested Submodule in `__init__`
@@ -234,12 +230,10 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to allow
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -302,12 +296,10 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -370,12 +362,10 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support, and is probably safe to do as it's unambiguous
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -403,12 +393,10 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support, and is probably safe to do as it's unambiguous
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -588,8 +576,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
 ## `from` Import of Non-Submodule (Non-Stub Check)
