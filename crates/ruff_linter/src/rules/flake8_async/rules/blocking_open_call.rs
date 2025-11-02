@@ -70,7 +70,7 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
-fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };

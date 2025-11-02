@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
+use crate::{Applicability, Edit, Fix};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, name::Name, parenthesize::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
-use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
@@ -155,6 +155,62 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
+fn resolve_file_open<'a>(
+    item: &'a ast::WithItem,
+    with: &'a ast::StmtWith,
+    semantic: &'a SemanticModel<'a>,
+    read_mode: bool,
+    filename: &'a Expr,
+    mode: OpenMode,
+    keywords: Vec<&'a ast::Keyword>,
+    path_obj: Option<&'a Expr>,
+) -> Option<FileOpen<'a>> {
+    match mode {
+        OpenMode::ReadText | OpenMode::ReadBytes => {
+            if !read_mode {
+                return None;
+            }
+        }
+        OpenMode::WriteText | OpenMode::WriteBytes => {
+            if read_mode {
+                return None;
+            }
+        }
+    }
+
+    if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
+        return None;
+    }
+
+    let var = item.optional_vars.as_deref()?.as_name_expr()?;
+    let scope = semantic.current_scope();
+
+    let binding = scope.get_all(var.id.as_str()).find_map(|id| {
+        let b = semantic.binding(id);
+        (b.range() == var.range()).then_some(b)
+    })?;
+
+    let references: Vec<&ResolvedReference> = binding
+        .references
+        .iter()
+        .map(|id| semantic.reference(*id))
+        .filter(|reference| with.range().contains_range(reference.range()))
+        .collect();
+
+    let [reference] = references.as_slice() else {
+        return None;
+    };
+
+    Some(FileOpen {
+        item,
+        filename,
+        mode,
+        keywords,
+        reference,
+        path_obj,
+    })
+}
+
 /// Find `open` operation in the given `with` item.
 fn find_file_open<'a>(
     item: &'a ast::WithItem,
@@ -169,8 +225,6 @@ fn find_file_open<'a>(
         arguments: ast::Arguments { args, keywords, .. },
         ..
     } = item.context_expr.as_call_expr()?;
-
-    let var = item.optional_vars.as_deref()?.as_name_expr()?;
 
     // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
     // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
@@ -192,59 +246,9 @@ fn find_file_open<'a>(
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
-
-    match mode {
-        OpenMode::ReadText | OpenMode::ReadBytes => {
-            if !read_mode {
-                return None;
-            }
-        }
-        OpenMode::WriteText | OpenMode::WriteBytes => {
-            if read_mode {
-                return None;
-            }
-        }
-    }
-
-    // Path.read_bytes and Path.write_bytes do not support any kwargs.
-    if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
-        return None;
-    }
-
-    // Now we need to find what is this variable bound to...
-    let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();
-
-    let binding = bindings
-        .iter()
-        .map(|id| semantic.binding(*id))
-        // We might have many bindings with the same name, but we only care
-        // for the one we are looking at right now.
-        .find(|binding| binding.range() == var.range())?;
-
-    // Since many references can share the same binding, we can limit our attention span
-    // exclusively to the body of the current `with` statement.
-    let references: Vec<&ResolvedReference> = binding
-        .references
-        .iter()
-        .map(|id| semantic.reference(*id))
-        .filter(|reference| with.range().contains_range(reference.range()))
-        .collect();
-
-    // And even with all these restrictions, if the file handle gets used not exactly once,
-    // it doesn't fit the bill.
-    let [reference] = references.as_slice() else {
-        return None;
-    };
-
-    Some(FileOpen {
-        item,
-        filename,
-        mode,
-        keywords,
-        reference,
-        path_obj: None,
-    })
+    resolve_file_open(
+        item, with, semantic, read_mode, filename, mode, keywords, None,
+    )
 }
 
 fn find_path_open<'a>(
@@ -259,15 +263,11 @@ fn find_path_open<'a>(
         arguments: ast::Arguments { args, keywords, .. },
         ..
     } = item.context_expr.as_call_expr()?;
+    if !is_open_call_from_pathlib(func, semantic) {
+        return None;
+    }
     let attr = func.as_attribute_expr()?;
-    if attr.attr.as_str() != "open" {
-        return None;
-    }
     let path_call = attr.value.as_call_expr()?;
-    let path_func = path_call.func.as_name_expr()?;
-    if path_func.id.as_str() != "Path" {
-        return None;
-    }
     let filename = path_call.arguments.args.first()?;
     let mode = if args.is_empty() {
         OpenMode::ReadText
@@ -276,47 +276,16 @@ fn find_path_open<'a>(
     };
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
-    match mode {
-        OpenMode::ReadText | OpenMode::ReadBytes => {
-            if !read_mode {
-                return None;
-            }
-        }
-        OpenMode::WriteText | OpenMode::WriteBytes => {
-            if read_mode {
-                return None;
-            }
-        }
-    }
-    if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
-        return None;
-    }
-    let var = item.optional_vars.as_deref()?.as_name_expr()?;
-    let scope = semantic.current_scope();
-    let bindings: Vec<_> = scope.get_all(var.id.as_str()).collect();
-    let binding = bindings
-        .iter()
-        .map(|id| semantic.binding(*id))
-        .find(|binding| binding.range() == var.range())?;
-
-    let references: Vec<&ResolvedReference> = binding
-        .references
-        .iter()
-        .map(|id| semantic.reference(*id))
-        .filter(|reference| with.range().contains_range(reference.range()))
-        .collect();
-
-    let [reference] = references.as_slice() else {
-        return None;
-    };
-    Some(FileOpen {
+    resolve_file_open(
         item,
+        with,
+        semantic,
+        read_mode,
         filename,
         mode,
         keywords,
-        reference,
-        path_obj: Some(attr.value.as_ref()),
-    })
+        Some(attr.value.as_ref()),
+    )
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
