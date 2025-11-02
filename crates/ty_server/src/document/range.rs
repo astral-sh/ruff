@@ -1,6 +1,6 @@
 use super::PositionEncoding;
+use crate::Db;
 use crate::system::file_to_url;
-use ty_python_semantic::Db;
 
 use lsp_types as types;
 use lsp_types::{Location, Position, Url};

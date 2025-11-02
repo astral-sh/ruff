@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
+use crate::Db;
 use crate::document::DocumentKey;
 use crate::session::index::{Document, Index};
 use lsp_types::Url;
@@ -16,7 +17,6 @@ use ruff_db::system::{
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ty_ide::cached_vendored_path;
-use ty_python_semantic::Db;
 
 /// Returns a [`Url`] for the given [`File`].
 pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
@@ -112,25 +112,28 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: AnySystemPath) -> Option<&Document> {
+    fn document(&self, path: AnySystemPath) -> Option<&Document> {
         let index = self.index();
         index.document(&DocumentKey::from(path)).ok()
     }
 
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<&Document> {
+    pub(crate) fn system_path_to_document(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.document(any_path)
     }
 
-    fn system_virtual_path_to_document_ref(&self, path: &SystemVirtualPath) -> Option<&Document> {
+    pub(crate) fn system_virtual_path_to_document(
+        &self,
+        path: &SystemVirtualPath,
+    ) -> Option<&Document> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.document(any_path)
     }
 }
 
 impl System for LSPSystem {
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         if let Some(document) = document {
             Ok(Metadata::new(
@@ -152,7 +155,7 @@ impl System for LSPSystem {
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         match document {
             Some(Document::Text(document)) => Ok(document.contents().to_string()),
@@ -161,7 +164,7 @@ impl System for LSPSystem {
     }
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         match document {
             Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
@@ -172,7 +175,7 @@ impl System for LSPSystem {
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
         let document = self
-            .system_virtual_path_to_document_ref(path)
+            .system_virtual_path_to_document(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         if let Document::Text(document) = &document {
@@ -187,7 +190,7 @@ impl System for LSPSystem {
         path: &SystemVirtualPath,
     ) -> std::result::Result<Notebook, NotebookError> {
         let document = self
-            .system_virtual_path_to_document_ref(path)
+            .system_virtual_path_to_document(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         match document {

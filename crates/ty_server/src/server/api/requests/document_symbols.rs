@@ -4,8 +4,9 @@ use lsp_types::request::DocumentSymbolRequest;
 use lsp_types::{DocumentSymbol, DocumentSymbolParams, SymbolInformation, Url};
 use ruff_db::files::File;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
-use ty_project::{Db, ProjectDatabase};
+use ty_project::ProjectDatabase;
 
+use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};
 use crate::server::api::symbols::{convert_symbol_kind, convert_to_lsp_symbol_information};
 use crate::server::api::traits::{
