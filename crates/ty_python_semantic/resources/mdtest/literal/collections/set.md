@@ -35,5 +35,5 @@ reveal_type({1, (1, 2), (1, 2, 3)})
 ## Set comprehensions
 
 ```py
-reveal_type({x for x in range(42)})  # revealed: set[@Todo(set comprehension element type)]
+reveal_type({x for x in range(42)})  # revealed: set[int | Unknown]
 ```
