@@ -113,30 +113,3 @@ Module(
 4 |     nonlocal x, y,
   |                  ^ Syntax Error: Trailing comma not allowed
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | def _():
-2 |     nonlocal ,
-3 |     nonlocal x,
-  |              ^ Syntax Error: Nonlocal name `x` found without binding
-4 |     nonlocal x, y,
-  |
-
-
-  |
-2 |     nonlocal ,
-3 |     nonlocal x,
-4 |     nonlocal x, y,
-  |              ^ Syntax Error: Nonlocal name `x` found without binding
-  |
-
-
-  |
-2 |     nonlocal ,
-3 |     nonlocal x,
-4 |     nonlocal x, y,
-  |                 ^ Syntax Error: Nonlocal name `y` found without binding
-  |

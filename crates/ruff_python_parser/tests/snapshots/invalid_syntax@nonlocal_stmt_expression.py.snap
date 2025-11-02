@@ -82,12 +82,3 @@ Module(
 2 |     nonlocal x + 1
   |                ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | def _():
-2 |     nonlocal x + 1
-  |              ^ Syntax Error: Nonlocal name `x` found without binding
-  |

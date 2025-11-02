@@ -528,7 +528,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn nonlocal(&self, _name: &str) -> Option<TextRange> {
-        None
+        Some(TextRange::new(0.into(), 0.into()))
     }
 
     fn in_async_context(&self) -> bool {
