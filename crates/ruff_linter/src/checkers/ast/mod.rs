@@ -738,6 +738,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidExpression(..)
             | SemanticSyntaxErrorKind::GlobalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
+            | SemanticSyntaxErrorKind::ReturnInAsyncGenerator
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
@@ -836,6 +837,22 @@ impl SemanticSyntaxContext for Checker<'_> {
                 ..
             }
         )
+    }
+
+    fn has_return(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match &scope.kind {
+                ScopeKind::Function(ast::StmtFunctionDef { body, .. }) => {
+                    return body.iter().any(|stmt| matches!(stmt, Stmt::Return(_)));
+                }
+                ScopeKind::Lambda(_) | ScopeKind::Class(_) => return false,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
+            }
+        }
+        false
     }
 
     fn in_loop_context(&self) -> bool {

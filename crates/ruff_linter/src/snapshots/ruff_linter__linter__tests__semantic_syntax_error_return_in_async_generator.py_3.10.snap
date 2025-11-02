@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: `return` with value in async generator
+ --> resources/test/fixtures/semantic_errors/return_in_async_generator.py:2:5
+  |
+1 | async def gen():
+2 |     yield 1
+  |     ^^^^^^^
+3 |     return 42
+  |

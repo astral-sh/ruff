@@ -822,6 +822,13 @@ impl SemanticSyntaxChecker {
                     // def f(): yield *x
                     Self::invalid_star_expression(value, ctx);
                 }
+                if ctx.in_function_scope() && ctx.in_async_context() && ctx.has_return() {
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::ReturnInAsyncGenerator,
+                        expr.range(),
+                    );
+                }
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
             }
             Expr::YieldFrom(_) => {
@@ -1169,6 +1176,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
                 write!(f, "no binding for nonlocal `{name}` found")
             }
+            SemanticSyntaxErrorKind::ReturnInAsyncGenerator => {
+                write!(f, "`return` with value in async generator")
+            }
         }
     }
 }
@@ -1397,7 +1407,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1415,7 +1428,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1572,6 +1588,8 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a nonlocal statement for a name that has no binding in an enclosing scope.
     NonlocalWithoutBinding(String),
+
+    ReturnInAsyncGenerator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -2108,6 +2126,8 @@ pub trait SemanticSyntaxContext {
     fn in_loop_context(&self) -> bool;
 
     fn is_bound_parameter(&self, name: &str) -> bool;
+
+    fn has_return(&self) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

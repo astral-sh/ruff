@@ -2813,6 +2813,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn is_bound_parameter(&self, _name: &str) -> bool {
         false
     }
+
+    fn has_return(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

@@ -583,6 +583,10 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn is_bound_parameter(&self, _name: &str) -> bool {
         false
     }
+
+    fn has_return(&self) -> bool {
+        false
+    }
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
