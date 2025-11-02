@@ -60,20 +60,43 @@ class User(models.Model):
 
 # Model class is detected
 reveal_type(User)  # revealed: <class 'User'>
+# 1. Current ty (no changes): <class 'User'>
+# 2. Future ty (after fix): <class 'User'> (no change needed)
+# 3. mypy + django-stubs: type[User]
+# 4. pyright + django-types: type[User]
 
 # TODO: [Phase 2] Should auto-synthesize .objects manager
-# reveal_type(User.objects)  # Should be: Manager[User]
-# Currently: error[unresolved-attribute]
+# reveal_type(User.objects)
+# 1. Current ty (no changes): error[unresolved-attribute]
+# 2. Future ty (after fix): Manager[User]
+# 3. mypy + django-stubs: Manager[User]
+# 4. pyright + django-types: BaseManager[User]
 
 # Instance creation works
 user = User()
 reveal_type(user)  # revealed: User
+# 1. Current ty (no changes): User
+# 2. Future ty (after fix): User (no change needed)
+# 3. mypy + django-stubs: User
+# 4. pyright + django-types: User
 
 # TODO: [Phase 2] Annotated attributes should be accessible
-# reveal_type(user.name)  # Should be: str
-# Currently: error[unresolved-attribute]
+# reveal_type(user.name)
+# 1. Current ty (no changes): error[unresolved-attribute]
+# 2. Future ty (after fix): str
+# 3. mypy + django-stubs: str
+# 4. pyright + django-types: str
 
 # Base model methods are available
 reveal_type(user.save)  # revealed: bound method User.save(**kwargs: Any) -> None
+# 1. Current ty (no changes): bound method User.save(**kwargs: Any) -> None
+# 2. Future ty (after fix): bound method User.save(**kwargs: Any) -> None (no change needed)
+# 3. mypy + django-stubs: def (**kwargs: Any) -> None
+# 4. pyright + django-types: (**kwargs: Any) -> None
+
 reveal_type(user.delete)  # revealed: bound method User.delete() -> tuple[int, dict[str, int]]
+# 1. Current ty (no changes): bound method User.delete() -> tuple[int, dict[str, int]]
+# 2. Future ty (after fix): bound method User.delete() -> tuple[int, dict[str, int]] (no change needed)
+# 3. mypy + django-stubs: def () -> tuple[int, dict[str, int]]
+# 4. pyright + django-types: () -> tuple[int, dict[str, int]]
 ```

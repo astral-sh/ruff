@@ -74,20 +74,40 @@ User.objects = models.Manager[User]()
 # Manager methods return QuerySet with correct generic
 qs = User.objects.all()
 reveal_type(qs)  # revealed: QuerySet[User]
+# 1. Current ty (no changes): QuerySet[User]
+# 2. Future ty (after fix): QuerySet[User] (no change needed - works with manual annotation)
+# 3. mypy + django-stubs: QuerySet[User, User]
+# 4. pyright + django-types: QuerySet[User, User]
 
 # Method chaining preserves QuerySet type
 filtered = User.objects.filter(name="test")
 reveal_type(filtered)  # revealed: QuerySet[User]
+# 1. Current ty (no changes): QuerySet[User]
+# 2. Future ty (after fix): QuerySet[User] (no change needed - works with manual annotation)
+# 3. mypy + django-stubs: QuerySet[User, User]
+# 4. pyright + django-types: QuerySet[User, User]
 
 # QuerySet.get() returns model instance
 user = User.objects.get(pk=1)
 reveal_type(user)  # revealed: User
+# 1. Current ty (no changes): User
+# 2. Future ty (after fix): User (no change needed - works with manual annotation)
+# 3. mypy + django-stubs: User
+# 4. pyright + django-types: User
 
 # QuerySet methods chain correctly
 chained = User.objects.all().filter(name="test").exclude(name="other")
 reveal_type(chained)  # revealed: QuerySet[User]
+# 1. Current ty (no changes): QuerySet[User]
+# 2. Future ty (after fix): QuerySet[User] (no change needed - works with manual annotation)
+# 3. mypy + django-stubs: QuerySet[User, User]
+# 4. pyright + django-types: QuerySet[User, User]
 
 # first() returns optional model instance
 maybe_user = User.objects.first()
 reveal_type(maybe_user)  # revealed: User | None
+# 1. Current ty (no changes): User | None
+# 2. Future ty (after fix): User | None (no change needed - works with manual annotation)
+# 3. mypy + django-stubs: User | None
+# 4. pyright + django-types: User | None
 ```
