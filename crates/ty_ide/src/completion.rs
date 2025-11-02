@@ -261,7 +261,7 @@ pub fn completion<'db>(
         add_keyword_value_completions(db, &typed_query, &mut completions);
     }
 
-    sort_completions(&mut completions);
+    completions.sort_by(compare_suggestions);
 
     if settings.auto_import {
         if let Some(scoped) = scoped {
@@ -274,6 +274,8 @@ pub fn completion<'db>(
             ));
         }
     }
+
+    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
 
     completions
 }
@@ -359,14 +361,9 @@ fn unimported_completions<'db>(
         });
     }
 
-    sort_completions(&mut completions);
+    completions.sort_by(compare_suggestions);
 
     completions
-}
-
-fn sort_completions(completions: &mut Vec<Completion>) {
-    completions.sort_by(compare_suggestions);
-    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
 }
 
 /// The kind of tokens identified under the cursor.
