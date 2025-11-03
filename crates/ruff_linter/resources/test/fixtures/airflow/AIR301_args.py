@@ -22,6 +22,7 @@ DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
 
 DAG(dag_id="class_timetable", timetable=NullTimetable())
 
+DAG(dag_id="class_concurrency", concurrency=12)
 
 DAG(dag_id="class_fail_stop", fail_stop=True)
 
@@ -105,5 +106,3 @@ ElasticsearchTaskHandler(filename_template="/tmp/test")
 GCSTaskHandler(filename_template="/tmp/test")
 
 FabAuthManager(None)
-
-DAG(dag_id="concurrency", concurrency=12)
