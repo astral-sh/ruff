@@ -240,7 +240,7 @@ version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
  "itertools 0.13.0",
@@ -262,9 +262,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.9.4"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
+checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
 name = "bitvec"
@@ -1025,7 +1025,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89a09f22a6c6069a18470eb92d2298acf25463f14256d24778e1230d789a2aec"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "block2",
  "libc",
  "objc2",
@@ -1318,7 +1318,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bf760ebf69878d9fd8f110c89703d90ce35095324d1f1edcb595c63945ee757"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "ignore",
  "walkdir",
 ]
@@ -1602,7 +1602,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f37dccff2791ab604f9babef0ba14fbe0be30bd368dc541e2b08d07c8aa908f3"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "inotify-sys",
  "libc",
 ]
@@ -1900,7 +1900,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "416f7e718bdb06000964960ffa43b4335ad4012ae8b99060261aa4a8088d5ccb"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "libc",
  "redox_syscall",
 ]
@@ -2105,7 +2105,7 @@ version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "cfg-if",
  "cfg_aliases",
  "libc",
@@ -2117,7 +2117,7 @@ version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "cfg-if",
  "cfg_aliases",
  "libc",
@@ -2145,7 +2145,7 @@ version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "fsevent-sys",
  "inotify",
  "kqueue",
@@ -2776,7 +2776,7 @@ version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5407465600fb0548f1442edf71dd20683c6ed326200ace4b1ef0763521bb3b77"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
 ]
 
 [[package]]
@@ -2864,7 +2864,7 @@ dependencies = [
  "argfile",
  "assert_fs",
  "bincode",
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "cachedir",
  "clap",
  "clap_complete_command",
@@ -3119,7 +3119,7 @@ version = "0.14.3"
 dependencies = [
  "aho-corasick",
  "anyhow",
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "clap",
  "colored 3.0.0",
  "fern",
@@ -3225,7 +3225,7 @@ name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
  "aho-corasick",
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "compact_str",
  "get-size2",
  "is-macro",
@@ -3329,7 +3329,7 @@ dependencies = [
 name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "itertools 0.14.0",
  "ruff_python_ast",
  "unic-ucd-category",
@@ -3340,7 +3340,7 @@ name = "ruff_python_parser"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "bstr",
  "compact_str",
  "get-size2",
@@ -3365,7 +3365,7 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "insta",
  "is-macro",
  "ruff_cache",
@@ -3386,7 +3386,7 @@ dependencies = [
 name = "ruff_python_stdlib"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "unicode-ident",
 ]
 
@@ -3564,7 +3564,7 @@ version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd15f8a2c5551a84d56efdc1cd049089e409ac19a3072d5037a17fd70719ff3e"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -4375,7 +4375,7 @@ dependencies = [
 name = "ty_ide"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "camino",
  "get-size2",
  "insta",
@@ -4446,7 +4446,7 @@ name = "ty_python_semantic"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "bitvec",
  "camino",
  "colored 3.0.0",
@@ -4502,7 +4502,7 @@ name = "ty_server"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.9.4",
+ "bitflags 2.10.0",
  "crossbeam",
  "dunce",
  "insta",
