@@ -114,6 +114,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     maybe_imported_modules: FxHashSet<MaybeModuleImport>,
+    seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -151,6 +152,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
 
+            seen_submodule_imports: FxHashSet::default(),
             maybe_imported_modules: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
@@ -1457,7 +1459,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     && let Some(submodule_raw) = &node.module
                     && let Some(submodule) = ModuleName::new(submodule_raw.as_str())
                     && let Some(direct_submodule) = submodule.components().next()
+                    && !self.seen_submodule_imports.contains(direct_submodule)
                 {
+                    self.seen_submodule_imports
+                        .insert(direct_submodule.to_owned());
+
                     let direct_submodule_name = Name::new(direct_submodule);
                     let symbol = self.add_symbol(direct_submodule_name);
                     self.add_definition(
