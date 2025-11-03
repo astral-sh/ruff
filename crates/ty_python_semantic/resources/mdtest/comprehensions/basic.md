@@ -162,10 +162,13 @@ The type context is propagated down into the comprehension:
 class Person(TypedDict):
     name: str
 
+# TODO: This should not error.
+# error: [invalid-assignment]
 persons: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
 reveal_type(persons)  # revealed: list[Person]
 
-# TODO: This should be an error
+# TODO: This should be an invalid-key error.
+# error: [invalid-assignment]
 invalid: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```
 

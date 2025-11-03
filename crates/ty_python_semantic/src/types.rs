@@ -1975,10 +1975,13 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+            (Type::TypedDict(_), _) => {
                 // TODO: Implement assignability and subtyping for TypedDict
                 ConstraintSet::from(relation.is_assignability())
             }
+
+            // A non-`TypedDict` cannot subtype a `TypedDict`
+            (_, Type::TypedDict(_)) => ConstraintSet::from(false),
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.

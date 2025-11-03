@@ -39,16 +39,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 25 |     person[str_key] = "Alice"  # error: [invalid-key]
 26 | 
 27 | def create_with_invalid_string_key():
-28 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}  # error: [invalid-key]
-29 |     bob = Person(name="Bob", age=25, unknown="Bar")  # error: [invalid-key]
-30 | from typing_extensions import ReadOnly
+28 |     # error: [invalid-key]
+29 |     # error: [invalid-assignment]
+30 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
 31 | 
-32 | class Employee(TypedDict):
-33 |     id: ReadOnly[int]
-34 |     name: str
+32 |     # error: [invalid-key]
+33 |     bob = Person(name="Bob", age=25, unknown="Bar")
+34 | from typing_extensions import ReadOnly
 35 | 
-36 | def write_to_readonly_key(employee: Employee):
-37 |     employee["id"] = 42  # error: [invalid-assignment]
+36 | class Employee(TypedDict):
+37 |     id: ReadOnly[int]
+38 |     name: str
+39 | 
+40 | def write_to_readonly_key(employee: Employee):
+41 |     employee["id"] = 42  # error: [invalid-assignment]
 ```
 
 # Diagnostics
@@ -157,17 +161,33 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
-  --> src/mdtest_snippet.py:28:21
+error[invalid-assignment]: Object of type `dict[Unknown | str, Unknown | str | int]` is not assignable to `Person`
+  --> src/mdtest_snippet.py:30:5
    |
-27 | def create_with_invalid_string_key():
-28 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}  # error: [invalid-key]
+28 |     # error: [invalid-key]
+29 |     # error: [invalid-assignment]
+30 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
+   |     ^^^^^
+31 |
+32 |     # error: [invalid-key]
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-key]: Invalid key for TypedDict `Person`
+  --> src/mdtest_snippet.py:30:21
+   |
+28 |     # error: [invalid-key]
+29 |     # error: [invalid-assignment]
+30 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
    |                     -----------------------------^^^^^^^^^--------
    |                     |                            |
    |                     |                            Unknown key "unknown"
    |                     TypedDict `Person`
-29 |     bob = Person(name="Bob", age=25, unknown="Bar")  # error: [invalid-key]
-30 | from typing_extensions import ReadOnly
+31 |
+32 |     # error: [invalid-key]
    |
 info: rule `invalid-key` is enabled by default
 
@@ -175,13 +195,12 @@ info: rule `invalid-key` is enabled by default
 
 ```
 error[invalid-key]: Invalid key for TypedDict `Person`
-  --> src/mdtest_snippet.py:29:11
+  --> src/mdtest_snippet.py:33:11
    |
-27 | def create_with_invalid_string_key():
-28 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}  # error: [invalid-key]
-29 |     bob = Person(name="Bob", age=25, unknown="Bar")  # error: [invalid-key]
+32 |     # error: [invalid-key]
+33 |     bob = Person(name="Bob", age=25, unknown="Bar")
    |           ------ TypedDict `Person`  ^^^^^^^^^^^^^ Unknown key "unknown"
-30 | from typing_extensions import ReadOnly
+34 | from typing_extensions import ReadOnly
    |
 info: rule `invalid-key` is enabled by default
 
@@ -189,21 +208,21 @@ info: rule `invalid-key` is enabled by default
 
 ```
 error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
-  --> src/mdtest_snippet.py:37:5
+  --> src/mdtest_snippet.py:41:5
    |
-36 | def write_to_readonly_key(employee: Employee):
-37 |     employee["id"] = 42  # error: [invalid-assignment]
+40 | def write_to_readonly_key(employee: Employee):
+41 |     employee["id"] = 42  # error: [invalid-assignment]
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
    |
 info: Item declaration
-  --> src/mdtest_snippet.py:33:5
+  --> src/mdtest_snippet.py:37:5
    |
-32 | class Employee(TypedDict):
-33 |     id: ReadOnly[int]
+36 | class Employee(TypedDict):
+37 |     id: ReadOnly[int]
    |     ----------------- Read-only item declared here
-34 |     name: str
+38 |     name: str
    |
 info: rule `invalid-assignment` is enabled by default
 

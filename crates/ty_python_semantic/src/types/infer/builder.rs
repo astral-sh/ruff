@@ -5,7 +5,9 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
+};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -5833,15 +5835,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression.map(|expr| self.infer_expression(expr, tcx))
     }
 
-    fn get_or_infer_expression(
-        &mut self,
-        expression: &ast::Expr,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        self.try_expression_type(expression)
-            .unwrap_or_else(|| self.infer_expression(expression, tcx))
-    }
-
     #[track_caller]
     fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
         debug_assert!(
@@ -6197,7 +6190,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = list;
 
         let elts = elts.iter().map(|elt| [Some(elt)]);
-        self.infer_collection_literal(elts, tcx, KnownClass::List)
+        let infer_elt_ty = |builder: &mut Self, elt, tcx| builder.infer_expression(elt, tcx);
+        self.infer_collection_literal(elts, tcx, infer_elt_ty, KnownClass::List)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
             })
@@ -6211,7 +6205,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = set;
 
         let elts = elts.iter().map(|elt| [Some(elt)]);
-        self.infer_collection_literal(elts, tcx, KnownClass::Set)
+        let infer_elt_ty = |builder: &mut Self, elt, tcx| builder.infer_expression(elt, tcx);
+        self.infer_collection_literal(elts, tcx, infer_elt_ty, KnownClass::Set)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), [Type::unknown()])
             })
@@ -6224,12 +6219,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             items,
         } = dict;
 
+        let mut item_types = FxHashMap::default();
+
         // Validate `TypedDict` dictionary literal assignments.
         if let Some(tcx) = tcx.annotation
             && let Some(typed_dict) = tcx
                 .filter_union(self.db(), Type::is_typed_dict)
                 .as_typed_dict()
-            && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict)
+            && let Some(ty) = self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
         {
             return ty;
         }
@@ -6245,7 +6242,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .map(|item| [item.key.as_ref(), Some(&item.value)]);
 
-        self.infer_collection_literal(items, tcx, KnownClass::Dict)
+        // Avoid inferring the items multiple times if we already attempted to infer the
+        // dictionary literal as a `TypedDict`. This also allows us to infer using the
+        // type context of the expected `TypedDict` field.
+        let infer_elt_ty = |builder: &mut Self, elt: &ast::Expr, tcx| {
+            item_types
+                .get(&elt.node_index().load())
+                .copied()
+                .unwrap_or_else(|| builder.infer_expression(elt, tcx))
+        };
+
+        self.infer_collection_literal(items, tcx, infer_elt_ty, KnownClass::Dict)
             .unwrap_or_else(|| {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()])
@@ -6256,6 +6263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         dict: &ast::ExprDict,
         typed_dict: TypedDictType<'db>,
+        item_types: &mut FxHashMap<NodeIndex, Type<'db>>,
     ) -> Option<Type<'db>> {
         let ast::ExprDict {
             range: _,
@@ -6267,14 +6275,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for item in items {
             let key_ty = self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+            if let Some((key, key_ty)) = item.key.as_ref().zip(key_ty) {
+                item_types.insert(key.node_index().load(), key_ty);
+            }
 
-            if let Some(Type::StringLiteral(key)) = key_ty
+            let value_ty = if let Some(Type::StringLiteral(key)) = key_ty
                 && let Some(field) = typed_dict_items.get(key.value(self.db()))
             {
-                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)));
+                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
             } else {
-                self.infer_expression(&item.value, TypeContext::default());
-            }
+                self.infer_expression(&item.value, TypeContext::default())
+            };
+
+            item_types.insert(item.value.node_index().load(), value_ty);
         }
 
         validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
@@ -6285,12 +6298,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Infer the type of a collection literal expression.
-    fn infer_collection_literal<'expr, const N: usize>(
+    fn infer_collection_literal<'expr, const N: usize, F, I>(
         &mut self,
-        elts: impl Iterator<Item = [Option<&'expr ast::Expr>; N]>,
+        elts: I,
         tcx: TypeContext<'db>,
+        mut infer_elt_expression: F,
         collection_class: KnownClass,
-    ) -> Option<Type<'db>> {
+    ) -> Option<Type<'db>>
+    where
+        I: Iterator<Item = [Option<&'expr ast::Expr>; N]>,
+        F: FnMut(&mut Self, &'expr ast::Expr, TypeContext<'db>) -> Type<'db>,
+    {
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
             let class_literal = collection_class.try_to_class_literal(self.db())?;
@@ -6306,7 +6324,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Infer the element types without type context, and fallback to unknown for
             // custom typesheds.
             for elt in elts.flatten().flatten() {
-                self.get_or_infer_expression(elt, TypeContext::default());
+                infer_elt_expression(self, elt, TypeContext::default());
             }
 
             return None;
@@ -6361,7 +6379,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for elts in elts {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value)] = elts.as_slice() {
-                let inferred_value_ty = self.get_or_infer_expression(value, TypeContext::default());
+                let inferred_value_ty = infer_elt_expression(self, value, TypeContext::default());
 
                 // Merge the inferred type of the nested dictionary.
                 if let Some(specialization) =
@@ -6384,7 +6402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let Some(elt) = elt else { continue };
 
-                let inferred_elt_ty = self.get_or_infer_expression(elt, elt_tcx);
+                let inferred_elt_ty = infer_elt_expression(self, elt, elt_tcx);
 
                 // Simplify the inference based on the declared type of the element.
                 if let Some(elt_tcx) = elt_tcx.annotation {

@@ -83,6 +83,7 @@ CAPITALIZED_NAME = "Name"
 
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "Name" - did you mean "name"?"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [invalid-assignment]
 dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
 
 def age() -> Literal["age"] | None:
@@ -95,30 +96,33 @@ The construction of a `TypedDict` is checked for type correctness:
 
 ```py
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
+# error: [invalid-assignment]
 eve1a: Person = {"name": b"Eve", "age": None}
+
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
-# TODO should reveal Person (should be fixed by implementing assignability for TypedDicts)
-reveal_type(eve1a)  # revealed: dict[Unknown | str, Unknown | bytes | None]
+reveal_type(eve1a)  # revealed: Person
 reveal_type(eve1b)  # revealed: Person
 
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [invalid-assignment]
 eve2a: Person = {"age": 22}
+
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
-# TODO should reveal Person (should be fixed by implementing assignability for TypedDicts)
-reveal_type(eve2a)  # revealed: dict[Unknown | str, Unknown | int]
+reveal_type(eve2a)  # revealed: Person
 reveal_type(eve2b)  # revealed: Person
 
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
+# error: [invalid-assignment]
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
+
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
 
-# TODO should reveal Person (should be fixed by implementing assignability for TypedDicts)
-reveal_type(eve3a)  # revealed: dict[Unknown | str, Unknown | str | int]
+reveal_type(eve3a)  # revealed: Person
 reveal_type(eve3b)  # revealed: Person
 ```
 
@@ -201,6 +205,8 @@ reveal_type(alice["inner"]["age"])  # revealed: int | None
 reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
 
 # error: [invalid-key] "Invalid key for TypedDict `Inner`: Unknown key "extra""
+# error: [invalid-argument-type]
+# error: [invalid-assignment]
 alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
 ```
 
@@ -237,20 +243,26 @@ All of these are missing the required `age` field:
 
 ```py
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-assignment]
 alice2: Person = {"name": "Alice"}
+
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 Person(name="Alice")
+
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 Person({"name": "Alice"})
 
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-argument-type]
 accepts_person({"name": "Alice"})
 
-# TODO: this should be an error, similar to the above
+# TODO: this should be an invalid-key error, similar to the above
+# error: [invalid-assignment]
 house.owner = {"name": "Alice"}
 
 a_person: Person
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-assignment]
 a_person = {"name": "Alice"}
 ```
 
@@ -258,21 +270,30 @@ All of these have an invalid type for the `name` field:
 
 ```py
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+# error: [invalid-assignment]
 alice3: Person = {"name": None, "age": 30}
+
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 Person(name=None, age=30)
+
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 Person({"name": None, "age": 30})
 
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+# error: [invalid-argument-type]
 accepts_person({"name": None, "age": 30})
-# TODO: this should be an error, similar to the above
+
+# TODO: this should be an invalid-key error
+# error: [invalid-assignment]
 house.owner = {"name": None, "age": 30}
 
 a_person: Person
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+# error: [invalid-assignment]
 a_person = {"name": None, "age": 30}
+
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+# error: [invalid-assignment]
 (a_person := {"name": None, "age": 30})
 ```
 
@@ -280,21 +301,30 @@ All of these have an extra field that is not defined in the `TypedDict`:
 
 ```py
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
+# error: [invalid-assignment]
 alice4: Person = {"name": "Alice", "age": 30, "extra": True}
+
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 Person(name="Alice", age=30, extra=True)
+
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
 Person({"name": "Alice", "age": 30, "extra": True})
 
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
+# error: [invalid-argument-type]
 accepts_person({"name": "Alice", "age": 30, "extra": True})
-# TODO: this should be an error
+
+# TODO: this should be an invalid-key error
+# error: [invalid-assignment]
 house.owner = {"name": "Alice", "age": 30, "extra": True}
 
 a_person: Person
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
+# error: [invalid-assignment]
 a_person = {"name": "Alice", "age": 30, "extra": True}
+
 # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "extra""
+# error: [invalid-assignment]
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
@@ -760,6 +790,7 @@ class Employee(Person):
 alice: Employee = {"name": "Alice", "employee_id": 1}
 
 # error: [missing-typed-dict-key] "Missing required key 'employee_id' in TypedDict `Employee` constructor"
+# error: [invalid-assignment]
 eve: Employee = {"name": "Eve"}
 
 def combine(p: Person, e: Employee):
@@ -861,6 +892,7 @@ p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
+# error: [invalid-assignment]
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
 class Items(TypedDict, Generic[T]):
@@ -894,6 +926,7 @@ p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
+# error: [invalid-assignment]
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
 class Items[T](TypedDict):
@@ -928,6 +961,9 @@ grandchild: Node = {"name": "grandchild", "parent": child}
 nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", "parent": None}}}
 
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
+# error: [invalid-assignment]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
 ```
 
@@ -977,7 +1013,7 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `MyDict` is not assignable to `Person`"
 x: Person = MyDict({"name": "Alice", "age": 30})
 ```
 
@@ -1029,8 +1065,12 @@ def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
 
 def create_with_invalid_string_key():
-    alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}  # error: [invalid-key]
-    bob = Person(name="Bob", age=25, unknown="Bar")  # error: [invalid-key]
+    # error: [invalid-key]
+    # error: [invalid-assignment]
+    alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
+
+    # error: [invalid-key]
+    bob = Person(name="Bob", age=25, unknown="Bar")
 ```
 
 Assignment to `ReadOnly` keys:
