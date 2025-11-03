@@ -26,21 +26,19 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             ..
         } = params;
 
-        let key = match session.key_from_url(uri) {
-            Ok(key) => key,
-            Err(uri) => {
-                tracing::debug!("Failed to create document key from URI: {}", uri);
-                return Ok(());
-            }
-        };
-
-        session
-            .close_document(&key)
+        let document = session
+            .document_handle(&uri)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        if let AnySystemPath::SystemVirtual(virtual_path) = key.path() {
+        let path = document.to_file_path().into_owned();
+
+        document
+            .close(session)
+            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+
+        if let AnySystemPath::SystemVirtual(virtual_path) = &path {
             session.apply_changes(
-                key.path(),
+                &path,
                 vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
             );
         }

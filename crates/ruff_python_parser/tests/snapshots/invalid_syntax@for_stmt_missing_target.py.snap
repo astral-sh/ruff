@@ -56,11 +56,11 @@ Module(
 
   |
 1 | for in x: ...
-  |     ^^ Syntax Error: Expected an identifier, but found a keyword 'in' that cannot be used here
+  |     ^^ Syntax Error: Expected an identifier, but found a keyword `in` that cannot be used here
   |
 
 
   |
 1 | for in x: ...
-  |        ^ Syntax Error: Expected 'in', found name
+  |        ^ Syntax Error: Expected `in`, found name
   |

@@ -427,7 +427,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
 
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                content.to_string(),
+                content.clone(),
                 compare.range(),
             )));
         }

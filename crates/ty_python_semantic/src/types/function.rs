@@ -534,6 +534,14 @@ pub struct FunctionLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
 
+fn overloads_and_implementation_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: FunctionLiteral<'db>,
+) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    (Box::new([]), None)
+}
+
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -576,7 +584,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), cycle_initial=overloads_and_implementation_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -659,14 +667,6 @@ impl<'db> FunctionLiteral<'db> {
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition(db).raw_signature(db)
     }
-}
-
-fn overloads_and_implementation_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionLiteral<'db>,
-) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-    (Box::new([]), None)
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a

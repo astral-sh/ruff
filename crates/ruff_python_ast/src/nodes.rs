@@ -3372,7 +3372,7 @@ impl Arguments {
     pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
         let args = self.args.iter().map(ArgOrKeyword::Arg);
         let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
-        args.merge_by(keywords, |left, right| left.start() < right.start())
+        args.merge_by(keywords, |left, right| left.start() <= right.start())
     }
 
     pub fn inner_range(&self) -> TextRange {

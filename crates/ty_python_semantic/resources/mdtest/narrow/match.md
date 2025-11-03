@@ -69,6 +69,81 @@ match x:
 reveal_type(x)  # revealed: object
 ```
 
+## Class patterns with generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def f(x: Covariant[int]):
+    match x:
+        case Covariant():
+            reveal_type(x)  # revealed: Covariant[int]
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+```
+
+## Class patterns with generic `@final` classes
+
+These work the same as non-`@final` classes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never, final
+
+@final
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def f(x: Covariant[int]):
+    match x:
+        case Covariant():
+            reveal_type(x)  # revealed: Covariant[int]
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+```
+
+## Class patterns where the class pattern does not resolve to a class
+
+In general this does not allow for narrowing, but we make an exception for `Any`. This is to support
+[real ecosystem code](https://github.com/jax-ml/jax/blob/d2ce04b6c3d03ae18b145965b8b8b92e09e8009c/jax/_src/pallas/mosaic_gpu/lowering.py#L3372-L3387)
+found in `jax`.
+
+```py
+from typing import Any
+
+X = Any
+
+def f(obj: object):
+    match obj:
+        case int():
+            reveal_type(obj)  # revealed: int
+        case X():
+            reveal_type(obj)  # revealed: Any & ~int
+
+def g(obj: object, Y: Any):
+    match obj:
+        case int():
+            reveal_type(obj)  # revealed: int
+        case Y():
+            reveal_type(obj)  # revealed: Any & ~int
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on

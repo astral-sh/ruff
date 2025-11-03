@@ -238,7 +238,7 @@ Module(
 3 | call(***x)
 4 |
 5 | call(**x := 1)
-  |          ^^ Syntax Error: Expected ',', found ':='
+  |          ^^ Syntax Error: Expected `,`, found `:=`
   |
 
 

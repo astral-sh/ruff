@@ -85,7 +85,7 @@ Module(
 2 | # token starts a statement.
 3 |
 4 | [1, 2
-  |      ^ Syntax Error: Expected ']', found newline
+  |      ^ Syntax Error: Expected `]`, found newline
 5 |
 6 | def foo():
 7 |     pass

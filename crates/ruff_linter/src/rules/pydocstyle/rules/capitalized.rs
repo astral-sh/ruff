@@ -94,7 +94,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
     let mut diagnostic = checker.report_diagnostic(
         FirstWordUncapitalized {
             first_word: first_word.to_string(),
-            capitalized_word: capitalized_word.to_string(),
+            capitalized_word: capitalized_word.clone(),
         },
         docstring.range(),
     );

@@ -245,7 +245,7 @@ Module(
 3 | *x += 1
 4 | pass += 1
 5 | x += pass
-  |      ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |      ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
 6 | (x + y) += 1
   |
 

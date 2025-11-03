@@ -62,6 +62,6 @@ Module(
   |
 1 | # `)` followed by a newline
 2 | with (item1, item2)
-  |                    ^ Syntax Error: Expected ':', found newline
+  |                    ^ Syntax Error: Expected `:`, found newline
 3 |     pass
   |

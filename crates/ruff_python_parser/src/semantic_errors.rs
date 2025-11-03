@@ -1841,6 +1841,15 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case (x, (y | y)): ...
                         //     case [a, _] | [a, _]: ...
                         //     case [a] | [C(a)]: ...
+
+                        // test_ok nested_alternative_patterns
+                        // match ruff:
+                        //     case {"lint": {"select": x} | {"extend-select": x}} | {"select": x}:
+                        //         ...
+                        // match 42:
+                        //     case [[x] | [x]] | x: ...
+                        // match 42:
+                        //     case [[x | x] | [x]] | x: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
@@ -1848,6 +1857,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         );
                         break;
                     }
+                    self.names = visitor.names;
                 }
             }
         }

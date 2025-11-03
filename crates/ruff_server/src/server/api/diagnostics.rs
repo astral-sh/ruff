@@ -1,7 +1,4 @@
-use lsp_types::Url;
-
 use crate::{
-    Session,
     lint::DiagnosticsMap,
     session::{Client, DocumentQuery, DocumentSnapshot},
 };
@@ -22,21 +19,10 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMa
 }
 
 pub(super) fn publish_diagnostics_for_document(
-    session: &Session,
-    url: &Url,
+    snapshot: &DocumentSnapshot,
     client: &Client,
 ) -> crate::server::Result<()> {
-    // Publish diagnostics if the client doesn't support pull diagnostics
-    if session.resolved_client_capabilities().pull_diagnostics {
-        return Ok(());
-    }
-
-    let snapshot = session
-        .take_snapshot(url.clone())
-        .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {url}"))
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-
-    for (uri, diagnostics) in generate_diagnostics(&snapshot) {
+    for (uri, diagnostics) in generate_diagnostics(snapshot) {
         client
             .send_notification::<lsp_types::notification::PublishDiagnostics>(
                 lsp_types::PublishDiagnosticsParams {
@@ -52,14 +38,9 @@ pub(super) fn publish_diagnostics_for_document(
 }
 
 pub(super) fn clear_diagnostics_for_document(
-    session: &Session,
     query: &DocumentQuery,
     client: &Client,
 ) -> crate::server::Result<()> {
-    if session.resolved_client_capabilities().pull_diagnostics {
-        return Ok(());
-    }
-
     client
         .send_notification::<lsp_types::notification::PublishDiagnostics>(
             lsp_types::PublishDiagnosticsParams {

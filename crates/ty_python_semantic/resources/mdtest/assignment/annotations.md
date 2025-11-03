@@ -259,7 +259,7 @@ class Color(Enum):
     RED = "red"
 
 f: dict[list[Literal[1]], list[Literal[Color.RED]]] = {[1]: [Color.RED, Color.RED]}
-reveal_type(f)  # revealed: dict[list[Literal[1]], list[Literal[Color.RED]]]
+reveal_type(f)  # revealed: dict[list[Literal[1]], list[Color]]
 
 class X[T]:
     def __init__(self, value: T): ...

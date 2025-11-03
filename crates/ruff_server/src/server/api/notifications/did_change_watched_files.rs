@@ -31,13 +31,19 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
             } else {
                 // publish diagnostics for text documents
                 for url in session.text_document_urls() {
-                    publish_diagnostics_for_document(session, url, client)?;
+                    let snapshot = session
+                        .take_snapshot(url.clone())
+                        .expect("snapshot should be available");
+                    publish_diagnostics_for_document(&snapshot, client)?;
                 }
             }
 
             // always publish diagnostics for notebook files (since they don't use pull diagnostics)
             for url in session.notebook_document_urls() {
-                publish_diagnostics_for_document(session, url, client)?;
+                let snapshot = session
+                    .take_snapshot(url.clone())
+                    .expect("snapshot should be available");
+                publish_diagnostics_for_document(&snapshot, client)?;
             }
         }
 

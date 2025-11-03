@@ -27,7 +27,10 @@ impl super::SyncNotificationHandler for DidChangeNotebook {
             .with_failure_code(ErrorCode::InternalError)?;
 
         // publish new diagnostics
-        publish_diagnostics_for_document(session, &key.into_url(), client)?;
+        let snapshot = session
+            .take_snapshot(key.into_url())
+            .expect("snapshot should be available");
+        publish_diagnostics_for_document(&snapshot, client)?;
 
         Ok(())
     }

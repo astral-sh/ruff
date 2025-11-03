@@ -5,7 +5,6 @@ use ruff_python_ast::{
     relocate::relocate_expr,
     visitor::{self, Visitor},
 };
-
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
