@@ -58,24 +58,24 @@ AnyOrNever = Any | Never
 UnknownOrInt = Unknown | int
 IntOrUnknown = int | Unknown
 
-reveal_type(IntOrStr)  # revealed: UnionType
-reveal_type(IntOrStrOrBytes1)  # revealed: UnionType
-reveal_type(IntOrStrOrBytes2)  # revealed: UnionType
-reveal_type(IntOrStrOrBytes3)  # revealed: UnionType
-reveal_type(IntOrStrOrBytes4)  # revealed: UnionType
-reveal_type(BytesOrIntOrStr)  # revealed: UnionType
-reveal_type(IntOrNone)  # revealed: UnionType
-reveal_type(NoneOrInt)  # revealed: UnionType
-reveal_type(IntOrStrOrNone)  # revealed: UnionType
-reveal_type(NoneOrIntOrStr)  # revealed: UnionType
-reveal_type(IntOrAny)  # revealed: UnionType
-reveal_type(AnyOrInt)  # revealed: UnionType
-reveal_type(NoneOrAny)  # revealed: UnionType
-reveal_type(AnyOrNone)  # revealed: UnionType
-reveal_type(NeverOrAny)  # revealed: UnionType
-reveal_type(AnyOrNever)  # revealed: UnionType
-reveal_type(UnknownOrInt)  # revealed: UnionType
-reveal_type(IntOrUnknown)  # revealed: UnionType
+reveal_type(IntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes2)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes3)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes4)  # revealed: types.UnionType
+reveal_type(BytesOrIntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrNone)  # revealed: types.UnionType
+reveal_type(NoneOrInt)  # revealed: types.UnionType
+reveal_type(IntOrStrOrNone)  # revealed: types.UnionType
+reveal_type(NoneOrIntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrAny)  # revealed: types.UnionType
+reveal_type(AnyOrInt)  # revealed: types.UnionType
+reveal_type(NoneOrAny)  # revealed: types.UnionType
+reveal_type(AnyOrNone)  # revealed: types.UnionType
+reveal_type(NeverOrAny)  # revealed: types.UnionType
+reveal_type(AnyOrNever)  # revealed: types.UnionType
+reveal_type(UnknownOrInt)  # revealed: types.UnionType
+reveal_type(IntOrUnknown)  # revealed: types.UnionType
 
 def _(
     int_or_str: IntOrStr,
@@ -180,7 +180,7 @@ def _(my_list: MyList[int]):
 
 ListOrTuple = list[T] | tuple[T, ...]
 
-reveal_type(ListOrTuple)  # revealed: UnionType
+reveal_type(ListOrTuple)  # revealed: types.UnionType
 
 def _(list_or_tuple: ListOrTuple[int]):
     reveal_type(list_or_tuple)  # revealed: @Todo(Generic specialization of types.UnionType)
