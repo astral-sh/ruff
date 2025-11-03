@@ -8,7 +8,7 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table};
 use crate::suppression::FileSuppressionId;
@@ -23,7 +23,7 @@ use crate::types::string_annotation::{
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
-    infer_isolated_expression, protocol_class::ProtocolClass,
+    protocol_class::ProtocolClass,
 };
 use crate::{
     Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
@@ -2036,20 +2036,11 @@ fn report_invalid_assignment_with_message(
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     node: AnyNodeRef,
-    definition: Definition<'db>,
     target_ty: Type,
-    mut source_ty: Type<'db>,
+    source_ty: Type<'db>,
 ) {
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
-
-    if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
-        && let Some(value) = annotated_assignment.value(context.module())
-    {
-        // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
-        // error messages.
-        source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
-    }
 
     report_invalid_assignment_with_message(
         context,
