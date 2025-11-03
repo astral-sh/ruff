@@ -401,28 +401,20 @@ impl<'db> ConstrainedTypeVar<'db> {
                 lower = Type::Never;
             }
             Type::Intersection(intersection)
-                if intersection
-                    .positive(db)
-                    .iter()
-                    .find(|element| {
-                        element.as_typevar().is_some_and(|element_bound_typevar| {
-                            typevar.is_same_typevar_as(db, element_bound_typevar)
-                        })
+                if intersection.positive(db).iter().any(|element| {
+                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                        typevar.is_same_typevar_as(db, element_bound_typevar)
                     })
-                    .is_some() =>
+                }) =>
             {
                 lower = Type::Never;
             }
             Type::Intersection(intersection)
-                if intersection
-                    .negative(db)
-                    .iter()
-                    .find(|element| {
-                        element.as_typevar().is_some_and(|element_bound_typevar| {
-                            typevar.is_same_typevar_as(db, element_bound_typevar)
-                        })
+                if intersection.negative(db).iter().any(|element| {
+                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                        typevar.is_same_typevar_as(db, element_bound_typevar)
                     })
-                    .is_some() =>
+                }) =>
             {
                 return Node::AlwaysFalse;
             }
@@ -435,15 +427,11 @@ impl<'db> ConstrainedTypeVar<'db> {
                 upper = Type::object();
             }
             Type::Union(union)
-                if union
-                    .elements(db)
-                    .iter()
-                    .find(|element| {
-                        element.as_typevar().is_some_and(|element_bound_typevar| {
-                            typevar.is_same_typevar_as(db, element_bound_typevar)
-                        })
+                if union.elements(db).iter().any(|element| {
+                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                        typevar.is_same_typevar_as(db, element_bound_typevar)
                     })
-                    .is_some() =>
+                }) =>
             {
                 upper = Type::object();
             }
