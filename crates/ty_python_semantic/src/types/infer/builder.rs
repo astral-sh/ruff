@@ -8474,7 +8474,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(left_ty)
                 } else {
                     Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::from_elements(
+                        UnionTypeInstance::new(
                             self.db(),
                             convert_none_type(left_ty),
                             convert_none_type(right_ty),

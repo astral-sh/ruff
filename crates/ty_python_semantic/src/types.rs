@@ -7651,7 +7651,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         KnownInstanceType::UnionType(union_type) => {
             for element in union_type.elements(db) {
-                visitor.visit_type(db, *element);
+                visitor.visit_type(db, element);
             }
         }
     }
@@ -8907,27 +8907,22 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct UnionTypeInstance<'db> {
-    #[returns(deref)]
-    elements: Box<[Type<'db>; 2]>,
+    left: Type<'db>,
+    right: Type<'db>,
 }
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
 impl<'db> UnionTypeInstance<'db> {
-    pub(crate) fn from_elements(
-        db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
-    ) -> UnionTypeInstance<'db> {
-        UnionTypeInstance::new(db, Box::new([left, right]))
+    pub(crate) fn elements(self, db: &'db dyn Db) -> [Type<'db>; 2] {
+        [self.left(db), self.right(db)]
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let elements = self.elements(db);
-        UnionTypeInstance::from_elements(
+        UnionTypeInstance::new(
             db,
-            elements[0].normalized_impl(db, visitor),
-            elements[1].normalized_impl(db, visitor),
+            self.left(db).normalized_impl(db, visitor),
+            self.right(db).normalized_impl(db, visitor),
         )
     }
 }
